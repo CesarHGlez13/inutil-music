@@ -1,0 +1,833 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:bstream_music/core/platform/app_platform.dart';
+import 'package:bstream_music/core/theme/app_theme.dart';
+import 'package:bstream_music/services/storage/app_background_image_service.dart';
+import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+  const journalKey = 'settings.downloadDirectoryMigration.v1';
+  const downloadDirectoryKey = 'settings.downloadDirectory';
+
+  late Directory sandbox;
+  late String documentsPath;
+
+  test('iOS reconstructs its media root from the current app container', () {
+    expect(
+      downloadDirectoryForPlatform(
+        platform: AppPlatformType.ios,
+        candidateDirectory:
+            '/var/mobile/Containers/Data/Application/OLD/Documents/BStream Music',
+        defaultDirectory:
+            '/var/mobile/Containers/Data/Application/NEW/Documents/BStream Music',
+      ),
+      '/var/mobile/Containers/Data/Application/NEW/Documents/BStream Music',
+    );
+    expect(
+      downloadDirectoryForPlatform(
+        platform: AppPlatformType.android,
+        candidateDirectory: '/data/user/0/com.bstream/files/BStream Music',
+        defaultDirectory: '/data/user/0/com.bstream/files/default',
+      ),
+      '/data/user/0/com.bstream/files/BStream Music',
+    );
+  });
+
+  setUp(() async {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    sandbox = await Directory.systemTemp.createTemp(
+      'bstream-settings-startup-',
+    );
+    documentsPath = p.join(sandbox.path, 'documents');
+    await Directory(documentsPath).create(recursive: true);
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+          return switch (call.method) {
+            'getDownloadsDirectory' => null,
+            'getApplicationDocumentsDirectory' => documentsPath,
+            _ => null,
+          };
+        });
+  });
+
+  tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
+    if (await sandbox.exists()) {
+      await sandbox.delete(recursive: true);
+    }
+  });
+
+  test(
+    'LIVE widget style keeps the classic default and persists rapid selections',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final first = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(first.dispose);
+      expect(
+        (await first.read(settingsControllerProvider.future)).liveWidgetStyle,
+        LiveWidgetStyle.classic,
+      );
+      final settings = first.read(settingsControllerProvider.notifier);
+      await Future.wait([
+        settings.setLiveWidgetStyle(LiveWidgetStyle.wave),
+        settings.setLiveWidgetStyle(LiveWidgetStyle.classic),
+        settings.setLiveWidgetStyle(LiveWidgetStyle.wave),
+      ]);
+      expect(
+        first.read(settingsControllerProvider).value?.liveWidgetStyle,
+        LiveWidgetStyle.wave,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('settings.liveWidgetStyle'), 'wave');
+
+      final restored = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(restored.dispose);
+      expect(
+        (await restored.read(
+          settingsControllerProvider.future,
+        )).liveWidgetStyle,
+        LiveWidgetStyle.wave,
+      );
+      expect(LiveWidgetStyle.fromCode('future-style'), LiveWidgetStyle.classic);
+    },
+  );
+
+  test(
+    'audio quality visibility defaults off and preserves an explicit saved value',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final first = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      expect(
+        (await first.read(settingsControllerProvider.future)).showAudioQuality,
+        isFalse,
+      );
+      await first
+          .read(settingsControllerProvider.notifier)
+          .setShowAudioQuality(true);
+      expect(
+        first.read(settingsControllerProvider).value?.showAudioQuality,
+        isTrue,
+      );
+      first.dispose();
+
+      final second = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(second.dispose);
+      expect(
+        (await second.read(settingsControllerProvider.future)).showAudioQuality,
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'translation defaults off and persists mutually exclusive lyric modes',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      final initial = await container.read(settingsControllerProvider.future);
+      expect(initial.lyricsTranslationEnabled, isFalse);
+      final controller = container.read(settingsControllerProvider.notifier);
+      await Future.wait([
+        controller.setLyricsRomanizationEnabled(true),
+        controller.setLyricsTranslationEnabled(true),
+        controller.setLyricsRomanizationEnabled(true),
+        controller.setLyricsTranslationEnabled(true),
+      ]);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('settings.lyricsTranslationEnabled'), isTrue);
+      expect(prefs.getBool('settings.lyricsRomanizationEnabled'), isFalse);
+      expect(
+        container
+            .read(settingsControllerProvider)
+            .value
+            ?.lyricsTranslationEnabled,
+        isTrue,
+      );
+      // Resolve corrupt/concurrently written preferences without enabling both.
+      await prefs.setBool('settings.lyricsRomanizationEnabled', true);
+      final restored = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(restored.dispose);
+      final settings = await restored.read(settingsControllerProvider.future);
+      expect(settings.lyricsTranslationEnabled, isTrue);
+      expect(settings.lyricsRomanizationEnabled, isFalse);
+    },
+  );
+
+  test(
+    'iOS ignores an unusable Downloads location and initializes in Documents',
+    () async {
+      final downloadsPath = p.join(sandbox.path, 'Downloads');
+      var downloadsDirectoryRequests = 0;
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(pathProviderChannel, (call) async {
+            switch (call.method) {
+              case 'getDownloadsDirectory':
+                downloadsDirectoryRequests += 1;
+                return downloadsPath;
+              case 'getApplicationDocumentsDirectory':
+                return documentsPath;
+              default:
+                return null;
+            }
+          });
+      SharedPreferences.setMockInitialValues({});
+      final container = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final preferences = await SharedPreferences.getInstance();
+
+      expect(downloadsDirectoryRequests, 0);
+      expect(settings.downloadDirectory, expectedRoot);
+      expect(preferences.getString(downloadDirectoryKey), expectedRoot);
+      expect(await Directory(downloadsPath).exists(), isFalse);
+      expect(await Directory(p.join(expectedRoot, 'audio')).exists(), isTrue);
+      expect(
+        await Directory(p.join(expectedRoot, 'thumbnails')).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'iOS repairs a persisted Downloads root from an affected install',
+    () async {
+      final invalidRoot = p.normalize(
+        p.join(sandbox.path, 'Downloads', 'BStream-Music'),
+      );
+      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final database = _RecordingLocalDatabaseService();
+      SharedPreferences.setMockInitialValues({
+        downloadDirectoryKey: invalidRoot,
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+          databaseServiceProvider.overrideWithValue(database),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(database.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+      final preferences = await SharedPreferences.getInstance();
+
+      expect(settings.downloadDirectory, expectedRoot);
+      expect(preferences.getString(downloadDirectoryKey), expectedRoot);
+      expect(database.rewrites, <(String, String?)>[
+        (expectedRoot, invalidRoot),
+      ]);
+      expect(await Directory(invalidRoot).exists(), isFalse);
+      expect(await Directory(p.join(expectedRoot, 'audio')).exists(), isTrue);
+      expect(
+        await Directory(p.join(expectedRoot, 'thumbnails')).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test('startup restores the persisted capsule mini player mode', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.surfaceBackgroundMode': 'transparent',
+      'settings.miniPlayerMode': 'capsule',
+      'settings.miniPlayerBackgroundMode': 'transparent',
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+
+    expect(settings.surfaceBackgroundMode, SurfaceBackgroundMode.transparent);
+    expect(settings.miniPlayerMode, MiniPlayerMode.capsule);
+    expect(
+      settings.miniPlayerBackgroundMode,
+      MiniPlayerBackgroundMode.transparent,
+    );
+  });
+
+  test('startup restores persisted Liquid Glass surface backgrounds', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.surfaceBackgroundMode': 'liquidGlass',
+      'settings.miniPlayerMode': 'capsule',
+      'settings.miniPlayerBackgroundMode': 'liquidGlass',
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+
+    expect(settings.surfaceBackgroundMode, SurfaceBackgroundMode.liquidGlass);
+    expect(settings.miniPlayerMode, MiniPlayerMode.capsule);
+    expect(
+      settings.miniPlayerBackgroundMode,
+      MiniPlayerBackgroundMode.liquidGlass,
+    );
+  });
+
+  test('startup restores and persists the full player style', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.playerStyle': 'classicVinyl',
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+    expect(settings.playerStyle, PlayerStyle.classicVinyl);
+
+    await container
+        .read(settingsControllerProvider.notifier)
+        .setPlayerStyle(PlayerStyle.bstreamMusic);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('settings.playerStyle'), 'bstreamMusic');
+    expect(
+      container.read(settingsControllerProvider).value?.playerStyle,
+      PlayerStyle.bstreamMusic,
+    );
+  });
+
+  test(
+    'player font defaults to current and persists the selected family',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final first = ProviderContainer();
+      final initial = await first.read(settingsControllerProvider.future);
+      final preferences = await SharedPreferences.getInstance();
+
+      expect(initial.playerFont, PlayerFont.current);
+      expect(preferences.containsKey('settings.playerFont'), isFalse);
+
+      await first
+          .read(settingsControllerProvider.notifier)
+          .setPlayerFont(PlayerFont.lora);
+      expect(
+        preferences.getString('settings.playerFont'),
+        PlayerFont.lora.code,
+      );
+      expect(
+        first.read(settingsControllerProvider).value?.playerFont,
+        PlayerFont.lora,
+      );
+      first.dispose();
+
+      final second = ProviderContainer();
+      addTearDown(second.dispose);
+      expect(
+        (await second.read(settingsControllerProvider.future)).playerFont,
+        PlayerFont.lora,
+      );
+    },
+  );
+
+  test('custom app background survives restart and clears cleanly', () async {
+    SharedPreferences.setMockInitialValues({});
+    final photo = image.Image(width: 24, height: 16);
+    image.fill(photo, color: image.ColorRgb8(40, 90, 140));
+    final original = File(p.join(sandbox.path, 'selected-photo.png'));
+    final originalBytes = image.encodePng(photo);
+    await original.writeAsBytes(originalBytes);
+    final service = AppBackgroundImageService(
+      supportDirectoryProvider: () async => sandbox,
+    );
+
+    ProviderContainer container() => ProviderContainer(
+      overrides: [
+        settingsControllerProvider.overrideWith(
+          () => SettingsController.forPlatform(AppPlatformType.ios),
+        ),
+        appBackgroundImageServiceProvider.overrideWithValue(service),
+      ],
+    );
+
+    final first = container();
+    await first.read(settingsControllerProvider.future);
+    await first
+        .read(settingsControllerProvider.notifier)
+        .setAppBackgroundPhoto(original);
+    final saved = first.read(settingsControllerProvider).value!;
+    final preferences = await SharedPreferences.getInstance();
+    final storedName = preferences.getString('settings.appBackgroundFileName');
+    final savedPath = saved.appBackgroundPath;
+
+    expect(storedName, saved.appBackgroundFileName);
+    expect(storedName, matches(RegExp(r'^background_\d+_\d+\.jpg$')));
+    expect(p.isAbsolute(storedName!), isFalse);
+    expect(savedPath, p.join(sandbox.path, 'app_backgrounds', storedName));
+    expect(await File(savedPath!).exists(), isTrue);
+    expect(await original.readAsBytes(), originalBytes);
+    first.dispose();
+
+    final restarted = container();
+    final restored = await restarted.read(settingsControllerProvider.future);
+    expect(restored.appBackgroundFileName, storedName);
+    expect(restored.appBackgroundPath, savedPath);
+
+    await restarted
+        .read(settingsControllerProvider.notifier)
+        .clearAppBackgroundPhoto();
+    expect(preferences.containsKey('settings.appBackgroundFileName'), isFalse);
+    expect(
+      restarted.read(settingsControllerProvider).value!.appBackgroundPath,
+      isNull,
+    );
+    expect(await File(savedPath).exists(), isFalse);
+    restarted.dispose();
+
+    final cleared = container();
+    addTearDown(cleared.dispose);
+    expect(
+      (await cleared.read(settingsControllerProvider.future)).appBackgroundPath,
+      isNull,
+    );
+  });
+
+  test('startup restores and persists the player artwork style', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.playerArtworkStyle': 'expanded',
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+    expect(settings.playerArtworkStyle, PlayerArtworkStyle.expanded);
+
+    await container
+        .read(settingsControllerProvider.notifier)
+        .setPlayerArtworkStyle(PlayerArtworkStyle.classic);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('settings.playerArtworkStyle'), 'classic');
+    expect(
+      container.read(settingsControllerProvider).value?.playerArtworkStyle,
+      PlayerArtworkStyle.classic,
+    );
+  });
+
+  test('startup restores and persists skip silence', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.skipSilenceEnabled': true,
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+    expect(settings.skipSilenceEnabled, isTrue);
+
+    await container
+        .read(settingsControllerProvider.notifier)
+        .setSkipSilenceEnabled(false);
+
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getBool('settings.skipSilenceEnabled'), isFalse);
+    expect(
+      container.read(settingsControllerProvider).value?.skipSilenceEnabled,
+      isFalse,
+    );
+  });
+
+  test(
+    'animated artwork defaults on and restores an explicit choice',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final freshContainer = ProviderContainer();
+      await freshContainer.read(settingsControllerProvider.future);
+      final freshPreferences = await SharedPreferences.getInstance();
+
+      expect(
+        freshContainer
+            .read(settingsControllerProvider)
+            .value
+            ?.animatedArtworkEnabled,
+        isTrue,
+      );
+      expect(
+        freshPreferences.containsKey('settings.animatedArtworkEnabled'),
+        isFalse,
+      );
+      freshContainer.dispose();
+
+      SharedPreferences.setMockInitialValues({
+        'settings.animatedArtworkEnabled': false,
+      });
+      final restoredContainer = ProviderContainer();
+      addTearDown(restoredContainer.dispose);
+
+      final restored = await restoredContainer.read(
+        settingsControllerProvider.future,
+      );
+      expect(restored.animatedArtworkEnabled, isFalse);
+
+      await restoredContainer
+          .read(settingsControllerProvider.notifier)
+          .setAnimatedArtworkEnabled(true);
+
+      final restoredPreferences = await SharedPreferences.getInstance();
+      expect(
+        restoredPreferences.getBool('settings.animatedArtworkEnabled'),
+        isTrue,
+      );
+      expect(
+        restoredContainer
+            .read(settingsControllerProvider)
+            .value
+            ?.animatedArtworkEnabled,
+        isTrue,
+      );
+    },
+  );
+
+  test('fresh Android startup uses the accent capsule defaults', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(settings.surfaceBackgroundMode, SurfaceBackgroundMode.accent);
+    expect(settings.playerStyle, PlayerStyle.bstreamMusic);
+    expect(settings.playerArtworkStyle, PlayerArtworkStyle.classic);
+    expect(settings.animatedArtworkEnabled, isTrue);
+    expect(settings.miniPlayerMode, MiniPlayerMode.capsule);
+    expect(settings.miniPlayerBackgroundMode, MiniPlayerBackgroundMode.accent);
+    expect(preferences.containsKey('settings.surfaceBackgroundMode'), isFalse);
+    expect(preferences.containsKey('settings.playerStyle'), isFalse);
+    expect(preferences.containsKey('settings.playerArtworkStyle'), isFalse);
+    expect(preferences.containsKey('settings.animatedArtworkEnabled'), isFalse);
+    expect(preferences.containsKey('settings.miniPlayerMode'), isFalse);
+    expect(
+      preferences.containsKey('settings.miniPlayerBackgroundMode'),
+      isFalse,
+    );
+    expect(settings.localMusicFilters, defaultLocalMusicFilters);
+    expect(settings.localMusicFilters, {
+      LocalMusicFilter.hideWhatsAppAudio,
+      LocalMusicFilter.hideTelegramAudio,
+      LocalMusicFilter.hideAudioRecordings,
+      LocalMusicFilter.hideTracksUnder30Seconds,
+    });
+    expect(preferences.containsKey('settings.localMusicFilters'), isFalse);
+  });
+
+  test('fresh Linux startup uses the classic mini player default', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    SharedPreferences.setMockInitialValues({});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(settings.miniPlayerMode, MiniPlayerMode.standard);
+    expect(preferences.containsKey('settings.miniPlayerMode'), isFalse);
+  });
+
+  test('startup restores the selected local music filters', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings.localMusicFilters': [
+        LocalMusicFilter.hideWhatsAppAudio.code,
+        LocalMusicFilter.hideTelegramAudio.code,
+        'futureFilter',
+      ],
+    });
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+
+    final settings = await container.read(settingsControllerProvider.future);
+
+    expect(settings.localMusicFilters, {
+      LocalMusicFilter.hideWhatsAppAudio,
+      LocalMusicFilter.hideTelegramAudio,
+    });
+  });
+
+  test('an explicitly empty local music filter list stays empty', () async {
+    SharedPreferences.setMockInitialValues({});
+    final firstContainer = ProviderContainer();
+    await firstContainer.read(settingsControllerProvider.future);
+    await firstContainer
+        .read(settingsControllerProvider.notifier)
+        .setLocalMusicFilters(const <LocalMusicFilter>{});
+    final preferences = await SharedPreferences.getInstance();
+
+    expect(preferences.getStringList('settings.localMusicFilters'), isEmpty);
+    firstContainer.dispose();
+
+    final restoredContainer = ProviderContainer();
+    addTearDown(restoredContainer.dispose);
+
+    final restored = await restoredContainer.read(
+      settingsControllerProvider.future,
+    );
+    expect(restored.localMusicFilters, isEmpty);
+  });
+
+  test(
+    'startup preserves an explicitly persisted classic artwork style',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'settings.surfaceBackgroundMode': 'transparent',
+        'settings.miniPlayerMode': 'default',
+        'settings.miniPlayerBackgroundMode': 'artwork',
+      });
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+
+      expect(settings.surfaceBackgroundMode, SurfaceBackgroundMode.transparent);
+      expect(settings.miniPlayerMode, MiniPlayerMode.standard);
+      expect(
+        settings.miniPlayerBackgroundMode,
+        MiniPlayerBackgroundMode.artwork,
+      );
+    },
+  );
+
+  test(
+    'startup quarantines a semantically invalid migration journal',
+    () async {
+      final currentRoot = p.join(documentsPath, 'BStream-Music');
+      final sourceRoot = p.join(sandbox.path, 'migration-source');
+      final targetRoot = p.join(sandbox.path, 'migration-target');
+      final unrelatedReference = p.join(sandbox.path, 'unrelated-reference');
+      for (final path in [sourceRoot, targetRoot, unrelatedReference]) {
+        await Directory(path).create(recursive: true);
+      }
+      SharedPreferences.setMockInitialValues({
+        downloadDirectoryKey: currentRoot,
+        journalKey: jsonEncode(<String, Object?>{
+          'version': 1,
+          'sourceRoot': sourceRoot,
+          'targetRoot': targetRoot,
+          // This is structurally valid but must never be allowed to rewrite
+          // database rows belonging to a root other than the source.
+          'referenceSourceRoot': unrelatedReference,
+        }),
+      });
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+      final prefs = await SharedPreferences.getInstance();
+
+      expect(settings.downloadDirectory, p.normalize(currentRoot));
+      expect(prefs.containsKey(journalKey), isFalse);
+      expect(prefs.getString(downloadDirectoryKey), p.normalize(currentRoot));
+      expect(await Directory(p.join(currentRoot, 'audio')).exists(), isTrue);
+      expect(
+        await Directory(p.join(currentRoot, 'thumbnails')).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'iOS rebases an unreachable journal instead of recreating its old sandbox',
+    () async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      final oldContainer = p.join(
+        sandbox.path,
+        '11111111-1111-1111-1111-111111111111',
+      );
+      final oldRoot = p.join(oldContainer, 'Documents', 'BStream-Music');
+      final oldTarget = p.join(oldContainer, 'Documents', 'alternate-media');
+      final currentRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final database = _RecordingLocalDatabaseService();
+      SharedPreferences.setMockInitialValues({
+        downloadDirectoryKey: oldRoot,
+        journalKey: jsonEncode(<String, Object?>{
+          'version': 1,
+          'sourceRoot': oldRoot,
+          'targetRoot': oldTarget,
+          'referenceSourceRoot': oldRoot,
+        }),
+      });
+
+      final container = ProviderContainer(
+        overrides: [
+          settingsControllerProvider.overrideWith(
+            () => SettingsController.forPlatform(AppPlatformType.ios),
+          ),
+          databaseServiceProvider.overrideWithValue(database),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(database.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+      final prefs = await SharedPreferences.getInstance();
+
+      expect(settings.downloadDirectory, currentRoot);
+      expect(prefs.getString(downloadDirectoryKey), currentRoot);
+      expect(prefs.containsKey(journalKey), isFalse);
+      expect(database.rewrites, <(String, String?)>[(currentRoot, oldRoot)]);
+      expect(await Directory(oldRoot).exists(), isFalse);
+      expect(await Directory(oldTarget).exists(), isFalse);
+      expect(await Directory(p.join(currentRoot, 'audio')).exists(), isTrue);
+      expect(
+        await Directory(p.join(currentRoot, 'thumbnails')).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'startup replaces a persisted filesystem root without migrating it',
+    () async {
+      final filesystemRoot = p.rootPrefix(sandbox.path);
+      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final database = _BlockingLocalDatabaseService();
+      SharedPreferences.setMockInitialValues({
+        downloadDirectoryKey: filesystemRoot,
+      });
+
+      final container = ProviderContainer(
+        overrides: [databaseServiceProvider.overrideWithValue(database)],
+      );
+      addTearDown(container.dispose);
+      addTearDown(database.dispose);
+
+      final settings = await container.read(settingsControllerProvider.future);
+      final prefs = await SharedPreferences.getInstance();
+
+      expect(settings.downloadDirectory, expectedRoot);
+      expect(prefs.getString(downloadDirectoryKey), expectedRoot);
+      expect(prefs.containsKey(journalKey), isFalse);
+      expect(database.rewriteCalls, 0);
+      expect(await Directory(p.join(expectedRoot, 'audio')).exists(), isTrue);
+      expect(
+        await Directory(p.join(expectedRoot, 'thumbnails')).exists(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'directory migration merges its result into the latest settings state',
+    () async {
+      final currentRoot = p.join(documentsPath, 'BStream-Music');
+      final targetRoot = p.join(sandbox.path, 'new-download-root');
+      final database = _BlockingLocalDatabaseService();
+      SharedPreferences.setMockInitialValues({
+        downloadDirectoryKey: currentRoot,
+      });
+
+      final container = ProviderContainer(
+        overrides: [databaseServiceProvider.overrideWithValue(database)],
+      );
+      addTearDown(container.dispose);
+      addTearDown(database.dispose);
+      await container.read(settingsControllerProvider.future);
+      final controller = container.read(settingsControllerProvider.notifier);
+
+      final migration = controller.setDownloadDirectory(targetRoot);
+      await database.rewriteStarted.future;
+      await controller.setThemeMode(AppThemeMode.dark);
+      database.allowRewrite.complete();
+      await migration;
+
+      final settings = container.read(settingsControllerProvider).requireValue;
+      expect(settings.downloadDirectory, p.normalize(targetRoot));
+      expect(settings.themeMode, AppThemeMode.dark);
+    },
+  );
+}
+
+class _BlockingLocalDatabaseService extends LocalDatabaseService {
+  final rewriteStarted = Completer<void>();
+  final allowRewrite = Completer<void>();
+  int rewriteCalls = 0;
+
+  @override
+  Future<LocalTrackMediaRootRewrite> rewriteLocalTrackMediaRootWithSnapshot({
+    required String mediaRoot,
+    String? oldMediaRoot,
+    String? canonicalOldMediaRoot,
+  }) async {
+    rewriteCalls++;
+    if (!rewriteStarted.isCompleted) {
+      rewriteStarted.complete();
+    }
+    await allowRewrite.future;
+    return LocalTrackMediaRootRewrite(const <LocalTrackMediaPathSnapshot>[]);
+  }
+}
+
+class _RecordingLocalDatabaseService extends LocalDatabaseService {
+  final rewrites = <(String, String?)>[];
+
+  @override
+  Future<void> rewriteLocalTrackMediaRoot({
+    required String mediaRoot,
+    String? oldMediaRoot,
+  }) async {
+    rewrites.add((mediaRoot, oldMediaRoot));
+  }
+}

@@ -1,0 +1,280 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
+
+import 'package:bstream_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  group('ArtworkProgressColorService', () {
+    test(
+      'uses the shared fallback for null, empty, and invalid sources',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'bstream-artwork-progress-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final service = ArtworkProgressColorService();
+        final invalidPath = File(
+          '${directory.path}${Platform.pathSeparator}missing-artwork.png',
+        ).path;
+
+        for (final source in <String?>[null, '', '   ', invalidPath]) {
+          expect(
+            await service.resolve(source),
+            ArtworkProgressColor.fallback,
+            reason: 'Unexpected color for source: $source',
+          );
+        }
+      },
+    );
+
+    test(
+      'deduplicates concurrent requests for the same normalized source',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'bstream-artwork-progress-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final service = ArtworkProgressColorService();
+        final source = File(
+          '${directory.path}${Platform.pathSeparator}missing-artwork.png',
+        ).path;
+
+        final first = service.resolve('  $source  ');
+        final second = service.resolve(source);
+
+        expect(second, same(first));
+        expect(
+          await Future.wait(<Future<Color>>[first, second]),
+          everyElement(ArtworkProgressColor.fallback),
+        );
+      },
+    );
+
+    test('serves extracted colors from cache until it is cleared', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'bstream-artwork-progress-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final artwork = await _writeSolidPng(
+        directory,
+        'artwork.png',
+        Colors.red,
+      );
+      final service = ArtworkProgressColorService(maximumCacheEntries: 2);
+
+      final extracted = await service.resolve(artwork.path);
+      expect(extracted, isNot(ArtworkProgressColor.fallback));
+
+      await artwork.delete();
+      expect(await service.resolve(artwork.path), extracted);
+
+      service.clearCache();
+      expect(
+        await service.resolve(artwork.path),
+        ArtworkProgressColor.fallback,
+      );
+    });
+
+    test(
+      'menu sampling preserves grayscale without changing progress sampling',
+      () async {
+        final directory = await Directory.systemTemp.createTemp(
+          'bstream-menu-gray-',
+        );
+        addTearDown(() => directory.delete(recursive: true));
+        final artwork = await _writeSolidPng(
+          directory,
+          'gray.png',
+          Colors.grey,
+        );
+        final menuService = ArtworkProgressColorService(
+          preserveSourceSaturation: true,
+        );
+        final progressService = ArtworkProgressColorService();
+        addTearDown(menuService.dispose);
+        addTearDown(progressService.dispose);
+        final menuColor = await menuService.resolve(artwork.path);
+        expect(menuColor.r, menuColor.g);
+        expect(menuColor.g, menuColor.b);
+        expect(
+          HSLColor.fromColor(
+            await progressService.resolve(artwork.path),
+          ).saturation,
+          closeTo(.28, .02),
+        );
+      },
+    );
+
+    test('decodes local artwork through the bounded 32 px cache key', () async {
+      final directory = await Directory.systemTemp.createTemp(
+        'bstream-artwork-progress-',
+      );
+      addTearDown(() => directory.delete(recursive: true));
+      final artwork = await _writeSolidPng(
+        directory,
+        'large-local-artwork.png',
+        Colors.deepPurple,
+        dimension: 256,
+      );
+      final imageCache = PaintingBinding.instance.imageCache;
+      imageCache
+        ..clear()
+        ..clearLiveImages();
+      addTearDown(() {
+        imageCache
+          ..clear()
+          ..clearLiveImages();
+      });
+      final configuration = const ImageConfiguration(size: Size.square(32));
+      final resizedKey = await ResizeImage(
+        FileImage(artwork),
+        width: 32,
+      ).obtainKey(configuration);
+      final fullSizeKey = await FileImage(artwork).obtainKey(configuration);
+      final service = ArtworkProgressColorService();
+      addTearDown(service.dispose);
+
+      expect(
+        await service.resolve(artwork.path),
+        isNot(ArtworkProgressColor.fallback),
+      );
+
+      final resizedStatus = imageCache.statusForKey(resizedKey);
+      expect(
+        resizedStatus.pending || resizedStatus.live || resizedStatus.keepAlive,
+        isTrue,
+      );
+      final fullSizeStatus = imageCache.statusForKey(fullSizeKey);
+      expect(
+        fullSizeStatus.pending ||
+            fullSizeStatus.live ||
+            fullSizeStatus.keepAlive,
+        isFalse,
+      );
+    });
+
+    testWidgets(
+      'keeps a shared lookup alive until its final lease is released',
+      (tester) async {
+        final service = ArtworkProgressColorService(
+          imageProviderForSource: (_) => _HangingImageProvider(),
+        );
+        addTearDown(service.dispose);
+
+        final first = service.acquire(' https://example.com/cover.jpg ');
+        final second = service.acquire('https://example.com/cover.jpg');
+        var completed = false;
+        second.future.then((_) => completed = true);
+
+        expect(second.future, same(first.future));
+        first.release();
+        await tester.pump();
+        expect(completed, isFalse);
+
+        second.release();
+        await tester.pump();
+        expect(await second.future, ArtworkProgressColor.fallback);
+        expect(completed, isTrue);
+      },
+    );
+  });
+
+  group('artwork progress color providers', () {
+    test(
+      'expose the service and delegate family lookups without changing source',
+      () async {
+        const expected = Color(0xFF7B8DFF);
+        final service = _RecordingArtworkProgressColorService(expected);
+        final container = ProviderContainer(
+          overrides: [
+            artworkProgressColorServiceProvider.overrideWithValue(service),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        expect(
+          container.read(artworkProgressColorServiceProvider),
+          same(service),
+        );
+        expect(
+          await container.read(
+            artworkProgressColorProvider(' artwork-source ').future,
+          ),
+          expected,
+        );
+        expect(service.sources, <String?>[' artwork-source ']);
+      },
+    );
+
+    test('family provider preserves the fallback for a null source', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(
+        await container.read(artworkProgressColorProvider(null).future),
+        ArtworkProgressColor.fallback,
+      );
+    });
+  });
+}
+
+Future<File> _writeSolidPng(
+  Directory directory,
+  String name,
+  Color color, {
+  int dimension = 4,
+}) async {
+  final recorder = ui.PictureRecorder();
+  final canvas = ui.Canvas(recorder);
+  canvas.drawRect(
+    ui.Rect.fromLTWH(0, 0, dimension.toDouble(), dimension.toDouble()),
+    ui.Paint()..color = color,
+  );
+  final picture = recorder.endRecording();
+  final image = await picture.toImage(dimension, dimension);
+  picture.dispose();
+  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+  image.dispose();
+  if (bytes == null) {
+    throw StateError('Could not encode artwork fixture.');
+  }
+
+  final file = File('${directory.path}${Platform.pathSeparator}$name');
+  await file.writeAsBytes(bytes.buffer.asUint8List(), flush: true);
+  return file;
+}
+
+class _RecordingArtworkProgressColorService
+    extends ArtworkProgressColorService {
+  _RecordingArtworkProgressColorService(this.color);
+
+  final Color color;
+  final List<String?> sources = <String?>[];
+
+  @override
+  ArtworkProgressColorLease acquire(String? rawSource) {
+    sources.add(rawSource);
+    return ArtworkProgressColorLease(future: Future<Color>.value(color));
+  }
+}
+
+class _HangingImageProvider extends ImageProvider<_HangingImageProvider> {
+  @override
+  Future<_HangingImageProvider> obtainKey(ImageConfiguration configuration) =>
+      SynchronousFuture<_HangingImageProvider>(this);
+
+  @override
+  ImageStreamCompleter loadImage(
+    _HangingImageProvider key,
+    ImageDecoderCallback decode,
+  ) {
+    return OneFrameImageStreamCompleter(Completer<ImageInfo>().future);
+  }
+}

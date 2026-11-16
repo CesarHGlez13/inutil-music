@@ -1,0 +1,1760 @@
+import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
+import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_engine.dart';
+import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_models.dart';
+import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_store.dart';
+import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_three_way_merger.dart';
+import 'package:bstream_music/services/youtube_music/playlist_sync/youtube_music_playlist_gateway.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  group('PlaylistThreeWayMerger', () {
+    var nextId = 0;
+    late PlaylistThreeWayMerger merger;
+    setUp(() {
+      nextId = 0;
+      merger = PlaylistThreeWayMerger(itemIdFactory: () => 'new-${nextId++}');
+    });
+
+    test('initial union preserves duplicates without doubling overlap', () {
+      final local = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'local-a1'),
+        _item('A', localId: 'local-a2'),
+      ]);
+      final remote = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'set-a1'),
+      ]);
+
+      final result = merger.merge(base: null, local: local, remote: remote);
+
+      expect(result.hasConflicts, isFalse);
+      expect(result.snapshot!.items, hasLength(2));
+      expect(result.snapshot!.items.map((item) => item.localItemId), <String?>[
+        'local-a1',
+        'local-a2',
+      ]);
+      expect(result.snapshot!.items.first.setVideoId, 'set-a1');
+    });
+
+    test(
+      'deletion wins over reorder and additions from both sides survive',
+      () {
+        final base = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+          _item('B', localId: 'b', setId: 'sb'),
+        ]);
+        final local = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+          _item('L', localId: 'l'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+          _item('B', setId: 'sb'),
+          _item('R', setId: 'sr'),
+        ]);
+
+        final merged = merger.merge(base: base, local: local, remote: remote);
+
+        expect(merged.hasConflicts, isFalse);
+        expect(
+          merged.snapshot!.items.map((item) => item.videoId).toSet(),
+          <String>{_video('A'), _video('L'), _video('R')},
+        );
+        expect(
+          merged.snapshot!.items.map((item) => item.videoId),
+          isNot(contains(_video('B'))),
+        );
+      },
+    );
+
+    test('same-video duplicates are deleted by occurrence identity', () {
+      final base = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a1', setId: 'set-1'),
+        _item('A', localId: 'a2', setId: 'set-2'),
+      ]);
+      final local = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a2', setId: 'set-2'),
+      ]);
+      final remote = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'set-1'),
+        _item('A', setId: 'set-2'),
+      ]);
+
+      final merged = merger.merge(base: base, local: local, remote: remote);
+
+      expect(merged.snapshot!.items, hasLength(1));
+      expect(merged.snapshot!.items.single.localItemId, 'a2');
+      expect(merged.snapshot!.items.single.setVideoId, 'set-2');
+    });
+
+    test('reports incompatible title and order changes', () {
+      final base = _snapshot('Base', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+        _item('B', localId: 'b', setId: 'sb'),
+        _item('C', localId: 'c', setId: 'sc'),
+      ]);
+      final local = _snapshot('Local', <PlaylistSyncItem>[
+        _item('B', localId: 'b'),
+        _item('A', localId: 'a'),
+        _item('C', localId: 'c'),
+      ]);
+      final remote = _snapshot('Remote', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+        _item('C', setId: 'sc'),
+        _item('B', setId: 'sb'),
+      ]);
+
+      final result = merger.merge(base: base, local: local, remote: remote);
+
+      expect(
+        result.conflicts.map((conflict) => conflict.kind),
+        containsAll(<PlaylistSyncConflictKind>{
+          PlaylistSyncConflictKind.title,
+          PlaylistSyncConflictKind.order,
+        }),
+      );
+    });
+
+    test('Liked Music order and title churn does not create a conflict', () {
+      final base = _snapshot('Liked Music', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+        _item('B', localId: 'b', setId: 'sb'),
+        _item('C', localId: 'c', setId: 'sc'),
+      ]);
+      final local = _snapshot('Liked Music', <PlaylistSyncItem>[
+        _item('B', localId: 'b'),
+        _item('A', localId: 'a'),
+        _item('C', localId: 'c'),
+        _item('D', localId: 'd'),
+      ]);
+      final remote = _snapshot('Liked Music', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+        _item('C', setId: 'sc'),
+        _item('B', setId: 'sb'),
+        _item('E', setId: 'se'),
+      ]);
+
+      final result = merger.merge(
+        base: base,
+        local: local,
+        remote: remote,
+        ignoreTitleConflicts: true,
+        ignoreOrderConflicts: true,
+      );
+
+      expect(result.hasConflicts, isFalse);
+      expect(
+        result.snapshot!.items.map((item) => item.videoId).toSet(),
+        <String>{
+          _video('A'),
+          _video('B'),
+          _video('C'),
+          _video('D'),
+          _video('E'),
+        },
+      );
+    });
+
+    test('local-only entries remain local and outside remote projection', () {
+      final localOnly = PlaylistSyncItem(
+        localItemId: 'local-file',
+        localTrackId: 'download',
+        track: CatalogTrack.local(localTrackId: 'download', title: 'File'),
+      );
+      final merged = merger.merge(
+        base: _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]),
+        local: _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a'),
+          localOnly,
+        ]),
+        remote: _snapshot('Road', <PlaylistSyncItem>[_item('A', setId: 'sa')]),
+      );
+
+      expect(merged.snapshot!.items, contains(localOnly));
+      expect(merged.snapshot!.remoteProjection.items, hasLength(1));
+    });
+  });
+
+  group('PlaylistSyncEngine', () {
+    final now = DateTime.utc(2026, 8, 22, 12);
+
+    test(
+      'Favorites use like endpoints instead of editing the LM playlist',
+      () async {
+        final base = _snapshot('Liked Music', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'set-a'),
+        ]);
+        final local = _snapshot('Favoritos', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'set-a'),
+          _item('B', localId: 'b'),
+        ]);
+        final remoteBefore = _snapshot('Liked Music', <PlaylistSyncItem>[
+          _item('A', setId: 'set-a'),
+        ]);
+        final remoteAfter = _snapshot('Liked Music', <PlaylistSyncItem>[
+          _item('B', setId: 'set-b'),
+          _item('A', setId: 'set-a'),
+        ]);
+        final key = const PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 2,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            base: base,
+            local: local,
+            localRevision: 2,
+            localDeleted: false,
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[remoteBefore, remoteAfter]);
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 1);
+        expect(gateway.mutationCount, 0);
+        expect(
+          gateway.likedDesired!.items.map((item) => item.videoId),
+          contains(_video('B')),
+        );
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test(
+      'concurrent likes keep one favorite and its downloaded identity',
+      () async {
+        final a = _item('A', localId: 'a', setId: 'set-a');
+        final downloadedB = _item(
+          'B',
+          localId: 'local-b',
+        ).copyWith(localTrackId: 'download-b');
+        const key = PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            base: _snapshot('Liked Music', <PlaylistSyncItem>[a]),
+            local: _snapshot('Favoritos', <PlaylistSyncItem>[a, downloadedB]),
+            localRevision: 2,
+            localDeleted: false,
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.add(
+            _snapshot('Liked Music', <PlaylistSyncItem>[
+              _item('B', setId: 'remote-b'),
+              _item('A', setId: 'set-a'),
+            ]),
+          );
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 0);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.local.items, hasLength(2));
+        final b = store.work.local.items.singleWhere(
+          (item) => item.videoId == _video('B'),
+        );
+        expect(b.localItemId, 'local-b');
+        expect(b.localTrackId, 'download-b');
+        expect(b.setVideoId, 'remote-b');
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test(
+      'first link unions imported favorites and preserves local-only files',
+      () async {
+        final downloadedA = _item(
+          'A',
+          localId: 'a',
+        ).copyWith(localTrackId: 'download-a');
+        final localOnly = PlaylistSyncItem(
+          localItemId: 'offline-item',
+          localTrackId: 'offline-file',
+          track: CatalogTrack.local(
+            localTrackId: 'offline-file',
+            title: 'Offline recording',
+          ),
+        );
+        const key = PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 0,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            local: _snapshot('Favoritos', <PlaylistSyncItem>[
+              downloadedA,
+              _item('B', localId: 'imported-b'),
+              localOnly,
+            ]),
+            localRevision: 3,
+            localDeleted: false,
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot>[
+            _snapshot('Liked Music', <PlaylistSyncItem>[
+              _item('C', setId: 'remote-c'),
+              _item('A', setId: 'remote-a'),
+            ]),
+            _snapshot('Liked Music', <PlaylistSyncItem>[
+              _item('B', setId: 'remote-b'),
+              _item('C', setId: 'remote-c'),
+              _item('A', setId: 'remote-a'),
+            ]),
+          ]);
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 1);
+        expect(gateway.mutationCount, 0);
+        expect(
+          gateway.likedDesired!.items.map((item) => item.videoId).toSet(),
+          <String>{_video('A'), _video('B'), _video('C')},
+        );
+        expect(store.work.local.items, hasLength(4));
+        expect(
+          store.work.local.items
+              .singleWhere((item) => item.videoId == _video('A'))
+              .localTrackId,
+          'download-a',
+        );
+        expect(
+          store.work.local.items
+              .singleWhere((item) => item.videoId == null)
+              .localTrackId,
+          'offline-file',
+        );
+      },
+    );
+
+    test('Favorites ignore server reordering after a like', () async {
+      final a = _item('A', localId: 'a', setId: 'set-a');
+      final b = _item('B', localId: 'b', setId: 'set-b');
+      final key = const PlaylistSyncKey(
+        accountKey: 'account',
+        playlistId: 'bstream:favorites',
+      );
+      final store = _MemoryStore(
+        PlaylistSyncWork(
+          binding: PlaylistSyncBinding(
+            key: key,
+            remotePlaylistId: 'LM',
+            mode: PlaylistSyncMode.automatic,
+            localRevisionAtBase: 1,
+            createdAt: now,
+            updatedAt: now,
+          ),
+          base: _snapshot('Liked Music', <PlaylistSyncItem>[a, b]),
+          local: _snapshot('Favoritos', <PlaylistSyncItem>[a, b]),
+          localRevision: 1,
+          localDeleted: false,
+        ),
+      );
+      final gateway = _FakeLikedGateway()
+        ..fetches.add(_snapshot('Liked Music', <PlaylistSyncItem>[b, a]));
+
+      final result = await _engine(store, gateway, now).sync(key);
+
+      expect(result.disposition, PlaylistSyncDisposition.synchronized);
+      expect(gateway.likedMutationCount, 0);
+      expect(gateway.mutationCount, 0);
+    });
+
+    test(
+      'Favorites keep local identity when YouTube reuses a setVideoId',
+      () async {
+        final videoA = _video('A');
+        final videoB = _video('B');
+        final localTrackA = CatalogTrack.youtube(
+          videoId: videoA,
+          title: 'Local metadata A',
+          artists: const <String>['Local artist A'],
+          album: 'Local album A',
+        );
+        final localA = PlaylistSyncItem(
+          localItemId: 'local-a',
+          localTrackId: 'download-a',
+          videoId: videoA,
+          setVideoId: 'set-old',
+          track: localTrackA,
+        );
+        final remoteB = PlaylistSyncItem(
+          videoId: videoB,
+          setVideoId: 'set-old',
+          track: CatalogTrack.youtube(
+            videoId: videoB,
+            title: 'Remote metadata B',
+            artists: const <String>['Remote artist B'],
+            album: 'Remote album B',
+          ),
+        );
+        final remoteA = PlaylistSyncItem(
+          videoId: videoA,
+          setVideoId: 'set-new',
+          track: CatalogTrack.youtube(videoId: videoA, title: ''),
+        );
+        const key = PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final local = PlaylistSyncSnapshot(
+          remotePlaylistId: 'LM',
+          title: 'Favoritos',
+          items: <PlaylistSyncItem>[localA],
+        );
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 1,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            base: local,
+            local: local,
+            localRevision: 1,
+            localDeleted: false,
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.add(
+            PlaylistSyncSnapshot(
+              remotePlaylistId: 'LM',
+              title: 'Liked Music',
+              items: <PlaylistSyncItem>[remoteB, remoteA],
+            ),
+          );
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 0);
+        expect(gateway.mutationCount, 0);
+        expect(store.commits, 1);
+        expect(store.conflicts, 0);
+        expect(store.work.intent, isNull);
+
+        final synchronizedA = store.work.local.items.singleWhere(
+          (item) => item.videoId == videoA,
+        );
+        expect(synchronizedA.localItemId, 'local-a');
+        expect(synchronizedA.localTrackId, 'download-a');
+        expect(synchronizedA.setVideoId, 'set-new');
+        expect(synchronizedA.track.title, 'Local metadata A');
+        expect(synchronizedA.track.artists, const <String>['Local artist A']);
+        expect(synchronizedA.track.album, 'Local album A');
+
+        final synchronizedB = store.work.local.items.singleWhere(
+          (item) => item.videoId == videoB,
+        );
+        expect(synchronizedB.localItemId, isNot('local-a'));
+        expect(synchronizedB.localTrackId, isNull);
+        expect(synchronizedB.setVideoId, 'set-old');
+        expect(synchronizedB.track.title, 'Remote metadata B');
+        expect(synchronizedB.track.artists, const <String>['Remote artist B']);
+        expect(synchronizedB.track.album, 'Remote album B');
+      },
+    );
+
+    test(
+      'an ambiguous favorite like is confirmed despite server reordering',
+      () async {
+        final a = _item('A', localId: 'a', setId: 'set-a');
+        final b = _item('B', localId: 'b', setId: 'set-b');
+        final desired = _snapshot('Favoritos', <PlaylistSyncItem>[a, b]);
+        final key = const PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 2,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            base: _snapshot('Liked Music', <PlaylistSyncItem>[a]),
+            local: desired,
+            localRevision: 2,
+            localDeleted: false,
+            intent: _ambiguousIntent(desired, now),
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.add(_snapshot('Liked Music', <PlaylistSyncItem>[b, a]));
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 0);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test(
+      'a legacy Favorites conflict is repaired with like endpoints',
+      () async {
+        final a = _item('A', localId: 'a', setId: 'set-a');
+        final b = _item('B', localId: 'b');
+        final key = const PlaylistSyncKey(
+          accountKey: 'account',
+          playlistId: 'bstream:favorites',
+        );
+        final local = _snapshot('Favoritos', <PlaylistSyncItem>[a, b]);
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: PlaylistSyncBinding(
+              key: key,
+              remotePlaylistId: 'LM',
+              mode: PlaylistSyncMode.automatic,
+              localRevisionAtBase: 2,
+              createdAt: now,
+              updatedAt: now,
+            ),
+            base: _snapshot('Liked Music', <PlaylistSyncItem>[a]),
+            local: local,
+            localRevision: 2,
+            localDeleted: false,
+            intent: PlaylistSyncIntent(
+              key: key,
+              requestedLocalRevision: 2,
+              reason: 'conflict_remoteNotEditable',
+              status: PlaylistSyncIntentStatus.conflict,
+              desiredSnapshot: local,
+              mutationToken: 'old-token',
+              attemptCount: 0,
+              createdAt: now,
+              updatedAt: now,
+            ),
+          ),
+        );
+        final gateway = _FakeLikedGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[
+            _snapshot('Liked Music', <PlaylistSyncItem>[a]),
+            _snapshot('Liked Music', <PlaylistSyncItem>[a, b]),
+          ]);
+
+        final result = await _engine(store, gateway, now).sync(key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.likedMutationCount, 1);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test('offline fetch is deferred without a mutation', () async {
+      final store = _MemoryStore(_work());
+      final gateway = _FakeGateway()..fetchError = const _Offline();
+      final engine = _engine(store, gateway, now);
+
+      final result = await engine.sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.deferred);
+      expect(gateway.mutationCount, 0);
+      expect(store.work.intent?.status, PlaylistSyncIntentStatus.pending);
+    });
+
+    test(
+      'a complete 325-song read repairs a previously truncated 100-song base',
+      () async {
+        final truncated = _snapshot('Road', [
+          for (var index = 0; index < 100; index++)
+            _item(
+              's${index.toString().padLeft(3, '0')}',
+              localId: 'local-$index',
+              setId: 'set-$index',
+            ),
+        ]);
+        final complete = _snapshot('Road', [
+          for (var index = 0; index < 325; index++)
+            _item(
+              index == 150 ? 's005' : 's${index.toString().padLeft(3, '0')}',
+              setId: 'set-$index',
+            ),
+        ]);
+        final store = _MemoryStore(_work(base: truncated, local: truncated));
+        final gateway = _FakeGateway()..fetches.addAll([complete, complete]);
+        final engine = _engine(store, gateway, now);
+
+        final repaired = await engine.sync(store.work.binding.key);
+
+        expect(repaired.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.mutationCount, 0);
+        expect(gateway.createCount, 0);
+        expect(store.work.local.items, hasLength(325));
+        expect(store.work.base!.items, hasLength(325));
+        expect(
+          store.work.local.items.map((item) => item.setVideoId),
+          complete.items.map((item) => item.setVideoId),
+        );
+        expect(
+          store.work.local.items.take(100).map((item) => item.localItemId),
+          truncated.items.map((item) => item.localItemId),
+        );
+        final repeatedVideo = store.work.local.items
+            .where((item) => item.videoId == _video('s005'))
+            .toList(growable: false);
+        expect(repeatedVideo, hasLength(2));
+        expect(repeatedVideo.map((item) => item.setVideoId), [
+          'set-5',
+          'set-150',
+        ]);
+        final repairedIds = store.work.local.items
+            .map((item) => item.localItemId)
+            .toList(growable: false);
+        expect(repairedIds.toSet(), hasLength(325));
+
+        final repeated = await engine.sync(store.work.binding.key);
+
+        expect(repeated.disposition, PlaylistSyncDisposition.noChanges);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.local.items, hasLength(325));
+        expect(
+          store.work.local.items.map((item) => item.localItemId),
+          repairedIds,
+        );
+      },
+    );
+
+    test(
+      'an incomplete playlist read preserves all 325 songs until retry',
+      () async {
+        final local = _snapshot('Road', [
+          for (var index = 0; index < 325; index++)
+            _item(
+              's${index.toString().padLeft(3, '0')}',
+              localId: 'local-$index',
+              setId: 'set-$index',
+            ),
+        ]);
+        final store = _MemoryStore(_work(base: local, local: local));
+        final gateway = _FakeGateway()
+          ..fetchError = const PlaylistGatewayUnavailableException(
+            'YouTube Music returned an incomplete playlist.',
+          );
+        final engine = _engine(store, gateway, now);
+
+        final deferred = await engine.sync(store.work.binding.key);
+
+        expect(deferred.disposition, PlaylistSyncDisposition.deferred);
+        expect(gateway.mutationCount, 0);
+        expect(store.commits, 0);
+        expect(store.work.local, same(local));
+        expect(store.work.base, same(local));
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.pending);
+        expect(store.work.intent?.mutationToken, isNull);
+
+        gateway
+          ..fetchError = null
+          ..fetches.add(local);
+        final retried = await engine.sync(store.work.binding.key);
+
+        expect(retried.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.local.items, hasLength(325));
+        expect(store.work.local.semanticallyEquals(local), isTrue);
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test(
+      'a stale create ACK keeps its remote ID and freezes the write',
+      () async {
+        final initial = _work();
+        final store = _MemoryStore(
+          PlaylistSyncWork(
+            binding: initial.binding.copyWith(remotePlaylistId: null),
+            base: null,
+            local: initial.local,
+            localRevision: initial.localRevision,
+            localDeleted: false,
+            intent: initial.intent,
+          ),
+        );
+        var sessionIsCurrent = true;
+        final gateway = _FakeGateway()
+          ..mutationReceipt = const RemoteMutationReceipt(
+            status: RemoteMutationStatus.ambiguous,
+            remotePlaylistId: 'created-before-switch',
+          )
+          ..onCreate = () => sessionIsCurrent = false;
+
+        final result = await _engine(
+          store,
+          gateway,
+          now,
+          canPersist: () => sessionIsCurrent,
+        ).sync(store.work.binding.key);
+
+        expect(result.disposition, PlaylistSyncDisposition.deferred);
+        expect(gateway.mutationCount, 1);
+        expect(store.work.binding.remotePlaylistId, 'created-before-switch');
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.ambiguous);
+        expect(store.work.intent?.mutationToken, isNotEmpty);
+      },
+    );
+
+    test('automatic sync respects a pending intent backoff', () async {
+      final initial = _work();
+      final store = _MemoryStore(
+        PlaylistSyncWork(
+          binding: initial.binding,
+          base: initial.base,
+          local: initial.local,
+          localRevision: initial.localRevision,
+          localDeleted: false,
+          intent: PlaylistSyncIntent(
+            key: initial.binding.key,
+            requestedLocalRevision: initial.localRevision,
+            reason: 'offline',
+            status: PlaylistSyncIntentStatus.pending,
+            attemptCount: 2,
+            nextAttemptAt: now.add(const Duration(minutes: 1)),
+            createdAt: now,
+            updatedAt: now,
+          ),
+        ),
+      );
+      final gateway = _FakeGateway()..fetchError = const _Offline();
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key, trigger: PlaylistSyncTrigger.automatic);
+
+      expect(result.disposition, PlaylistSyncDisposition.deferred);
+      expect(store.work.intent!.attemptCount, 2);
+      expect(gateway.mutationCount, 0);
+    });
+
+    test('ambiguous write commits only after successful read-back', () async {
+      final base = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+      ]);
+      final local = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+        _item('B', localId: 'b'),
+      ]);
+      final before = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+      ]);
+      final after = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+        _item('B', setId: 'sb'),
+      ]);
+      final store = _MemoryStore(_work(base: base, local: local));
+      final gateway = _FakeGateway()
+        ..fetches.addAll(<PlaylistSyncSnapshot?>[before, after])
+        ..mutationReceipt = const RemoteMutationReceipt(
+          status: RemoteMutationStatus.ambiguous,
+        );
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.synchronized);
+      expect(gateway.mutationCount, 1);
+      expect(store.commits, 1);
+      expect(store.work.intent, isNull);
+    });
+
+    test('unverified ambiguous write is never blindly retried', () async {
+      final base = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+      ]);
+      final local = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+        _item('B', localId: 'b'),
+      ]);
+      final unchanged = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+      ]);
+      final store = _MemoryStore(_work(base: base, local: local));
+      final gateway = _FakeGateway()
+        ..fetches.addAll(<PlaylistSyncSnapshot?>[
+          unchanged,
+          unchanged,
+          unchanged,
+        ])
+        ..mutationReceipt = const RemoteMutationReceipt(
+          status: RemoteMutationStatus.ambiguous,
+        );
+      final engine = _engine(store, gateway, now);
+
+      expect(
+        (await engine.sync(store.work.binding.key)).disposition,
+        PlaylistSyncDisposition.deferred,
+      );
+      expect(store.work.intent?.status, PlaylistSyncIntentStatus.ambiguous);
+      expect(
+        (await engine.sync(store.work.binding.key)).disposition,
+        PlaylistSyncDisposition.conflict,
+      );
+      expect(store.work.intent?.status, PlaylistSyncIntentStatus.conflict);
+      expect(store.work.intent?.desiredSnapshot, isNotNull);
+      expect(store.work.intent?.mutationToken, isNotNull);
+      expect(
+        (await engine.sync(store.work.binding.key)).disposition,
+        PlaylistSyncDisposition.conflict,
+      );
+      expect(gateway.mutationCount, 1);
+      expect(gateway.fetches, isEmpty);
+    });
+
+    test(
+      'explicit keep-remote resolution is read-only and adopts remote',
+      () async {
+        final base = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]);
+        final local = _snapshot('Local edit', <PlaylistSyncItem>[
+          _item('B', localId: 'b'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+        ]);
+        final store = _MemoryStore(
+          _work(base: base, local: local, intent: _conflictIntent(now)),
+        );
+        final gateway = _FakeGateway()..fetches.add(remote);
+        final engine = _engine(store, gateway, now);
+
+        expect(
+          (await engine.sync(store.work.binding.key)).disposition,
+          PlaylistSyncDisposition.conflict,
+        );
+        expect(gateway.fetches, hasLength(1));
+        await store.resolveConflict(
+          key: store.work.binding.key,
+          resolution: PlaylistSyncConflictResolution.keepRemote,
+          expectedLocalRevision: store.work.localRevision,
+          now: now,
+        );
+
+        final resolved = await engine.sync(store.work.binding.key);
+
+        expect(resolved.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.mutationCount, 0);
+        expect(store.work.local.title, 'Road');
+        expect(store.work.local.items.single.videoId, _video('A'));
+      },
+    );
+
+    test(
+      'explicit keep-local recreates a remotely deleted playlist exactly once',
+      () async {
+        final local = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]);
+        final recreated = PlaylistSyncSnapshot(
+          remotePlaylistId: 'recreated-remote',
+          title: 'Road',
+          items: <PlaylistSyncItem>[_item('A', setId: 'sa')],
+        );
+        final store = _MemoryStore(_work(base: local, local: local));
+        final gateway = _FakeGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[
+            null,
+            null,
+            recreated,
+            recreated,
+          ])
+          ..mutationReceipt = const RemoteMutationReceipt(
+            status: RemoteMutationStatus.acknowledged,
+            remotePlaylistId: 'recreated-remote',
+          );
+        final engine = _engine(store, gateway, now);
+
+        final missing = await engine.sync(store.work.binding.key);
+        expect(missing.disposition, PlaylistSyncDisposition.remoteDeleted);
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.conflict);
+        expect(gateway.createCount, 0);
+
+        await store.resolveConflict(
+          key: store.work.binding.key,
+          resolution: PlaylistSyncConflictResolution.keepLocal,
+          expectedLocalRevision: store.work.localRevision,
+          now: now,
+        );
+        final recreatedResult = await engine.sync(store.work.binding.key);
+        final idempotentResult = await engine.sync(store.work.binding.key);
+
+        expect(
+          recreatedResult.disposition,
+          PlaylistSyncDisposition.synchronized,
+        );
+        expect(idempotentResult.disposition, PlaylistSyncDisposition.noChanges);
+        expect(gateway.createCount, 1);
+        expect(gateway.mutationCount, 1);
+        expect(store.work.binding.remotePlaylistId, 'recreated-remote');
+        expect(store.work.intent, isNull);
+      },
+    );
+
+    test(
+      'verified ambiguous write preserves a download linked while waiting',
+      () async {
+        final desired = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a'),
+        ]);
+        final local = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a').copyWith(localTrackId: 'download-a'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'verified-a'),
+        ]);
+        final store = _MemoryStore(
+          _work(
+            base: desired,
+            local: local,
+            intent: _ambiguousIntent(desired, now),
+          ),
+        );
+        final gateway = _FakeGateway()..fetches.add(remote);
+
+        final result = await _engine(
+          store,
+          gateway,
+          now,
+        ).sync(store.work.binding.key);
+
+        expect(result.disposition, PlaylistSyncDisposition.synchronized);
+        expect(gateway.mutationCount, 0);
+        expect(store.commits, 1);
+        expect(store.work.local.items.single.localTrackId, 'download-a');
+        expect(store.work.local.items.single.setVideoId, 'verified-a');
+      },
+    );
+
+    test(
+      'verified old write keeps newer local content queued without another write',
+      () async {
+        final desired = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a'),
+        ]);
+        final local = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a'),
+          _item('B', localId: 'b'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'verified-a'),
+        ]);
+        final store = _MemoryStore(
+          _work(
+            base: desired,
+            local: local,
+            intent: _ambiguousIntent(desired, now),
+          ),
+        );
+        final gateway = _FakeGateway()..fetches.add(remote);
+
+        final result = await _engine(
+          store,
+          gateway,
+          now,
+        ).sync(store.work.binding.key);
+
+        expect(result.disposition, PlaylistSyncDisposition.deferred);
+        expect(gateway.mutationCount, 0);
+        expect(store.commits, 0);
+        expect(store.baseOnlyCommits, 1);
+        expect(store.conflicts, 0);
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.pending);
+        expect(store.work.intent?.mutationToken, isNull);
+        expect(store.work.base!.items.map((item) => item.videoId), <String?>[
+          _video('A'),
+        ]);
+        expect(store.work.base!.items.single.setVideoId, 'verified-a');
+        expect(store.work.local.items.map((item) => item.videoId), <String?>[
+          _video('A'),
+          _video('B'),
+        ]);
+      },
+    );
+
+    test(
+      'already equal snapshots are idempotent and issue no writes',
+      () async {
+        final equal = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+        ]);
+        final store = _MemoryStore(_work(base: equal, local: equal));
+        final gateway = _FakeGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[remote, remote]);
+        final engine = _engine(store, gateway, now);
+
+        await engine.sync(store.work.binding.key);
+        await engine.sync(store.work.binding.key);
+
+        expect(gateway.mutationCount, 0);
+        expect(store.conflicts, 0);
+      },
+    );
+
+    test('a session fence rolls back a read-only local commit', () async {
+      final equal = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', localId: 'a', setId: 'sa'),
+      ]);
+      final remote = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+      ]);
+      final store = _MemoryStore(_work(base: equal, local: equal));
+      final gateway = _FakeGateway()..fetches.add(remote);
+      var fenceChecks = 0;
+      final engine = _engine(
+        store,
+        gateway,
+        now,
+        canPersist: () => ++fenceChecks <= 2,
+      );
+
+      final result = await engine.sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.deferred);
+      expect(gateway.mutationCount, 0);
+      expect(store.commits, 0);
+      expect(store.work.intent, isNull);
+    });
+
+    test(
+      'a fence after a remote write preserves an ambiguous frozen intent',
+      () async {
+        final base = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]);
+        final local = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+          _item('B', localId: 'b'),
+        ]);
+        final before = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+        ]);
+        final after = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+          _item('B', setId: 'sb'),
+        ]);
+        final store = _MemoryStore(_work(base: base, local: local));
+        final gateway = _FakeGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[before, after]);
+        var fenceChecks = 0;
+        final engine = _engine(
+          store,
+          gateway,
+          now,
+          // load, initial read, pre-write, pre-readback and post-readback pass;
+          // the transaction's final fence is the first rejected check.
+          canPersist: () => ++fenceChecks <= 5,
+        );
+
+        final result = await engine.sync(store.work.binding.key);
+
+        expect(result.disposition, PlaylistSyncDisposition.deferred);
+        expect(gateway.mutationCount, 1);
+        expect(store.commits, 0);
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.ambiguous);
+        expect(store.work.intent?.desiredSnapshot?.items, hasLength(2));
+        expect(store.work.intent?.mutationToken, isNotEmpty);
+      },
+    );
+
+    test(
+      'alignment skips unavailable rows before and between playable songs',
+      () async {
+        final equal = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'old-a'),
+          _item('B', localId: 'b', setId: 'old-b'),
+        ]);
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _unavailable('unavailable-before'),
+          _item('A', setId: 'verified-a'),
+          _unavailable('unavailable-between'),
+          _item('B', setId: 'verified-b'),
+        ]);
+        final store = _MemoryStore(_work(base: equal, local: equal));
+        final gateway = _FakeGateway()..fetches.add(remote);
+
+        final result = await _engine(
+          store,
+          gateway,
+          now,
+        ).sync(store.work.binding.key);
+
+        expect(result.disposition, PlaylistSyncDisposition.noChanges);
+        expect(gateway.mutationCount, 0);
+        expect(store.commits, 1);
+        final playable = store.work.local.items
+            .where((item) => item.videoId != null)
+            .toList(growable: false);
+        expect(playable.map((item) => item.localItemId), <String?>['a', 'b']);
+        expect(playable.map((item) => item.setVideoId), <String?>[
+          'verified-a',
+          'verified-b',
+        ]);
+      },
+    );
+
+    test('acknowledged delete commits after a successful read-back', () async {
+      final remote = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+      ]);
+      final store = _MemoryStore(_work(localDeleted: true));
+      final gateway = _FakeGateway()
+        ..fetches.addAll(<PlaylistSyncSnapshot?>[remote, null])
+        ..mutationReceipt = const RemoteMutationReceipt(
+          status: RemoteMutationStatus.acknowledged,
+        );
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.localDeleted);
+      expect(gateway.mutationCount, 1);
+      expect(store.remoteDeletes, 1);
+      expect(store.work.intent, isNull);
+    });
+
+    test('a local-only tombstone never reads or deletes the remote', () async {
+      final store = _MemoryStore(
+        _work(localDeleted: true, requestRemoteDelete: false),
+      );
+      final gateway = _FakeGateway()
+        ..fetches.add(
+          _snapshot('Road', <PlaylistSyncItem>[_item('A', setId: 'sa')]),
+        );
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.localDeleted);
+      expect(gateway.fetches, hasLength(1));
+      expect(gateway.mutationCount, 0);
+      expect(store.remoteDeletes, 0);
+      expect(store.work.binding.remotePlaylistId, 'remote');
+    });
+
+    test('rejected delete is a conflict and is not marked ambiguous', () async {
+      final remote = _snapshot('Road', <PlaylistSyncItem>[
+        _item('A', setId: 'sa'),
+      ]);
+      final store = _MemoryStore(_work(localDeleted: true));
+      final gateway = _FakeGateway()
+        ..fetches.add(remote)
+        ..mutationReceipt = const RemoteMutationReceipt(
+          status: RemoteMutationStatus.rejected,
+          message: 'forbidden',
+        );
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.conflict);
+      expect(
+        result.conflicts.single.kind,
+        PlaylistSyncConflictKind.remoteNotEditable,
+      );
+      expect(gateway.mutationCount, 1);
+      expect(gateway.fetches, isEmpty);
+      expect(store.work.intent?.status, PlaylistSyncIntentStatus.conflict);
+      expect(store.conflicts, 1);
+    });
+
+    test(
+      'ambiguous delete is read back once and never emitted again',
+      () async {
+        final remote = _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', setId: 'sa'),
+        ]);
+        final store = _MemoryStore(_work(localDeleted: true));
+        final gateway = _FakeGateway()
+          ..fetches.addAll(<PlaylistSyncSnapshot?>[remote, remote, remote])
+          ..mutationReceipt = const RemoteMutationReceipt(
+            status: RemoteMutationStatus.ambiguous,
+            message: 'timeout',
+          );
+        final engine = _engine(store, gateway, now);
+
+        final first = await engine.sync(store.work.binding.key);
+        final frozenToken = store.work.intent?.mutationToken;
+        final second = await engine.sync(store.work.binding.key);
+        final third = await engine.sync(store.work.binding.key);
+
+        expect(first.disposition, PlaylistSyncDisposition.deferred);
+        expect(second.disposition, PlaylistSyncDisposition.conflict);
+        expect(third.disposition, PlaylistSyncDisposition.conflict);
+        expect(gateway.mutationCount, 1);
+        expect(gateway.fetches, isEmpty);
+        expect(store.work.intent?.status, PlaylistSyncIntentStatus.conflict);
+        expect(store.work.intent?.mutationToken, frozenToken);
+        expect(frozenToken, isNotEmpty);
+        expect(store.remoteDeletes, 0);
+      },
+    );
+
+    test('a non-editable remote is never deleted', () async {
+      final remote = PlaylistSyncSnapshot(
+        remotePlaylistId: 'remote',
+        title: 'Road',
+        items: <PlaylistSyncItem>[_item('A', setId: 'sa')],
+        isEditable: false,
+      );
+      final store = _MemoryStore(_work(localDeleted: true));
+      final gateway = _FakeGateway()..fetches.add(remote);
+
+      final result = await _engine(
+        store,
+        gateway,
+        now,
+      ).sync(store.work.binding.key);
+
+      expect(result.disposition, PlaylistSyncDisposition.conflict);
+      expect(
+        result.conflicts.single.kind,
+        PlaylistSyncConflictKind.remoteNotEditable,
+      );
+      expect(gateway.mutationCount, 0);
+      expect(store.remoteDeletes, 0);
+      expect(store.work.intent?.status, PlaylistSyncIntentStatus.conflict);
+    });
+  });
+}
+
+PlaylistSyncEngine _engine(
+  _MemoryStore store,
+  _FakeGateway gateway,
+  DateTime now, {
+  bool Function()? canPersist,
+}) {
+  var id = 0;
+  return PlaylistSyncEngine(
+    store: store,
+    gateway: gateway,
+    merger: PlaylistThreeWayMerger(itemIdFactory: () => 'new-${id++}'),
+    mutationTokenFactory: () => 'mutation-${id++}',
+    clock: () => now,
+    canPersist: canPersist,
+  );
+}
+
+PlaylistSyncWork _work({
+  PlaylistSyncSnapshot? base,
+  PlaylistSyncSnapshot? local,
+  bool localDeleted = false,
+  bool requestRemoteDelete = true,
+  PlaylistSyncIntent? intent,
+}) {
+  final now = DateTime.utc(2026, 8, 22);
+  const key = PlaylistSyncKey(accountKey: 'account', playlistId: 'playlist');
+  return PlaylistSyncWork(
+    binding: PlaylistSyncBinding(
+      key: key,
+      remotePlaylistId: 'remote',
+      mode: PlaylistSyncMode.automatic,
+      localRevisionAtBase: 1,
+      remoteDeleteRequestedAt: localDeleted && requestRemoteDelete ? now : null,
+      createdAt: now,
+      updatedAt: now,
+    ),
+    base:
+        base ??
+        _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]),
+    local:
+        local ??
+        _snapshot('Road', <PlaylistSyncItem>[
+          _item('A', localId: 'a', setId: 'sa'),
+        ]),
+    localRevision: 1,
+    localDeleted: localDeleted,
+    intent: intent,
+  );
+}
+
+PlaylistSyncIntent _ambiguousIntent(
+  PlaylistSyncSnapshot desired,
+  DateTime now,
+) => PlaylistSyncIntent(
+  key: const PlaylistSyncKey(accountKey: 'account', playlistId: 'playlist'),
+  requestedLocalRevision: 1,
+  reason: 'ambiguous_mutation',
+  status: PlaylistSyncIntentStatus.ambiguous,
+  desiredSnapshot: desired,
+  desiredSnapshotHash: desired.semanticHash,
+  mutationToken: 'frozen-token',
+  attemptCount: 1,
+  createdAt: now,
+  updatedAt: now,
+);
+
+PlaylistSyncIntent _conflictIntent(DateTime now) => PlaylistSyncIntent(
+  key: const PlaylistSyncKey(accountKey: 'account', playlistId: 'playlist'),
+  requestedLocalRevision: 1,
+  reason: 'conflict_ambiguousMutation',
+  status: PlaylistSyncIntentStatus.conflict,
+  attemptCount: 1,
+  createdAt: now,
+  updatedAt: now,
+);
+
+PlaylistSyncSnapshot _snapshot(String title, List<PlaylistSyncItem> items) {
+  return PlaylistSyncSnapshot(
+    remotePlaylistId: 'remote',
+    title: title,
+    items: items,
+  );
+}
+
+PlaylistSyncItem _item(String seed, {String? localId, String? setId}) {
+  final videoId = _video(seed);
+  return PlaylistSyncItem(
+    localItemId: localId,
+    videoId: videoId,
+    setVideoId: setId,
+    track: CatalogTrack.youtube(videoId: videoId, title: seed),
+  );
+}
+
+PlaylistSyncItem _unavailable(String setId) => PlaylistSyncItem(
+  setVideoId: setId,
+  track: CatalogTrack(
+    key: 'unavailable:$setId',
+    provider: CatalogProvider.legacy,
+    providerId: setId,
+    title: 'Unavailable',
+  ),
+);
+
+String _video(String seed) => '${seed.padRight(10, '0')}1';
+
+class _FakeGateway implements YouTubeMusicPlaylistGateway {
+  final List<PlaylistSyncSnapshot?> fetches = <PlaylistSyncSnapshot?>[];
+  Object? fetchError;
+  void Function()? onFetch;
+  void Function()? onCreate;
+  RemoteMutationReceipt mutationReceipt = const RemoteMutationReceipt(
+    status: RemoteMutationStatus.acknowledged,
+  );
+  int mutationCount = 0;
+  int createCount = 0;
+
+  @override
+  Future<PlaylistSyncSnapshot?> fetchPlaylist({
+    required String accountKey,
+    required String remotePlaylistId,
+  }) async {
+    final error = fetchError;
+    if (error != null) {
+      throw error;
+    }
+    final result = fetches.removeAt(0);
+    onFetch?.call();
+    return result;
+  }
+
+  @override
+  Future<RemoteMutationReceipt> applyDesiredState({
+    required String accountKey,
+    required PlaylistSyncSnapshot observed,
+    required PlaylistSyncSnapshot desired,
+    required String mutationToken,
+  }) async {
+    mutationCount += 1;
+    return mutationReceipt;
+  }
+
+  @override
+  Future<RemoteMutationReceipt> createPlaylist({
+    required String accountKey,
+    required PlaylistSyncSnapshot desired,
+    required String mutationToken,
+  }) async {
+    mutationCount += 1;
+    createCount += 1;
+    onCreate?.call();
+    return mutationReceipt;
+  }
+
+  @override
+  Future<RemoteMutationReceipt> deletePlaylist({
+    required String accountKey,
+    required PlaylistSyncSnapshot observed,
+    required String mutationToken,
+  }) async {
+    mutationCount += 1;
+    return mutationReceipt;
+  }
+}
+
+class _FakeLikedGateway extends _FakeGateway
+    implements YouTubeMusicLikedMusicGateway {
+  int likedMutationCount = 0;
+  PlaylistSyncSnapshot? likedObserved;
+  PlaylistSyncSnapshot? likedDesired;
+
+  @override
+  Future<RemoteMutationReceipt> applyLikedMusicState({
+    required String accountKey,
+    required PlaylistSyncSnapshot observed,
+    required PlaylistSyncSnapshot desired,
+    required String mutationToken,
+  }) async {
+    likedMutationCount += 1;
+    likedObserved = observed;
+    likedDesired = desired;
+    return const RemoteMutationReceipt(
+      status: RemoteMutationStatus.acknowledged,
+      remotePlaylistId: 'LM',
+    );
+  }
+}
+
+class _MemoryStore implements PlaylistSyncStore {
+  _MemoryStore(this.work);
+
+  PlaylistSyncWork work;
+  int commits = 0;
+  int baseOnlyCommits = 0;
+  int conflicts = 0;
+  int remoteDeletes = 0;
+
+  @override
+  Future<PlaylistSyncWork?> loadWork(PlaylistSyncKey key) async => work;
+
+  @override
+  Future<List<PlaylistSyncBinding>> listBindings({String? accountKey}) async =>
+      <PlaylistSyncBinding>[work.binding];
+
+  @override
+  Future<List<PlaylistSyncUnresolvedConflict>> listUnresolvedConflicts({
+    required String accountKey,
+  }) async => const <PlaylistSyncUnresolvedConflict>[];
+
+  @override
+  Future<void> upsertBinding(
+    PlaylistSyncBinding binding, {
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+    work = PlaylistSyncWork(
+      binding: binding,
+      base: work.base,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: work.intent,
+    );
+  }
+
+  @override
+  Future<bool> updateBindingPrivacy({
+    required PlaylistSyncKey key,
+    required String expectedRemotePlaylistId,
+    required String privacy,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+    final binding = work.binding;
+    if (binding.key != key ||
+        binding.remotePlaylistId != expectedRemotePlaylistId ||
+        binding.remoteDeleteRequestedAt != null) {
+      return false;
+    }
+    work = PlaylistSyncWork(
+      binding: binding.copyWith(privacy: privacy, updatedAt: now),
+      base: work.base,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: work.intent,
+    );
+    return true;
+  }
+
+  @override
+  Future<PlaylistSyncImportResult> importRemotePlaylistAtomically({
+    required PlaylistSyncBinding binding,
+    required String localPlaylistName,
+    required int requestedLocalRevision,
+    required String reason,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+    if (work.binding.key.accountKey == binding.key.accountKey &&
+        work.binding.remotePlaylistId == binding.remotePlaylistId) {
+      return PlaylistSyncImportResult(binding: work.binding, created: false);
+    }
+    work = PlaylistSyncWork(
+      binding: binding,
+      local: PlaylistSyncSnapshot(title: localPlaylistName, items: const []),
+      localRevision: requestedLocalRevision,
+      localDeleted: false,
+      intent: PlaylistSyncIntent(
+        key: binding.key,
+        requestedLocalRevision: requestedLocalRevision,
+        reason: reason,
+        status: PlaylistSyncIntentStatus.pending,
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+    return PlaylistSyncImportResult(binding: binding, created: true);
+  }
+
+  @override
+  Future<void> enqueueIntent({
+    required PlaylistSyncKey key,
+    required int requestedLocalRevision,
+    required String reason,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+  }
+
+  @override
+  Future<void> commitSynchronized({
+    required PlaylistSyncKey key,
+    required PlaylistSyncSnapshot mergedLocal,
+    required PlaylistSyncSnapshot verifiedRemote,
+    required int expectedLocalRevision,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+    commits += 1;
+    work = PlaylistSyncWork(
+      binding: work.binding,
+      base: mergedLocal,
+      local: mergedLocal,
+      localRevision: work.localRevision,
+      localDeleted: false,
+    );
+  }
+
+  @override
+  Future<void> commitVerifiedBaseWithNewerLocal({
+    required PlaylistSyncKey key,
+    required PlaylistSyncSnapshot verifiedBase,
+    required PlaylistSyncSnapshot verifiedRemote,
+    required int verifiedLocalRevision,
+    required int expectedLocalRevision,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    if (work.localRevision != expectedLocalRevision) {
+      throw const PlaylistSyncRevisionChanged();
+    }
+    _ensureMemoryCommitAllowed(canCommit);
+    baseOnlyCommits += 1;
+    work = PlaylistSyncWork(
+      binding: work.binding.copyWith(
+        remotePlaylistId: verifiedRemote.remotePlaylistId,
+        isEditable: verifiedRemote.isEditable,
+        privacy: verifiedRemote.privacy,
+        baseTitle: verifiedBase.title,
+        baseSnapshotHash: verifiedRemote.semanticHash,
+        remoteRevision: verifiedRemote.revisionToken,
+        localRevisionAtBase: verifiedLocalRevision,
+        lastSyncedAt: now,
+        lastRemoteSeenAt: now,
+        updatedAt: now,
+      ),
+      base: verifiedBase,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: PlaylistSyncIntent(
+        key: key,
+        requestedLocalRevision: expectedLocalRevision,
+        reason: 'newer_local_after_verified_ambiguous',
+        status: PlaylistSyncIntentStatus.pending,
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Future<void> recordDeferred({
+    required PlaylistSyncKey key,
+    required int requestedLocalRevision,
+    required String reason,
+    required DateTime now,
+    required DateTime nextAttemptAt,
+    PlaylistSyncSnapshot? desired,
+    String? mutationToken,
+    String? error,
+    bool ambiguous = false,
+  }) async {
+    work = PlaylistSyncWork(
+      binding: work.binding,
+      base: work.base,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: PlaylistSyncIntent(
+        key: key,
+        requestedLocalRevision: requestedLocalRevision,
+        reason: reason,
+        status: ambiguous
+            ? PlaylistSyncIntentStatus.ambiguous
+            : PlaylistSyncIntentStatus.pending,
+        desiredSnapshot: desired,
+        desiredSnapshotHash: desired?.semanticHash,
+        mutationToken: mutationToken,
+        attemptCount: (work.intent?.attemptCount ?? 0) + 1,
+        nextAttemptAt: nextAttemptAt,
+        lastError: error,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Future<void> recordConflict({
+    required PlaylistSyncKey key,
+    required PlaylistSyncConflict conflict,
+    required PlaylistSyncSnapshot? base,
+    required PlaylistSyncSnapshot local,
+    required PlaylistSyncSnapshot? remote,
+    required DateTime now,
+  }) async {
+    conflicts += 1;
+    final previous = work.intent;
+    work = PlaylistSyncWork(
+      binding: work.binding,
+      base: work.base,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: PlaylistSyncIntent(
+        key: key,
+        requestedLocalRevision:
+            previous?.requestedLocalRevision ?? work.localRevision,
+        reason: 'conflict_${conflict.kind.name}',
+        status: PlaylistSyncIntentStatus.conflict,
+        desiredSnapshot: previous?.desiredSnapshot,
+        desiredSnapshotHash: previous?.desiredSnapshotHash,
+        mutationToken: previous?.mutationToken,
+        attemptCount: previous?.attemptCount ?? 0,
+        nextAttemptAt: previous?.nextAttemptAt,
+        lastError: previous?.lastError,
+        createdAt: previous?.createdAt ?? now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Future<void> resolveConflict({
+    required PlaylistSyncKey key,
+    required PlaylistSyncConflictResolution resolution,
+    required int expectedLocalRevision,
+    required DateTime now,
+  }) async {
+    if (work.localRevision != expectedLocalRevision) {
+      throw const PlaylistSyncRevisionChanged();
+    }
+    if (work.intent?.status != PlaylistSyncIntentStatus.conflict) {
+      throw StateError('No unresolved playlist sync conflict exists.');
+    }
+    work = PlaylistSyncWork(
+      binding: work.binding,
+      base: work.base,
+      local: work.local,
+      localRevision: work.localRevision,
+      localDeleted: work.localDeleted,
+      intent: PlaylistSyncIntent(
+        key: key,
+        requestedLocalRevision: expectedLocalRevision,
+        reason: playlistSyncConflictResolutionReason(resolution),
+        status: PlaylistSyncIntentStatus.pending,
+        attemptCount: 0,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    );
+  }
+
+  @override
+  Future<void> commitRemoteDeleted({
+    required PlaylistSyncKey key,
+    required int expectedLocalRevision,
+    required DateTime now,
+    bool Function()? canCommit,
+  }) async {
+    _ensureMemoryCommitAllowed(canCommit);
+    remoteDeletes += 1;
+  }
+}
+
+void _ensureMemoryCommitAllowed(bool Function()? canCommit) {
+  if (canCommit != null && !canCommit()) {
+    throw const PlaylistSyncFenceChanged();
+  }
+}
+
+class _Offline implements Exception {
+  const _Offline();
+}

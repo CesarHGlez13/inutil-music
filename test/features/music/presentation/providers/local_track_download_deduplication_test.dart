@@ -1,0 +1,1756 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:bstream_music/core/errors/app_exception.dart';
+import 'package:bstream_music/features/music/domain/entities/download_options.dart';
+import 'package:bstream_music/features/music/domain/entities/download_result.dart';
+import 'package:bstream_music/features/music/domain/entities/local_track.dart';
+import 'package:bstream_music/features/music/domain/entities/playlist.dart';
+import 'package:bstream_music/features/music/domain/entities/track_info.dart';
+import 'package:bstream_music/features/music/domain/repositories/library_repository.dart';
+import 'package:bstream_music/features/music/domain/repositories/music_repository.dart';
+import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:bstream_music/services/audio_sources/audio_format_details.dart';
+import 'package:bstream_music/services/downloader/downloader_service.dart';
+import 'package:bstream_music/services/downloader/download_audio_metadata_service.dart';
+import 'package:bstream_music/services/storage/library_operation_coordinator.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:image/image.dart' as image;
+import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
+
+final List<int> _validArtworkBytes = image.encodePng(
+  image.Image(width: 2, height: 2),
+);
+
+const _downloadFormat = AudioFormatDetails(
+  codec: 'aac',
+  mimeType: 'audio/mp4',
+  bitrate: 325929,
+  sampleRate: 44100,
+  channels: 2,
+);
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
+  group('LocalTrackDownloadHelper deduplication', () {
+    test(
+      'embeds resolved metadata and saved artwork before publishing the track',
+      () async {
+        const track = TrackInfo(
+          id: 'embedded-catalog-song',
+          title: 'Canci\u00f3n del cat\u00e1logo',
+          artist: 'Artista uno, Artista dos',
+          artists: ['Artista uno', 'Artista dos'],
+          album: '\u00c1lbum del cat\u00e1logo',
+          url: 'https://catalog.example/tracks/embedded-song',
+          thumbnailUrl: 'https://images.example/embedded-song.png',
+          duration: Duration(minutes: 3),
+          metadataSource: TrackMetadataSource.youtubeMusic,
+        );
+        late _DownloadFixture fixture;
+        late File cachedArtwork;
+        var publishedDuringEmbedding = true;
+        var savedArtworkExisted = false;
+        final metadataService = _RecordingAudioMetadataService(
+          onEmbed: (call) async {
+            publishedDuringEmbedding =
+                fixture.libraryRepository.localTracks.isNotEmpty;
+            savedArtworkExisted =
+                call.artworkPath != null &&
+                await File(call.artworkPath!).exists();
+            await File(
+              call.filePath,
+            ).writeAsBytes([8, 9], mode: FileMode.append, flush: true);
+            return AudioMetadataWriteResult.written;
+          },
+        );
+        fixture = await _DownloadFixture.create(
+          metadataService: metadataService,
+          artworkCacheFileLookup: (_) async => cachedArtwork,
+        );
+        addTearDown(fixture.dispose);
+        cachedArtwork = await File(
+          p.join(fixture.tempDirectory.path, 'source-cover.png'),
+        ).writeAsBytes(_validArtworkBytes);
+
+        final result = await fixture.helper.resolveForLibrary(track);
+
+        expect(publishedDuringEmbedding, isFalse);
+        expect(savedArtworkExisted, isTrue);
+        expect(metadataService.calls, hasLength(1));
+        final call = metadataService.calls.single;
+        expect(call.filePath, result.track.filePath);
+        expect(call.title, track.title);
+        expect(call.artist, track.artist);
+        expect(call.album, track.album);
+        expect(call.artworkPath, result.track.thumbnailPath);
+        expect(call.artworkPath, isNot(cachedArtwork.path));
+        expect(result.downloadResult!.bytes, 6);
+        expect(result.downloadResult!.audioFormat, _downloadFormat);
+        expect(result.track.audioFormat, _downloadFormat);
+        expect(await File(result.track.filePath).length(), 6);
+        expect(
+          fixture.libraryRepository.localTracks.single.id,
+          result.track.id,
+        );
+        expect(
+          fixture.libraryRepository.localTracks.single.audioFormat,
+          _downloadFormat,
+        );
+        expect(fixture.musicRepository.infoCalls, 0);
+        expect(fixture.musicRepository.downloadCalls, 1);
+      },
+    );
+
+    test(
+      'coalesces embedding until one newly downloaded track is published',
+      () async {
+        final embeddingStarted = Completer<void>();
+        final releaseEmbedding = Completer<void>();
+        final metadataService = _RecordingAudioMetadataService(
+          onEmbed: (_) async {
+            embeddingStarted.complete();
+            await releaseEmbedding.future;
+            return AudioMetadataWriteResult.unchanged;
+          },
+        );
+        final fixture = await _DownloadFixture.create(
+          metadataService: metadataService,
+        );
+        addTearDown(fixture.dispose);
+        final track = _remoteTrack(
+          url: 'https://catalog.example/tracks/coalesced-embedding',
+        );
+        final first = fixture.helper.resolveForLibrary(track);
+        await embeddingStarted.future;
+        final second = fixture.helper.resolveForLibrary(track);
+        await Future<void>.delayed(Duration.zero);
+        expect(fixture.libraryRepository.localTracks, isEmpty);
+        expect(metadataService.calls, hasLength(1));
+        releaseEmbedding.complete();
+        final results = await Future.wait([first, second]);
+        expect(fixture.musicRepository.downloadCalls, 1);
+        expect(metadataService.calls, hasLength(1));
+        expect(results.map((result) => result.track.id).toSet(), hasLength(1));
+        expect(results.where((result) => result.reusedExisting), hasLength(1));
+        expect(fixture.libraryRepository.localTracks, hasLength(1));
+      },
+    );
+
+    for (final throwsFailure in [false, true]) {
+      test(
+        'keeps the usable download when embedding ${throwsFailure ? 'throws' : 'fails'}',
+        () async {
+          final metadataService = _RecordingAudioMetadataService(
+            onEmbed: (_) async {
+              if (throwsFailure) {
+                throw const FileSystemException('Simulated tagging failure');
+              }
+              return AudioMetadataWriteResult.failed;
+            },
+          );
+          final fixture = await _DownloadFixture.create(
+            metadataService: metadataService,
+          );
+          addTearDown(fixture.dispose);
+          final result = await fixture.helper.resolveForLibrary(
+            _remoteTrack(url: 'https://catalog.example/tracks/tagging-failure'),
+          );
+          expect(await File(result.track.filePath).readAsBytes(), [1, 2, 3, 1]);
+          expect(result.downloadResult!.bytes, 4);
+          expect(
+            fixture.libraryRepository.localTracks.single.id,
+            result.track.id,
+          );
+          expect(metadataService.calls, hasLength(1));
+        },
+      );
+    }
+
+    test(
+      'cancellation during embedding rolls back audio and the saved cover',
+      () async {
+        final embeddingStarted = Completer<void>();
+        final releaseEmbedding = Completer<void>();
+        final metadataService = _RecordingAudioMetadataService(
+          onEmbed: (_) async {
+            embeddingStarted.complete();
+            await releaseEmbedding.future;
+            return AudioMetadataWriteResult.written;
+          },
+        );
+        late File cachedArtwork;
+        final fixture = await _DownloadFixture.create(
+          metadataService: metadataService,
+          artworkCacheFileLookup: (_) async => cachedArtwork,
+        );
+        addTearDown(fixture.dispose);
+        cachedArtwork = await File(
+          p.join(fixture.tempDirectory.path, 'cached-cover.png'),
+        ).writeAsBytes(_validArtworkBytes);
+        var cancelled = false;
+        const taskId = 'cancel-during-metadata';
+        fixture.helper.registerCancellationProbe(taskId, () => cancelled);
+        final operation = fixture.helper.resolveForLibrary(
+          _remoteTrack(
+            url: 'https://catalog.example/tracks/cancel-embedding',
+            thumbnailUrl: 'https://images.example/cancel-cover.png',
+          ),
+          taskId: taskId,
+        );
+        final failure = expectLater(
+          operation,
+          throwsA(
+            isA<DownloaderException>().having(
+              (error) => error.code,
+              'code',
+              'download_cancelled',
+            ),
+          ),
+        );
+        await embeddingStarted.future;
+        cancelled = true;
+        releaseEmbedding.complete();
+        await failure;
+        expect(fixture.libraryRepository.localTracks, isEmpty);
+        final call = metadataService.calls.single;
+        expect(await File(call.filePath).exists(), isFalse);
+        expect(call.artworkPath, isNotNull);
+        expect(await File(call.artworkPath!).exists(), isFalse);
+        expect(await cachedArtwork.exists(), isTrue);
+      },
+    );
+
+    test(
+      'shares legacy cleanup across concurrent and later downloads',
+      () async {
+        final releaseCleanup = Completer<bool>();
+        final cleanupStarted = Completer<void>();
+        var cleanupCalls = 0;
+        final fixture = await _DownloadFixture.create(
+          legacyArtworkCleanup: (_) {
+            cleanupCalls++;
+            if (!cleanupStarted.isCompleted) cleanupStarted.complete();
+            return releaseCleanup.future;
+          },
+        );
+        addTearDown(fixture.dispose);
+
+        Future<LocalTrackDownloadResult> download(int index) =>
+            fixture.helper.resolveForLibrary(
+              _remoteTrack(
+                id: 'cleanup-$index',
+                url: 'https://catalog.example/tracks/cleanup-$index',
+              ),
+              allowConcurrentDownload: true,
+            );
+        final first = download(1);
+        final second = download(2);
+        await cleanupStarted.future;
+        await Future<void>.delayed(Duration.zero);
+        expect(cleanupCalls, 1);
+        releaseCleanup.complete(true);
+        await Future.wait([first, second]);
+        await download(3);
+
+        expect(cleanupCalls, 1);
+        expect(fixture.musicRepository.downloadCalls, 3);
+      },
+    );
+
+    test(
+      'retries incomplete legacy cleanup and resets it after restore',
+      () async {
+        var cleanupCalls = 0;
+        final fixture = await _DownloadFixture.create(
+          legacyArtworkCleanup: (_) async => ++cleanupCalls > 1,
+        );
+        addTearDown(fixture.dispose);
+
+        Future<LocalTrackDownloadResult> download(int index) =>
+            fixture.helper.resolveForLibrary(
+              _remoteTrack(
+                id: 'cleanup-retry-$index',
+                url: 'https://catalog.example/tracks/cleanup-retry-$index',
+              ),
+            );
+        await download(1);
+        await download(2);
+        await download(3);
+        expect(cleanupCalls, 2);
+
+        final coordinator = fixture.container.read(
+          libraryOperationCoordinatorProvider,
+        );
+        await coordinator.runExclusive(
+          LibraryMaintenancePhase.committingRestore,
+          () async {},
+        );
+        await download(4);
+        expect(cleanupCalls, 3);
+      },
+    );
+
+    test('retries legacy cleanup after a directory read failure', () async {
+      var cleanupCalls = 0;
+      final fixture = await _DownloadFixture.create(
+        legacyArtworkCleanup: (_) async {
+          if (++cleanupCalls == 1) {
+            throw const FileSystemException('Directory cannot be read');
+          }
+          return true;
+        },
+      );
+      addTearDown(fixture.dispose);
+      final track = _remoteTrack(
+        url: 'https://catalog.example/tracks/cleanup-read-retry',
+      );
+
+      await expectLater(
+        fixture.helper.resolveForLibrary(track),
+        throwsA(isA<FileSystemException>()),
+      );
+      expect(fixture.musicRepository.downloadCalls, 0);
+      await fixture.helper.resolveForLibrary(track);
+      expect(cleanupCalls, 2);
+      expect(fixture.musicRepository.downloadCalls, 1);
+    });
+
+    test(
+      'cleans only legacy images and checks directories created later',
+      () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+
+        Future<LocalTrackDownloadResult> download(int index) =>
+            fixture.helper.resolveForLibrary(
+              _remoteTrack(
+                id: 'cleanup-files-$index',
+                url: 'https://catalog.example/tracks/cleanup-files-$index',
+              ),
+            );
+        final first = await download(1);
+        final directory = File(first.track.filePath).parent;
+        final legacy = File(p.join(directory.path, 'old-cover.jpg'));
+        final unrelated = File(p.join(directory.path, 'keep.txt'));
+        await legacy.writeAsBytes([1]);
+        await unrelated.writeAsString('preserved');
+
+        await download(2);
+        expect(await legacy.exists(), isFalse);
+        expect(await unrelated.exists(), isTrue);
+        expect(await File(first.track.filePath).exists(), isTrue);
+        expect(
+          await directory.list().where((entry) => entry is File).length,
+          3,
+        );
+      },
+    );
+
+    test('always reuses an existing valid library file', () async {
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final existing = await fixture.addExisting(
+        sourceUrl: 'https://catalog.example/tracks/42',
+      );
+      var downloadStarted = false;
+
+      final result = await fixture.helper.resolveForLibrary(
+        _remoteTrack(url: 'https://catalog.example/tracks/42'),
+        onDownloadStarted: () => downloadStarted = true,
+      );
+
+      expect(result.reusedExisting, isTrue);
+      expect(result.track.id, existing.id);
+      expect(result.track.filePath, existing.filePath);
+      expect(fixture.musicRepository.downloadCalls, 0);
+      expect(fixture.libraryRepository.localTracks, hasLength(1));
+      expect(downloadStarted, isFalse);
+      expect(fixture.metadataService.calls, isEmpty);
+    });
+
+    test(
+      'does not merge different strong URLs solely by title and artist',
+      () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        final existing = await fixture.addExisting(
+          sourceUrl: 'https://catalog-a.example/tracks/42',
+        );
+
+        final result = await fixture.helper.resolveForLibrary(
+          _remoteTrack(url: 'https://catalog-b.example/tracks/42'),
+        );
+
+        expect(result.reusedExisting, isFalse);
+        expect(fixture.musicRepository.downloadCalls, 1);
+        expect(fixture.libraryRepository.localTracks, hasLength(2));
+        expect(result.track.filePath, isNot(existing.filePath));
+      },
+    );
+
+    test('treats equivalent YouTube URL forms as one source', () async {
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final existing = await fixture.addExisting(
+        sourceUrl: 'https://youtu.be/dQw4w9WgXcQ?t=9',
+      );
+
+      final result = await fixture.helper.resolveForLibrary(
+        _remoteTrack(
+          id: 'dQw4w9WgXcQ',
+          url: 'https://www.youtube.com/live/dQw4w9WgXcQ?feature=share',
+        ),
+      );
+
+      expect(result.reusedExisting, isTrue);
+      expect(result.track.id, existing.id);
+      expect(result.track.filePath, existing.filePath);
+      expect(fixture.musicRepository.downloadCalls, 0);
+    });
+
+    for (final invalidFile in ['missing', 'zero bytes']) {
+      test('redownloads when the matching file is $invalidFile', () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        final existing = await fixture.addExisting(
+          sourceUrl: 'https://catalog.example/tracks/42',
+          createFile: invalidFile != 'missing',
+          contents: const [],
+        );
+
+        final result = await fixture.helper.resolveForLibrary(
+          _remoteTrack(url: 'https://catalog.example/tracks/42'),
+        );
+
+        expect(result.reusedExisting, isFalse);
+        expect(result.track.id, existing.id);
+        expect(fixture.musicRepository.downloadCalls, 1);
+        expect(await File(result.track.filePath).length(), greaterThan(0));
+      });
+    }
+
+    test(
+      'coalesces concurrent requests for the same source identity',
+      () async {
+        final releaseDownload = Completer<void>();
+        final fixture = await _DownloadFixture.create(
+          downloadGate: releaseDownload.future,
+        );
+        addTearDown(fixture.dispose);
+        final firstTrack = _remoteTrack(
+          id: 'dQw4w9WgXcQ',
+          url: 'https://youtu.be/dQw4w9WgXcQ',
+          thumbnailUrl: 'file:///missing-artwork.jpg',
+        );
+        final equivalentTrack = _remoteTrack(
+          id: 'dQw4w9WgXcQ',
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          thumbnailUrl: 'file:///missing-artwork.jpg',
+        );
+
+        final first = fixture.helper.resolveForLibrary(firstTrack);
+        final second = fixture.helper.resolveForLibrary(equivalentTrack);
+        await fixture.musicRepository.firstDownloadStarted.future;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        final callsBeforeCompletion = fixture.musicRepository.downloadCalls;
+        releaseDownload.complete();
+        final results = await Future.wait([first, second]);
+
+        expect(callsBeforeCompletion, 1);
+        expect(fixture.musicRepository.downloadCalls, 1);
+        expect(results[0].track.id, results[1].track.id);
+        expect(results[0].reusedExisting, isFalse);
+        expect(results[1].reusedExisting, isTrue);
+        expect(fixture.libraryRepository.localTracks, hasLength(1));
+      },
+    );
+
+    test(
+      'coalesces distinct initial identities that resolve to the same video',
+      () async {
+        final releaseDownload = Completer<void>();
+        const resolved = TrackInfo(
+          id: 'resolved-shared-video',
+          title: 'Resolved shared song',
+          artist: 'Resolved artist',
+          artists: ['Resolved artist'],
+          album: 'Resolved album',
+          url: 'https://video.example/watch/shared-video',
+          thumbnailUrl: 'file:///missing-resolved-artwork.jpg',
+          duration: Duration(minutes: 3),
+        );
+        final fixture = await _DownloadFixture.create(
+          downloadGate: releaseDownload.future,
+          resolvedInfo: resolved,
+        );
+        addTearDown(fixture.dispose);
+
+        final first = fixture.helper.resolveForLibrary(
+          const TrackInfo(
+            id: 'unresolved-one',
+            title: 'Sin título',
+            artist: 'Desconocido',
+            url: 'https://catalog.example/unresolved/one',
+          ),
+          allowConcurrentDownload: true,
+        );
+        final second = fixture.helper.resolveForLibrary(
+          const TrackInfo(
+            id: 'unresolved-two',
+            title: 'Untitled',
+            artist: 'Unknown',
+            url: 'https://catalog.example/unresolved/two',
+          ),
+          allowConcurrentDownload: true,
+        );
+
+        await fixture.musicRepository.firstDownloadStarted.future;
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+
+        expect(fixture.musicRepository.infoCalls, 2);
+        expect(fixture.musicRepository.downloadCalls, 1);
+
+        releaseDownload.complete();
+        final results = await Future.wait([
+          first,
+          second,
+        ]).timeout(const Duration(seconds: 3));
+
+        expect(results.map((result) => result.track.id).toSet(), hasLength(1));
+        expect(results.where((result) => result.reusedExisting), hasLength(1));
+        expect(
+          results.where((result) => result.downloadResult != null),
+          hasLength(1),
+        );
+        expect(fixture.musicRepository.downloadCalls, 1);
+        expect(fixture.libraryRepository.localTracks, hasLength(1));
+      },
+    );
+
+    test(
+      'keeps coalesced and serialized resolutions gated before maintenance',
+      () async {
+        final releaseDownload = Completer<void>();
+        final fixture = await _DownloadFixture.create(
+          downloadGate: releaseDownload.future,
+        );
+        addTearDown(fixture.dispose);
+        final firstTrack = _remoteTrack(
+          id: 'dQw4w9WgXcQ',
+          url: 'https://youtu.be/dQw4w9WgXcQ',
+          thumbnailUrl: 'file:///missing-first-artwork.jpg',
+        );
+        final equivalentTrack = _remoteTrack(
+          id: 'dQw4w9WgXcQ',
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+          thumbnailUrl: 'file:///missing-equivalent-artwork.jpg',
+        );
+        final serializedTrack = _remoteTrack(
+          id: 'another-video-id',
+          url: 'https://catalog.example/tracks/serialized',
+          thumbnailUrl: 'file:///missing-serialized-artwork.jpg',
+        );
+
+        final first = fixture.helper.resolveForLibrary(firstTrack);
+        final coalesced = fixture.helper.resolveForLibrary(equivalentTrack);
+        final serialized = fixture.helper.resolveForLibrary(serializedTrack);
+        await fixture.musicRepository.firstDownloadStarted.future;
+
+        var maintenanceRan = false;
+        final maintenance = fixture.container
+            .read(libraryOperationCoordinatorProvider)
+            .runExclusive(
+              LibraryMaintenancePhase.migratingDirectory,
+              () async => maintenanceRan = true,
+            );
+        await Future<void>.delayed(Duration.zero);
+        expect(maintenanceRan, isFalse);
+
+        releaseDownload.complete();
+        final results = await Future.wait([
+          first,
+          coalesced,
+          serialized,
+        ]).timeout(const Duration(seconds: 3));
+        await maintenance.timeout(const Duration(seconds: 3));
+
+        expect(maintenanceRan, isTrue);
+        expect(fixture.musicRepository.downloadCalls, 2);
+        expect(results[0].track.id, results[1].track.id);
+        expect(results[2].track.id, isNot(results[0].track.id));
+      },
+    );
+
+    test(
+      'runs distinct restore downloads concurrently with a global limit',
+      () async {
+        final releaseDownloads = Completer<void>();
+        final fixture = await _DownloadFixture.create(
+          downloadGate: releaseDownloads.future,
+        );
+        addTearDown(fixture.dispose);
+        final operations = [
+          for (var index = 0; index < 4; index++)
+            fixture.helper.resolveForLibrary(
+              _remoteTrack(
+                id: 'restore-$index',
+                url: 'https://catalog.example/tracks/restore-$index',
+                thumbnailUrl: 'file:///missing-$index-artwork.jpg',
+              ),
+              allowConcurrentDownload: true,
+            ),
+        ];
+
+        await _waitUntil(() => fixture.musicRepository.downloadCalls == 3);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        expect(fixture.musicRepository.downloadCalls, 3);
+
+        releaseDownloads.complete();
+        final results = await Future.wait(
+          operations,
+        ).timeout(const Duration(seconds: 3));
+
+        expect(fixture.musicRepository.downloadCalls, 4);
+        expect(results.map((result) => result.track.id).toSet(), hasLength(4));
+        expect(fixture.libraryRepository.localTracks, hasLength(4));
+      },
+    );
+
+    test(
+      'rejects an unrelated fallback file returned by the backend',
+      () async {
+        final fixture = await _DownloadFixture.create(
+          returnUnrelatedFile: true,
+        );
+        addTearDown(fixture.dispose);
+
+        await expectLater(
+          fixture.helper.resolveForLibrary(
+            _remoteTrack(url: 'https://catalog.example/tracks/42'),
+          ),
+          throwsA(anything),
+        );
+
+        expect(fixture.libraryRepository.localTracks, isEmpty);
+      },
+    );
+
+    test(
+      'persists complete InnerTube metadata without an info lookup',
+      () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        const track = TrackInfo(
+          id: 'music-song-id',
+          title: 'Canonical song',
+          artist: 'Artist One, Artist Two',
+          artists: ['Artist One', 'Artist Two'],
+          album: 'Canonical album',
+          url: 'https://catalog.example/tracks/inner-tube-song',
+          thumbnailUrl: 'file:///missing-primary-artwork.jpg',
+          catalogThumbnailUrl: 'file:///missing-catalog-artwork.jpg',
+          duration: Duration(minutes: 4, seconds: 12),
+          metadataSource: TrackMetadataSource.youtubeMusic,
+        );
+
+        final result = await fixture.helper.resolveForLibrary(track);
+
+        expect(fixture.musicRepository.infoCalls, 0);
+        expect(result.track.album, track.album);
+        expect(result.track.artists, track.artists);
+        expect(result.track.metadataSource, TrackMetadataSource.youtubeMusic);
+        expect(result.track.sourceId, track.id);
+        expect(result.track.thumbnailUrl, track.thumbnailUrl);
+        expect(result.track.catalogThumbnailUrl, track.catalogThumbnailUrl);
+      },
+    );
+
+    test('stores catalog artwork before the video thumbnail', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final requestedPaths = <String>[];
+      server.listen((request) async {
+        requestedPaths.add(request.uri.path);
+        if (request.uri.path == '/catalog.jpg') {
+          request.response.headers.contentType = ContentType('image', 'jpeg');
+          request.response.add(_validArtworkBytes);
+        } else {
+          request.response.statusCode = HttpStatus.notFound;
+        }
+        await request.response.close();
+      });
+      final origin = 'http://${server.address.address}:${server.port}';
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final track = TrackInfo(
+        id: 'catalog-art-id',
+        title: 'Artwork fallback song',
+        artist: 'Catalog artist',
+        artists: const ['Catalog artist'],
+        album: 'Catalog album',
+        url: 'https://catalog.example/tracks/artwork-fallback',
+        thumbnailUrl: '$origin/primary.jpg',
+        catalogThumbnailUrl: '$origin/catalog.jpg',
+        duration: const Duration(minutes: 3),
+        metadataSource: TrackMetadataSource.youtubeMusic,
+      );
+
+      final result = await HttpOverrides.runWithHttpOverrides(
+        () => fixture.helper.resolveForLibrary(track),
+        _RealHttpOverrides(),
+      );
+
+      expect(requestedPaths, ['/catalog.jpg']);
+      expect(result.track.thumbnailUrl, '$origin/catalog.jpg');
+      expect(result.track.catalogThumbnailUrl, '$origin/catalog.jpg');
+      expect(result.track.thumbnailPath, isNotNull);
+      expect(await File(result.track.thumbnailPath!).length(), greaterThan(0));
+      expect(
+        await Directory(
+          p.dirname(result.track.thumbnailPath!),
+        ).list().where((entity) => entity.path.endsWith('.part')).isEmpty,
+        isTrue,
+      );
+    });
+
+    test('rejects an HTML response disguised as JPEG artwork', () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final requestedPaths = <String>[];
+      server.listen((request) async {
+        requestedPaths.add(request.uri.path);
+        request.response.headers.contentType = ContentType('image', 'jpeg');
+        if (request.uri.path == '/primary.jpg') {
+          request.response.add(_validArtworkBytes);
+        } else {
+          request.response.add('<html>not an image</html>'.codeUnits);
+        }
+        await request.response.close();
+      });
+      final origin = 'http://${server.address.address}:${server.port}';
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final track = TrackInfo(
+        id: 'validated-art-id',
+        title: 'Validated artwork song',
+        artist: 'Artist',
+        artists: const ['Artist'],
+        album: 'Album',
+        url: 'https://catalog.example/tracks/validated-art',
+        thumbnailUrl: '$origin/primary.jpg',
+        catalogThumbnailUrl: '$origin/catalog.jpg',
+        duration: const Duration(minutes: 3),
+        metadataSource: TrackMetadataSource.youtubeMusic,
+      );
+
+      final result = await HttpOverrides.runWithHttpOverrides(
+        () => fixture.helper.resolveForLibrary(track),
+        _RealHttpOverrides(),
+      );
+
+      expect(requestedPaths, ['/catalog.jpg', '/primary.jpg']);
+      expect(result.track.thumbnailUrl, '$origin/primary.jpg');
+      expect(
+        await File(result.track.thumbnailPath!).readAsBytes(),
+        _validArtworkBytes,
+      );
+    });
+
+    test(
+      'repairs legacy local artwork from the catalog without downloading audio',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final requestedPaths = <String>[];
+        final sharpArtwork = _validArtworkBytes;
+        server.listen((request) async {
+          requestedPaths.add(request.uri.path);
+          if (request.uri.path == '/catalog.jpg') {
+            request.response.headers.contentType = ContentType('image', 'jpeg');
+            request.response.add(sharpArtwork);
+          } else {
+            request.response.statusCode = HttpStatus.notFound;
+          }
+          await request.response.close();
+        });
+        final origin = 'http://${server.address.address}:${server.port}';
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        final audioFile = File(p.join(fixture.tempDirectory.path, 'song.m4a'));
+        await audioFile.writeAsBytes(const [1, 2, 3], flush: true);
+        final softArtwork = File(
+          p.join(fixture.tempDirectory.path, 'legacy-soft.jpg'),
+        );
+        await softArtwork.writeAsBytes(const [
+          0xFF,
+          0xD8,
+          0xFF,
+          0xD9,
+        ], flush: true);
+        final legacy = LocalTrack(
+          id: 'legacy-artwork-track',
+          title: 'Legacy artwork song',
+          artist: 'Catalog artist',
+          filePath: audioFile.path,
+          addedAt: DateTime(2025),
+          sourceUrl: 'https://catalog.example/tracks/legacy-artwork',
+          thumbnailUrl: '$origin/video.jpg',
+          catalogThumbnailUrl: '$origin/catalog.jpg',
+          thumbnailPath: softArtwork.path,
+          duration: const Duration(minutes: 3),
+          // Old rows can have this default even after gaining catalog data.
+          metadataSource: TrackMetadataSource.youtube,
+        );
+        fixture.libraryRepository.localTracks.add(legacy);
+
+        final repaired = await HttpOverrides.runWithHttpOverrides(
+          () => fixture.helper.repairStoredArtwork([legacy]),
+          _RealHttpOverrides(),
+        );
+        final updated = fixture.libraryRepository.localTracks.single;
+
+        expect(repaired, 1);
+        expect(requestedPaths, ['/catalog.jpg']);
+        expect(updated.thumbnailUrl, '$origin/catalog.jpg');
+        expect(updated.thumbnailPath, isNot(softArtwork.path));
+        expect(await File(updated.thumbnailPath!).readAsBytes(), sharpArtwork);
+        expect(await audioFile.readAsBytes(), const [1, 2, 3]);
+        expect(fixture.musicRepository.downloadCalls, 0);
+
+        final secondPass = await HttpOverrides.runWithHttpOverrides(
+          () => fixture.helper.repairStoredArtwork([updated]),
+          _RealHttpOverrides(),
+        );
+        expect(secondPass, 0);
+        expect(requestedPaths, ['/catalog.jpg']);
+      },
+    );
+
+    test(
+      'repairs a missing legacy cover from the persistent display cache',
+      () async {
+        const exact =
+            'https://i.ytimg.com/vi/abcdefghijk/mqdefault.jpg?catalog=1';
+        late File cachedArtwork;
+        final cacheLookups = <String>[];
+        final fixture = await _DownloadFixture.create(
+          artworkCacheFileLookup: (source) async {
+            cacheLookups.add(source);
+            return source == exact ? cachedArtwork : null;
+          },
+        );
+        addTearDown(fixture.dispose);
+        cachedArtwork = File(
+          p.join(fixture.tempDirectory.path, 'cached-preview.jpg'),
+        );
+        await cachedArtwork.writeAsBytes(_validArtworkBytes);
+        final legacy = LocalTrack(
+          id: 'legacy-cache-track',
+          title: 'Cached legacy artwork',
+          artist: 'Artist',
+          filePath: p.join(fixture.tempDirectory.path, 'audio.m4a'),
+          addedAt: DateTime(2025),
+          sourceUrl: 'https://youtube.com/watch?v=abcdefghijk',
+          thumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hq720.jpg',
+          catalogThumbnailUrl: exact,
+          sourceId: 'abcdefghijk',
+        );
+        fixture.libraryRepository.localTracks.add(legacy);
+
+        final repaired = await fixture.helper.repairStoredArtwork([legacy]);
+        final updated = fixture.libraryRepository.localTracks.single;
+
+        expect(repaired, 1);
+        expect(cacheLookups, [exact]);
+        expect(updated.thumbnailUrl, exact);
+        expect(updated.thumbnailPath, isNotNull);
+        expect(updated.thumbnailPath, isNot(cachedArtwork.path));
+        expect(
+          await File(updated.thumbnailPath!).readAsBytes(),
+          await cachedArtwork.readAsBytes(),
+        );
+        expect(fixture.musicRepository.downloadCalls, 0);
+      },
+    );
+
+    test(
+      'keeps a valid stored fallback without redownloading an ideal variant',
+      () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        final artwork = File(
+          p.join(fixture.tempDirectory.path, 'stored-fallback.jpg'),
+        );
+        await artwork.writeAsBytes(_validArtworkBytes);
+        final local = LocalTrack(
+          id: 'stored-fallback-track',
+          title: 'Stored fallback',
+          artist: 'Artist',
+          filePath: p.join(fixture.tempDirectory.path, 'audio.m4a'),
+          addedAt: DateTime(2026),
+          sourceUrl: 'https://youtube.com/watch?v=abcdefghijk',
+          thumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hqdefault.jpg',
+          catalogThumbnailUrl: 'https://i.ytimg.com/vi/abcdefghijk/hq720.jpg',
+          thumbnailPath: artwork.path,
+        );
+
+        final repaired = await fixture.helper.repairStoredArtwork([local]);
+
+        expect(repaired, 0);
+      },
+    );
+
+    test(
+      'accepts a valid direct fallback when distinct catalog art was unavailable',
+      () async {
+        final cacheLookups = <String>[];
+        final fixture = await _DownloadFixture.create(
+          artworkCacheFileLookup: (source) async {
+            cacheLookups.add(source);
+            return null;
+          },
+        );
+        addTearDown(fixture.dispose);
+        final artwork = File(
+          p.join(fixture.tempDirectory.path, 'stored-direct-fallback.png'),
+        );
+        await artwork.writeAsBytes(_validArtworkBytes);
+        final local = LocalTrack(
+          id: 'stored-direct-family-track',
+          title: 'Stored direct family',
+          artist: 'Artist',
+          filePath: p.join(fixture.tempDirectory.path, 'audio.m4a'),
+          addedAt: DateTime(2026),
+          sourceUrl: 'https://catalog.example/tracks/direct-family',
+          thumbnailUrl: 'https://images.example/direct.png',
+          catalogThumbnailUrl: 'https://images.example/missing-catalog.png',
+          thumbnailPath: artwork.path,
+        );
+
+        final repaired = await fixture.helper.repairStoredArtwork([local]);
+
+        expect(repaired, 0);
+        expect(cacheLookups, isEmpty);
+      },
+    );
+
+    test(
+      'reuses full-frame validation only for an unchanged stored cover',
+      () async {
+        var validations = 0;
+        final fixture = await _DownloadFixture.create(
+          thumbnailValidator: (bytes) async {
+            validations++;
+            return image.decodeImage(bytes) == null ? null : '.png';
+          },
+        );
+        addTearDown(fixture.dispose);
+        final artwork = File(
+          p.join(fixture.tempDirectory.path, 'unchanged.png'),
+        );
+        await artwork.writeAsBytes(_validArtworkBytes);
+        final local = LocalTrack(
+          id: 'unchanged-art-track',
+          title: 'Unchanged artwork',
+          artist: 'Artist',
+          filePath: p.join(fixture.tempDirectory.path, 'audio.m4a'),
+          addedAt: DateTime(2026),
+          sourceUrl: 'https://catalog.example/tracks/unchanged',
+          thumbnailUrl: 'https://images.example/art.png',
+          thumbnailPath: artwork.path,
+        );
+
+        expect(await fixture.helper.repairStoredArtwork([local]), 0);
+        expect(await fixture.helper.repairStoredArtwork([local]), 0);
+        expect(validations, 1);
+
+        await artwork.setLastModified(DateTime.utc(2030));
+        expect(await fixture.helper.repairStoredArtwork([local]), 0);
+        expect(validations, 2);
+        expect(fixture.musicRepository.downloadCalls, 0);
+      },
+    );
+
+    for (final mutation in ['corrupt', 'delete']) {
+      test(
+        'repairs a previously validated cover after $mutation without touching audio',
+        () async {
+          late File cached;
+          final fixture = await _DownloadFixture.create(
+            artworkCacheFileLookup: (_) async => cached,
+          );
+          addTearDown(fixture.dispose);
+          final artwork = File(
+            p.join(fixture.tempDirectory.path, 'changed.png'),
+          );
+          cached = File(p.join(fixture.tempDirectory.path, 'cached.png'));
+          final audio = File(p.join(fixture.tempDirectory.path, 'audio.m4a'));
+          await artwork.writeAsBytes(_validArtworkBytes);
+          await cached.writeAsBytes(_validArtworkBytes);
+          await audio.writeAsBytes([4, 3, 2, 1]);
+          final local = LocalTrack(
+            id: 'changed-art-track',
+            title: 'Changed artwork',
+            artist: 'Artist',
+            filePath: audio.path,
+            addedAt: DateTime(2026),
+            sourceUrl: 'https://catalog.example/tracks/changed',
+            thumbnailUrl: 'https://images.example/art.png',
+            thumbnailPath: artwork.path,
+          );
+          fixture.libraryRepository.localTracks.add(local);
+          expect(await fixture.helper.repairStoredArtwork([local]), 0);
+          if (mutation == 'delete') {
+            await artwork.delete();
+          } else {
+            // Same length and file path, but an invalid PNG frame. A successful
+            // validation from the previous pass must not mask this replacement.
+            final damaged = List<int>.of(_validArtworkBytes);
+            damaged.fillRange(8, damaged.length, 0);
+            await artwork.writeAsBytes(damaged, flush: true);
+            await artwork.setLastModified(DateTime.utc(2030));
+          }
+
+          expect(await fixture.helper.repairStoredArtwork([local]), 1);
+          final repaired = fixture.libraryRepository.localTracks.single;
+          expect(
+            await File(repaired.thumbnailPath!).readAsBytes(),
+            _validArtworkBytes,
+          );
+          expect(await audio.readAsBytes(), [4, 3, 2, 1]);
+          expect(fixture.musicRepository.downloadCalls, 0);
+        },
+      );
+    }
+
+    test(
+      'rolls back newly downloaded audio and artwork when persistence fails',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          request.response.headers.contentType = ContentType('image', 'jpeg');
+          request.response.add(_validArtworkBytes);
+          await request.response.close();
+        });
+        final fixture = await _DownloadFixture.create(
+          failSavingLocalTrack: true,
+        );
+        addTearDown(fixture.dispose);
+        final artwork =
+            'http://${server.address.address}:${server.port}/artwork.jpg';
+        final track = TrackInfo(
+          id: 'rollback-song-id',
+          title: 'Rollback song',
+          artist: 'Rollback artist',
+          artists: const ['Rollback artist'],
+          album: 'Rollback album',
+          url: 'https://catalog.example/tracks/rollback-song',
+          thumbnailUrl: artwork,
+          duration: const Duration(minutes: 3),
+          metadataSource: TrackMetadataSource.youtubeMusic,
+        );
+
+        await expectLater(
+          HttpOverrides.runWithHttpOverrides(
+            () => fixture.helper.resolveForLibrary(track),
+            _RealHttpOverrides(),
+          ),
+          throwsA(isA<StateError>()),
+        );
+
+        final artifacts = await fixture.tempDirectory
+            .list(recursive: true)
+            .where((entity) => entity is File)
+            .cast<File>()
+            .toList();
+        expect(artifacts, isEmpty);
+        expect(fixture.libraryRepository.localTracks, isEmpty);
+        expect(fixture.musicRepository.downloadCalls, 1);
+      },
+    );
+
+    test('fills only missing fields from resolved playback metadata', () async {
+      const url = 'https://catalog.example/tracks/incomplete-song';
+      final fixture = await _DownloadFixture.create(
+        resolvedInfo: const TrackInfo(
+          id: 'resolved-video-id',
+          title: 'Decorated video title (Official Video)',
+          artist: 'Resolved Artist',
+          artists: ['Resolved Artist'],
+          album: 'Resolved album',
+          url: url,
+          thumbnailUrl: 'file:///resolved-artwork.jpg',
+          duration: Duration(minutes: 3, seconds: 44),
+        ),
+      );
+      addTearDown(fixture.dispose);
+      const track = TrackInfo(
+        id: 'catalog-song-id',
+        title: 'Canonical title',
+        artist: 'Desconocido',
+        url: url,
+        catalogThumbnailUrl: 'file:///catalog-artwork.jpg',
+        metadataSource: TrackMetadataSource.youtubeMusic,
+      );
+
+      final result = await fixture.helper.resolveForLibrary(track);
+
+      expect(fixture.musicRepository.infoCalls, 1);
+      expect(result.track.title, 'Canonical title');
+      expect(result.track.artist, 'Resolved Artist');
+      expect(result.track.artists, const ['Resolved Artist']);
+      expect(result.track.album, 'Resolved album');
+      expect(result.track.duration, const Duration(minutes: 3, seconds: 44));
+      expect(result.track.thumbnailUrl, 'file:///resolved-artwork.jpg');
+      expect(result.track.catalogThumbnailUrl, track.catalogThumbnailUrl);
+      expect(result.track.metadataSource, TrackMetadataSource.youtubeMusic);
+      expect(result.track.sourceId, track.id);
+    });
+
+    test(
+      'enriches a reused legacy row without downloading audio again',
+      () async {
+        final fixture = await _DownloadFixture.create();
+        addTearDown(fixture.dispose);
+        final existing = await fixture.addExisting(
+          sourceUrl: 'https://catalog.example/tracks/42',
+          audioFormat: _downloadFormat,
+        );
+        const canonical = TrackInfo(
+          id: 'catalog-track-42',
+          title: 'Canonical title',
+          artist: 'First Artist, Guest Artist',
+          artists: ['First Artist', 'Guest Artist'],
+          album: 'Canonical album',
+          url: 'https://catalog.example/tracks/42',
+          thumbnailUrl: 'file:///missing-primary-artwork.jpg',
+          catalogThumbnailUrl: 'file:///missing-catalog-artwork.jpg',
+          duration: Duration(minutes: 3),
+          metadataSource: TrackMetadataSource.youtubeMusic,
+          streamBitrate: 96000,
+          streamCodec: 'opus',
+        );
+
+        final result = await fixture.helper.resolveForLibrary(canonical);
+
+        expect(result.reusedExisting, isTrue);
+        expect(result.track.id, existing.id);
+        expect(result.track.filePath, existing.filePath);
+        expect(result.track.title, canonical.title);
+        expect(result.track.artist, canonical.artist);
+        expect(result.track.album, canonical.album);
+        expect(result.track.artists, canonical.artists);
+        expect(result.track.metadataSource, TrackMetadataSource.youtubeMusic);
+        expect(result.track.sourceId, canonical.id);
+        expect(result.track.audioFormat, _downloadFormat);
+        expect(fixture.musicRepository.downloadCalls, 0);
+        expect(
+          fixture.libraryRepository.localTracks.single,
+          same(result.track),
+        );
+      },
+    );
+  });
+
+  group('DownloadController deduplication', () {
+    test('direct download reuses an existing library track', () async {
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final existing = await fixture.addExisting(
+        sourceUrl: 'https://catalog.example/tracks/42',
+      );
+      final track = _remoteTrack(url: 'https://catalog.example/tracks/42');
+
+      await fixture.container
+          .read(downloadControllerProvider.notifier)
+          .downloadAudio(track);
+      await _waitUntil(
+        () =>
+            fixture.container
+                .read(downloadControllerProvider)[track.url]
+                ?.status ==
+            DownloadProgressStatus.completed,
+      );
+
+      final task = fixture.container.read(
+        downloadControllerProvider,
+      )[track.url]!;
+      expect(task.reusedExisting, isTrue);
+      expect(task.localTrack?.id, existing.id);
+      expect(task.localTrack?.filePath, existing.filePath);
+      expect(fixture.musicRepository.downloadCalls, 0);
+    });
+
+    test('direct library download reuses Biblioteca', () async {
+      final fixture = await _DownloadFixture.create();
+      addTearDown(fixture.dispose);
+      final existing = await fixture.addExisting(
+        sourceUrl: 'https://catalog.example/tracks/42',
+      );
+
+      final result = await fixture.container
+          .read(downloadControllerProvider.notifier)
+          .downloadAudioForLibrary(
+            _remoteTrack(url: 'https://catalog.example/tracks/42'),
+          );
+
+      expect(result.id, existing.id);
+      expect(result.filePath, existing.filePath);
+      expect(fixture.musicRepository.downloadCalls, 0);
+      expect(fixture.container.read(downloadControllerProvider), isEmpty);
+    });
+
+    test(
+      'progress from a foreign task id cannot mutate the active task',
+      () async {
+        final releaseDownload = Completer<void>();
+        final fixture = await _DownloadFixture.create(
+          downloadGate: releaseDownload.future,
+        );
+        addTearDown(fixture.dispose);
+        final track = _remoteTrack(url: 'https://catalog.example/tracks/42');
+        final controller = fixture.container.read(
+          downloadControllerProvider.notifier,
+        );
+
+        await controller.downloadAudio(track);
+        await fixture.musicRepository.firstDownloadStarted.future;
+        final task = fixture.container.read(
+          downloadControllerProvider,
+        )[track.url]!;
+
+        fixture.progressService.emit(
+          DownloadProgress(
+            taskId: 'another-download-task',
+            url: track.url,
+            status: DownloadProgressStatus.running,
+            progress: 0.73,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+
+        var current = fixture.container.read(
+          downloadControllerProvider,
+        )[track.url]!;
+        expect(current.taskId, task.taskId);
+        expect(current.progress, isNull);
+
+        fixture.progressService.emit(
+          DownloadProgress(
+            taskId: task.taskId,
+            url: 'https://redirected.example/audio',
+            status: DownloadProgressStatus.running,
+            progress: 0.41,
+          ),
+        );
+        await Future<void>.delayed(Duration.zero);
+        current = fixture.container.read(
+          downloadControllerProvider,
+        )[track.url]!;
+        expect(current.progress, 0.41);
+
+        releaseDownload.complete();
+        await _waitUntil(
+          () =>
+              fixture.container
+                  .read(downloadControllerProvider)[track.url]
+                  ?.status ==
+              DownloadProgressStatus.completed,
+        );
+      },
+    );
+
+    test('fallback clears the primary error and restarts progress', () async {
+      final releaseDownload = Completer<void>();
+      final fixture = await _DownloadFixture.create(
+        downloadGate: releaseDownload.future,
+      );
+      addTearDown(fixture.dispose);
+      final track = _remoteTrack(url: 'https://catalog.example/tracks/42');
+      await fixture.container
+          .read(downloadControllerProvider.notifier)
+          .downloadAudio(track);
+      await fixture.musicRepository.firstDownloadStarted.future;
+      final task = fixture.container.read(
+        downloadControllerProvider,
+      )[track.url]!;
+
+      fixture.progressService.emit(
+        DownloadProgress(
+          taskId: task.taskId,
+          url: track.url,
+          status: DownloadProgressStatus.running,
+          progress: 0.64,
+        ),
+      );
+      fixture.progressService.emit(
+        DownloadProgress(
+          taskId: task.taskId,
+          url: track.url,
+          status: DownloadProgressStatus.failed,
+          progress: 0.64,
+          message: 'InnerTube principal falló; usando cliente alternativo',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(
+        fixture.container
+            .read(downloadControllerProvider)[track.url]
+            ?.errorMessage,
+        contains('InnerTube principal'),
+      );
+
+      fixture.progressService.emit(
+        DownloadProgress(
+          taskId: task.taskId,
+          url: track.url,
+          status: DownloadProgressStatus.queued,
+          progress: 0,
+          message: 'Preparando cliente InnerTube alternativo',
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+      final fallback = fixture.container.read(
+        downloadControllerProvider,
+      )[track.url]!;
+      expect(fallback.status, DownloadProgressStatus.queued);
+      expect(fallback.progress, 0);
+      expect(fallback.errorMessage, isNull);
+
+      releaseDownload.complete();
+      await _waitUntil(
+        () =>
+            fixture.container
+                .read(downloadControllerProvider)[track.url]
+                ?.status ==
+            DownloadProgressStatus.completed,
+      );
+    });
+
+    test('removes a queued download without starting its transfer', () async {
+      final releaseDownload = Completer<void>();
+      final fixture = await _DownloadFixture.create(
+        downloadGate: releaseDownload.future,
+      );
+      addTearDown(fixture.dispose);
+      final first = _remoteTrack(
+        id: 'first-track',
+        url: 'https://catalog.example/tracks/first',
+      );
+      final queued = _remoteTrack(
+        id: 'queued-track',
+        url: 'https://catalog.example/tracks/queued',
+      );
+      final controller = fixture.container.read(
+        downloadControllerProvider.notifier,
+      );
+
+      await controller.downloadAudio(first);
+      await fixture.musicRepository.firstDownloadStarted.future;
+      await controller.downloadAudio(queued);
+      expect(
+        fixture.container.read(downloadControllerProvider)[queued.url]?.status,
+        DownloadProgressStatus.queued,
+      );
+
+      expect(await controller.cancelDownload(queued.url), isTrue);
+      expect(
+        fixture.container.read(downloadControllerProvider),
+        isNot(contains(queued.url)),
+      );
+      expect(fixture.progressService.cancelledTaskIds, isEmpty);
+
+      releaseDownload.complete();
+      await _waitUntil(() => fixture.musicRepository.completedDownloads == 1);
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect(fixture.musicRepository.downloadCalls, 1);
+    });
+
+    test('cancels an active task and discards its completed residue', () async {
+      final releaseDownload = Completer<void>();
+      final fixture = await _DownloadFixture.create(
+        downloadGate: releaseDownload.future,
+      );
+      addTearDown(fixture.dispose);
+      final track = _remoteTrack(
+        url: 'https://catalog.example/tracks/cancel-active',
+      );
+      final controller = fixture.container.read(
+        downloadControllerProvider.notifier,
+      );
+
+      await controller.downloadAudio(track);
+      await fixture.musicRepository.firstDownloadStarted.future;
+      final taskId = fixture.container
+          .read(downloadControllerProvider)[track.url]!
+          .taskId;
+
+      expect(await controller.cancelDownload(track.url), isTrue);
+      expect(fixture.container.read(downloadControllerProvider), isEmpty);
+      expect(fixture.progressService.cancelledTaskIds, <String>[taskId]);
+
+      releaseDownload.complete();
+      await _waitUntil(() => fixture.musicRepository.completedDownloads == 1);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+
+      expect(fixture.libraryRepository.localTracks, isEmpty);
+      final audioDirectory = Directory(
+        p.join(fixture.tempDirectory.path, 'audio'),
+      );
+      expect(
+        await audioDirectory.list().where((entity) => entity is File).toList(),
+        isEmpty,
+      );
+    });
+  });
+}
+
+TrackInfo _remoteTrack({
+  String id = 'remote-42',
+  required String url,
+  String thumbnailUrl = '',
+}) {
+  return TrackInfo(
+    id: id,
+    title: 'La misma canción',
+    artist: 'El mismo artista',
+    url: url,
+    thumbnailUrl: thumbnailUrl,
+    duration: const Duration(minutes: 3),
+  );
+}
+
+Future<void> _waitUntil(bool Function() predicate) async {
+  for (var attempt = 0; attempt < 100; attempt++) {
+    if (predicate()) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  fail('Timed out waiting for the expected download state.');
+}
+
+class _DownloadFixture {
+  _DownloadFixture._({
+    required this.tempDirectory,
+    required this.libraryRepository,
+    required this.musicRepository,
+    required this.progressService,
+    required this.container,
+    required this.metadataService,
+  });
+
+  final Directory tempDirectory;
+  final _MemoryLibraryRepository libraryRepository;
+  final _RecordingMusicRepository musicRepository;
+  final _ProgressOnlyDownloaderService progressService;
+  final ProviderContainer container;
+  final _RecordingAudioMetadataService metadataService;
+
+  LocalTrackDownloadHelper get helper =>
+      container.read(localTrackDownloadHelperProvider);
+
+  static Future<_DownloadFixture> create({
+    Future<void>? downloadGate,
+    bool returnUnrelatedFile = false,
+    TrackInfo? resolvedInfo,
+    bool failSavingLocalTrack = false,
+    ArtworkCacheFileLookup? artworkCacheFileLookup,
+    LocalTrackThumbnailValidator? thumbnailValidator,
+    LocalTrackLegacyArtworkCleanup? legacyArtworkCleanup,
+    _RecordingAudioMetadataService? metadataService,
+  }) async {
+    final tempDirectory = await Directory.systemTemp.createTemp(
+      'bstream-download-dedupe-',
+    );
+    final libraryRepository = _MemoryLibraryRepository(
+      failSavingLocalTrack: failSavingLocalTrack,
+    );
+    final musicRepository = _RecordingMusicRepository(
+      downloadGate: downloadGate,
+      returnUnrelatedFile: returnUnrelatedFile,
+      resolvedInfo: resolvedInfo,
+    );
+    final progressService = _ProgressOnlyDownloaderService();
+    final effectiveMetadataService =
+        metadataService ?? _RecordingAudioMetadataService();
+    final settingsController = _FixedSettingsController(tempDirectory.path);
+    final container = ProviderContainer(
+      overrides: [
+        libraryRepositoryProvider.overrideWithValue(libraryRepository),
+        musicRepositoryProvider.overrideWithValue(musicRepository),
+        downloadAudioMetadataServiceProvider.overrideWithValue(
+          effectiveMetadataService,
+        ),
+        downloaderServiceProvider.overrideWithValue(progressService),
+        settingsControllerProvider.overrideWith(() => settingsController),
+        artworkCacheFileLookupProvider.overrideWithValue(
+          artworkCacheFileLookup ?? (_) async => null,
+        ),
+        if (thumbnailValidator != null || legacyArtworkCleanup != null)
+          localTrackDownloadHelperProvider.overrideWith(
+            (ref) => LocalTrackDownloadHelper(
+              ref,
+              thumbnailValidator: thumbnailValidator,
+              legacyArtworkCleanup: legacyArtworkCleanup,
+            ),
+          ),
+      ],
+    );
+    return _DownloadFixture._(
+      tempDirectory: tempDirectory,
+      libraryRepository: libraryRepository,
+      musicRepository: musicRepository,
+      progressService: progressService,
+      container: container,
+      metadataService: effectiveMetadataService,
+    );
+  }
+
+  Future<LocalTrack> addExisting({
+    required String sourceUrl,
+    bool createFile = true,
+    List<int> contents = const [1, 2, 3],
+    AudioFormatDetails? audioFormat,
+  }) async {
+    final file = File(
+      p.join(
+        tempDirectory.path,
+        'existing-${libraryRepository.localTracks.length}.m4a',
+      ),
+    );
+    if (createFile) {
+      await file.writeAsBytes(contents, flush: true);
+    }
+    final track = LocalTrack(
+      id: 'existing-${libraryRepository.localTracks.length}',
+      title: 'La misma canción',
+      artist: 'El mismo artista',
+      filePath: file.path,
+      addedAt: DateTime(2025),
+      sourceUrl: sourceUrl,
+      duration: const Duration(minutes: 3),
+      audioFormat: audioFormat,
+    );
+    libraryRepository.localTracks.add(track);
+    return track;
+  }
+
+  Future<void> dispose() async {
+    container.dispose();
+    await progressService.close();
+    if (await tempDirectory.exists()) {
+      await tempDirectory.delete(recursive: true);
+    }
+  }
+}
+
+typedef _AudioMetadataCall = ({
+  String filePath,
+  String title,
+  String artist,
+  String? album,
+  String? artworkPath,
+});
+
+class _RecordingAudioMetadataService implements DownloadAudioMetadataService {
+  _RecordingAudioMetadataService({this.onEmbed});
+
+  final Future<AudioMetadataWriteResult> Function(_AudioMetadataCall call)?
+  onEmbed;
+  final calls = <_AudioMetadataCall>[];
+
+  @override
+  Future<AudioMetadataWriteResult> embed({
+    required String filePath,
+    required String title,
+    required String artist,
+    String? album,
+    String? artworkPath,
+  }) async {
+    final call = (
+      filePath: filePath,
+      title: title,
+      artist: artist,
+      album: album,
+      artworkPath: artworkPath,
+    );
+    calls.add(call);
+    return await onEmbed?.call(call) ?? AudioMetadataWriteResult.unsupported;
+  }
+}
+
+class _FixedSettingsController extends SettingsController {
+  _FixedSettingsController(this.downloadDirectory);
+
+  final String downloadDirectory;
+
+  @override
+  Future<SettingsState> build() async => SettingsState(
+    downloadDirectory: downloadDirectory,
+    language: AppLanguage.spanish,
+  );
+}
+
+class _RecordingMusicRepository implements MusicRepository {
+  _RecordingMusicRepository({
+    this.downloadGate,
+    this.returnUnrelatedFile = false,
+    this.resolvedInfo,
+  });
+
+  final Future<void>? downloadGate;
+  final bool returnUnrelatedFile;
+  final TrackInfo? resolvedInfo;
+  final firstDownloadStarted = Completer<void>();
+  int downloadCalls = 0;
+  int completedDownloads = 0;
+  int infoCalls = 0;
+
+  @override
+  Future<DownloadResult> downloadAudio(
+    String url,
+    DownloadOptions options,
+  ) async {
+    downloadCalls++;
+    if (!firstDownloadStarted.isCompleted) {
+      firstDownloadStarted.complete();
+    }
+    if (downloadGate != null) {
+      await downloadGate;
+    }
+    final id = 'download-$downloadCalls';
+    final fileName = returnUnrelatedFile
+        ? 'unrelated-existing-audio.m4a'
+        : '${options.fileName ?? id}.m4a';
+    final file = File(p.join(options.outputDirectory, fileName));
+    await file.parent.create(recursive: true);
+    await file.writeAsBytes([1, 2, 3, downloadCalls], flush: true);
+    completedDownloads++;
+    return DownloadResult(
+      id: id,
+      sourceUrl: url,
+      filePath: file.path,
+      fileName: fileName,
+      mediaType: DownloadMediaType.audio,
+      completedAt: DateTime(2026),
+      bytes: await file.length(),
+      audioFormat: _downloadFormat,
+    );
+  }
+
+  @override
+  Future<TrackInfo> getInfo(String url) async {
+    infoCalls++;
+    return resolvedInfo ??
+        TrackInfo(
+          id: 'resolved-id',
+          title: 'La misma canción',
+          artist: 'El mismo artista',
+          artists: const ['El mismo artista'],
+          album: 'Album resuelto',
+          url: url,
+          duration: const Duration(minutes: 3),
+        );
+  }
+
+  @override
+  Future<TrackInfo> getPlaybackInfo(String url) async {
+    return await getInfo(url);
+  }
+
+  @override
+  Future<List<TrackInfo>> search(String query) => throw UnimplementedError();
+}
+
+class _ProgressOnlyDownloaderService
+    implements DownloaderService, CancellableDownloaderService {
+  final _controller = StreamController<DownloadProgress>.broadcast();
+  final List<String> cancelledTaskIds = <String>[];
+
+  @override
+  Stream<DownloadProgress> get progressStream => _controller.stream;
+
+  void emit(DownloadProgress progress) => _controller.add(progress);
+
+  Future<void> close() => _controller.close();
+
+  @override
+  Future<void> cancelDownload(String taskId) async {
+    cancelledTaskIds.add(taskId);
+  }
+
+  @override
+  Future<DownloadResult> downloadAudio(String url, DownloadOptions options) =>
+      throw UnimplementedError();
+
+  @override
+  Future<TrackInfo> getInfo(String url) => throw UnimplementedError();
+
+  @override
+  Future<TrackInfo> getPlaybackInfo(String url) => throw UnimplementedError();
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<List<TrackInfo>> search(String query) => throw UnimplementedError();
+}
+
+class _RealHttpOverrides extends HttpOverrides {}
+
+class _MemoryLibraryRepository implements LibraryRepository {
+  _MemoryLibraryRepository({this.failSavingLocalTrack = false});
+
+  final bool failSavingLocalTrack;
+  final List<LocalTrack> localTracks = [];
+
+  @override
+  Future<List<LocalTrack>> getLocalTracks() async => List.of(localTracks);
+
+  @override
+  Future<void> saveLocalTrack(LocalTrack track) async {
+    if (failSavingLocalTrack) {
+      throw StateError('simulated database write failure');
+    }
+    localTracks.removeWhere((existing) => existing.id == track.id);
+    localTracks.add(track);
+  }
+
+  @override
+  Future<void> deleteLocalTrack(String trackId) async {
+    localTracks.removeWhere((track) => track.id == trackId);
+  }
+
+  @override
+  Future<Set<String>> purgeMissingLocalTracks(List<LocalTrack> tracks) async =>
+      const {};
+
+  @override
+  Future<void> markPlayed(
+    String trackId,
+    DateTime playedAt, {
+    String? playlistId,
+  }) async {}
+
+  @override
+  Future<List<LocalTrack>> getHistory() async => const [];
+
+  @override
+  Future<List<Playlist>> getPlaylists() async => const [];
+
+  @override
+  Future<void> savePlaylist(Playlist playlist) async {}
+
+  @override
+  Future<void> deletePlaylist(String playlistId) async {}
+}

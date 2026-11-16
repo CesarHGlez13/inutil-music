@@ -1,0 +1,899 @@
+name: Release installers
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-installers-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FLUTTER_VERSION: "3.47.9"
+
+jobs:
+  quality:
+    # Stable candidate for the required status check on protected branches.
+    name: Required quality gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
+        with:
+          gradle-version: "8.14.3"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Configure Android Gradle properties
+        shell: bash
+        run: |
+          printf 'sdk.dir=%s\nflutter.sdk=%s\n' "$ANDROID_HOME" "$FLUTTER_ROOT" > android/local.properties
+
+      - name: Verify formatting
+        run: >-
+          dart format --output=none --set-exit-if-changed
+          lib test integration_test test_driver tool
+
+      - name: Analyze source
+        run: flutter analyze
+
+      - name: Run tests
+        run: flutter test --coverage
+
+      - name: Smoke-test LIVE overlay layouts
+        run: node tool/live_overlay_browser_smoke.mjs
+
+      - name: Run Android unit tests
+        working-directory: android
+        run: |
+          gradle --version
+          gradle :app:testDebugUnitTest :just_audio:testDebugUnitTest --no-daemon
+
+      - name: Enforce self-contained media resolver
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eiq '^[[:space:]]*youtube_explode(_dart)?[[:space:]]*:' pubspec.yaml pubspec.lock; then
+            echo "youtube_explode must not be present in the dependency graph." >&2
+            exit 1
+          fi
+
+          legacy_tools="$(
+            find android windows/tools linux/tools macos/tools \
+              -type f \
+              \( \
+                -iname 'yt-dlp*' -o \
+                -iname 'yt_dlp*' -o \
+                -iname 'ytdlp*' -o \
+                -iname 'deno' -o \
+                -iname 'deno.exe' \
+              \) \
+              -print 2>/dev/null || true
+          )"
+          if [[ -n "$legacy_tools" ]]; then
+            echo "External resolver executables must not be vendored:" >&2
+            printf '%s\n' "$legacy_tools" >&2
+            exit 1
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: error
+          retention-days: 14
+          archive: false
+
+  ios:
+    name: iOS unsigned IPA
+    needs: [metadata, quality]
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      APP_VERSION: ${{ needs.metadata.outputs.app_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Analyze source on macOS
+        run: flutter analyze
+
+      - name: Run iOS support tests
+        run: >-
+          flutter test
+          test/ios_support_contract_test.dart
+          test/platform_channels/ios_file_export_channel_test.dart
+          test/platform_channels/ios_local_media_channel_test.dart
+          test/services/local_media/ios_device_audio_catalog_test.dart
+          test/services/media_session/desktop_media_session_factory_test.dart
+          --reporter compact
+
+      - name: Build unsigned iOS simulator app
+        run: flutter build ios --simulator --no-codesign
+
+      - name: Build unsigned iOS device app
+        run: flutter build ios --release --no-codesign
+
+      - name: Package unsigned iOS IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/ios/iphoneos/Runner.app"
+          stage="$RUNNER_TEMP/bstream-ios-ipa"
+          ipa="$PWD/dist/BStream-Music-$APP_VERSION-iOS-unsigned.ipa"
+
+          test -d "$app"
+          test -f "$app/Info.plist"
+          test -x "$app/Runner"
+          test -f "$app/PlugIns/NowPlayingWidget.appex/Info.plist"
+          test -x "$app/PlugIns/NowPlayingWidget.appex/NowPlayingWidget"
+          test ! -e "$app/embedded.mobileprovision"
+          test ! -d "$app/_CodeSignature"
+          /usr/bin/lipo "$app/Runner" -verify_arch arm64
+          /usr/bin/lipo "$app/PlugIns/NowPlayingWidget.appex/NowPlayingWidget" -verify_arch arm64
+
+          built_version="$(
+            /usr/libexec/PlistBuddy \
+              -c 'Print :CFBundleShortVersionString' \
+              "$app/Info.plist"
+          )"
+          test "$built_version" = "$APP_VERSION"
+          if /usr/bin/codesign --verify --deep --strict "$app" >/dev/null 2>&1; then
+            echo "Runner.app was expected to be unsigned, but it has a valid signature." >&2
+            exit 1
+          fi
+
+          rm -rf "$stage"
+          mkdir -p "$stage/Payload" "$PWD/dist"
+          /usr/bin/ditto "$app" "$stage/Payload/Runner.app"
+          (
+            cd "$stage"
+            /usr/bin/zip -qry -X "$ipa" Payload
+          )
+
+          /usr/bin/unzip -tqq "$ipa"
+          entries="$(/usr/bin/unzip -Z1 "$ipa")"
+          grep -Fxq "Payload/Runner.app/Info.plist" <<<"$entries"
+          grep -Fxq "Payload/Runner.app/Runner" <<<"$entries"
+          grep -Fxq "Payload/Runner.app/PlugIns/NowPlayingWidget.appex/Info.plist" <<<"$entries"
+          grep -Fxq "Payload/Runner.app/PlugIns/NowPlayingWidget.appex/NowPlayingWidget" <<<"$entries"
+          if grep -Eq '^__MACOSX/|^Payload/Runner\.app/_CodeSignature/' <<<"$entries"; then
+            echo "The unsigned IPA contains signing data or AppleDouble metadata." >&2
+            exit 1
+          fi
+          if grep -Fxq "Payload/Runner.app/embedded.mobileprovision" <<<"$entries"; then
+            echo "The unsigned IPA unexpectedly contains a provisioning profile." >&2
+            exit 1
+          fi
+
+      - name: Upload unsigned iOS IPA
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-iOS-unsigned
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+  metadata:
+    name: Read app metadata
+    runs-on: ubuntu-latest
+    outputs:
+      app_version: ${{ steps.version.outputs.app_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Read version from pubspec
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          pubspec_version="$(sed -nE 's/^version:[[:space:]]*([^[:space:]#]+)[[:space:]]*(#.*)?$/\1/p' pubspec.yaml)"
+          if [[ ! "$pubspec_version" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(\+[0-9]+)?$ ]]; then
+            echo "pubspec.yaml must contain one stable X.Y.Z version with an optional numeric build suffix" >&2
+            exit 1
+          fi
+          app_version="${BASH_REMATCH[1]}"
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            expected_tag="v$app_version"
+            if [[ "$GITHUB_REF_NAME" != "$expected_tag" ]]; then
+              echo "Release tag '$GITHUB_REF_NAME' must exactly match pubspec version '$expected_tag'" >&2
+              exit 1
+            fi
+          fi
+
+          echo "app_version=$app_version" >> "$GITHUB_OUTPUT"
+
+  android:
+    name: Android release APKs
+    needs: [metadata, quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      APP_VERSION: ${{ needs.metadata.outputs.app_version }}
+      BSTREAM_ANDROID_KEYSTORE_BASE64: ${{ secrets.BSTREAM_ANDROID_KEYSTORE_BASE64 }}
+      BSTREAM_ANDROID_STORE_PASSWORD: ${{ secrets.BSTREAM_ANDROID_STORE_PASSWORD }}
+      BSTREAM_ANDROID_KEY_ALIAS: ${{ secrets.BSTREAM_ANDROID_KEY_ALIAS }}
+      BSTREAM_ANDROID_KEY_PASSWORD: ${{ secrets.BSTREAM_ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Configure Android release signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          required=(
+            BSTREAM_ANDROID_KEYSTORE_BASE64
+            BSTREAM_ANDROID_STORE_PASSWORD
+            BSTREAM_ANDROID_KEY_ALIAS
+            BSTREAM_ANDROID_KEY_PASSWORD
+          )
+          for variable in "${required[@]}"; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "Required GitHub secret is missing: $variable" >&2
+              exit 1
+            fi
+          done
+
+          keystore="$RUNNER_TEMP/bstream-upload-keystore.jks"
+          printf '%s' "$BSTREAM_ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+          echo "BSTREAM_ANDROID_STORE_FILE=$keystore" >> "$GITHUB_ENV"
+
+      - name: Resolve dependencies
+        run: |
+          flutter clean
+          flutter pub get --enforce-lockfile
+
+      - name: Build ARMv7, ARMv8, and x86_64 APKs
+        run: >-
+          flutter build apk
+          --release
+          --split-per-abi
+          --target-platform android-arm,android-arm64,android-x64
+
+      - name: Verify and name Android APKs
+        shell: bash
+        run: |
+          set -euo pipefail
+          output="$PWD/build/app/outputs/flutter-apk"
+          arm32="$output/app-armeabi-v7a-release.apk"
+          arm64="$output/app-arm64-v8a-release.apk"
+          x64="$output/app-x86_64-release.apk"
+          test -f "$arm32"
+          test -f "$arm64"
+          test -f "$x64"
+
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          aapt2="$(find "$ANDROID_HOME/build-tools" -type f -name aapt2 | sort -V | tail -n 1)"
+          test -x "$apksigner"
+          test -x "$aapt2"
+          "$apksigner" verify --verbose "$arm32"
+          "$apksigner" verify --verbose "$arm64"
+          "$apksigner" verify --verbose "$x64"
+
+          verify_abi() {
+            apk="$1"
+            abi="$2"
+            entries="$(unzip -Z1 "$apk")"
+            printf '%s\n' "$entries" | grep -Fx "lib/$abi/libflutter.so"
+            if printf '%s\n' "$entries" |
+              awk -F/ -v expected="$abi" '$1 == "lib" && $2 != expected { print; found=1 } END { exit !found }'
+            then
+              echo "APK contains native libraries for an unexpected ABI: $apk" >&2
+              exit 1
+            fi
+          }
+
+          verify_no_obsolete_resolver() {
+            apk="$1"
+            entries="$(unzip -Z1 "$apk")"
+            obsolete_native="$(
+              printf '%s\n' "$entries" |
+                grep -Ei '^lib/[^/]+/(libpython[^/]*\.so|libqjs\.so)$' || true
+            )"
+            if [[ -n "$obsolete_native" ]]; then
+              echo "APK contains an obsolete native resolver runtime: $apk" >&2
+              printf '%s\n' "$obsolete_native" >&2
+              exit 1
+            fi
+
+            obsolete_archive="$(
+              printf '%s\n' "$entries" |
+                grep -Ei '(^|/)(yt-dlp|yt_dlp|ytdlp)(\.[^/]*)?$' || true
+            )"
+            if [[ -n "$obsolete_archive" ]]; then
+              echo "APK contains an obsolete yt-dlp artifact: $apk" >&2
+              printf '%s\n' "$obsolete_archive" >&2
+              exit 1
+            fi
+
+            resources="$("$aapt2" dump resources "$apk")"
+            if grep -Eiq 'raw/(yt_dlp|ytdlp)([^[:alnum:]_]|$)' <<<"$resources"; then
+              echo "APK resource table still contains raw yt-dlp: $apk" >&2
+              exit 1
+            fi
+          }
+          verify_abi "$arm32" "armeabi-v7a"
+          verify_abi "$arm64" "arm64-v8a"
+          verify_abi "$x64" "x86_64"
+          verify_no_obsolete_resolver "$arm32"
+          verify_no_obsolete_resolver "$arm64"
+          verify_no_obsolete_resolver "$x64"
+
+          mkdir -p dist
+          cp "$arm32" "dist/BStream-Music-$APP_VERSION-Android-armeabi-v7a.apk"
+          cp "$arm64" "dist/BStream-Music-$APP_VERSION-Android-arm64-v8a.apk"
+          cp "$x64" "dist/BStream-Music-$APP_VERSION-Android-x86_64.apk"
+
+      - name: Enforce Android artifact size budgets
+        run: |
+          # 1.3.1 baseline: about 50.0/51.3/53.0 MiB with audio sources and
+          # file metadata support. Keep tight per-ABI caps, including IPADIC.
+          dart run tool/check_artifact_size.dart "dist/BStream-Music-$APP_VERSION-Android-armeabi-v7a.apk" 50.5
+          dart run tool/check_artifact_size.dart "dist/BStream-Music-$APP_VERSION-Android-arm64-v8a.apk" 52
+          dart run tool/check_artifact_size.dart "dist/BStream-Music-$APP_VERSION-Android-x86_64.apk" 53.5
+
+      - name: Upload Android ARMv7 APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Android-armeabi-v7a
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-Android-armeabi-v7a.apk
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+      - name: Upload Android ARMv8 APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Android-arm64-v8a
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-Android-arm64-v8a.apk
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+      - name: Upload Android x86_64 APK
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Android-x86_64
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-Android-x86_64.apk
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+  windows:
+    name: Windows x64 installer
+    needs: [metadata, quality]
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      APP_VERSION: ${{ needs.metadata.outputs.app_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Rust for Windows SMTC
+        shell: pwsh
+        run: |
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Install pinned NuGet CLI
+        shell: pwsh
+        run: ./tool/ensure_nuget.ps1
+
+      - name: Resolve dependencies
+        run: |
+          flutter clean
+          flutter pub get --enforce-lockfile
+
+      - name: Test Windows animated artwork
+        run: >-
+          flutter test
+          test/features/music/presentation/providers/spotify_canvas_provider_test.dart
+          test/features/music/presentation/widgets/player_canvas_lookup_test.dart
+          test/features/music/presentation/widgets/player_canvas_layout_test.dart
+          test/features/music/presentation/widgets/spotify_canvas_video_test.dart
+          test/services/spotify_canvas/spotify_canvas_resolver_test.dart
+          test/services/animated_artwork/apple_animated_artwork_resolver_test.dart
+          test/services/player/fragmented_artwork_mp4_test.dart
+          test/services/player/artwork_video_rendering_test.dart
+          test/services/player/playback_visual_cache_test.dart
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Bundle Visual C++ runtime
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $PWD "build/windows/x64/runner/Release"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (!(Test-Path -LiteralPath $vswhere)) { throw "vswhere.exe was not found." }
+
+          $vsInstall = & $vswhere `
+            -latest `
+            -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -property installationPath
+          if (!$vsInstall) { throw "A Visual Studio installation with C++ tools was not found." }
+
+          $redistRoot = Join-Path $vsInstall "VC/Redist/MSVC"
+          $crtDir = Get-ChildItem `
+            -Path (Join-Path $redistRoot "*/x64/Microsoft.VC*.CRT") `
+            -Directory |
+            Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName "vcruntime140.dll") } |
+            Sort-Object {
+              (Get-Item (Join-Path $_.FullName "vcruntime140.dll")).VersionInfo.FileVersionRaw
+            } -Descending |
+            Select-Object -First 1
+          if (!$crtDir) { throw "The x64 Visual C++ runtime was not found." }
+
+          Copy-Item -Path (Join-Path $crtDir.FullName "*.dll") -Destination $bundle
+
+      - name: Verify Windows bundle
+        shell: pwsh
+        run: |
+          $bundle = Join-Path $PWD "build/windows/x64/runner/Release"
+          $required = @(
+            (Join-Path $bundle "bstream_music.exe"),
+            (Join-Path $bundle "THIRD_PARTY_NOTICES.md"),
+            (Join-Path $bundle "msvcp140.dll"),
+            (Join-Path $bundle "vcruntime140.dll"),
+            (Join-Path $bundle "vcruntime140_1.dll")
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path -LiteralPath $path)) {
+              throw "Required Windows bundle file is missing: $path"
+            }
+          }
+
+          foreach ($relativePath in @("tools", "scripts")) {
+            $path = Join-Path $bundle $relativePath
+            if (Test-Path -LiteralPath $path) {
+              throw "Unexpected external-runtime directory remains in bundle: $path"
+            }
+          }
+
+      - name: Build Inno Setup installer
+        shell: pwsh
+        run: |
+          $isccCandidates = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $isccCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (!$iscc) { throw "Inno Setup 6 was not found on the runner." }
+
+          New-Item -ItemType Directory -Force -Path "dist" | Out-Null
+          & $iscc "/DMyAppVersion=$env:APP_VERSION" "packaging/windows/BStreamMusic.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed with exit code $LASTEXITCODE." }
+
+          $installer = Join-Path $PWD "dist/BStream-Music-$env:APP_VERSION-Windows-x64-Setup.exe"
+          if (!(Test-Path -LiteralPath $installer)) { throw "The Windows installer was not generated." }
+
+      - name: Enforce Windows installer size budget
+        shell: pwsh
+        run: >-
+          dart run tool/check_artifact_size.dart
+          "dist/BStream-Music-$env:APP_VERSION-Windows-x64-Setup.exe" 88
+
+      - name: Smoke-test Windows installer
+        shell: pwsh
+        run: |
+          $installer = Join-Path $PWD "dist/BStream-Music-$env:APP_VERSION-Windows-x64-Setup.exe"
+          $installDir = Join-Path $env:RUNNER_TEMP "bstream-music-smoke-install"
+          $install = Start-Process `
+            -FilePath $installer `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/NOICONS", "/DIR=`"$installDir`"") `
+            -WindowStyle Hidden `
+            -Wait `
+            -PassThru
+          if ($install.ExitCode -ne 0) { throw "Installer smoke test failed with exit code $($install.ExitCode)." }
+
+          $required = @(
+            (Join-Path $installDir "bstream_music.exe"),
+            (Join-Path $installDir "THIRD_PARTY_NOTICES.md"),
+            (Join-Path $installDir "msvcp140.dll"),
+            (Join-Path $installDir "vcruntime140.dll"),
+            (Join-Path $installDir "vcruntime140_1.dll")
+          )
+          foreach ($path in $required) {
+            if (!(Test-Path -LiteralPath $path)) {
+              throw "Installed file is missing: $path"
+            }
+          }
+
+          foreach ($relativePath in @("tools", "scripts")) {
+            $path = Join-Path $installDir $relativePath
+            if (Test-Path -LiteralPath $path) {
+              throw "Unexpected external-runtime directory remains installed: $path"
+            }
+          }
+
+          $uninstaller = Join-Path $installDir "unins000.exe"
+          $uninstall = Start-Process `
+            -FilePath $uninstaller `
+            -ArgumentList @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART") `
+            -WindowStyle Hidden `
+            -Wait `
+            -PassThru
+          if ($uninstall.ExitCode -ne 0) { throw "Uninstaller smoke test failed with exit code $($uninstall.ExitCode)." }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Windows-x64-Setup
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-Windows-x64-Setup.exe
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+  linux:
+    name: Linux x64 installers
+    needs: [metadata, quality]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      APP_VERSION: ${{ needs.metadata.outputs.app_version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install Linux build and packaging dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # GitHub-hosted images include unrelated third-party APT feeds. Keep
+          # this build on the Ubuntu 22.04 base repositories so an outage or
+          # access-policy change in those feeds cannot block BStream packages.
+          apt_sourceparts="$RUNNER_TEMP/bstream-apt-sourceparts"
+          mkdir -p "$apt_sourceparts"
+          apt_options=(
+            -o "Dir::Etc::sourcelist=/etc/apt/sources.list"
+            -o "Dir::Etc::sourceparts=$apt_sourceparts"
+            -o "APT::Get::List-Cleanup=0"
+            -o "Acquire::Retries=5"
+          )
+
+          sudo apt-get "${apt_options[@]}" update
+          sudo env DEBIAN_FRONTEND=noninteractive \
+            apt-get "${apt_options[@]}" install --yes \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev \
+            libsqlite3-dev \
+            libsecret-1-dev \
+            libmpv-dev \
+            desktop-file-utils \
+            cpio \
+            file \
+            rpm \
+            unzip
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      - name: Verify Linux bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$PWD/build/linux/x64/release/bundle"
+          test -x "$bundle/bstream_music"
+          test -x "$bundle/BStream Music"
+          test ! -e "$bundle/tools"
+          test ! -e "$bundle/scripts"
+          desktop-file-validate packaging/linux/com.bstream.bstream_music.desktop
+
+          missing=0
+          while IFS= read -r -d '' candidate; do
+            if file "$candidate" | grep -q 'ELF'; then
+              dependencies="$(ldd "$candidate" 2>&1 || true)"
+              if grep -q 'not found' <<<"$dependencies"; then
+                printf 'Missing shared library for %s:\n%s\n' "$candidate" "$dependencies" >&2
+                missing=1
+              fi
+            fi
+          done < <(find "$bundle" -type f -print0)
+          test "$missing" -eq 0
+
+      - name: Build DEB and RPM installers
+        shell: bash
+        run: |
+          chmod 755 packaging/linux/build_packages.sh packaging/linux/bstream-music
+          packaging/linux/build_packages.sh \
+            "$PWD/build/linux/x64/release/bundle" \
+            "$APP_VERSION" \
+            "$PWD/dist"
+
+      - name: Verify Linux installer payloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          deb="$PWD/dist/BStream-Music-$APP_VERSION-linux-amd64.deb"
+          rpm="$PWD/dist/BStream-Music-$APP_VERSION-linux-x86_64.rpm"
+          stage="$(mktemp -d)"
+          trap 'rm -rf "$stage"' EXIT
+
+          test "$(dpkg-deb --field "$deb" Version)" = "$APP_VERSION"
+          deb_dependencies="$(dpkg-deb --field "$deb" Depends)"
+          grep -Eq '(^|, )libsecret-1-0([, ]|$)' <<<"$deb_dependencies"
+          dpkg-deb --extract "$deb" "$stage/deb"
+
+          test "$(rpm -qp --queryformat '%{VERSION}' "$rpm")" = "$APP_VERSION"
+          rpm_dependencies="$(rpm -qpR "$rpm")"
+          grep -Fxq libsecret <<<"$rpm_dependencies"
+          mkdir -p "$stage/rpm"
+          (
+            cd "$stage/rpm"
+            rpm2cpio "$rpm" | cpio --quiet -idmu
+          )
+
+          for root in "$stage/deb" "$stage/rpm"; do
+            test -x "$root/opt/bstream-music/bstream_music"
+            test -x "$root/opt/bstream-music/BStream Music"
+            test -f "$root/opt/bstream-music/THIRD_PARTY_NOTICES.md"
+            test -x "$root/usr/bin/bstream-music"
+            test -f \
+              "$root/usr/share/applications/com.bstream.bstream_music.desktop"
+            test ! -e "$root/opt/bstream-music/tools"
+            test ! -e "$root/opt/bstream-music/scripts"
+          done
+
+      - name: Enforce Linux installer size budgets
+        run: |
+          dart run tool/check_artifact_size.dart "dist/BStream-Music-$APP_VERSION-linux-amd64.deb" 108
+          dart run tool/check_artifact_size.dart "dist/BStream-Music-$APP_VERSION-linux-x86_64.rpm" 121
+
+      - name: Upload Debian installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Linux-DEB-amd64
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-linux-amd64.deb
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+      - name: Upload RPM installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-Linux-RPM-x86_64
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-linux-x86_64.rpm
+          if-no-files-found: error
+          retention-days: 30
+          archive: false
+
+  macos:
+    name: macOS ${{ matrix.arch }} installer
+    needs: [metadata, quality]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    env:
+      APP_VERSION: ${{ needs.metadata.outputs.app_version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-26
+            arch: arm64
+            host_arch: arm64
+            max_mib: 134
+          - runner: macos-26-intel
+            arch: x64
+            host_arch: x86_64
+            max_mib: 140
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Verify runner architecture
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(uname -m)"
+          if [[ "$actual" != "${{ matrix.host_arch }}" ]]; then
+            echo "Expected ${{ matrix.host_arch }} runner, received $actual" >&2
+            exit 1
+          fi
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Build macOS release
+        run: flutter build macos --release
+
+      - name: Sign embedded macOS code consistently
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/macos/Build/Products/Release/bstream_music.app"
+          bash macos/sign_release_bundle.sh "$app"
+
+      - name: Audit macOS application bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/macos/Build/Products/Release/bstream_music.app"
+          bash macos/verify_release_bundle.sh \
+            "$app" \
+            "${{ matrix.host_arch }}" \
+            "$APP_VERSION"
+          test ! -e "$app/Contents/Resources/tools"
+          test ! -e "$app/Contents/Resources/scripts"
+
+      - name: Smoke test macOS launch
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/macos/Build/Products/Release/bstream_music.app"
+          executable="$app/Contents/MacOS/bstream_music"
+          log="$RUNNER_TEMP/bstream-macos-smoke.log"
+
+          "$executable" >"$log" 2>&1 &
+          app_pid=$!
+
+          for _ in {1..8}; do
+            sleep 1
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              wait "$app_pid" || true
+              cat "$log"
+              echo "BStream Music terminated during the macOS launch smoke test." >&2
+              exit 1
+            fi
+          done
+
+          kill -TERM "$app_pid" 2>/dev/null || true
+          wait "$app_pid" || true
+
+      - name: Build macOS PKG installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/macos/Build/Products/Release/bstream_music.app"
+          executable="$app/Contents/MacOS/bstream_music"
+          test -x "$executable"
+
+          lipo "$executable" -verify_arch "${{ matrix.host_arch }}"
+
+          payload="$RUNNER_TEMP/bstream-pkg-root"
+          staged_app="$payload/Applications/BStream Music.app"
+          rm -rf "$payload"
+          mkdir -p "$payload/Applications"
+          ditto "$app" "$staged_app"
+          codesign --verify --deep --strict "$staged_app"
+
+          mkdir -p dist
+          package="dist/BStream-Music-$APP_VERSION-macOS-${{ matrix.arch }}.pkg"
+          pkgbuild \
+            --root "$payload" \
+            --install-location / \
+            --identifier com.bstream.bstreamMusic.pkg \
+            --version "$APP_VERSION" \
+            --ownership recommended \
+            "$package"
+          payload_files="$RUNNER_TEMP/bstream-payload-files.txt"
+          pkgutil --payload-files "$package" >"$payload_files"
+          grep -Fq \
+            "BStream Music.app/Contents/MacOS/bstream_music" \
+            "$payload_files"
+          if grep -Eiq '/(tools|scripts)(/|$)' "$payload_files"; then
+            echo "Unexpected external-runtime directory found in macOS package payload." >&2
+            exit 1
+          fi
+
+          expanded_package="$RUNNER_TEMP/bstream-expanded-pkg"
+          rm -rf "$expanded_package"
+          pkgutil --expand-full "$package" "$expanded_package"
+          packaged_app="$(
+            find "$expanded_package" -type d -name "BStream Music.app" \
+              -print -quit
+          )"
+          test -n "$packaged_app"
+          codesign --verify --deep --strict "$packaged_app"
+
+      - name: Enforce macOS installer size budget
+        run: >-
+          dart run tool/check_artifact_size.dart
+          "dist/BStream-Music-$APP_VERSION-macOS-${{ matrix.arch }}.pkg"
+          ${{ matrix.max_mib }}
+
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: BStream-Music-${{ env.APP_VERSION }}-macOS-${{ matrix.arch }}
+          path: dist/BStream-Music-${{ env.APP_VERSION }}-macOS-${{ matrix.arch }}.pkg
+          if-no-files-found: error
+          retention-days: 30
+          archive: false

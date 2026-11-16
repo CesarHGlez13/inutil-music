@@ -1,0 +1,616 @@
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart';
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_ui.dart';
+import '../../../../core/widgets/painted_glass_button_style.dart';
+import '../../domain/entities/track_info.dart';
+import '../providers/music_providers.dart';
+import '../providers/track_selection_controller.dart';
+import '../widgets/artwork_detail_scaffold.dart';
+import '../widgets/artwork_gradient_header_background.dart';
+import '../widgets/mini_player.dart';
+import '../widgets/playlist_actions.dart';
+import '../widgets/source_image.dart';
+import '../widgets/track_result_tile.dart';
+import '../widgets/track_selection_toolbar.dart';
+
+typedef AddRemoteTracksToPlaylist =
+    Future<void> Function(
+      BuildContext context,
+      List<TrackInfo> tracks, {
+      String? initialPlaylistName,
+    });
+
+class RemoteCollectionDetailPage extends ConsumerStatefulWidget {
+  const RemoteCollectionDetailPage({
+    required this.title,
+    required this.subtitle,
+    required this.artworkSource,
+    required this.queueSourceId,
+    required this.tracksProvider,
+    required this.emptyMessage,
+    required this.errorMessage,
+    required this.onOpenPlayer,
+    this.onAddToPlaylist,
+    this.detailsProvider,
+    this.metadata = const [],
+    this.fallbackIcon = Icons.queue_music_rounded,
+    this.preferCollectionArtworkForTracks = false,
+    this.songCountLabel,
+    this.onRetry,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? artworkSource;
+  final String queueSourceId;
+  final ProviderListenable<AsyncValue<List<TrackInfo>>> tracksProvider;
+  final String emptyMessage;
+  final String errorMessage;
+  final VoidCallback onOpenPlayer;
+  final AddRemoteTracksToPlaylist? onAddToPlaylist;
+  final FutureProvider<RemoteCollectionData>? detailsProvider;
+  final List<String> metadata;
+  final IconData fallbackIcon;
+
+  /// Album entries share the selected release's cover in rows and playback.
+  /// Mixes and playlists retain each song's own artwork.
+  final bool preferCollectionArtworkForTracks;
+  final String? songCountLabel;
+  final VoidCallback? onRetry;
+
+  @override
+  ConsumerState<RemoteCollectionDetailPage> createState() =>
+      _RemoteCollectionDetailPageState();
+}
+
+class _RemoteCollectionDetailPageState
+    extends ConsumerState<RemoteCollectionDetailPage> {
+  bool _addingToPlaylist = false;
+  final _selectionScope = Object();
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = ref.watch(appStringsProvider);
+    final selection = ref.watch(trackSelectionProvider(_selectionScope));
+    final detailsState = widget.detailsProvider == null
+        ? null
+        : ref.watch(widget.detailsProvider!);
+    final detail = switch (detailsState) {
+      AsyncData(:final value) => value,
+      _ => null,
+    };
+    final AsyncValue<List<TrackInfo>> tracksState = detailsState == null
+        ? ref.watch(widget.tracksProvider)
+        : detailsState.whenData((value) => value.tracks);
+    final tracks = switch (tracksState) {
+      AsyncData(:final value) => value,
+      _ => const <TrackInfo>[],
+    };
+    final resolvedTitle = detail?.title ?? widget.title;
+    final resolvedSubtitle = detail?.subtitle ?? widget.subtitle;
+    final collectionArtworkSource =
+        detail?.artworkSource ?? widget.artworkSource;
+    final resolvedArtworkSource =
+        collectionArtworkSource ??
+        (tracks.isEmpty ? null : tracks.first.thumbnailUrl);
+    final visibleTracks = widget.preferCollectionArtworkForTracks
+        ? _withCollectionArtwork(tracks, collectionArtworkSource)
+        : tracks;
+    final defaultMode = defaultMiniPlayerModeForPlatform(
+      Theme.of(context).platform,
+    );
+    final miniPlayerAppearance = ref.watch(
+      settingsControllerProvider.select(
+        (settings) => (
+          mode: settings.value?.miniPlayerMode ?? defaultMode,
+          backgroundMode:
+              settings.value?.miniPlayerBackgroundMode ??
+              defaultMiniPlayerBackgroundMode,
+        ),
+      ),
+    );
+    final miniPlayerMode = miniPlayerAppearance.mode;
+    final underlayMiniPlayer =
+        miniPlayerMode == MiniPlayerMode.capsule ||
+        miniPlayerAppearance.backgroundMode.usesBackdrop;
+    final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
+    final bottomContentPadding = underlayMiniPlayer
+        ? miniPlayerHeight + MediaQuery.viewPaddingOf(context).bottom
+        : 0.0;
+    final scaffold = ArtworkDetailScaffold(
+      key: const ValueKey('remote-collection-detail'),
+      extendBody: underlayMiniPlayer,
+      backButtonKey: ValueKey(
+        selection.active
+            ? 'collection-selection-close'
+            : 'remote-collection-back',
+      ),
+      backTooltip: selection.active ? strings.cancel : null,
+      onBack: selection.active ? selection.clear : null,
+      closeButton: selection.active,
+      selectionToolbar: selection.active
+          ? TrackSelectionToolbar(
+              scope: _selectionScope,
+              tracks: visibleTracks,
+              keyPrefix: 'collection-selection',
+              initialPlaylistName: resolvedTitle,
+              showCloseButton: false,
+            )
+          : null,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          RepaintBoundary(
+            key: const ValueKey('remote-collection-artwork-underlay'),
+            child: ArtworkColorPageBackground(
+              artworkSource: resolvedArtworkSource,
+              keyPrefix: 'remote-collection',
+            ),
+          ),
+          CustomScrollView(
+            scrollCacheExtent: const ScrollCacheExtent.pixels(800),
+            slivers: [
+              SliverToBoxAdapter(
+                child: _CollectionHeader(
+                  title: resolvedTitle,
+                  subtitle: resolvedSubtitle,
+                  artworkSource: resolvedArtworkSource,
+                  metadata: widget.metadata,
+                  fallbackIcon: widget.fallbackIcon,
+                  trackCount: tracksState is AsyncData<List<TrackInfo>>
+                      ? visibleTracks.length
+                      : null,
+                  playLabel: strings.play,
+                  addToPlaylistLabel: strings.addToPlaylist,
+                  songsLabel: strings.collectionSongCount,
+                  songCountLabel: widget.songCountLabel,
+                  canPlay: visibleTracks.isNotEmpty,
+                  onPlay: () =>
+                      _play(context, visibleTracks.first, visibleTracks),
+                  addingToPlaylist: _addingToPlaylist,
+                  onAddToPlaylist: visibleTracks.isEmpty
+                      ? null
+                      : () => _addToPlaylist(visibleTracks, resolvedTitle),
+                ),
+              ),
+              switch (tracksState) {
+                AsyncData() when visibleTracks.isEmpty => SliverToBoxAdapter(
+                  child: _CollectionStatus(
+                    key: const ValueKey('remote-collection-empty'),
+                    icon: Icons.music_off_rounded,
+                    message: widget.emptyMessage,
+                  ),
+                ),
+                AsyncData() => SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                  sliver: SliverList.separated(
+                    itemCount: visibleTracks.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: appTrackRowGap),
+                    itemBuilder: (context, index) {
+                      final track = visibleTracks[index];
+                      final identity = track.id.trim().isEmpty
+                          ? track.url
+                          : track.id;
+                      return KeyedSubtree(
+                        key: ValueKey('remote-collection-track-$identity'),
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1080),
+                            child: TrackResultTile(
+                              track: track,
+                              selectionScope: _selectionScope,
+                              queue: visibleTracks,
+                              queueSourceId: widget.queueSourceId,
+                              onOpenPlayer: () => _openPlayer(context),
+                              surfaceOpacity: 0.52,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                AsyncError() => SliverToBoxAdapter(
+                  child: _CollectionStatus(
+                    key: const ValueKey('remote-collection-error'),
+                    icon: Icons.cloud_off_rounded,
+                    message: widget.errorMessage,
+                    action: FilledButton.tonalIcon(
+                      key: const ValueKey('remote-collection-retry'),
+                      onPressed: () {
+                        if (widget.onRetry case final retry?) {
+                          retry();
+                          return;
+                        }
+                        final provider = widget.detailsProvider;
+                        if (provider != null) {
+                          ref.invalidate(provider);
+                        } else if (widget.tracksProvider
+                            case final ProviderOrFamily provider) {
+                          ref.invalidate(provider);
+                        }
+                      },
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 48),
+                      ),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(strings.retry),
+                    ),
+                  ),
+                ),
+                _ => const SliverToBoxAdapter(
+                  child: _CollectionStatus(
+                    key: ValueKey('remote-collection-loading'),
+                    child: CircularProgressIndicator(),
+                  ),
+                ),
+              },
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  key: const ValueKey('remote-collection-bottom-spacer'),
+                  height: bottomContentPadding + 24,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      // This route has its own Scaffold, outside HomePage's shell. Reserve
+      // the gesture/three-button navigation area here without duplicating it
+      // while the keyboard is visible.
+      bottomNavigationBar: ColoredBox(
+        key: const ValueKey('remote-collection-mini-player'),
+        color: underlayMiniPlayer
+            ? Colors.transparent
+            : Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            height: miniPlayerHeight,
+            child: MiniPlayer(
+              mode: miniPlayerMode,
+              backgroundMode: miniPlayerAppearance.backgroundMode,
+              onOpenPlayer: () => _openPlayer(context),
+            ),
+          ),
+        ),
+      ),
+    );
+    return PopScope(
+      canPop: !selection.active,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) selection.clear();
+      },
+      child: scaffold,
+    );
+  }
+
+  Future<void> _addToPlaylist(List<TrackInfo> tracks, String title) async {
+    if (_addingToPlaylist) return;
+    setState(() => _addingToPlaylist = true);
+    try {
+      final action = widget.onAddToPlaylist;
+      if (action == null) {
+        await addCollectionToPlaylist(
+          context,
+          ref,
+          tracks,
+          initialPlaylistName: title,
+        );
+      } else {
+        await action(context, tracks, initialPlaylistName: title);
+      }
+    } catch (error) {
+      debugPrint('Could not open collection playlist action: $error');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ref.read(appStringsProvider).playlistAddFailed)),
+      );
+    } finally {
+      if (mounted) setState(() => _addingToPlaylist = false);
+    }
+  }
+
+  List<TrackInfo> _withCollectionArtwork(
+    List<TrackInfo> tracks,
+    String? collectionArtwork,
+  ) {
+    final normalizedArtwork = collectionArtwork?.trim();
+    if (normalizedArtwork == null || normalizedArtwork.isEmpty) return tracks;
+    var changed = false;
+    final result = <TrackInfo>[];
+    for (final track in tracks) {
+      if (track.thumbnailUrl == normalizedArtwork &&
+          track.catalogThumbnailUrl == normalizedArtwork &&
+          track.metadataSource == TrackMetadataSource.youtubeMusic) {
+        result.add(track);
+        continue;
+      }
+      changed = true;
+      // Both row artwork and the playback source must use the album cover.
+      // Mark it as catalog metadata so stream extraction keeps this choice.
+      result.add(
+        track.copyWith(
+          thumbnailUrl: normalizedArtwork,
+          catalogThumbnailUrl: normalizedArtwork,
+          metadataSource: TrackMetadataSource.youtubeMusic,
+        ),
+      );
+    }
+    return changed ? List<TrackInfo>.unmodifiable(result) : tracks;
+  }
+
+  void _play(BuildContext context, TrackInfo selected, List<TrackInfo> tracks) {
+    if (tracks.isEmpty) return;
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    final playbackError = ref.read(appStringsProvider).playbackError;
+    final playback = ref
+        .read(playerControllerProvider.notifier)
+        .playRemote(
+          selected,
+          queue: tracks,
+          queueSourceId: widget.queueSourceId,
+        );
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    widget.onOpenPlayer();
+    unawaited(
+      playback.catchError((Object error, StackTrace stackTrace) {
+        messenger
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(playbackError)));
+      }),
+    );
+  }
+
+  void _openPlayer(BuildContext context) {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    widget.onOpenPlayer();
+  }
+}
+
+class _CollectionHeader extends StatelessWidget {
+  const _CollectionHeader({
+    required this.title,
+    required this.subtitle,
+    required this.artworkSource,
+    required this.metadata,
+    required this.fallbackIcon,
+    required this.trackCount,
+    required this.playLabel,
+    required this.addToPlaylistLabel,
+    required this.songsLabel,
+    required this.canPlay,
+    required this.onPlay,
+    required this.onAddToPlaylist,
+    this.addingToPlaylist = false,
+    this.songCountLabel,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? artworkSource;
+  final List<String> metadata;
+  final IconData fallbackIcon;
+  final int? trackCount;
+  final String playLabel;
+  final String addToPlaylistLabel;
+  final String Function(int count) songsLabel;
+  final bool canPlay;
+  final VoidCallback onPlay;
+  final VoidCallback? onAddToPlaylist;
+  final bool addingToPlaylist;
+  final String? songCountLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final actionStyle = paintedGlassButtonStyle(context);
+    final validMetadata = metadata
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+    final details = [
+      ...validMetadata,
+      if (songCountLabel != null)
+        songCountLabel!
+      else if (trackCount != null)
+        songsLabel(trackCount!),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 720;
+        final artworkSize = wide ? 224.0 : 196.0;
+        final artworkCacheWidth = wide ? 640 : 512;
+        final artwork = ClipRRect(
+          key: const ValueKey('remote-collection-artwork'),
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox.square(
+            dimension: artworkSize,
+            child: ProportionalArtwork(
+              source: artworkSource,
+              cacheWidth: artworkCacheWidth,
+              fallback: ColoredBox(
+                color: const Color(0xFF202520),
+                child: Icon(fallbackIcon, size: 64),
+              ),
+            ),
+          ),
+        );
+        final description = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: wide
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
+          children: [
+            Text(
+              key: const ValueKey('remote-collection-title'),
+              title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: wide ? TextAlign.start : TextAlign.center,
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                color: AppColors.contentTitleFor(context),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (subtitle.trim().isNotEmpty) ...[
+              const SizedBox(height: 7),
+              Text(
+                subtitle.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: wide ? TextAlign.start : TextAlign.center,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: AppColors.contentSubtitleFor(context),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+            if (details.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                details.join(' \u2022 '),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                textAlign: wide ? TextAlign.start : TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.contentSubtitleFor(context),
+                ),
+              ),
+            ],
+            const SizedBox(height: 18),
+            Wrap(
+              alignment: wide ? WrapAlignment.start : WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilledButton.icon(
+                  key: const ValueKey('remote-collection-play'),
+                  onPressed: canPlay ? onPlay : null,
+                  style: actionStyle,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: Text(playLabel),
+                ),
+                if (onAddToPlaylist != null)
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('remote-collection-add-to-playlist'),
+                    onPressed: addingToPlaylist ? null : onAddToPlaylist,
+                    style: actionStyle,
+                    icon: const Icon(Icons.playlist_add_rounded),
+                    label: Text(addToPlaylistLabel),
+                  ),
+              ],
+            ),
+          ],
+        );
+
+        return RepaintBoundary(
+          key: const ValueKey('remote-collection-header'),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ArtworkGradientHeaderBackground(
+                  artworkSource: artworkSource,
+                  cacheWidth: artworkCacheWidth,
+                  keyPrefix: 'remote-collection',
+                ),
+              ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1080),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      wide ? 28 : 20,
+                      MediaQuery.paddingOf(context).top + (wide ? 24 : 12),
+                      wide ? 28 : 20,
+                      20,
+                    ),
+                    child: wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              artwork,
+                              const SizedBox(width: 28),
+                              Expanded(child: description),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              artwork,
+                              const SizedBox(height: 18),
+                              description,
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CollectionStatus extends StatelessWidget {
+  const _CollectionStatus({
+    super.key,
+    this.icon,
+    this.message,
+    this.action,
+    this.child,
+  });
+
+  final IconData? icon;
+  final String? message;
+  final Widget? action;
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 220),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child:
+              child ??
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (icon != null)
+                    Icon(
+                      icon,
+                      size: 42,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  if (message != null) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      message!,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: AppColors.contentSubtitleFor(context),
+                      ),
+                    ),
+                  ],
+                  if (action != null) ...[const SizedBox(height: 16), action!],
+                ],
+              ),
+        ),
+      ),
+    );
+  }
+}

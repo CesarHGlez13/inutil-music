@@ -1,0 +1,5389 @@
+import 'dart:async';
+import 'player_lyrics_icon.dart';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/platform/app_platform.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_dialog.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui.dart';
+import '../../../../core/widgets/app_shared_widgets.dart';
+import '../../../../platform_channels/android_file_export_channel.dart';
+import '../../../../platform_channels/android_supported_links_settings_channel.dart';
+import '../../../../platform_channels/ios_file_export_channel.dart';
+import '../../../../services/app_update/github_release_checker.dart';
+import '../../../../services/audio_sources/audio_source_policy.dart';
+import '../../../../services/live/tiktok_live_command_service.dart';
+import '../../../../services/storage/library_csv_service.dart';
+import '../providers/live_overlay_controller.dart';
+import '../providers/music_providers.dart';
+import 'app_update_dialog.dart';
+import 'library_csv_import_dialog.dart';
+import 'lyrics_animation_transition.dart';
+import 'live_widget_style_settings.dart';
+import 'scrolled_under_tab_frame.dart';
+import 'player_style_gallery.dart';
+import 'youtube_music_settings_account_card.dart';
+
+typedef DownloadDirectoryPicker =
+    Future<String?> Function({String? dialogTitle, String? initialDirectory});
+
+bool _usesSingleAudioQuality(BuildContext context) =>
+    AppPlatform.isDesktop &&
+    !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+
+double _settingsContentMaxWidth(BuildContext context, double compactWidth) {
+  final desktopLayout =
+      AppPlatform.isDesktop &&
+      Theme.of(context).platform != TargetPlatform.android;
+  return desktopLayout ? double.infinity : compactWidth;
+}
+
+final downloadDirectoryPickerProvider = Provider<DownloadDirectoryPicker>((
+  ref,
+) {
+  return ({String? dialogTitle, String? initialDirectory}) =>
+      FilePicker.getDirectoryPath(
+        dialogTitle: dialogTitle,
+        initialDirectory: initialDirectory,
+      );
+});
+
+typedef StorageImportFilePicker =
+    Future<String?> Function({
+      required String dialogTitle,
+      required List<String> allowedExtensions,
+    });
+
+final storageImportFilePickerProvider = Provider<StorageImportFilePicker>((
+  ref,
+) {
+  return ({
+    required String dialogTitle,
+    required List<String> allowedExtensions,
+  }) async {
+    final file = await FilePicker.pickFile(
+      dialogTitle: dialogTitle,
+      type: FileType.custom,
+      allowedExtensions: allowedExtensions,
+      windowsOptions: const WindowsOptions(lockParentWindow: true),
+      linuxOptions: const LinuxOptions(lockParentWindow: true),
+    );
+    return file?.path;
+  };
+});
+
+typedef AppBackgroundPhotoPicker = Future<File?> Function();
+
+final appBackgroundPhotoPickerProvider = Provider<AppBackgroundPhotoPicker>((
+  ref,
+) {
+  return () async {
+    if (AppPlatform.isMobile) {
+      final selected = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 2048,
+        maxHeight: 2048,
+        imageQuality: 88,
+      );
+      return selected == null ? null : File(selected.path);
+    }
+    final selected = await FilePicker.pickFile(
+      type: FileType.image,
+      windowsOptions: const WindowsOptions(lockParentWindow: true),
+      linuxOptions: const LinuxOptions(lockParentWindow: true),
+    );
+    return selected?.path == null ? null : File(selected!.path!);
+  };
+});
+
+typedef SettingsExternalLauncher = Future<bool> Function(Uri url);
+
+final settingsExternalLauncherProvider = Provider<SettingsExternalLauncher>(
+  (ref) =>
+      (url) => launchUrl(url, mode: LaunchMode.externalApplication),
+);
+
+typedef SettingsReleaseChecker =
+    Future<AppReleaseCheckResult> Function({required String currentVersion});
+
+final settingsReleaseCheckerProvider = Provider<SettingsReleaseChecker>((ref) {
+  final checker = GitHubReleaseChecker();
+  Future<AppReleaseCheckResult>? pendingCheck;
+  return ({required currentVersion}) {
+    return pendingCheck ??= checker
+        .check(currentVersion: currentVersion)
+        .whenComplete(() => pendingCheck = null);
+  };
+});
+
+typedef SettingsSupportedLinksLauncher = Future<bool> Function();
+
+typedef _TikTokCommandPermissionChanged =
+    void Function(
+      TikTokCommandAudience audience,
+      TikTokLiveCommand command,
+      bool enabled,
+    );
+
+final settingsSupportedLinksLauncherProvider =
+    Provider<SettingsSupportedLinksLauncher>((ref) {
+      const channel = AndroidSupportedLinksSettingsChannel();
+      return channel.open;
+    });
+
+enum _SettingsRoute {
+  root,
+  appearance,
+  playerStyles,
+  liveWidget,
+  lyrics,
+  lyricsProviders,
+  storage,
+  audioSources,
+  dataSaving,
+  live,
+  about,
+}
+
+const double _settingsRootCardHorizontalPadding = 6.0;
+
+class SettingsNavigationController extends ChangeNotifier {
+  _SettingsPanelState? _state;
+  bool _disposed = false;
+
+  bool get canPop => _state?._canPop ?? false;
+
+  bool maybePop() => _state?._popRoute() ?? false;
+
+  void _attach(_SettingsPanelState state) {
+    _state = state;
+  }
+
+  void _detach(_SettingsPanelState state) {
+    if (_state == state) {
+      _state = null;
+    }
+  }
+
+  void _routeChanged() => _notifySafely();
+
+  void _notifySafely() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _state = null;
+    super.dispose();
+  }
+}
+
+class SettingsPanel extends ConsumerStatefulWidget {
+  const SettingsPanel({
+    this.active = true,
+    this.navigationController,
+    this.bottomContentPadding = 0,
+    super.key,
+  });
+
+  final bool active;
+  final SettingsNavigationController? navigationController;
+  final double bottomContentPadding;
+
+  @override
+  ConsumerState<SettingsPanel> createState() => _SettingsPanelState();
+}
+
+class _SettingsPanelState extends ConsumerState<SettingsPanel> {
+  final _downloadPathController = TextEditingController();
+  final _tiktokLiveController = TextEditingController();
+  final _downloadPathFocusNode = FocusNode();
+  final _tiktokLiveFocusNode = FocusNode();
+  bool _backupBusy = false;
+  bool _recommendationClearBusy = false;
+  bool _releaseCheckBusy = false;
+  _SettingsRoute _route = _SettingsRoute.root;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.navigationController?._attach(this);
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationController != widget.navigationController) {
+      oldWidget.navigationController?._detach(this);
+      widget.navigationController?._attach(this);
+    }
+    if (!oldWidget.active && widget.active) {
+      _route = _SettingsRoute.root;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.navigationController?._detach(this);
+    _downloadPathController.dispose();
+    _tiktokLiveController.dispose();
+    _downloadPathFocusNode.dispose();
+    _tiktokLiveFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(settingsControllerProvider);
+    // Import progress can publish several updates per second. The storage
+    // page only needs to know when actions must be disabled; the progress
+    // dialog owns the detailed subscription below. Selecting this single bit
+    // keeps the complete Settings navigator out of those progress frames.
+    final csvTransferBusy = _route == _SettingsRoute.storage
+        ? ref.watch(
+            libraryCsvTransferControllerProvider.select(
+              (transfer) => transfer.isBusy,
+            ),
+          )
+        : false;
+    final supportsTikTokLive =
+        AppPlatform.supportsTikTokLive ||
+        AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+    final tiktokLive = supportsTikTokLive && _route == _SettingsRoute.live
+        ? ref.watch(tiktokLiveControllerProvider)
+        : null;
+    final strings = ref.watch(appStringsProvider);
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final transitionDuration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+
+    Widget routeFrame(Widget body, {List<Widget>? rootSlivers}) {
+      if (_route == _SettingsRoute.playerStyles) return body;
+      final header = _SettingsHeader(
+        route: _route,
+        title: _routeTitle(_route, strings),
+        strings: strings,
+        onBack: _goBack,
+      );
+      if (_route != _SettingsRoute.root) {
+        final desktopLayout =
+            AppPlatform.isDesktop &&
+            Theme.of(context).platform != TargetPlatform.android;
+        return ScrolledUnderTabFrame(
+          surfaceKey: ValueKey('settings-detail-header-surface-${_route.name}'),
+          scrollKey: ValueKey('settings-detail-scroll-${_route.name}'),
+          header: header,
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                appTabFirstSectionTopGap,
+                12,
+                widget.bottomContentPadding + 28,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: SizedBox(
+                    width: desktopLayout ? double.infinity : null,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        maxWidth: desktopLayout ? double.infinity : 760,
+                      ),
+                      child: body,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      }
+      return ScrolledUnderTabFrame(
+        surfaceKey: const ValueKey('settings-tab-header-surface'),
+        scrollKey: const ValueKey('settings-root'),
+        header: header,
+        slivers:
+            rootSlivers ??
+            [
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: body,
+                ),
+              ),
+            ],
+      );
+    }
+
+    return settings.when(
+      data: (state) {
+        _syncControllers(state);
+        final tiktokState = tiktokLive?.value;
+        if (tiktokState != null) {
+          _syncTikTokController(tiktokState);
+        }
+        final rootSelected = _route == _SettingsRoute.root;
+        final routeBody = rootSelected
+            ? const SizedBox.shrink()
+            : _buildRoute(
+                state: state,
+                tiktokLive: tiktokLive,
+                csvTransferBusy: csvTransferBusy,
+                strings: strings,
+              );
+        return AnimatedSwitcher(
+          key: const ValueKey('settings-route-switcher'),
+          duration: transitionDuration,
+          reverseDuration: transitionDuration,
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          layoutBuilder: (currentChild, previousChildren) => Stack(
+            fit: StackFit.expand,
+            alignment: Alignment.topLeft,
+            children: <Widget>[...previousChildren, ?currentChild],
+          ),
+          child: RepaintBoundary(
+            key: ValueKey('settings-detail-${_route.name}'),
+            child: KeyedSubtree(
+              child: routeFrame(
+                routeBody,
+                rootSlivers: rootSelected
+                    ? _buildRootSlivers(
+                        state: state,
+                        supportsTikTokLive: supportsTikTokLive,
+                        strings: strings,
+                      )
+                    : null,
+              ),
+            ),
+          ),
+        );
+      },
+      loading: () =>
+          routeFrame(const Center(child: CircularProgressIndicator())),
+      error: (error, _) => routeFrame(Center(child: Text(error.toString()))),
+    );
+  }
+
+  bool get _canPop => _route != _SettingsRoute.root;
+
+  bool _popRoute() {
+    if (!_canPop) {
+      return false;
+    }
+    _goBack();
+    return true;
+  }
+
+  void _openRoute(_SettingsRoute route) {
+    if (route == _route) {
+      return;
+    }
+    setState(() => _route = route);
+    widget.navigationController?._routeChanged();
+  }
+
+  void _goBack() {
+    if (_route == _SettingsRoute.root) {
+      return;
+    }
+    setState(() {
+      _route = switch (_route) {
+        _SettingsRoute.liveWidget ||
+        _SettingsRoute.playerStyles => _SettingsRoute.appearance,
+        _SettingsRoute.lyricsProviders => _SettingsRoute.lyrics,
+        _ => _SettingsRoute.root,
+      };
+    });
+    widget.navigationController?._routeChanged();
+  }
+
+  String _routeTitle(_SettingsRoute route, AppStrings strings) {
+    return switch (route) {
+      _SettingsRoute.root => strings.settings,
+      _SettingsRoute.appearance => strings.appearance,
+      _SettingsRoute.playerStyles => strings.playerStyles,
+      _SettingsRoute.liveWidget => strings.liveWidget,
+      _SettingsRoute.lyrics => strings.lyricsAppearance,
+      _SettingsRoute.lyricsProviders => strings.lyricsProviders,
+      _SettingsRoute.storage => strings.storage,
+      _SettingsRoute.audioSources => strings.audioSources,
+      _SettingsRoute.dataSaving => strings.dataSaving,
+      _SettingsRoute.live => strings.liveConnection,
+      _SettingsRoute.about => strings.aboutApplication,
+    };
+  }
+
+  Widget _buildRoute({
+    required SettingsState state,
+    required AsyncValue<TikTokLiveState>? tiktokLive,
+    required bool csvTransferBusy,
+    required AppStrings strings,
+  }) {
+    final content = switch (_route) {
+      _SettingsRoute.appearance => _AppearanceSettings(
+        themeMode: state.themeMode,
+        accent: state.accent,
+        surfaceBackgroundMode: state.surfaceBackgroundMode,
+        appBackgroundPath: state.appBackgroundPath,
+        playerFont: state.playerFont,
+        liveWidgetStyle: state.liveWidgetStyle,
+        onOpenLiveWidget:
+            AppPlatform.isDesktop &&
+                !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform)
+            ? () => _openRoute(_SettingsRoute.liveWidget)
+            : null,
+        playerStyle: state.playerStyle,
+        showAudioQuality: state.showAudioQuality,
+        animatedArtworkEnabled: state.animatedArtworkEnabled,
+        playerArtworkStyle: state.playerArtworkStyle,
+        appleAnimatedArtworkEnabled: state.appleAnimatedArtworkEnabled,
+        spotifyCanvasEnabled: state.spotifyCanvasEnabled,
+        miniPlayerMode: state.miniPlayerMode,
+        miniPlayerBackgroundMode: state.miniPlayerBackgroundMode,
+        strings: strings,
+        onThemeModeChanged: (mode) =>
+            ref.read(settingsControllerProvider.notifier).setThemeMode(mode),
+        onAccentChanged: (accent) =>
+            ref.read(settingsControllerProvider.notifier).setAccent(accent),
+        onSurfaceBackgroundModeChanged: (mode) => ref
+            .read(settingsControllerProvider.notifier)
+            .setSurfaceBackgroundMode(mode),
+        onPickAppBackgroundPhoto: ref.read(appBackgroundPhotoPickerProvider),
+        onAppBackgroundPhotoSelected: (file) => ref
+            .read(settingsControllerProvider.notifier)
+            .setAppBackgroundPhoto(file),
+        onAppBackgroundCleared: () => ref
+            .read(settingsControllerProvider.notifier)
+            .clearAppBackgroundPhoto(),
+        onPlayerFontChanged: (font) =>
+            ref.read(settingsControllerProvider.notifier).setPlayerFont(font),
+        onOpenPlayerStyles: () => _openRoute(_SettingsRoute.playerStyles),
+        onShowAudioQualityChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setShowAudioQuality(enabled),
+        onAnimatedArtworkEnabledChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setAnimatedArtworkEnabled(enabled),
+        onPlayerArtworkStyleChanged: (style) => ref
+            .read(settingsControllerProvider.notifier)
+            .setPlayerArtworkStyle(style),
+        onAppleAnimatedArtworkEnabledChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setAppleAnimatedArtworkEnabled(enabled),
+        onSpotifyCanvasEnabledChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setSpotifyCanvasEnabled(enabled),
+        onMiniPlayerModeChanged: (mode) => ref
+            .read(settingsControllerProvider.notifier)
+            .setMiniPlayerMode(mode),
+        onMiniPlayerBackgroundModeChanged: (mode) => ref
+            .read(settingsControllerProvider.notifier)
+            .setMiniPlayerBackgroundMode(mode),
+      ),
+      _SettingsRoute.playerStyles => PlayerStyleGalleryPage(
+        style: state.playerStyle,
+        strings: strings,
+        header: _SettingsHeader(
+          route: _SettingsRoute.playerStyles,
+          title: strings.playerStyles,
+          strings: strings,
+          onBack: _goBack,
+        ),
+        bottomContentPadding: widget.bottomContentPadding,
+        onChanged: (style) async {
+          await ref
+              .read(settingsControllerProvider.notifier)
+              .setPlayerStyle(style);
+        },
+      ),
+      _SettingsRoute.liveWidget => LiveWidgetStyleSettings(
+        style: state.liveWidgetStyle,
+        accent: state.accent,
+        strings: strings,
+        onChanged: (style) => ref
+            .read(settingsControllerProvider.notifier)
+            .setLiveWidgetStyle(style),
+      ),
+      _SettingsRoute.lyrics => _LyricsAppearanceSettings(
+        enabledProviders: state.enabledLyricsProviders,
+        onOpenProviders: () => _openRoute(_SettingsRoute.lyricsProviders),
+        animationStyle: state.lyricsAnimationStyle,
+        alignment: state.lyricsTextAlignment,
+        romanizationEnabled: state.lyricsRomanizationEnabled,
+        romanizationLanguages: state.lyricsRomanizationLanguages,
+        strings: strings,
+        onAnimationChanged: (style) => ref
+            .read(settingsControllerProvider.notifier)
+            .setLyricsAnimationStyle(style),
+        onAlignmentChanged: (alignment) => ref
+            .read(settingsControllerProvider.notifier)
+            .setLyricsTextAlignment(alignment),
+        onRomanizationEnabledChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setLyricsRomanizationEnabled(enabled),
+        onRomanizationLanguagesChanged: (languages) => ref
+            .read(settingsControllerProvider.notifier)
+            .setLyricsRomanizationLanguages(languages),
+      ),
+      _SettingsRoute.lyricsProviders => _LyricsProvidersSettings(
+        enabledProviders: state.enabledLyricsProviders,
+        strings: strings,
+        onChanged: (provider, enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .toggleLyricsProvider(provider, enabled),
+      ),
+      _SettingsRoute.audioSources => _AudioSourcesSettings(
+        jioSaavnEnabled: state.jioSaavnEnabled,
+        strings: strings,
+        onJioSaavnChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setJioSaavnEnabled(enabled),
+      ),
+      _SettingsRoute.dataSaving => _DataSavingSettings(
+        state: state,
+        strings: strings,
+        singleProfile: _usesSingleAudioQuality(context),
+        onWifiTap: () => _chooseAudioQuality(wifi: true),
+        onMobileTap: () => _chooseAudioQuality(wifi: false),
+      ),
+      _SettingsRoute.storage => _StorageSettings(
+        strings: strings,
+        canChangeDownloadDirectory:
+            AppPlatform.isDesktop &&
+            Theme.of(context).platform != TargetPlatform.android,
+        downloadPathController: _downloadPathController,
+        downloadPathFocusNode: _downloadPathFocusNode,
+        busy: _backupBusy || csvTransferBusy,
+        onBrowse: _pickDownloadDirectory,
+        onImportBackup: _importBackup,
+        onImportCsv: _importCsv,
+        onExportBackup: _exportBackup,
+        onExportCsv: _exportCsv,
+      ),
+      _SettingsRoute.live =>
+        tiktokLive == null
+            ? Text(strings.liveUnavailable)
+            : tiktokLive.when(
+                data: (liveState) => _TikTokLiveSettings(
+                  controller: _tiktokLiveController,
+                  focusNode: _tiktokLiveFocusNode,
+                  state: liveState,
+                  strings: strings,
+                  onConnect: () => ref
+                      .read(tiktokLiveControllerProvider.notifier)
+                      .connect(_tiktokLiveController.text),
+                  onDisconnect: () => ref
+                      .read(tiktokLiveControllerProvider.notifier)
+                      .disconnect(),
+                  onCommandPermissionChanged: (audience, command, enabled) =>
+                      ref
+                          .read(tiktokLiveControllerProvider.notifier)
+                          .setCommandPermission(audience, command, enabled),
+                ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => Text(error.toString()),
+              ),
+      _SettingsRoute.about => _AboutApplicationSettings(
+        strings: strings,
+        checkingForUpdates: _releaseCheckBusy,
+        onVersion: _checkForAppUpdate,
+        onSupport: _openSupportDevelopment,
+        onGitHub: _openGitHubRepository,
+      ),
+      _SettingsRoute.root => const SizedBox.shrink(),
+    };
+
+    return content;
+  }
+
+  List<Widget> _buildRootSlivers({
+    required SettingsState state,
+    required bool supportsTikTokLive,
+    required AppStrings strings,
+  }) {
+    final showSupportedLinks =
+        AppPlatform.isAndroid ||
+        Theme.of(context).platform == TargetPlatform.android;
+    final showSkipSilence = ref.watch(skipSilenceSupportedProvider);
+    return [
+      SliverPadding(
+        padding: EdgeInsets.fromLTRB(
+          _settingsRootCardHorizontalPadding,
+          appTabFirstSectionTopGap,
+          _settingsRootCardHorizontalPadding,
+          widget.bottomContentPadding + 24,
+        ),
+        sliver: SliverList.list(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: appSectionGap),
+              child: YouTubeMusicSettingsAccountCard(
+                strings: strings,
+                active: widget.active,
+              ),
+            ),
+            _SettingsGroup(
+              titleKey: const ValueKey('settings-first-section-title'),
+              title: strings.general,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-language'),
+                  icon: Icons.language_rounded,
+                  title: strings.language,
+                  subtitle: state.language.label,
+                  onTap: () => _chooseLanguage(
+                    currentLanguage: state.language,
+                    strings: strings,
+                  ),
+                ),
+              ],
+            ),
+            _SettingsGroup(
+              title: strings.appearance,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-appearance'),
+                  icon: Icons.palette_rounded,
+                  title: strings.appearance,
+                  subtitle:
+                      '${strings.themeModeLabel(state.themeMode)} · '
+                      '${strings.accentLabel(state.accent)} · '
+                      '${strings.miniPlayerModeLabel(state.miniPlayerMode)}',
+                  onTap: () => _openRoute(_SettingsRoute.appearance),
+                ),
+                const SizedBox(height: appCardGap),
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-lyrics-appearance'),
+                  leading: const PlayerLyricsIcon(),
+                  title: strings.lyrics,
+                  subtitle:
+                      '${strings.lyricsAnimationLabel(state.lyricsAnimationStyle)}'
+                      ' · '
+                      '${state.lyricsTextAlignment == LyricsTextAlignment.centered ? strings.centeredLyricsAlignment : strings.normalLyricsAlignment}',
+                  onTap: () => _openRoute(_SettingsRoute.lyrics),
+                ),
+              ],
+            ),
+            _SettingsGroup(
+              title: strings.playback,
+              children: [
+                KeyedSubtree(
+                  key: const ValueKey('settings-inline-timer'),
+                  child: _SleepTimerSettingsScope(
+                    strings: strings,
+                    onCustomDuration: _chooseSleepTimerDuration,
+                  ),
+                ),
+                const SizedBox(height: appCardGap),
+                _CrossfadeSettings(
+                  key: const ValueKey('settings-inline-crossfade'),
+                  enabled: state.crossfadeEnabled,
+                  duration: state.crossfadeDuration,
+                  strings: strings,
+                  onEnabledChanged: ref
+                      .read(settingsControllerProvider.notifier)
+                      .setCrossfadeEnabled,
+                  onDurationSelected: ref
+                      .read(settingsControllerProvider.notifier)
+                      .setCrossfadeDuration,
+                ),
+                if (showSkipSilence) ...[
+                  const SizedBox(height: appCardGap),
+                  _SkipSilenceSettings(
+                    key: const ValueKey('settings-inline-skip-silence'),
+                    enabled: state.skipSilenceEnabled,
+                    strings: strings,
+                    onEnabledChanged: ref
+                        .read(settingsControllerProvider.notifier)
+                        .setSkipSilenceEnabled,
+                  ),
+                ],
+              ],
+            ),
+            _SettingsGroup(
+              title: strings.privacyAndRecommendations,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-recommendation-history'),
+                  icon: Icons.auto_awesome_rounded,
+                  title: strings.recommendationHistory,
+                  subtitle: state.recommendationHistoryEnabled
+                      ? strings.recommendationHistoryEnabled
+                      : strings.recommendationHistoryDisabled,
+                  onTap: _recommendationClearBusy || _backupBusy
+                      ? null
+                      : () => ref
+                            .read(settingsControllerProvider.notifier)
+                            .setRecommendationHistoryEnabled(
+                              !state.recommendationHistoryEnabled,
+                            ),
+                  trailing: Switch.adaptive(
+                    key: const ValueKey('recommendation-history-switch'),
+                    value: state.recommendationHistoryEnabled,
+                    onChanged: _recommendationClearBusy || _backupBusy
+                        ? null
+                        : ref
+                              .read(settingsControllerProvider.notifier)
+                              .setRecommendationHistoryEnabled,
+                  ),
+                ),
+                const SizedBox(height: appCardGap),
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-clear-recommendations'),
+                  icon: Icons.delete_sweep_outlined,
+                  title: strings.clearRecommendationHistory,
+                  subtitle: strings.clearRecommendationHistorySummary,
+                  accent: Theme.of(context).colorScheme.error,
+                  onTap: _recommendationClearBusy || _backupBusy
+                      ? null
+                      : _clearRecommendationHistory,
+                  trailing: _recommendationClearBusy
+                      ? const SizedBox.square(
+                          dimension: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2.4),
+                        )
+                      : null,
+                ),
+              ],
+            ),
+            _SettingsGroup(
+              title: strings.storage,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('storage-data-saving'),
+                  icon: Icons.data_saver_on_rounded,
+                  title: strings.dataSaving,
+                  subtitle: _usesSingleAudioQuality(context)
+                      ? strings.desktopDataSavingSummary
+                      : strings.dataSavingSummary,
+                  onTap: () => _openRoute(_SettingsRoute.dataSaving),
+                ),
+                const SizedBox(height: appCardGap),
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-storage'),
+                  icon: Icons.storage_rounded,
+                  title: strings.backupAndRestore,
+                  subtitle: strings.storageSummary,
+                  onTap: () => _openRoute(_SettingsRoute.storage),
+                ),
+                const SizedBox(height: appCardGap),
+                _SettingsEntryCard(
+                  key: const ValueKey('storage-local-music-filters'),
+                  icon: Icons.filter_alt_rounded,
+                  title: strings.localMusicFilters,
+                  subtitle: strings.localMusicFiltersSummary(
+                    state.localMusicFilters.length,
+                  ),
+                  onTap: () => _chooseLocalMusicFilters(
+                    filters: state.localMusicFilters,
+                    strings: strings,
+                  ),
+                ),
+              ],
+            ),
+            Consumer(
+              builder: (context, scopedRef, _) {
+                final tiktokLive = supportsTikTokLive
+                    ? scopedRef.watch(tiktokLiveControllerProvider)
+                    : null;
+                final liveState = tiktokLive?.value;
+                return _SettingsGroup(
+                  title: strings.integrations,
+                  children: [
+                    _SettingsEntryCard(
+                      key: const ValueKey('settings-card-audio-sources'),
+                      icon: Icons.library_music_rounded,
+                      title: strings.audioSources,
+                      subtitle: strings.audioSourcesSummary,
+                      onTap: () => _openRoute(_SettingsRoute.audioSources),
+                    ),
+                    if (showSupportedLinks || tiktokLive != null)
+                      const SizedBox(height: appCardGap),
+                    if (showSupportedLinks)
+                      _SettingsEntryCard(
+                        key: const ValueKey('settings-card-supported-links'),
+                        icon: Icons.link_rounded,
+                        title: strings.supportedLinks,
+                        subtitle: strings.supportedLinksSummary,
+                        onTap: _openSupportedLinksSettings,
+                      ),
+                    if (showSupportedLinks && tiktokLive != null)
+                      const SizedBox(height: appCardGap),
+                    if (tiktokLive != null) ...[
+                      _SettingsEntryCard(
+                        key: const ValueKey('settings-card-live'),
+                        icon: Icons.live_tv_rounded,
+                        title: strings.liveConnection,
+                        subtitle:
+                            liveState?.message ?? strings.liveConnectionSummary,
+                        status: switch (liveState?.status) {
+                          TikTokLiveStatus.connected => true,
+                          TikTokLiveStatus.error ||
+                          TikTokLiveStatus.liveEnded => false,
+                          _ => null,
+                        },
+                        onTap: () => _openRoute(_SettingsRoute.live),
+                      ),
+                      const SizedBox(height: appCardGap),
+                      _LiveRequestStorageCard(
+                        state: liveState,
+                        strings: strings,
+                        onChanged: (value) => scopedRef
+                            .read(tiktokLiveControllerProvider.notifier)
+                            .setSaveRequestsToLibrary(value),
+                      ),
+                    ],
+                  ],
+                );
+              },
+            ),
+            _SettingsGroup(
+              title: strings.applicationInformation,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('settings-card-about'),
+                  icon: Icons.info_outline_rounded,
+                  title: strings.aboutApplication,
+                  subtitle: strings.aboutApplicationSummary,
+                  onTap: () => _openRoute(_SettingsRoute.about),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ];
+  }
+
+  void _syncControllers(SettingsState state) {
+    if (!_downloadPathFocusNode.hasFocus &&
+        _downloadPathController.text != state.downloadDirectory) {
+      _downloadPathController.text = state.downloadDirectory;
+    }
+  }
+
+  Future<void> _clearRecommendationHistory() async {
+    if (_recommendationClearBusy || _backupBusy) {
+      return;
+    }
+    final strings = ref.read(appStringsProvider);
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        key: const ValueKey('recommendation-history-clear-confirmation'),
+        title: Text(strings.clearRecommendationHistoryTitle),
+        content: Text(strings.clearRecommendationHistoryMessage),
+        actions: [
+          TextButton(
+            key: const ValueKey('recommendation-history-clear-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            key: const ValueKey('recommendation-history-clear-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(strings.clearRecommendationHistory),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+    setState(() => _recommendationClearBusy = true);
+    try {
+      await ref
+          .read(settingsControllerProvider.notifier)
+          .clearRecommendationHistory();
+      if (mounted) {
+        _showSnackBar(strings.recommendationHistoryCleared);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _recommendationClearBusy = false);
+      }
+    }
+  }
+
+  Future<void> _chooseLanguage({
+    required AppLanguage currentLanguage,
+    required AppStrings strings,
+  }) async {
+    final selected = await showAppDialog<AppLanguage>(
+      context: context,
+      builder: (_) =>
+          _LanguageSelectorDialog(language: currentLanguage, strings: strings),
+    );
+    if (!mounted || selected == null || selected == currentLanguage) {
+      return;
+    }
+    await ref.read(settingsControllerProvider.notifier).setLanguage(selected);
+  }
+
+  Future<void> _chooseAudioQuality({required bool wifi}) async {
+    final state = ref.read(settingsControllerProvider).value;
+    if (state == null) return;
+    final strings = ref.read(appStringsProvider);
+    final saved = wifi ? state.wifiAudioQuality : state.mobileAudioQuality;
+    final selected = await showAppDialog<AudioQualityProfile>(
+      context: context,
+      builder: (_) => _AudioQualityProfileDialog(
+        networkLabel: _usesSingleAudioQuality(context)
+            ? strings.audioQuality
+            : wifi
+            ? strings.wifiNetwork
+            : strings.mobileNetwork,
+        selected: state.jioSaavnEnabled ? saved : AudioQualityProfile.standard,
+        jioSaavnEnabled: state.jioSaavnEnabled,
+        strings: strings,
+      ),
+    );
+    if (!mounted || selected == null) return;
+    // The source may be disabled while a dialog is open. Never select an
+    // unavailable provider; the mandatory YouTube Music choice stays usable.
+    final current = ref.read(settingsControllerProvider).value;
+    if (current == null ||
+        (selected == AudioQualityProfile.high && !current.jioSaavnEnabled)) {
+      return;
+    }
+    final controller = ref.read(settingsControllerProvider.notifier);
+    if (wifi) {
+      await controller.setWifiAudioQuality(selected);
+    } else {
+      await controller.setMobileAudioQuality(selected);
+    }
+  }
+
+  Future<void> _chooseLocalMusicFilters({
+    required Set<LocalMusicFilter> filters,
+    required AppStrings strings,
+  }) async {
+    final selected = await showAppDialog<Set<LocalMusicFilter>>(
+      context: context,
+      builder: (_) =>
+          _LocalMusicFiltersDialog(filters: filters, strings: strings),
+    );
+    if (!mounted ||
+        selected == null ||
+        _sameLocalMusicFilters(selected, filters)) {
+      return;
+    }
+    await ref
+        .read(settingsControllerProvider.notifier)
+        .setLocalMusicFilters(selected);
+  }
+
+  Future<void> _chooseSleepTimerDuration(SleepTimerState timer) async {
+    final strings = ref.read(appStringsProvider);
+    final entered = await showAppDialog<String>(
+      context: context,
+      builder: (_) => _SleepTimerDurationDialog(
+        initialDuration: timer.selectedDuration,
+        strings: strings,
+      ),
+    );
+    if (!mounted || entered == null) {
+      return;
+    }
+    final minutes = int.tryParse(entered.trim());
+    if (minutes == null || minutes < 1 || minutes > 720) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(strings.invalidTimerDuration)));
+      return;
+    }
+    ref
+        .read(sleepTimerControllerProvider.notifier)
+        .selectDuration(Duration(minutes: minutes));
+  }
+
+  void _syncTikTokController(TikTokLiveState state) {
+    if (!_tiktokLiveFocusNode.hasFocus &&
+        _tiktokLiveController.text != state.creatorInput) {
+      _tiktokLiveController.text = state.creatorInput;
+    }
+  }
+
+  Future<void> _openSupportDevelopment() async {
+    await _openExternalPage(
+      url: AppConstants.supportDevelopmentUrl,
+      failureMessage: ref.read(appStringsProvider).supportDevelopmentOpenFailed,
+    );
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    if (_releaseCheckBusy) {
+      return;
+    }
+    setState(() => _releaseCheckBusy = true);
+    final strings = ref.read(appStringsProvider);
+    AppReleaseCheckResult result;
+    try {
+      result = await ref.read(settingsReleaseCheckerProvider)(
+        currentVersion: AppConstants.appVersion,
+      );
+    } catch (_) {
+      if (mounted && _route == _SettingsRoute.about) {
+        _showSnackBar(strings.updateCheckFailed);
+      }
+      return;
+    } finally {
+      if (mounted) {
+        setState(() => _releaseCheckBusy = false);
+      }
+    }
+    if (!mounted || _route != _SettingsRoute.about) {
+      return;
+    }
+    if (!result.updateAvailable) {
+      _showSnackBar(strings.appIsUpToDate);
+      return;
+    }
+    await showAppUpdateAvailableDialog(
+      context: context,
+      strings: strings,
+      release: result,
+      onDownload: _openUpdateDownloadPage,
+    );
+  }
+
+  Future<void> _openUpdateDownloadPage() async {
+    await _openExternalPage(
+      url: AppConstants.appDownloadUrl,
+      failureMessage: ref.read(appStringsProvider).updateDownloadOpenFailed,
+    );
+  }
+
+  Future<void> _openGitHubRepository() async {
+    await _openExternalPage(
+      url: AppConstants.githubRepositoryUrl,
+      failureMessage: ref.read(appStringsProvider).githubRepositoryOpenFailed,
+    );
+  }
+
+  Future<void> _openSupportedLinksSettings() async {
+    try {
+      final opened = await ref.read(settingsSupportedLinksLauncherProvider)();
+      if (!mounted || opened) {
+        return;
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+    }
+    _showSnackBar(ref.read(appStringsProvider).supportedLinksOpenFailed);
+  }
+
+  Future<void> _openExternalPage({
+    required String url,
+    required String failureMessage,
+  }) async {
+    try {
+      final opened = await ref.read(settingsExternalLauncherProvider)(
+        Uri.parse(url),
+      );
+      if (!mounted || opened) {
+        return;
+      }
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+    }
+    _showSnackBar(failureMessage);
+  }
+
+  Future<void> _pickDownloadDirectory() async {
+    final strings = ref.read(appStringsProvider);
+    final controller = ref.read(settingsControllerProvider.notifier);
+    final pickDirectory = ref.read(downloadDirectoryPickerProvider);
+    final previousPath = _downloadPathController.text;
+    try {
+      final selected = await pickDirectory(
+        dialogTitle: strings.selectDownloadFolder,
+        initialDirectory: previousPath.isEmpty ? null : previousPath,
+      );
+      if (!mounted || selected == null) {
+        return;
+      }
+      await controller.setDownloadDirectory(selected);
+      if (!mounted) {
+        return;
+      }
+      _downloadPathController.text =
+          ref.read(settingsControllerProvider).value?.downloadDirectory ??
+          selected;
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _downloadPathController.text =
+          ref.read(settingsControllerProvider).value?.downloadDirectory ??
+          previousPath;
+      _showSnackBar(strings.downloadFolderSaveFailed);
+    }
+  }
+
+  Future<void> _exportBackup() async {
+    if (_backupBusy) {
+      return;
+    }
+    setState(() => _backupBusy = true);
+    File? backupFile;
+    try {
+      final strings = ref.read(appStringsProvider);
+      backupFile = await ref
+          .read(settingsControllerProvider.notifier)
+          .createBackupFile();
+      if (!mounted) {
+        return;
+      }
+      final fileName = _backupFileName();
+      final String? path;
+      if (AppPlatform.isAndroid) {
+        path = await const AndroidFileExportChannel().saveFile(
+          sourcePath: backupFile.path,
+          fileName: fileName,
+        );
+      } else if (AppPlatform.isIOS) {
+        path = await const IosFileExportChannel().saveFile(
+          sourcePath: backupFile.path,
+          fileName: fileName,
+        );
+      } else {
+        final destination = await FilePicker.saveFile(
+          dialogTitle: strings.exportBackupTitle,
+          fileName: fileName,
+          bytes: await backupFile.readAsBytes(),
+          initialDirectory: _downloadPathController.text,
+          type: FileType.custom,
+          allowedExtensions: const ['zip'],
+          windowsOptions: const WindowsOptions(lockParentWindow: true),
+          linuxOptions: const LinuxOptions(lockParentWindow: true),
+        );
+        path = destination?.toString();
+      }
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(
+        path == null ? strings.backupCancelled : strings.backupExported,
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('${ref.read(appStringsProvider).backupFailed} $error');
+    } finally {
+      try {
+        if (backupFile != null && await backupFile.exists()) {
+          await backupFile.delete();
+        }
+      } catch (_) {
+        // Cleanup failure must never leave Storage permanently disabled.
+      }
+      if (mounted) {
+        setState(() => _backupBusy = false);
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    if (_backupBusy) {
+      return;
+    }
+    final strings = ref.read(appStringsProvider);
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        key: const ValueKey('backup-import-confirmation'),
+        title: Text(strings.replaceLibraryTitle),
+        content: Text(strings.replaceLibraryMessage),
+        actions: [
+          TextButton(
+            key: const ValueKey('backup-import-cancel'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton(
+            key: const ValueKey('backup-import-confirm'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(strings.restoreAndReplace),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) {
+      return;
+    }
+    setState(() => _backupBusy = true);
+    try {
+      final path = await ref.read(storageImportFilePickerProvider)(
+        dialogTitle: strings.importBackupTitle,
+        allowedExtensions: const ['zip'],
+      );
+      if (path == null) {
+        if (mounted) {
+          _showSnackBar(strings.backupCancelled);
+        }
+        return;
+      }
+      if (path.trim().isEmpty) {
+        throw const FormatException('No se pudo leer el archivo seleccionado.');
+      }
+      await ref
+          .read(settingsControllerProvider.notifier)
+          .restoreBackupFile(path);
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar(strings.backupImported);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      _showSnackBar('${ref.read(appStringsProvider).backupFailed} $error');
+    } finally {
+      if (mounted) {
+        setState(() => _backupBusy = false);
+      }
+    }
+  }
+
+  Future<void> _importCsv() async {
+    if (_backupBusy || ref.read(libraryCsvTransferControllerProvider).isBusy) {
+      return;
+    }
+    final strings = ref.read(appStringsProvider);
+    setState(() => _backupBusy = true);
+    try {
+      final path = await ref.read(storageImportFilePickerProvider)(
+        dialogTitle: strings.importFromCsv,
+        allowedExtensions: const ['csv', 'tsv', 'txt'],
+      );
+      if (path == null) {
+        if (mounted) _showSnackBar(strings.backupCancelled);
+        return;
+      }
+      if (path.trim().isEmpty) {
+        throw const FormatException('No se pudo leer el archivo seleccionado.');
+      }
+
+      if (!mounted) return;
+      await showLibraryCsvImportFlow(context: context, ref: ref, path: path);
+    } catch (error) {
+      if (mounted) {
+        _showSnackBar('${strings.csvImportFailed} ${readableCsvError(error)}');
+      }
+    } finally {
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  Future<void> _exportCsv() => runLibraryCsvTransferFlow(
+    ref: ref,
+    operation: () async {
+      if (mounted) await _exportCsvNow();
+    },
+  );
+
+  Future<void> _exportCsvNow() async {
+    if (_backupBusy || ref.read(libraryCsvTransferControllerProvider).isBusy) {
+      return;
+    }
+    final strings = ref.read(appStringsProvider);
+    final profile = await showAppDialog<LibraryCsvProfile>(
+      context: context,
+      builder: (dialogContext) => _CsvProfileDialog(
+        strings: strings,
+        onSelected: (value) => Navigator.of(dialogContext).pop(value),
+        onCancel: () => Navigator.of(dialogContext).pop(),
+      ),
+    );
+    if (!mounted || profile == null) return;
+
+    setState(() => _backupBusy = true);
+    Directory? transferDirectory;
+    try {
+      final controller = ref.read(
+        libraryCsvTransferControllerProvider.notifier,
+      );
+      controller.reset();
+      final document = await controller.prepareExport();
+      final temporaryRoot = await getTemporaryDirectory();
+      transferDirectory = await temporaryRoot.createTemp('bstream-csv-');
+      final fileName = _csvFileName(profile);
+      final source = await ref
+          .read(libraryCsvServiceProvider)
+          .createExportFile(
+            document: document,
+            profile: profile,
+            outputPath:
+                '${transferDirectory.path}${Platform.pathSeparator}$fileName',
+          );
+      if (!mounted) return;
+
+      final String? destination;
+      if (AppPlatform.isAndroid) {
+        destination = await const AndroidFileExportChannel().saveFile(
+          sourcePath: source.path,
+          fileName: fileName,
+          mimeType: 'text/csv',
+        );
+      } else if (AppPlatform.isIOS) {
+        destination = await const IosFileExportChannel().saveFile(
+          sourcePath: source.path,
+          fileName: fileName,
+          mimeType: 'text/csv',
+        );
+      } else {
+        final selectedPath = await FilePicker.saveFile(
+          dialogTitle: strings.exportToCsv,
+          fileName: fileName,
+          bytes: await source.readAsBytes(),
+          mimeType: 'text/csv',
+          initialDirectory: _downloadPathController.text,
+          type: FileType.custom,
+          allowedExtensions: const ['csv'],
+          windowsOptions: const WindowsOptions(lockParentWindow: true),
+          linuxOptions: const LinuxOptions(lockParentWindow: true),
+        );
+        destination = selectedPath == null
+            ? null
+            : _ensureCsvExtension(selectedPath.toString());
+      }
+      if (!mounted) return;
+      _showSnackBar(
+        destination == null ? strings.backupCancelled : strings.csvExported,
+      );
+      controller.reset();
+    } catch (error) {
+      ref.read(libraryCsvTransferControllerProvider.notifier).reset();
+      if (mounted) {
+        _showSnackBar('${strings.csvExportFailed} ${readableCsvError(error)}');
+      }
+    } finally {
+      try {
+        if (transferDirectory != null && await transferDirectory.exists()) {
+          await transferDirectory.delete(recursive: true);
+        }
+      } catch (_) {
+        // Cleanup must never leave Storage permanently disabled.
+      }
+      if (mounted) setState(() => _backupBusy = false);
+    }
+  }
+
+  String _backupFileName() {
+    final stamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+    return 'bstream-music-backup-$stamp.zip';
+  }
+
+  String _csvFileName(LibraryCsvProfile profile) {
+    final stamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(':', '-')
+        .replaceAll('.', '-');
+    return 'bstream-music-${profile.name}-$stamp.csv';
+  }
+
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _CsvProfileDialog extends StatelessWidget {
+  const _CsvProfileDialog({
+    required this.strings,
+    required this.onSelected,
+    required this.onCancel,
+  });
+
+  final AppStrings strings;
+  final ValueChanged<LibraryCsvProfile> onSelected;
+  final VoidCallback onCancel;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = <(LibraryCsvProfile, String)>[
+      (LibraryCsvProfile.bstream, strings.csvProfileBStream),
+      (LibraryCsvProfile.metroList, strings.csvProfileMetroList),
+      (LibraryCsvProfile.harmony, strings.csvProfileHarmony),
+      (LibraryCsvProfile.soundiiz, strings.csvProfileSoundiiz),
+    ];
+    return AppAlertDialog(
+      key: const ValueKey('csv-export-profile-dialog'),
+      scrollable: true,
+      title: Text(strings.chooseCsvProfile),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < options.length; index++) ...[
+                if (index > 0) const SizedBox(height: 6),
+                Material(
+                  key: ValueKey(
+                    'csv-profile-surface-${options[index].$1.name}',
+                  ),
+                  color: AppColors.cardSurfaceFor(context),
+                  borderRadius: BorderRadius.circular(appCardRadius),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    key: ValueKey('csv-profile-${options[index].$1.name}'),
+                    minVerticalPadding: 10,
+                    title: Text(options[index].$2),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () => onSelected(options[index].$1),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('csv-export-profile-cancel'),
+          onPressed: onCancel,
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+String _ensureCsvExtension(String path) =>
+    path.toLowerCase().endsWith('.csv') ? path : '$path.csv';
+
+class _SettingsHeader extends StatelessWidget {
+  const _SettingsHeader({
+    required this.route,
+    required this.title,
+    required this.strings,
+    required this.onBack,
+  });
+
+  final _SettingsRoute route;
+  final String title;
+  final AppStrings strings;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = appTabTitleStyle(context);
+    if (route == _SettingsRoute.root) {
+      return Text(
+        key: const ValueKey('settings-tab-title'),
+        title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: style,
+      );
+    }
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('settings-detail-back'),
+            tooltip: strings.back,
+            onPressed: onBack,
+            icon: const Icon(Icons.arrow_back_rounded),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              key: const ValueKey('settings-detail-title'),
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: style,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsEntryCard extends StatelessWidget {
+  const _SettingsEntryCard({
+    this.icon,
+    this.leading,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.accent,
+    this.status,
+    this.trailing,
+    super.key,
+  }) : assert(icon != null || leading != null);
+
+  final IconData? icon;
+  final Widget? leading;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final Color? accent;
+  final bool? status;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final desktopLayout =
+        AppPlatform.isDesktop && theme.platform != TargetPlatform.android;
+    final highlight = accent ?? colors.primary;
+    final card = _SettingsItemSurface(
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 78),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: highlight.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(appListCardIconRadius),
+                    border: Border.all(
+                      color: highlight.withValues(alpha: 0.24),
+                    ),
+                  ),
+                  child: IconTheme.merge(
+                    data: IconThemeData(color: highlight, size: 24),
+                    child: Center(
+                      child: leading ?? Icon(icon, color: highlight, size: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: appListCardSubtitleStyle(context),
+                      ),
+                    ],
+                  ),
+                ),
+                if (status != null) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    status! ? Icons.check_circle_rounded : Icons.error_rounded,
+                    color: status! ? colors.primary : colors.error,
+                    size: 19,
+                  ),
+                ],
+                if (trailing case final trailing?) ...[
+                  const SizedBox(width: 8),
+                  trailing,
+                ] else if (onTap != null) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: desktopLayout ? double.infinity : 760,
+      ),
+      child: card,
+    );
+  }
+}
+
+class _AboutApplicationSettings extends StatelessWidget {
+  const _AboutApplicationSettings({
+    required this.strings,
+    required this.checkingForUpdates,
+    required this.onVersion,
+    required this.onSupport,
+    required this.onGitHub,
+  });
+
+  final AppStrings strings;
+  final bool checkingForUpdates;
+  final VoidCallback onVersion;
+  final VoidCallback onSupport;
+  final VoidCallback onGitHub;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSectionPanel(
+      children: [
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-version'),
+          icon: Icons.sell_outlined,
+          title: strings.versionLabel,
+          subtitle: AppConstants.appVersion,
+          onTap: checkingForUpdates ? null : onVersion,
+          trailing: checkingForUpdates
+              ? const SizedBox.square(
+                  key: ValueKey('settings-version-check-progress'),
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2.2),
+                )
+              : null,
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-whats-new'),
+          icon: Icons.auto_awesome_rounded,
+          title: strings.whatsNewTitle(AppConstants.appVersion),
+          subtitle: strings.whatsNewSummary,
+          onTap: () => _showWhatsNew(context),
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-support'),
+          icon: Icons.favorite_outline_rounded,
+          title: strings.supportDevelopmentTitle,
+          subtitle: strings.supportDevelopmentBody,
+          onTap: onSupport,
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-github'),
+          icon: Icons.code_rounded,
+          title: strings.githubRepositoryTitle,
+          subtitle: strings.githubRepositoryBody,
+          onTap: onGitHub,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showWhatsNew(BuildContext context) async {
+    final highlights = strings.whatsNewHighlights;
+    await showAppDialog<void>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        key: const ValueKey('settings-about-whats-new-dialog'),
+        title: Text(strings.whatsNewTitle(AppConstants.appVersion)),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var index = 0; index < highlights.length; index++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index == highlights.length - 1 ? 0 : 14,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.only(top: 3),
+                          child: Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 18,
+                            color: Theme.of(dialogContext).colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(highlights[index])),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('settings-about-whats-new-close'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(strings.close),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LanguageSelectorDialog extends StatelessWidget {
+  const _LanguageSelectorDialog({
+    required this.language,
+    required this.strings,
+  });
+
+  final AppLanguage language;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-language-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.language),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var index = 0; index < AppLanguage.values.length; index++) ...[
+              if (index > 0) const SizedBox(height: 8),
+              _SettingsDialogOption(
+                key: ValueKey(
+                  'settings-language-option-${AppLanguage.values[index].name}',
+                ),
+                selected: language == AppLanguage.values[index],
+                icon: Icons.language_rounded,
+                label: AppLanguage.values[index].label,
+                onTap: () =>
+                    Navigator.of(context).pop(AppLanguage.values[index]),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-language-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsDialogOption extends StatelessWidget {
+  const _SettingsDialogOption({
+    required this.selected,
+    this.icon,
+    this.leading,
+    required this.label,
+    required this.onTap,
+    super.key,
+  }) : assert(icon != null || leading != null);
+
+  final bool selected;
+  final IconData? icon;
+  final Widget? leading;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected
+            ? colors.primaryContainer.withValues(
+                alpha: AppColors.cardSurfaceOpacityFor(context),
+              )
+            : AppColors.cardSurfaceFor(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appListCardIconRadius),
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 56),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Row(
+                children: [
+                  IconTheme.merge(
+                    data: IconThemeData(
+                      color: selected
+                          ? colors.primary
+                          : colors.onSurfaceVariant,
+                      size: 24,
+                    ),
+                    child:
+                        leading ??
+                        Icon(
+                          icon,
+                          color: selected
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
+                        ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: selected ? colors.onPrimaryContainer : null,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(
+                    selected
+                        ? Icons.check_circle_rounded
+                        : Icons.radio_button_unchecked_rounded,
+                    color: selected ? colors.primary : colors.onSurfaceVariant,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerFontSelectorDialog extends StatefulWidget {
+  const _PlayerFontSelectorDialog({required this.font, required this.strings});
+
+  final PlayerFont font;
+  final AppStrings strings;
+
+  @override
+  State<_PlayerFontSelectorDialog> createState() =>
+      _PlayerFontSelectorDialogState();
+}
+
+class _PlayerFontSelectorDialogState extends State<_PlayerFontSelectorDialog> {
+  late PlayerFont selected = widget.font;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-player-font-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(widget.strings.playerFont),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final font in PlayerFont.values) ...[
+              if (font != PlayerFont.current) const SizedBox(height: 8),
+              _PlayerFontOption(
+                key: ValueKey('settings-player-font-option-${font.code}'),
+                font: font,
+                selected: selected == font,
+                strings: widget.strings,
+                onTap: () => setState(() => selected = font),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(widget.strings.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('settings-player-font-apply'),
+          onPressed: () => Navigator.of(context).pop(selected),
+          child: Text(widget.strings.apply),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayerFontOption extends StatelessWidget {
+  const _PlayerFontOption({
+    required this.font,
+    required this.selected,
+    required this.strings,
+    required this.onTap,
+    super.key,
+  });
+
+  final PlayerFont font;
+  final bool selected;
+  final AppStrings strings;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: strings.playerFontLabel(font),
+      excludeSemantics: true,
+      child: Material(
+        color: selected
+            ? colors.primaryContainer.withValues(
+                alpha: AppColors.cardSurfaceOpacityFor(context),
+              )
+            : AppColors.cardSurfaceFor(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appListCardIconRadius),
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.text_fields_rounded,
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        strings.playerFontLabel(font),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: font.fontFamily,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: selected
+                              ? colors.onPrimaryContainer
+                              : colors.onSurface,
+                        ),
+                      ),
+                      Text(
+                        strings.playerFontDescription(font),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: selected
+                              ? colors.onPrimaryContainer.withValues(alpha: 0.8)
+                              : colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  selected
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: selected ? colors.primary : colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerArtworkStyleSelectorDialog extends StatelessWidget {
+  const _PlayerArtworkStyleSelectorDialog({
+    required this.style,
+    required this.strings,
+  });
+
+  final PlayerArtworkStyle style;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-player-artwork-style-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.playerArtworkStyle),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-player-artwork-style-option-classic',
+              ),
+              selected: style == PlayerArtworkStyle.classic,
+              icon: Icons.crop_square_rounded,
+              label: strings.playerArtworkStyleClassic,
+              onTap: () =>
+                  Navigator.of(context).pop(PlayerArtworkStyle.classic),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-player-artwork-style-option-expanded',
+              ),
+              selected: style == PlayerArtworkStyle.expanded,
+              icon: Icons.aspect_ratio_rounded,
+              label: strings.playerArtworkStyleExpanded,
+              onTap: () =>
+                  Navigator.of(context).pop(PlayerArtworkStyle.expanded),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-player-artwork-style-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniPlayerModeSelectorDialog extends StatelessWidget {
+  const _MiniPlayerModeSelectorDialog({
+    required this.mode,
+    required this.strings,
+  });
+
+  final MiniPlayerMode mode;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-mini-player-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.miniPlayer),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey('settings-mini-player-option-default'),
+              selected: mode == MiniPlayerMode.standard,
+              leading: const _MiniPlayerStyleIcon(
+                key: ValueKey('settings-mini-player-icon-default'),
+                mode: MiniPlayerMode.standard,
+              ),
+              label: strings.miniPlayerClassic,
+              onTap: () => Navigator.of(context).pop(MiniPlayerMode.standard),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey('settings-mini-player-option-capsule'),
+              selected: mode == MiniPlayerMode.capsule,
+              leading: const _MiniPlayerStyleIcon(
+                key: ValueKey('settings-mini-player-icon-capsule'),
+                mode: MiniPlayerMode.capsule,
+              ),
+              label: strings.miniPlayerCapsule,
+              onTap: () => Navigator.of(context).pop(MiniPlayerMode.capsule),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-mini-player-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _SurfaceBackgroundSelectorDialog extends StatelessWidget {
+  const _SurfaceBackgroundSelectorDialog({
+    required this.mode,
+    required this.strings,
+  });
+
+  final SurfaceBackgroundMode mode;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-surface-background-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.surfaceBackground),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey('settings-surface-background-option-accent'),
+              selected: mode == SurfaceBackgroundMode.accent,
+              icon: Icons.format_color_fill_rounded,
+              label: strings.surfaceBackgroundAccent,
+              onTap: () =>
+                  Navigator.of(context).pop(SurfaceBackgroundMode.accent),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-surface-background-option-transparent',
+              ),
+              selected: mode == SurfaceBackgroundMode.transparent,
+              icon: Icons.blur_on_rounded,
+              label: strings.surfaceBackgroundTransparent,
+              onTap: () =>
+                  Navigator.of(context).pop(SurfaceBackgroundMode.transparent),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-surface-background-option-liquid-glass',
+              ),
+              selected: mode == SurfaceBackgroundMode.liquidGlass,
+              icon: Icons.water_drop_rounded,
+              label: strings.surfaceBackgroundLiquidGlass,
+              onTap: () =>
+                  Navigator.of(context).pop(SurfaceBackgroundMode.liquidGlass),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-surface-background-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+enum _AppBackgroundChoice { none, custom }
+
+class _AppBackgroundSelectorDialog extends StatelessWidget {
+  const _AppBackgroundSelectorDialog({
+    required this.customSelected,
+    required this.strings,
+  });
+
+  final bool customSelected;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-app-background-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.appBackground),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey('settings-app-background-option-none'),
+              selected: !customSelected,
+              icon: Icons.hide_image_rounded,
+              label: strings.appBackgroundNone,
+              onTap: () => Navigator.of(context).pop(_AppBackgroundChoice.none),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey('settings-app-background-option-custom'),
+              selected: customSelected,
+              icon: Icons.add_photo_alternate_rounded,
+              label: strings.appBackgroundCustom,
+              onTap: () =>
+                  Navigator.of(context).pop(_AppBackgroundChoice.custom),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-app-background-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _MiniPlayerBackgroundSelectorDialog extends StatelessWidget {
+  const _MiniPlayerBackgroundSelectorDialog({
+    required this.mode,
+    required this.strings,
+  });
+
+  final MiniPlayerBackgroundMode mode;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-mini-player-background-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.miniPlayerBackground),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-mini-player-background-option-accent',
+              ),
+              selected: mode == MiniPlayerBackgroundMode.accent,
+              icon: Icons.format_color_fill_rounded,
+              label: strings.miniPlayerBackgroundAccent,
+              onTap: () =>
+                  Navigator.of(context).pop(MiniPlayerBackgroundMode.accent),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-mini-player-background-option-artwork',
+              ),
+              selected: mode == MiniPlayerBackgroundMode.artwork,
+              icon: Icons.image_rounded,
+              label: strings.miniPlayerBackgroundArtwork,
+              onTap: () =>
+                  Navigator.of(context).pop(MiniPlayerBackgroundMode.artwork),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-mini-player-background-option-transparent',
+              ),
+              selected: mode == MiniPlayerBackgroundMode.transparent,
+              icon: Icons.blur_on_rounded,
+              label: strings.miniPlayerBackgroundTransparent,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(MiniPlayerBackgroundMode.transparent),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey(
+                'settings-mini-player-background-option-liquid-glass',
+              ),
+              selected: mode == MiniPlayerBackgroundMode.liquidGlass,
+              icon: Icons.water_drop_rounded,
+              label: strings.miniPlayerBackgroundLiquidGlass,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(MiniPlayerBackgroundMode.liquidGlass),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('settings-mini-player-background-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _AppearanceSettings extends StatelessWidget {
+  const _AppearanceSettings({
+    required this.themeMode,
+    required this.accent,
+    required this.surfaceBackgroundMode,
+    required this.appBackgroundPath,
+    required this.playerFont,
+    required this.liveWidgetStyle,
+    this.onOpenLiveWidget,
+    required this.playerStyle,
+    required this.showAudioQuality,
+    required this.animatedArtworkEnabled,
+    required this.playerArtworkStyle,
+    required this.appleAnimatedArtworkEnabled,
+    required this.spotifyCanvasEnabled,
+    required this.miniPlayerMode,
+    required this.miniPlayerBackgroundMode,
+    required this.strings,
+    required this.onThemeModeChanged,
+    required this.onAccentChanged,
+    required this.onSurfaceBackgroundModeChanged,
+    required this.onPickAppBackgroundPhoto,
+    required this.onAppBackgroundPhotoSelected,
+    required this.onAppBackgroundCleared,
+    required this.onPlayerFontChanged,
+    required this.onOpenPlayerStyles,
+    required this.onShowAudioQualityChanged,
+    required this.onAnimatedArtworkEnabledChanged,
+    required this.onPlayerArtworkStyleChanged,
+    required this.onAppleAnimatedArtworkEnabledChanged,
+    required this.onSpotifyCanvasEnabledChanged,
+    required this.onMiniPlayerModeChanged,
+    required this.onMiniPlayerBackgroundModeChanged,
+  });
+
+  final AppThemeMode themeMode;
+  final AppAccent accent;
+  final SurfaceBackgroundMode surfaceBackgroundMode;
+  final String? appBackgroundPath;
+  final PlayerFont playerFont;
+  final LiveWidgetStyle liveWidgetStyle;
+  final VoidCallback? onOpenLiveWidget;
+  final PlayerStyle playerStyle;
+  final bool showAudioQuality;
+  final bool animatedArtworkEnabled;
+  final PlayerArtworkStyle playerArtworkStyle;
+  final bool appleAnimatedArtworkEnabled;
+  final bool spotifyCanvasEnabled;
+  final MiniPlayerMode miniPlayerMode;
+  final MiniPlayerBackgroundMode miniPlayerBackgroundMode;
+  final AppStrings strings;
+  final ValueChanged<AppThemeMode> onThemeModeChanged;
+  final ValueChanged<AppAccent> onAccentChanged;
+  final Future<void> Function(SurfaceBackgroundMode)
+  onSurfaceBackgroundModeChanged;
+  final AppBackgroundPhotoPicker onPickAppBackgroundPhoto;
+  final Future<void> Function(File) onAppBackgroundPhotoSelected;
+  final Future<void> Function() onAppBackgroundCleared;
+  final Future<void> Function(PlayerFont) onPlayerFontChanged;
+  final VoidCallback onOpenPlayerStyles;
+  final Future<void> Function(bool) onShowAudioQualityChanged;
+  final Future<void> Function(bool) onAnimatedArtworkEnabledChanged;
+  final Future<void> Function(PlayerArtworkStyle) onPlayerArtworkStyleChanged;
+  final Future<void> Function(bool) onAppleAnimatedArtworkEnabledChanged;
+  final Future<void> Function(bool) onSpotifyCanvasEnabledChanged;
+  final Future<void> Function(MiniPlayerMode) onMiniPlayerModeChanged;
+  final Future<void> Function(MiniPlayerBackgroundMode)
+  onMiniPlayerBackgroundModeChanged;
+
+  Future<void> _chooseMiniPlayerMode(BuildContext context) async {
+    final selected = await showAppDialog<MiniPlayerMode>(
+      context: context,
+      builder: (_) =>
+          _MiniPlayerModeSelectorDialog(mode: miniPlayerMode, strings: strings),
+    );
+    if (!context.mounted || selected == null || selected == miniPlayerMode) {
+      return;
+    }
+    await onMiniPlayerModeChanged(selected);
+  }
+
+  Future<void> _choosePlayerFont(BuildContext context) async {
+    final selected = await showAppDialog<PlayerFont>(
+      context: context,
+      builder: (_) =>
+          _PlayerFontSelectorDialog(font: playerFont, strings: strings),
+    );
+    if (!context.mounted || selected == null || selected == playerFont) return;
+    await onPlayerFontChanged(selected);
+  }
+
+  Future<void> _choosePlayerArtworkStyle(BuildContext context) async {
+    final selected = await showAppDialog<PlayerArtworkStyle>(
+      context: context,
+      builder: (_) => _PlayerArtworkStyleSelectorDialog(
+        style: playerArtworkStyle,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted ||
+        selected == null ||
+        selected == playerArtworkStyle) {
+      return;
+    }
+    await onPlayerArtworkStyleChanged(selected);
+  }
+
+  Future<void> _chooseSurfaceBackgroundMode(BuildContext context) async {
+    final selected = await showAppDialog<SurfaceBackgroundMode>(
+      context: context,
+      builder: (_) => _SurfaceBackgroundSelectorDialog(
+        mode: surfaceBackgroundMode,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted ||
+        selected == null ||
+        selected == surfaceBackgroundMode) {
+      return;
+    }
+    await onSurfaceBackgroundModeChanged(selected);
+  }
+
+  Future<void> _chooseAppBackground(BuildContext context) async {
+    final selected = await showAppDialog<_AppBackgroundChoice>(
+      context: context,
+      builder: (_) => _AppBackgroundSelectorDialog(
+        customSelected: appBackgroundPath != null,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted || selected == null) return;
+    try {
+      if (selected == _AppBackgroundChoice.none) {
+        await onAppBackgroundCleared();
+        return;
+      }
+      final image = await onPickAppBackgroundPhoto();
+      if (image != null) {
+        await onAppBackgroundPhotoSelected(image);
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.appBackgroundSelectionFailed)),
+      );
+      debugPrint('Could not select app background: $error');
+    }
+  }
+
+  Future<void> _chooseMiniPlayerBackgroundMode(BuildContext context) async {
+    final selected = await showAppDialog<MiniPlayerBackgroundMode>(
+      context: context,
+      builder: (_) => _MiniPlayerBackgroundSelectorDialog(
+        mode: miniPlayerBackgroundMode,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted ||
+        selected == null ||
+        selected == miniPlayerBackgroundMode) {
+      return;
+    }
+    await onMiniPlayerBackgroundModeChanged(selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: _settingsContentMaxWidth(context, 520),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SettingsSectionPanel(
+            title: strings.theme,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: SegmentedButton<AppThemeMode>(
+                  selected: {themeMode},
+                  style: ButtonStyle(
+                    minimumSize: WidgetStateProperty.all(const Size(0, 50)),
+                    padding: WidgetStateProperty.all(
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    ),
+                    textStyle: WidgetStateProperty.all(
+                      Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    iconSize: WidgetStateProperty.all(22),
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: AppThemeMode.system,
+                      icon: const Icon(Icons.settings_suggest_rounded),
+                      label: Text(strings.themeSystem),
+                    ),
+                    ButtonSegment(
+                      value: AppThemeMode.light,
+                      icon: const Icon(Icons.light_mode_rounded),
+                      label: Text(strings.themeLight),
+                    ),
+                    ButtonSegment(
+                      value: AppThemeMode.dark,
+                      icon: const Icon(Icons.dark_mode_rounded),
+                      label: Text(strings.themeDark),
+                    ),
+                  ],
+                  onSelectionChanged: (selection) =>
+                      onThemeModeChanged(selection.first),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.accentColor,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 328),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final columnCount = ((constraints.maxWidth + 8) / 56)
+                            .floor()
+                            .clamp(1, 6);
+                        return GridView.builder(
+                          key: const ValueKey('accent-palette-grid'),
+                          shrinkWrap: true,
+                          primary: false,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: columnCount,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                              ),
+                          itemCount: AppAccent.values.length,
+                          itemBuilder: (context, index) {
+                            final option = AppAccent.values[index];
+                            return _AccentSwatch(
+                              accent: option,
+                              selected: option == accent,
+                              label: strings.accentLabel(option),
+                              onTap: () => onAccentChanged(option),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.surfaceEffects,
+            children: [
+              _SettingsEntryCard(
+                key: const ValueKey('surface-background-selector'),
+                icon: switch (surfaceBackgroundMode) {
+                  SurfaceBackgroundMode.accent =>
+                    Icons.format_color_fill_rounded,
+                  SurfaceBackgroundMode.transparent => Icons.blur_on_rounded,
+                  SurfaceBackgroundMode.liquidGlass => Icons.water_drop_rounded,
+                },
+                title: strings.surfaceBackground,
+                subtitle: strings.surfaceBackgroundModeLabel(
+                  surfaceBackgroundMode,
+                ),
+                onTap: () => _chooseSurfaceBackgroundMode(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('app-background-selector'),
+                icon: Icons.wallpaper_rounded,
+                title: strings.appBackground,
+                subtitle: appBackgroundPath == null
+                    ? strings.appBackgroundNone
+                    : strings.appBackgroundCustom,
+                onTap: () => _chooseAppBackground(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('player-font-selector'),
+                icon: Icons.text_fields_rounded,
+                title: strings.playerFont,
+                subtitle: strings.playerFontLabel(playerFont),
+                onTap: () => _choosePlayerFont(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.player,
+            children: [
+              _SettingsEntryCard(
+                key: const ValueKey('player-style-selector'),
+                icon: switch (playerStyle) {
+                  PlayerStyle.bstreamMusic => Icons.graphic_eq_rounded,
+                  PlayerStyle.appleMusic => Icons.music_note_rounded,
+                  PlayerStyle.classicVinyl => Icons.album_rounded,
+                  PlayerStyle.spotifyMusic => Icons.play_circle_rounded,
+                },
+                title: strings.playerStyle,
+                subtitle: strings.playerStyleLabel(playerStyle),
+                onTap: onOpenPlayerStyles,
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('show-audio-quality-toggle'),
+                icon: Icons.high_quality_rounded,
+                title: strings.showAudioQuality,
+                subtitle: strings.showAudioQualityDescription,
+                onTap: () => onShowAudioQualityChanged(!showAudioQuality),
+                trailing: Switch.adaptive(
+                  key: const ValueKey('show-audio-quality-switch'),
+                  value: showAudioQuality,
+                  onChanged: onShowAudioQualityChanged,
+                ),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('animated-artwork-toggle'),
+                icon: Icons.motion_photos_auto_rounded,
+                title: strings.animatedArtwork,
+                subtitle: strings.animatedArtworkDescription,
+                onTap: () =>
+                    onAnimatedArtworkEnabledChanged(!animatedArtworkEnabled),
+                trailing: Switch.adaptive(
+                  key: const ValueKey('animated-artwork-switch'),
+                  value: animatedArtworkEnabled,
+                  onChanged: onAnimatedArtworkEnabledChanged,
+                ),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('player-artwork-style-selector'),
+                icon: switch (playerArtworkStyle) {
+                  PlayerArtworkStyle.classic => Icons.crop_square_rounded,
+                  PlayerArtworkStyle.expanded => Icons.aspect_ratio_rounded,
+                },
+                title: strings.playerArtworkStyle,
+                subtitle: strings.playerArtworkStyleLabel(playerArtworkStyle),
+                onTap: () => _choosePlayerArtworkStyle(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('apple-animated-artwork-toggle'),
+                icon: Icons.live_tv_rounded,
+                title: strings.appleAnimatedArtwork,
+                subtitle: AppPlatform.current == AppPlatformType.linux
+                    ? strings.spotifyCanvasUnavailable
+                    : strings.appleAnimatedArtworkDescription,
+                onTap: AppPlatform.current == AppPlatformType.linux
+                    ? null
+                    : () => onAppleAnimatedArtworkEnabledChanged(
+                        !appleAnimatedArtworkEnabled,
+                      ),
+                trailing: Switch.adaptive(
+                  key: const ValueKey('apple-animated-artwork-switch'),
+                  value:
+                      AppPlatform.current != AppPlatformType.linux &&
+                      appleAnimatedArtworkEnabled,
+                  onChanged: AppPlatform.current == AppPlatformType.linux
+                      ? null
+                      : onAppleAnimatedArtworkEnabledChanged,
+                ),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('spotify-canvas-toggle'),
+                icon: Icons.movie_filter_rounded,
+                title: strings.spotifyCanvas,
+                subtitle: AppPlatform.current == AppPlatformType.linux
+                    ? strings.spotifyCanvasUnavailable
+                    : strings.spotifyCanvasDescription,
+                onTap: AppPlatform.current == AppPlatformType.linux
+                    ? null
+                    : () =>
+                          onSpotifyCanvasEnabledChanged(!spotifyCanvasEnabled),
+                trailing: Switch.adaptive(
+                  key: const ValueKey('spotify-canvas-switch'),
+                  value:
+                      AppPlatform.current != AppPlatformType.linux &&
+                      spotifyCanvasEnabled,
+                  onChanged: AppPlatform.current == AppPlatformType.linux
+                      ? null
+                      : onSpotifyCanvasEnabledChanged,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.miniPlayer,
+            children: [
+              _SettingsEntryCard(
+                key: const ValueKey('mini-player-mode-selector'),
+                leading: _MiniPlayerStyleIcon(
+                  key: const ValueKey('mini-player-mode-selector-icon'),
+                  mode: miniPlayerMode,
+                ),
+                title: strings.miniPlayerStyle,
+                subtitle: strings.miniPlayerModeLabel(miniPlayerMode),
+                onTap: () => _chooseMiniPlayerMode(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('mini-player-background-selector'),
+                icon: switch (miniPlayerBackgroundMode) {
+                  MiniPlayerBackgroundMode.accent =>
+                    Icons.format_color_fill_rounded,
+                  MiniPlayerBackgroundMode.artwork => Icons.image_rounded,
+                  MiniPlayerBackgroundMode.transparent => Icons.blur_on_rounded,
+                  MiniPlayerBackgroundMode.liquidGlass =>
+                    Icons.water_drop_rounded,
+                },
+                title: strings.miniPlayerBackground,
+                subtitle: strings.miniPlayerBackgroundModeLabel(
+                  miniPlayerBackgroundMode,
+                ),
+                onTap: () => _chooseMiniPlayerBackgroundMode(context),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          if (onOpenLiveWidget != null) ...[
+            _SettingsSectionPanel(
+              title: strings.liveWidget,
+              children: [
+                _SettingsEntryCard(
+                  key: const ValueKey('live-widget-style-selector'),
+                  icon: Icons.live_tv_rounded,
+                  title: strings.liveWidget,
+                  subtitle: strings.liveWidgetStyleLabel(liveWidgetStyle),
+                  onTap: onOpenLiveWidget,
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MiniPlayerStyleIcon extends StatelessWidget {
+  const _MiniPlayerStyleIcon({required this.mode, super.key});
+
+  final MiniPlayerMode mode;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox.square(
+      dimension: 24,
+      child: CustomPaint(
+        painter: _MiniPlayerStyleIconPainter(
+          mode: mode,
+          color:
+              IconTheme.of(context).color ??
+              Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniPlayerStyleIconPainter extends CustomPainter {
+  const _MiniPlayerStyleIconPainter({required this.mode, required this.color});
+
+  final MiniPlayerMode mode;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true;
+    final rect = mode == MiniPlayerMode.capsule
+        ? Rect.fromLTRB(1.5, 5.5, size.width - 1.5, size.height - 5.5)
+        : Rect.fromLTRB(1.5, 4.5, size.width - 1.5, size.height - 3.5);
+
+    if (mode == MiniPlayerMode.capsule) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(rect.height / 2)),
+        paint,
+      );
+    } else {
+      final radius = 3.5;
+      final path = Path()
+        ..moveTo(rect.left, rect.bottom)
+        ..lineTo(rect.left, rect.top + radius)
+        ..quadraticBezierTo(rect.left, rect.top, rect.left + radius, rect.top)
+        ..lineTo(rect.right - radius, rect.top)
+        ..quadraticBezierTo(rect.right, rect.top, rect.right, rect.top + radius)
+        ..lineTo(rect.right, rect.bottom)
+        ..close();
+      canvas.drawPath(path, paint);
+    }
+
+    final artworkCenter = Offset(rect.left + 4.5, rect.center.dy);
+    if (mode == MiniPlayerMode.capsule) {
+      canvas.drawCircle(artworkCenter, 2.2, paint);
+    } else {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: artworkCenter, width: 4.4, height: 4.4),
+          const Radius.circular(0.8),
+        ),
+        paint,
+      );
+    }
+    canvas
+      ..drawLine(
+        Offset(rect.left + 8.5, rect.center.dy - 1.8),
+        Offset(rect.right - 3, rect.center.dy - 1.8),
+        paint,
+      )
+      ..drawLine(
+        Offset(rect.left + 8.5, rect.center.dy + 2),
+        Offset(rect.right - 7, rect.center.dy + 2),
+        paint,
+      );
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniPlayerStyleIconPainter oldDelegate) {
+    return mode != oldDelegate.mode || color != oldDelegate.color;
+  }
+}
+
+class _LyricsAppearanceSettings extends StatelessWidget {
+  const _LyricsAppearanceSettings({
+    required this.enabledProviders,
+    required this.onOpenProviders,
+    required this.animationStyle,
+    required this.alignment,
+    required this.romanizationEnabled,
+    required this.romanizationLanguages,
+    required this.strings,
+    required this.onAnimationChanged,
+    required this.onAlignmentChanged,
+    required this.onRomanizationEnabledChanged,
+    required this.onRomanizationLanguagesChanged,
+  });
+
+  final Set<LyricsProvider> enabledProviders;
+  final VoidCallback onOpenProviders;
+  final LyricsAnimationStyle animationStyle;
+  final LyricsTextAlignment alignment;
+  final bool romanizationEnabled;
+  final Set<LyricsRomanizationLanguage> romanizationLanguages;
+  final AppStrings strings;
+  final ValueChanged<LyricsAnimationStyle> onAnimationChanged;
+  final ValueChanged<LyricsTextAlignment> onAlignmentChanged;
+  final ValueChanged<bool> onRomanizationEnabledChanged;
+  final ValueChanged<Set<LyricsRomanizationLanguage>>
+  onRomanizationLanguagesChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: _settingsContentMaxWidth(context, 520),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SettingsSectionPanel(
+            children: [
+              _SettingsEntryCard(
+                key: const ValueKey('settings-card-lyrics-providers'),
+                icon: Icons.library_music_rounded,
+                title: strings.lyricsProviders,
+                subtitle: enabledProviders.isEmpty
+                    ? strings.noLyricsProvidersEnabled
+                    : LyricsProvider.values
+                          .where(enabledProviders.contains)
+                          .map((provider) => provider.label)
+                          .join(' · '),
+                onTap: onOpenProviders,
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.lyricsAnimation,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: Wrap(
+                  key: const ValueKey('lyrics-animation-options'),
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final option in LyricsAnimationStyle.values)
+                      ChoiceChip(
+                        key: ValueKey('lyrics-animation-option-${option.code}'),
+                        selected: animationStyle == option,
+                        showCheckmark: true,
+                        avatar: Icon(_lyricsAnimationIcon(option), size: 18),
+                        label: Text(strings.lyricsAnimationLabel(option)),
+                        onSelected: (_) => onAnimationChanged(option),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.lyricsAlignment,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: SegmentedButton<LyricsTextAlignment>(
+                    key: const ValueKey('lyrics-alignment-options'),
+                    selected: {alignment},
+                    segments: [
+                      ButtonSegment(
+                        value: LyricsTextAlignment.normal,
+                        icon: const Icon(Icons.format_align_left_rounded),
+                        label: Text(strings.normalLyricsAlignment),
+                      ),
+                      ButtonSegment(
+                        value: LyricsTextAlignment.centered,
+                        icon: const Icon(Icons.format_align_center_rounded),
+                        label: Text(strings.centeredLyricsAlignment),
+                      ),
+                    ],
+                    onSelectionChanged: (selection) =>
+                        onAlignmentChanged(selection.first),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.lyricsRomanization,
+            children: [
+              _SettingsItemSurface(
+                key: const ValueKey('lyrics-romanization-card'),
+                child: Column(
+                  children: [
+                    SwitchListTile.adaptive(
+                      key: const ValueKey('lyrics-romanization-toggle'),
+                      value: romanizationEnabled,
+                      title: Text(strings.romanizeLyrics),
+                      subtitle: Text(
+                        strings.romanizeLyricsSummary,
+                        style: appListCardSubtitleStyle(context),
+                      ),
+                      secondary: const Icon(Icons.translate_rounded),
+                      onChanged: onRomanizationEnabledChanged,
+                    ),
+                    if (romanizationEnabled) ...[
+                      const Divider(height: 1),
+                      Padding(
+                        key: const ValueKey('lyrics-romanization-languages'),
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                strings.romanizationLanguages,
+                                style: Theme.of(context).textTheme.labelLarge
+                                    ?.copyWith(fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final language
+                                      in LyricsRomanizationLanguage.values)
+                                    FilterChip(
+                                      key: ValueKey(
+                                        'lyrics-romanization-language-'
+                                        '${language.code}',
+                                      ),
+                                      selected: romanizationLanguages.contains(
+                                        language,
+                                      ),
+                                      showCheckmark: true,
+                                      label: Text(
+                                        strings.romanizationLanguageLabel(
+                                          language,
+                                        ),
+                                      ),
+                                      onSelected:
+                                          romanizationLanguages.contains(
+                                                language,
+                                              ) &&
+                                              romanizationLanguages.length == 1
+                                          ? null
+                                          : (selected) {
+                                              final next = romanizationLanguages
+                                                  .toSet();
+                                              if (selected) {
+                                                next.add(language);
+                                              } else {
+                                                next.remove(language);
+                                              }
+                                              onRomanizationLanguagesChanged(
+                                                next,
+                                              );
+                                            },
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+          _SettingsSectionPanel(
+            title: strings.lyricsPreview,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: _LyricsAnimationPreview(
+                  animationStyle: animationStyle,
+                  alignment: alignment,
+                  romanizationEnabled: romanizationEnabled,
+                  romanizationLanguages: romanizationLanguages,
+                  strings: strings,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LyricsProvidersSettings extends StatelessWidget {
+  const _LyricsProvidersSettings({
+    required this.enabledProviders,
+    required this.strings,
+    required this.onChanged,
+  });
+
+  final Set<LyricsProvider> enabledProviders;
+  final AppStrings strings;
+  final void Function(LyricsProvider provider, bool enabled) onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: _settingsContentMaxWidth(context, 520),
+      ),
+      child: _SettingsSectionPanel(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+            child: Text(
+              strings.lyricsProvidersHint,
+              style: appListCardSubtitleStyle(context),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _SettingsItemSurface(
+            key: const ValueKey('lyrics-providers-card'),
+            child: Column(
+              children: [
+                for (final provider in LyricsProvider.values) ...[
+                  if (provider != LyricsProvider.values.first)
+                    const Divider(height: 1),
+                  SwitchListTile.adaptive(
+                    key: ValueKey('lyrics-provider-toggle-${provider.name}'),
+                    title: Text(provider.label),
+                    subtitle: provider == LyricsProvider.betterLyrics
+                        ? Text(
+                            strings.betterLyricsAvailabilityHint,
+                            style: appListCardSubtitleStyle(context),
+                          )
+                        : null,
+                    value: enabledProviders.contains(provider),
+                    onChanged: (enabled) => onChanged(provider, enabled),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Text(
+              enabledProviders.isEmpty
+                  ? strings.lyricsProvidersDisabledHint
+                  : strings.lyricsProvidersFallbackHint,
+              key: const ValueKey('lyrics-providers-status'),
+              style: appListCardSubtitleStyle(context),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+IconData _lyricsAnimationIcon(LyricsAnimationStyle style) => switch (style) {
+  LyricsAnimationStyle.smooth => Icons.auto_awesome_rounded,
+  LyricsAnimationStyle.slide => Icons.swipe_up_rounded,
+  LyricsAnimationStyle.highlight => Icons.zoom_in_rounded,
+};
+
+class _LyricsAnimationPreview extends ConsumerStatefulWidget {
+  const _LyricsAnimationPreview({
+    required this.animationStyle,
+    required this.alignment,
+    required this.romanizationEnabled,
+    required this.romanizationLanguages,
+    required this.strings,
+  });
+
+  final LyricsAnimationStyle animationStyle;
+  final LyricsTextAlignment alignment;
+  final bool romanizationEnabled;
+  final Set<LyricsRomanizationLanguage> romanizationLanguages;
+  final AppStrings strings;
+
+  @override
+  ConsumerState<_LyricsAnimationPreview> createState() =>
+      _LyricsAnimationPreviewState();
+}
+
+class _LyricsAnimationPreviewState
+    extends ConsumerState<_LyricsAnimationPreview> {
+  int _replayToken = 0;
+  late List<String> _sourceLines;
+  late Future<List<String>> _romanizedLines;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshDisplayLines();
+  }
+
+  @override
+  void didUpdateWidget(covariant _LyricsAnimationPreview oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animationStyle != widget.animationStyle ||
+        oldWidget.alignment != widget.alignment ||
+        oldWidget.romanizationEnabled != widget.romanizationEnabled ||
+        oldWidget.romanizationLanguages != widget.romanizationLanguages ||
+        oldWidget.strings.appLanguage != widget.strings.appLanguage) {
+      _replayToken++;
+    }
+    if (oldWidget.romanizationEnabled != widget.romanizationEnabled ||
+        oldWidget.romanizationLanguages != widget.romanizationLanguages ||
+        oldWidget.strings.appLanguage != widget.strings.appLanguage) {
+      _refreshDisplayLines();
+    }
+  }
+
+  void _refreshDisplayLines() {
+    _sourceLines = widget.romanizationEnabled
+        ? _lyricsRomanizationPreviewLines(_previewLanguage())
+        : [
+            widget.strings.lyricsPreviewPreviousLine,
+            widget.strings.lyricsPreviewActiveLine,
+            widget.strings.lyricsPreviewNextLine,
+          ];
+    _romanizedLines = widget.romanizationEnabled
+        ? ref
+              .read(lyricsRomanizationServiceProvider)
+              .romanizePreview(_sourceLines, widget.romanizationLanguages)
+        : Future<List<String>>.value(const <String>[]);
+  }
+
+  LyricsRomanizationLanguage _previewLanguage() {
+    return LyricsRomanizationLanguage.values.firstWhere(
+      widget.romanizationLanguages.contains,
+      orElse: () => LyricsRomanizationLanguage.korean,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final accent = colors.primary;
+    final centered = widget.alignment == LyricsTextAlignment.centered;
+    final textAlign = centered ? TextAlign.center : TextAlign.start;
+    return FutureBuilder<List<String>>(
+      key: ObjectKey(_romanizedLines),
+      future: _romanizedLines,
+      builder: (context, snapshot) {
+        final romanizedLines = widget.romanizationEnabled
+            ? snapshot.data
+            : null;
+        String? romanizedLineAt(int index) {
+          if (romanizedLines == null || index >= romanizedLines.length) {
+            return null;
+          }
+          return romanizedLines[index];
+        }
+
+        return Container(
+          key: const ValueKey('lyrics-animation-preview'),
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF111715), Color(0xFF030504)],
+            ),
+            borderRadius: BorderRadius.circular(appCardRadius),
+            border: Border.all(color: accent.withValues(alpha: 0.28)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _LyricsPreviewLine(
+                slot: 'previous',
+                original: _sourceLines[0],
+                romanized: romanizedLineAt(0),
+                textAlign: textAlign,
+                originalStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.38),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+                romanizedStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.48),
+                  fontSize: 12,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 13),
+              LyricsAnimationPreviewTransition(
+                key: ValueKey(
+                  'lyrics-preview-${widget.animationStyle.code}-'
+                  '${widget.alignment.name}-$_replayToken',
+                ),
+                style: widget.animationStyle,
+                accent: accent,
+                alignment: centered ? Alignment.center : Alignment.centerLeft,
+                child: _LyricsPreviewLine(
+                  slot: 'active',
+                  original: _sourceLines[1],
+                  romanized: romanizedLineAt(1),
+                  textAlign: textAlign,
+                  romanizationGap: 4,
+                  originalStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    height: 1.15,
+                    fontWeight: FontWeight.w900,
+                    shadows: [
+                      Shadow(
+                        color: accent.withValues(alpha: 0.30),
+                        blurRadius: 10,
+                      ),
+                      Shadow(
+                        color: accent.withValues(alpha: 0.14),
+                        blurRadius: 24,
+                      ),
+                    ],
+                  ),
+                  romanizedStyle: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.72),
+                    fontSize: 14,
+                    height: 1.2,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 13),
+              _LyricsPreviewLine(
+                slot: 'next',
+                original: _sourceLines[2],
+                romanized: romanizedLineAt(2),
+                textAlign: textAlign,
+                originalStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.38),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+                romanizedStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.48),
+                  fontSize: 12,
+                  height: 1.15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: centered ? Alignment.center : Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: const ValueKey('lyrics-preview-replay'),
+                  onPressed: () => setState(() => _replayToken++),
+                  style: TextButton.styleFrom(foregroundColor: accent),
+                  icon: const Icon(Icons.replay_rounded, size: 18),
+                  label: Text(widget.strings.replayAnimation),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _LyricsPreviewLine extends StatelessWidget {
+  const _LyricsPreviewLine({
+    required this.slot,
+    required this.original,
+    required this.romanized,
+    required this.textAlign,
+    required this.originalStyle,
+    required this.romanizedStyle,
+    this.romanizationGap = 2,
+  });
+
+  final String slot;
+  final String original;
+  final String? romanized;
+  final TextAlign textAlign;
+  final TextStyle originalStyle;
+  final TextStyle romanizedStyle;
+  final double romanizationGap;
+
+  @override
+  Widget build(BuildContext context) {
+    final romanizedText = romanized?.trim();
+    final showRomanization =
+        romanizedText != null &&
+        romanizedText.isNotEmpty &&
+        romanizedText != original.trim();
+    return Column(
+      key: ValueKey('lyrics-preview-$slot-pair'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          original,
+          key: ValueKey('lyrics-preview-$slot-line'),
+          textAlign: textAlign,
+          style: originalStyle,
+        ),
+        if (showRomanization) ...[
+          SizedBox(height: romanizationGap),
+          Text(
+            romanizedText,
+            key: ValueKey('lyrics-preview-$slot-romanized-line'),
+            textAlign: textAlign,
+            style: romanizedStyle,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+List<String> _lyricsRomanizationPreviewLines(
+  LyricsRomanizationLanguage language,
+) => switch (language) {
+  LyricsRomanizationLanguage.japanese => const [
+    'よるが かがやきはじめる',
+    'いっしょに このうたを うたう',
+    'リズムが またはじまる',
+  ],
+  LyricsRomanizationLanguage.korean => const [
+    '밤이 빛나기 시작해',
+    '함께 이 노래를 불러',
+    '리듬이 다시 시작돼',
+  ],
+  LyricsRomanizationLanguage.chinese => const ['夜空开始闪耀', '我们一起唱这首歌', '节奏再次开始'],
+  LyricsRomanizationLanguage.cyrillic => const [
+    'Ночь начинает сиять',
+    'Мы вместе поём эту песню',
+    'И ритм начинается снова',
+  ],
+  LyricsRomanizationLanguage.arabic => const [
+    'يبدأ الليل في التألق',
+    'نغني هذه الأغنية معًا',
+    'ويبدأ الإيقاع من جديد',
+  ],
+  LyricsRomanizationLanguage.hebrew => const [
+    'הלילה מתחיל לזהור',
+    'אנחנו שרים יחד',
+    'והקצב מתחיל שוב',
+  ],
+};
+
+class _AccentSwatch extends StatelessWidget {
+  const _AccentSwatch({
+    required this.accent,
+    required this.selected,
+    required this.label,
+    required this.onTap,
+  });
+
+  final AppAccent accent;
+  final bool selected;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Semantics(
+      key: ValueKey('accent-${accent.code}'),
+      button: true,
+      selected: selected,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(appListCardIconRadius),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 48,
+            height: 48,
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [accent.seedColor, accent.darkColor],
+              ),
+              borderRadius: BorderRadius.circular(appListCardIconRadius),
+              border: Border.all(
+                color: selected ? scheme.onSurface : scheme.outlineVariant,
+                width: selected ? 3 : 1,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: accent.seedColor.withValues(alpha: 0.38),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: selected
+                ? Icon(
+                    Icons.check_rounded,
+                    color: accent.seedColor.computeLuminance() > 0.58
+                        ? Colors.black
+                        : Colors.white,
+                    size: 22,
+                  )
+                : null,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SleepTimerDurationDialog extends StatefulWidget {
+  const _SleepTimerDurationDialog({
+    required this.initialDuration,
+    required this.strings,
+  });
+
+  final Duration initialDuration;
+  final AppStrings strings;
+
+  @override
+  State<_SleepTimerDurationDialog> createState() =>
+      _SleepTimerDurationDialogState();
+}
+
+class _SleepTimerDurationDialogState extends State<_SleepTimerDurationDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+      text: widget.initialDuration.inMinutes.toString(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = widget.strings;
+    return AppAlertDialog(
+      title: Text(strings.timerDuration),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        decoration: InputDecoration(
+          labelText: strings.timerMinutes(30),
+          prefixIcon: const Icon(Icons.timer_outlined),
+        ),
+        onSubmitted: (value) => Navigator.of(context).pop(value),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(_controller.text),
+          child: Text(strings.startTimer),
+        ),
+      ],
+    );
+  }
+}
+
+class _SleepTimerSettingsScope extends ConsumerWidget {
+  const _SleepTimerSettingsScope({
+    required this.strings,
+    required this.onCustomDuration,
+  });
+
+  final AppStrings strings;
+  final ValueChanged<SleepTimerState> onCustomDuration;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(sleepTimerControllerProvider);
+    final controller = ref.read(sleepTimerControllerProvider.notifier);
+    return _SleepTimerSettings(
+      state: state,
+      strings: strings,
+      onEnabledChanged: controller.setEnabled,
+      onDurationSelected: controller.selectDuration,
+      onCustomDuration: () => onCustomDuration(state),
+    );
+  }
+}
+
+class _SleepTimerSettings extends StatelessWidget {
+  const _SleepTimerSettings({
+    required this.state,
+    required this.strings,
+    required this.onEnabledChanged,
+    required this.onDurationSelected,
+    required this.onCustomDuration,
+  });
+
+  static const _presets = [
+    Duration(minutes: 15),
+    Duration(minutes: 30),
+    Duration(minutes: 60),
+  ];
+
+  final SleepTimerState state;
+  final AppStrings strings;
+  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<Duration> onDurationSelected;
+  final VoidCallback onCustomDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final customSelected = !_presets.contains(state.selectedDuration);
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 520),
+      child: _SettingsItemSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile.adaptive(
+              value: state.isActive,
+              onChanged: onEnabledChanged,
+              secondary: const Icon(Icons.bedtime_rounded),
+              title: Text(
+                strings.automaticShutdown,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                state.isActive
+                    ? strings.sleepTimerRemaining(state.remaining)
+                    : strings.sleepTimerOff,
+                style: appListCardSubtitleStyle(context),
+              ),
+            ),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: state.isActive
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              for (
+                                var index = 0;
+                                index < _presets.length;
+                                index++
+                              ) ...[
+                                if (index > 0) const SizedBox(width: 8),
+                                Expanded(
+                                  child: _PlaybackOptionButton(
+                                    selected:
+                                        state.selectedDuration ==
+                                        _presets[index],
+                                    inactiveIcon: Icons.schedule_rounded,
+                                    label: strings.timerMinutes(
+                                      _presets[index].inMinutes,
+                                    ),
+                                    onTap: () =>
+                                        onDurationSelected(_presets[index]),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          _PlaybackOptionButton(
+                            selected: customSelected,
+                            inactiveIcon: Icons.tune_rounded,
+                            label: strings.customDuration,
+                            onTap: onCustomDuration,
+                          ),
+                        ],
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CrossfadeSettings extends StatelessWidget {
+  const _CrossfadeSettings({
+    required this.enabled,
+    required this.duration,
+    required this.strings,
+    required this.onEnabledChanged,
+    required this.onDurationSelected,
+    super.key,
+  });
+
+  final bool enabled;
+  final Duration duration;
+  final AppStrings strings;
+  final ValueChanged<bool> onEnabledChanged;
+  final ValueChanged<Duration> onDurationSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final desktopLayout =
+        AppPlatform.isDesktop &&
+        Theme.of(context).platform != TargetPlatform.android;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: desktopLayout ? double.infinity : 520,
+      ),
+      child: _SettingsItemSurface(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SwitchListTile.adaptive(
+              key: const ValueKey('settings-crossfade-switch'),
+              value: enabled,
+              onChanged: onEnabledChanged,
+              secondary: const Icon(Icons.multitrack_audio_rounded),
+              title: Text(
+                strings.crossfade,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+              subtitle: Text(
+                strings.crossfadeSummary,
+                style: appListCardSubtitleStyle(context),
+              ),
+            ),
+            AnimatedSwitcher(
+              key: const ValueKey('settings-crossfade-options-transition'),
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              reverseDuration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 140),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) => ClipRect(
+                child: SizeTransition(
+                  sizeFactor: animation,
+                  alignment: Alignment.topCenter,
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+              ),
+              child: enabled
+                  ? Padding(
+                      key: const ValueKey('settings-crossfade-options'),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                      child: _CrossfadeDurationSlider(
+                        duration: duration,
+                        strings: strings,
+                        onDurationSelected: onDurationSelected,
+                      ),
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('settings-crossfade-options-hidden'),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkipSilenceSettings extends StatelessWidget {
+  const _SkipSilenceSettings({
+    required this.enabled,
+    required this.strings,
+    required this.onEnabledChanged,
+    super.key,
+  });
+
+  final bool enabled;
+  final AppStrings strings;
+  final ValueChanged<bool> onEnabledChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final desktopLayout =
+        AppPlatform.isDesktop &&
+        Theme.of(context).platform != TargetPlatform.android;
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: desktopLayout ? double.infinity : 520,
+      ),
+      child: _SettingsItemSurface(
+        child: SwitchListTile.adaptive(
+          key: const ValueKey('settings-skip-silence-switch'),
+          value: enabled,
+          onChanged: onEnabledChanged,
+          secondary: const Icon(Icons.fast_forward_rounded),
+          title: Text(
+            strings.skipSilence,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            strings.skipSilenceSummary,
+            style: appListCardSubtitleStyle(context),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CrossfadeDurationSlider extends StatefulWidget {
+  const _CrossfadeDurationSlider({
+    required this.duration,
+    required this.strings,
+    required this.onDurationSelected,
+  });
+
+  final Duration duration;
+  final AppStrings strings;
+  final ValueChanged<Duration> onDurationSelected;
+
+  @override
+  State<_CrossfadeDurationSlider> createState() =>
+      _CrossfadeDurationSliderState();
+}
+
+class _CrossfadeDurationSliderState extends State<_CrossfadeDurationSlider> {
+  static const _thumbDiameter = 18.0;
+  static const _trackHeight = 3.0;
+  static const _labelTargetWidth = 48.0;
+
+  int? _dragPreviewIndex;
+  bool _isDragging = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final durations = supportedCrossfadeDurations;
+    const labeledSeconds = [1, 5, 10, 15];
+    final committedIndex = durations
+        .indexOf(widget.duration)
+        .clamp(0, durations.length - 1);
+    final selectedIndex = (_dragPreviewIndex ?? committedIndex).clamp(
+      0,
+      durations.length - 1,
+    );
+    final accent = AppColors.downloadAccentFor(context);
+    final inactive = AppColors.menuInactiveSliderFor(context);
+    final selected = durations[selectedIndex];
+    final increasedIndex = (selectedIndex + 1).clamp(0, durations.length - 1);
+    final decreasedIndex = (selectedIndex - 1).clamp(0, durations.length - 1);
+    final motionDuration =
+        MediaQuery.disableAnimationsOf(context) || _isDragging
+        ? Duration.zero
+        : const Duration(milliseconds: 150);
+
+    void previewIndex(int index) {
+      final nextIndex = index.clamp(0, durations.length - 1);
+      if (_dragPreviewIndex != nextIndex) {
+        setState(() => _dragPreviewIndex = nextIndex);
+      }
+    }
+
+    void commitIndex(int index) {
+      final next = durations[index.clamp(0, durations.length - 1)];
+      if (_dragPreviewIndex != null) {
+        setState(() => _dragPreviewIndex = null);
+      }
+      if (next != widget.duration) {
+        widget.onDurationSelected(next);
+      }
+    }
+
+    return Semantics(
+      container: true,
+      slider: true,
+      label: widget.strings.crossfadeDuration,
+      value: widget.strings.secondsShort(selected.inSeconds),
+      increasedValue: widget.strings.secondsShort(
+        durations[increasedIndex].inSeconds,
+      ),
+      decreasedValue: widget.strings.secondsShort(
+        durations[decreasedIndex].inSeconds,
+      ),
+      onIncrease: selectedIndex < durations.length - 1
+          ? () => commitIndex(selectedIndex + 1)
+          : null,
+      onDecrease: selectedIndex > 0
+          ? () => commitIndex(selectedIndex - 1)
+          : null,
+      child: ExcludeSemantics(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.strings.crossfadeDuration,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppColors.contentSubtitleFor(context),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                AnimatedSwitcher(
+                  duration: motionDuration,
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  child: Text(
+                    key: ValueKey(
+                      'settings-crossfade-current-${selected.inSeconds}s',
+                    ),
+                    widget.strings.secondsShort(selected.inSeconds),
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: accent,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            SizedBox(
+              key: const ValueKey('settings-crossfade-duration-slider'),
+              height: 48,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final thumbRadius = _thumbDiameter / 2;
+                  final usableWidth = (width - _thumbDiameter).clamp(
+                    1.0,
+                    double.infinity,
+                  );
+                  final selectedFraction =
+                      selectedIndex / (durations.length - 1);
+                  final thumbLeft = usableWidth * selectedFraction;
+                  final trackTop = (constraints.maxHeight - _trackHeight) / 2;
+                  final thumbTop = (constraints.maxHeight - _thumbDiameter) / 2;
+
+                  int indexForPosition(double dx) {
+                    final fraction = ((dx - thumbRadius) / usableWidth).clamp(
+                      0.0,
+                      1.0,
+                    );
+                    return (fraction * (durations.length - 1)).round();
+                  }
+
+                  KeyEventResult handleKeyEvent(
+                    FocusNode node,
+                    KeyEvent event,
+                  ) {
+                    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+                      return KeyEventResult.ignored;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowLeft ||
+                        event.logicalKey == LogicalKeyboardKey.arrowDown) {
+                      commitIndex(selectedIndex - 1);
+                      return KeyEventResult.handled;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.arrowRight ||
+                        event.logicalKey == LogicalKeyboardKey.arrowUp) {
+                      commitIndex(selectedIndex + 1);
+                      return KeyEventResult.handled;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.home) {
+                      commitIndex(0);
+                      return KeyEventResult.handled;
+                    }
+                    if (event.logicalKey == LogicalKeyboardKey.end) {
+                      commitIndex(durations.length - 1);
+                      return KeyEventResult.handled;
+                    }
+                    return KeyEventResult.ignored;
+                  }
+
+                  return Focus(
+                    onKeyEvent: handleKeyEvent,
+                    child: Builder(
+                      builder: (focusContext) {
+                        final focused = Focus.of(focusContext).hasFocus;
+                        return AnimatedContainer(
+                          duration: motionDuration,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: focused
+                                  ? accent.withValues(alpha: 0.7)
+                                  : Colors.transparent,
+                            ),
+                          ),
+                          child: MouseRegion(
+                            cursor: SystemMouseCursors.click,
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTapDown: (_) {
+                                Focus.of(focusContext).requestFocus();
+                              },
+                              onTapUp: (details) {
+                                commitIndex(
+                                  indexForPosition(details.localPosition.dx),
+                                );
+                              },
+                              onHorizontalDragStart: (details) {
+                                Focus.of(focusContext).requestFocus();
+                                setState(() {
+                                  _isDragging = true;
+                                  _dragPreviewIndex = indexForPosition(
+                                    details.localPosition.dx,
+                                  );
+                                });
+                              },
+                              onHorizontalDragUpdate: (details) => previewIndex(
+                                indexForPosition(details.localPosition.dx),
+                              ),
+                              onHorizontalDragEnd: (_) {
+                                final preview =
+                                    _dragPreviewIndex ?? committedIndex;
+                                setState(() => _isDragging = false);
+                                commitIndex(preview);
+                              },
+                              onHorizontalDragCancel: () {
+                                if (_isDragging || _dragPreviewIndex != null) {
+                                  setState(() {
+                                    _isDragging = false;
+                                    _dragPreviewIndex = null;
+                                  });
+                                }
+                              },
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: thumbRadius,
+                                    right: thumbRadius,
+                                    top: trackTop,
+                                    height: _trackHeight,
+                                    child: DecoratedBox(
+                                      key: const ValueKey(
+                                        'settings-crossfade-duration-track',
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: inactive,
+                                        borderRadius: BorderRadius.circular(
+                                          _trackHeight / 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  AnimatedPositioned(
+                                    key: const ValueKey(
+                                      'settings-crossfade-duration-fill',
+                                    ),
+                                    duration: motionDuration,
+                                    curve: Curves.easeOutCubic,
+                                    left: thumbRadius,
+                                    top: trackTop,
+                                    width: usableWidth * selectedFraction,
+                                    height: _trackHeight,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        borderRadius: BorderRadius.circular(
+                                          _trackHeight / 2,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  for (
+                                    var index = 0;
+                                    index < durations.length;
+                                    index++
+                                  )
+                                    Positioned(
+                                      left:
+                                          thumbRadius +
+                                          usableWidth *
+                                              (index / (durations.length - 1)) -
+                                          3,
+                                      top: (constraints.maxHeight - 6) / 2,
+                                      width: 6,
+                                      height: 6,
+                                      child: DecoratedBox(
+                                        key: ValueKey(
+                                          'settings-crossfade-tick-'
+                                          '${durations[index].inSeconds}s',
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: index <= selectedIndex
+                                              ? accent
+                                              : inactive,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ),
+                                  AnimatedPositioned(
+                                    key: const ValueKey(
+                                      'settings-crossfade-duration-thumb',
+                                    ),
+                                    duration: motionDuration,
+                                    curve: Curves.easeOutCubic,
+                                    left: thumbLeft,
+                                    top: thumbTop,
+                                    width: _thumbDiameter,
+                                    height: _thumbDiameter,
+                                    child: DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        color: accent,
+                                        shape: BoxShape.circle,
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            color: Color(0x30000000),
+                                            blurRadius: 5,
+                                            offset: Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            SizedBox(
+              height: 48,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final width = constraints.maxWidth;
+                  final usableWidth = (width - _thumbDiameter).clamp(
+                    1.0,
+                    double.infinity,
+                  );
+                  final targetWidth = width < _labelTargetWidth
+                      ? width
+                      : _labelTargetWidth;
+                  return Stack(
+                    children: [
+                      for (final seconds in labeledSeconds)
+                        Builder(
+                          builder: (context) {
+                            final fraction =
+                                (seconds - 1) / (durations.length - 1);
+                            final markerCenter =
+                                _thumbDiameter / 2 + usableWidth * fraction;
+                            final left = (markerCenter - targetWidth / 2).clamp(
+                              0.0,
+                              width - targetWidth,
+                            );
+                            final translation =
+                                markerCenter - (left + targetWidth / 2);
+                            return Positioned(
+                              left: left,
+                              top: 0,
+                              width: targetWidth,
+                              height: 48,
+                              child: InkWell(
+                                key: ValueKey('settings-crossfade-${seconds}s'),
+                                onTap: () => commitIndex(seconds - 1),
+                                borderRadius: BorderRadius.circular(6),
+                                child: Transform.translate(
+                                  offset: Offset(translation, 0),
+                                  child: Center(
+                                    child: Text(
+                                      widget.strings.secondsShort(seconds),
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelMedium
+                                          ?.copyWith(
+                                            color: seconds == selected.inSeconds
+                                                ? accent
+                                                : AppColors.contentSubtitleFor(
+                                                    context,
+                                                  ),
+                                            fontWeight:
+                                                seconds == selected.inSeconds
+                                                ? FontWeight.w900
+                                                : FontWeight.w700,
+                                          ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackOptionButton extends StatelessWidget {
+  const _PlaybackOptionButton({
+    required this.selected,
+    required this.inactiveIcon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool selected;
+  final IconData inactiveIcon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final borderRadius = BorderRadius.circular(appListCardIconRadius);
+    return SizedBox(
+      height: 52,
+      child: Material(
+        color: selected
+            ? colors.primaryContainer.withValues(
+                alpha: AppColors.cardSurfaceOpacityFor(context),
+              )
+            : AppColors.cardSurfaceFor(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: BorderSide(
+            color: selected ? colors.primary : colors.outlineVariant,
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  selected ? Icons.check_rounded : inactiveIcon,
+                  size: 19,
+                  color: selected ? colors.onSurface : colors.primary,
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  const _SettingsGroup({
+    this.titleKey,
+    required this.title,
+    required this.children,
+  });
+
+  final Key? titleKey;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: appSectionGap),
+      child: _SettingsSectionPanel(
+        title: title,
+        titleKey: titleKey,
+        children: children,
+      ),
+    );
+  }
+}
+
+/// Shares a single, inexpensive painted surface between related settings.
+/// Rows use this Material for their ink response instead of adding individual
+/// cards, borders, blur filters, or composited opacity layers.
+class _SettingsSectionPanel extends StatelessWidget {
+  const _SettingsSectionPanel({
+    this.title,
+    this.titleKey,
+    required this.children,
+  });
+
+  final String? title;
+  final Key? titleKey;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: double.infinity,
+      child: Card(
+        key: title == null ? null : ValueKey('settings-section-panel-$title'),
+        margin: EdgeInsets.zero,
+        elevation: 0,
+        color: colors.surfaceContainerLow.withValues(alpha: 0.88),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(22),
+          side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: _SettingsSectionScope(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title != null) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                    child: Text(
+                      title!,
+                      key: titleKey,
+                      style: appSectionTitleStyle(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                ],
+                for (final child in children)
+                  if (child is SizedBox &&
+                      child.child == null &&
+                      child.height == appCardGap)
+                    const Divider(height: 1, indent: 16, endIndent: 16)
+                  else
+                    child,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsSectionScope extends InheritedWidget {
+  const _SettingsSectionScope({required super.child});
+
+  static bool contains(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_SettingsSectionScope>() !=
+      null;
+
+  @override
+  bool updateShouldNotify(_SettingsSectionScope oldWidget) => false;
+}
+
+class _SettingsItemSurface extends StatelessWidget {
+  const _SettingsItemSurface({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_SettingsSectionScope.contains(context)) return child;
+    return AppCardGradientBorder(
+      solidInLiquidGlass: true,
+      child: Material(
+        color: AppColors.cardSurfaceFor(context),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(appCardRadius),
+          side: BorderSide(
+            color: AppColors.cardBorderFor(context, solidInLiquidGlass: true),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: child,
+      ),
+    );
+  }
+}
+
+class _AudioSourcesSettings extends StatelessWidget {
+  const _AudioSourcesSettings({
+    required this.jioSaavnEnabled,
+    required this.strings,
+    required this.onJioSaavnChanged,
+  });
+
+  final bool jioSaavnEnabled;
+  final AppStrings strings;
+  final ValueChanged<bool> onJioSaavnChanged;
+
+  @override
+  Widget build(BuildContext context) => _SettingsSectionPanel(
+    children: [
+      _SettingsEntryCard(
+        key: const ValueKey('audio-source-youtube-music'),
+        icon: Icons.play_circle_rounded,
+        title: 'YouTube Music',
+        subtitle: strings.youtubeMusicSourceDescription,
+        onTap: null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Tooltip(
+              message: strings.audioSourceAlwaysEnabled,
+              child: const Icon(Icons.lock_outline_rounded, size: 18),
+            ),
+            Switch.adaptive(
+              key: const ValueKey('audio-source-youtube-music-switch'),
+              value: true,
+              onChanged: null,
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: appCardGap),
+      _SettingsEntryCard(
+        key: const ValueKey('audio-source-jiosaavn'),
+        icon: Icons.high_quality_rounded,
+        title: 'JioSaavn',
+        subtitle: strings.jioSaavnSourceDescription,
+        onTap: () => onJioSaavnChanged(!jioSaavnEnabled),
+        trailing: Switch.adaptive(
+          key: const ValueKey('audio-source-jiosaavn-switch'),
+          value: jioSaavnEnabled,
+          onChanged: onJioSaavnChanged,
+        ),
+      ),
+    ],
+  );
+}
+
+class _DataSavingSettings extends StatelessWidget {
+  const _DataSavingSettings({
+    required this.state,
+    required this.strings,
+    required this.singleProfile,
+    required this.onWifiTap,
+    required this.onMobileTap,
+  });
+
+  final SettingsState state;
+  final AppStrings strings;
+  final bool singleProfile;
+  final VoidCallback onWifiTap;
+  final VoidCallback onMobileTap;
+
+  String _selectionLabel(AudioQualityProfile saved) {
+    final high = state.jioSaavnEnabled && saved == AudioQualityProfile.high;
+    return high
+        ? '${strings.highAudioQuality} · JioSaavn'
+        : '${strings.standardAudioQuality} · YouTube Music';
+  }
+
+  @override
+  Widget build(BuildContext context) => _SettingsSectionPanel(
+    children: [
+      _SettingsEntryCard(
+        key: ValueKey(
+          singleProfile ? 'data-saving-quality' : 'data-saving-wifi',
+        ),
+        icon: singleProfile ? Icons.headphones_rounded : Icons.wifi_rounded,
+        title: singleProfile ? strings.audioQuality : strings.wifiNetwork,
+        subtitle: _selectionLabel(state.wifiAudioQuality),
+        onTap: onWifiTap,
+      ),
+      if (!singleProfile) ...[
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('data-saving-mobile'),
+          icon: Icons.signal_cellular_alt_rounded,
+          title: strings.mobileNetwork,
+          subtitle: _selectionLabel(state.mobileAudioQuality),
+          onTap: onMobileTap,
+        ),
+      ],
+    ],
+  );
+}
+
+class _AudioQualityProfileDialog extends StatelessWidget {
+  const _AudioQualityProfileDialog({
+    required this.networkLabel,
+    required this.selected,
+    required this.jioSaavnEnabled,
+    required this.strings,
+  });
+
+  final String networkLabel;
+  final AudioQualityProfile selected;
+  final bool jioSaavnEnabled;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) => AppAlertDialog(
+    key: const ValueKey('audio-quality-profile-dialog'),
+    scrollable: true,
+    title: Text(networkLabel),
+    content: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 480),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (jioSaavnEnabled) ...[
+            _option(
+              context,
+              profile: AudioQualityProfile.high,
+              title: strings.highAudioQuality,
+              provider: 'JioSaavn',
+              icon: Icons.high_quality_rounded,
+            ),
+            const SizedBox(height: appCardGap),
+          ],
+          _option(
+            context,
+            profile: AudioQualityProfile.standard,
+            title: strings.standardAudioQuality,
+            provider: 'YouTube Music',
+            icon: Icons.play_circle_rounded,
+          ),
+        ],
+      ),
+    ),
+    actions: [
+      TextButton(
+        onPressed: () => Navigator.of(context).pop(),
+        child: Text(strings.cancel),
+      ),
+    ],
+  );
+
+  Widget _option(
+    BuildContext context, {
+    required AudioQualityProfile profile,
+    required String title,
+    required String provider,
+    required IconData icon,
+  }) => _SettingsEntryCard(
+    key: ValueKey('audio-quality-profile-${profile.name}'),
+    icon: icon,
+    title: title,
+    subtitle: provider,
+    onTap: () => Navigator.of(context).pop(profile),
+    trailing: Icon(
+      selected == profile
+          ? Icons.check_circle_rounded
+          : Icons.radio_button_unchecked_rounded,
+      color: selected == profile ? Theme.of(context).colorScheme.primary : null,
+    ),
+  );
+}
+
+class _StorageSettings extends StatelessWidget {
+  const _StorageSettings({
+    required this.strings,
+    required this.canChangeDownloadDirectory,
+    required this.downloadPathController,
+    required this.downloadPathFocusNode,
+    required this.busy,
+    required this.onBrowse,
+    required this.onImportBackup,
+    required this.onImportCsv,
+    required this.onExportBackup,
+    required this.onExportCsv,
+  });
+
+  final AppStrings strings;
+  final bool canChangeDownloadDirectory;
+  final TextEditingController downloadPathController;
+  final FocusNode downloadPathFocusNode;
+  final bool busy;
+  final VoidCallback onBrowse;
+  final VoidCallback onImportBackup;
+  final VoidCallback onImportCsv;
+  final VoidCallback onExportBackup;
+  final VoidCallback onExportCsv;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (canChangeDownloadDirectory) ...[
+          _SettingsSectionPanel(
+            title: strings.downloads,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+                child: _PathField(
+                  controller: downloadPathController,
+                  focusNode: downloadPathFocusNode,
+                  label: strings.folder,
+                  icon: Icons.folder_rounded,
+                  browseTooltip: strings.browseFolder,
+                  onBrowse: onBrowse,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: appSectionGap),
+        ],
+        _StorageTransferSection(
+          title: strings.importData,
+          children: [
+            _SettingsEntryCard(
+              key: const ValueKey('storage-import-backup'),
+              icon: Icons.settings_backup_restore_rounded,
+              title: strings.importFromLocalBackup,
+              subtitle: strings.importBackupSummary,
+              onTap: busy ? null : onImportBackup,
+            ),
+            const SizedBox(height: appCardGap),
+            _SettingsEntryCard(
+              key: const ValueKey('storage-import-csv'),
+              icon: Icons.upload_file_rounded,
+              title: strings.importFromCsv,
+              subtitle: strings.importCsvSummary,
+              onTap: busy ? null : onImportCsv,
+            ),
+          ],
+        ),
+        const SizedBox(height: appSectionGap),
+        _StorageTransferSection(
+          title: strings.exportData,
+          children: [
+            _SettingsEntryCard(
+              key: const ValueKey('storage-export-backup'),
+              icon: Icons.inventory_2_rounded,
+              title: strings.exportLocalBackup,
+              subtitle: strings.exportBackupSummary,
+              onTap: busy ? null : onExportBackup,
+            ),
+            const SizedBox(height: appCardGap),
+            _SettingsEntryCard(
+              key: const ValueKey('storage-export-csv'),
+              icon: Icons.download_for_offline_rounded,
+              title: strings.exportToCsv,
+              subtitle: strings.exportCsvSummary,
+              onTap: busy ? null : onExportCsv,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+bool _sameLocalMusicFilters(
+  Set<LocalMusicFilter> first,
+  Set<LocalMusicFilter> second,
+) {
+  return first.length == second.length && first.containsAll(second);
+}
+
+class _LocalMusicFiltersDialog extends StatefulWidget {
+  const _LocalMusicFiltersDialog({
+    required this.filters,
+    required this.strings,
+  });
+
+  final Set<LocalMusicFilter> filters;
+  final AppStrings strings;
+
+  @override
+  State<_LocalMusicFiltersDialog> createState() =>
+      _LocalMusicFiltersDialogState();
+}
+
+class _LocalMusicFiltersDialogState extends State<_LocalMusicFiltersDialog> {
+  late final Set<LocalMusicFilter> _filters = widget.filters.toSet();
+
+  void _setFilter(LocalMusicFilter filter, {required bool selected}) {
+    setState(() {
+      if (selected) {
+        _filters.add(filter);
+      } else {
+        _filters.remove(filter);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = widget.strings;
+    return AppAlertDialog(
+      key: const ValueKey('settings-local-music-filters-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.localMusicFilters),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 460),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _LocalMusicFilterOption(
+              key: const ValueKey('local-music-filter-whatsapp'),
+              selected: _filters.contains(LocalMusicFilter.hideWhatsAppAudio),
+              icon: Icons.chat_rounded,
+              title: strings.hideWhatsAppAudio,
+              subtitle: strings.hideWhatsAppAudioSummary,
+              onChanged: (selected) => _setFilter(
+                LocalMusicFilter.hideWhatsAppAudio,
+                selected: selected,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _LocalMusicFilterOption(
+              key: const ValueKey('local-music-filter-telegram'),
+              selected: _filters.contains(LocalMusicFilter.hideTelegramAudio),
+              icon: Icons.send_rounded,
+              title: strings.hideTelegramAudio,
+              subtitle: strings.hideTelegramAudioSummary,
+              onChanged: (selected) => _setFilter(
+                LocalMusicFilter.hideTelegramAudio,
+                selected: selected,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _LocalMusicFilterOption(
+              key: const ValueKey('local-music-filter-recordings'),
+              selected: _filters.contains(LocalMusicFilter.hideAudioRecordings),
+              icon: Icons.mic_off_rounded,
+              title: strings.hideAudioRecordings,
+              subtitle: strings.hideAudioRecordingsSummary,
+              onChanged: (selected) => _setFilter(
+                LocalMusicFilter.hideAudioRecordings,
+                selected: selected,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _LocalMusicFilterOption(
+              key: const ValueKey('local-music-filter-short-tracks'),
+              selected: _filters.contains(
+                LocalMusicFilter.hideTracksUnder30Seconds,
+              ),
+              icon: Icons.timer_off_outlined,
+              title: strings.hideTracksUnder30Seconds,
+              subtitle: strings.hideTracksUnder30SecondsSummary,
+              onChanged: (selected) => _setFilter(
+                LocalMusicFilter.hideTracksUnder30Seconds,
+                selected: selected,
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          key: const ValueKey('local-music-filters-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+        FilledButton(
+          key: const ValueKey('local-music-filters-apply'),
+          onPressed: () => Navigator.of(
+            context,
+          ).pop(Set<LocalMusicFilter>.unmodifiable(_filters)),
+          child: Text(strings.apply),
+        ),
+      ],
+    );
+  }
+}
+
+class _LocalMusicFilterOption extends StatelessWidget {
+  const _LocalMusicFilterOption({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onChanged,
+    super.key,
+  });
+
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      color: selected
+          ? colors.primaryContainer.withValues(
+              alpha: AppColors.cardSurfaceOpacityFor(context),
+            )
+          : AppColors.cardSurfaceFor(context),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(appListCardIconRadius),
+        side: BorderSide(
+          color: selected ? colors.primary : colors.outlineVariant,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: CheckboxListTile.adaptive(
+        value: selected,
+        onChanged: (value) => onChanged(value ?? false),
+        secondary: Icon(
+          icon,
+          color: selected ? colors.primary : colors.onSurfaceVariant,
+        ),
+        title: Text(title),
+        subtitle: Text(subtitle, style: appListCardSubtitleStyle(context)),
+        controlAffinity: ListTileControlAffinity.trailing,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      ),
+    );
+  }
+}
+
+class _StorageTransferSection extends StatelessWidget {
+  const _StorageTransferSection({required this.title, required this.children});
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SettingsSectionPanel(title: title, children: children);
+  }
+}
+
+class _LiveRequestStorageCard extends StatelessWidget {
+  const _LiveRequestStorageCard({
+    required this.state,
+    required this.strings,
+    required this.onChanged,
+  });
+
+  final TikTokLiveState? state;
+  final AppStrings strings;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final liveState = state;
+    final savesToLibrary = liveState?.saveRequestsToLibrary ?? false;
+    final hasQueuedRequests = liveState?.liveQueue.isNotEmpty ?? false;
+    final canChange = liveState != null && !hasQueuedRequests;
+    return _SettingsEntryCard(
+      key: const ValueKey('settings-card-live-request-storage'),
+      icon: savesToLibrary
+          ? Icons.library_add_check_rounded
+          : Icons.cloud_queue_rounded,
+      title: strings.saveLiveRequestsToLibrary,
+      subtitle: hasQueuedRequests
+          ? strings.saveLiveRequestsToLibraryLocked
+          : savesToLibrary
+          ? strings.saveLiveRequestsToLibraryEnabled
+          : strings.saveLiveRequestsToLibraryDisabled,
+      onTap: canChange ? () => onChanged(!savesToLibrary) : null,
+      trailing: Switch.adaptive(
+        key: const ValueKey('tiktok-live-save-requests-to-library'),
+        value: savesToLibrary,
+        onChanged: canChange ? onChanged : null,
+      ),
+    );
+  }
+}
+
+class _TikTokLiveSettings extends StatelessWidget {
+  const _TikTokLiveSettings({
+    required this.controller,
+    required this.focusNode,
+    required this.state,
+    required this.strings,
+    required this.onConnect,
+    required this.onDisconnect,
+    required this.onCommandPermissionChanged,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final TikTokLiveState state;
+  final AppStrings strings;
+  final VoidCallback onConnect;
+  final VoidCallback onDisconnect;
+  final _TikTokCommandPermissionChanged onCommandPermissionChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final connected = state.isConnected;
+    final busy = state.isBusy;
+    final statusColor = switch (state.status) {
+      TikTokLiveStatus.connected => Theme.of(context).colorScheme.primary,
+      TikTokLiveStatus.error => Theme.of(context).colorScheme.error,
+      TikTokLiveStatus.liveEnded => Theme.of(context).colorScheme.error,
+      _ => Theme.of(context).colorScheme.onSurfaceVariant,
+    };
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: _settingsContentMaxWidth(context, 760),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(strings.tiktokLive, style: appSectionTitleStyle(context)),
+          const SizedBox(height: appSectionTitleGap),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final input = TextField(
+                key: const ValueKey('tiktok-live-user-field'),
+                controller: controller,
+                focusNode: focusNode,
+                enabled: !busy && !connected,
+                decoration: InputDecoration(
+                  labelText: strings.tiktokLiveUser,
+                  prefixIcon: const Icon(Icons.live_tv_rounded),
+                ),
+                onSubmitted: (_) {
+                  if (!connected && !busy) {
+                    onConnect();
+                  }
+                },
+              );
+              final action = connected || busy
+                  ? FilledButton.tonalIcon(
+                      key: const ValueKey('tiktok-live-disconnect'),
+                      icon: Icon(
+                        busy ? Icons.close_rounded : Icons.link_off_rounded,
+                      ),
+                      label: Text(strings.disconnect),
+                      onPressed: onDisconnect,
+                    )
+                  : FilledButton.icon(
+                      key: const ValueKey('tiktok-live-connect'),
+                      icon: const Icon(Icons.sensors_rounded),
+                      label: Text(strings.connect),
+                      onPressed: onConnect,
+                    );
+              if (constraints.maxWidth < 600) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    input,
+                    const SizedBox(height: 10),
+                    SizedBox(height: 48, child: action),
+                  ],
+                );
+              }
+              return Row(
+                children: [
+                  Expanded(child: input),
+                  const SizedBox(width: 10),
+                  action,
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          Column(
+            key: const ValueKey('tiktok-live-session-details'),
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(_statusIcon(state.status), color: statusColor, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      state.message,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+              if (state.roomId != null && state.roomId!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${strings.roomId}: ${state.roomId}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              if (state.pendingPlayCommands > 0) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${strings.pendingRequests}: ${state.pendingPlayCommands}',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+              if (state.lastCommand != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  '${strings.lastCommand}: ${state.lastCommand!.text}'
+                  '${_commandRoleSuffix(state.lastCommand!, strings)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ],
+          ),
+          const _LiveOverlayServerControl(),
+          const SizedBox(height: 12),
+          Text(
+            strings.commandPermissions,
+            style: appSecondaryLabelStyle(context),
+          ),
+          const SizedBox(height: 8),
+          _TikTokCommandAudienceSection(
+            audience: TikTokCommandAudience.everyone,
+            permissions: state.commandPermissions,
+            strings: strings,
+            onChanged: onCommandPermissionChanged,
+          ),
+          const SizedBox(height: 10),
+          _TikTokCommandAudienceSection(
+            audience: TikTokCommandAudience.followers,
+            permissions: state.commandPermissions,
+            strings: strings,
+            onChanged: onCommandPermissionChanged,
+          ),
+          const SizedBox(height: 10),
+          _TikTokCommandAudienceSection(
+            audience: TikTokCommandAudience.moderators,
+            permissions: state.commandPermissions,
+            strings: strings,
+            onChanged: onCommandPermissionChanged,
+          ),
+          const SizedBox(height: 10),
+          _TikTokCommandAudienceSection(
+            audience: TikTokCommandAudience.subscribers,
+            permissions: state.commandPermissions,
+            strings: strings,
+            onChanged: onCommandPermissionChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _statusIcon(TikTokLiveStatus status) {
+    return switch (status) {
+      TikTokLiveStatus.connected => Icons.check_circle_rounded,
+      TikTokLiveStatus.connecting => Icons.sync_rounded,
+      TikTokLiveStatus.error => Icons.error_rounded,
+      TikTokLiveStatus.liveEnded => Icons.stop_circle_rounded,
+      _ => Icons.info_rounded,
+    };
+  }
+
+  String _commandRoleSuffix(TikTokLiveChatCommand command, AppStrings strings) {
+    final roles = <String>[
+      if (command.isModerator) strings.moderator,
+      if (command.isFollower) strings.follower,
+      if (command.isSubscriber) strings.subscriber,
+    ];
+    return roles.isEmpty ? '' : ' - ${roles.join(', ')}';
+  }
+}
+
+class _LiveOverlayServerControl extends ConsumerWidget {
+  const _LiveOverlayServerControl();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final available = ref.watch(liveOverlayAvailableProvider);
+    if (!available || Theme.of(context).platform != TargetPlatform.windows) {
+      return const SizedBox.shrink();
+    }
+
+    final overlay = ref.watch(liveOverlayControllerProvider);
+    final strings = ref.watch(appStringsProvider);
+    final canStop = overlay.isActive;
+    final canStart =
+        !overlay.isBusy &&
+        !overlay.isActive &&
+        overlay.status != LiveOverlayStatus.unsupported;
+    final canToggle = canStop || canStart;
+    final subtitle = switch (overlay.status) {
+      LiveOverlayStatus.inactive => strings.liveOverlayInactive,
+      LiveOverlayStatus.starting => strings.liveOverlayStarting,
+      LiveOverlayStatus.active =>
+        overlay.error ??
+            strings.liveOverlayActive(
+              (overlay.url ?? Uri.parse(liveOverlayUrl)).toString(),
+            ),
+      LiveOverlayStatus.stopping => strings.liveOverlayStopping,
+      LiveOverlayStatus.unsupported =>
+        overlay.error ?? strings.liveOverlayUnsupported,
+      LiveOverlayStatus.error => overlay.error ?? strings.liveOverlayError,
+    };
+
+    void toggle() {
+      final controller = ref.read(liveOverlayControllerProvider.notifier);
+      if (overlay.isActive) {
+        unawaited(controller.stop());
+      } else if (canStart) {
+        unawaited(controller.start());
+      }
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: _SettingsEntryCard(
+        key: const ValueKey('tiktok-live-overlay-card'),
+        icon: overlay.isActive ? Icons.language_rounded : Icons.web_rounded,
+        title: strings.liveOverlay,
+        subtitle: subtitle,
+        onTap: canToggle ? toggle : null,
+        accent:
+            overlay.status == LiveOverlayStatus.error ||
+                overlay.status == LiveOverlayStatus.unsupported
+            ? Theme.of(context).colorScheme.error
+            : null,
+        trailing: overlay.isBusy
+            ? const SizedBox.square(
+                key: ValueKey('tiktok-live-overlay-progress'),
+                dimension: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (overlay.isActive) ...[
+                    IconButton(
+                      key: const ValueKey('tiktok-live-overlay-copy-url'),
+                      tooltip: strings.copyOverlayUrl,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => unawaited(
+                        Clipboard.setData(
+                          ClipboardData(
+                            text: (overlay.url ?? Uri.parse(liveOverlayUrl))
+                                .toString(),
+                          ),
+                        ),
+                      ),
+                      icon: const Icon(Icons.content_copy_rounded, size: 20),
+                    ),
+                    IconButton(
+                      key: const ValueKey('tiktok-live-overlay-preview'),
+                      tooltip: strings.openOverlayPreview,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => unawaited(
+                        launchUrl(
+                          overlay.url ?? Uri.parse(liveOverlayUrl),
+                          mode: LaunchMode.externalApplication,
+                        ),
+                      ),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 20),
+                    ),
+                  ],
+                  Switch.adaptive(
+                    key: const ValueKey('tiktok-live-overlay-switch'),
+                    value: overlay.isActive,
+                    onChanged: canToggle ? (_) => toggle() : null,
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _TikTokCommandAudienceSection extends StatelessWidget {
+  const _TikTokCommandAudienceSection({
+    required this.audience,
+    required this.permissions,
+    required this.strings,
+    required this.onChanged,
+  });
+
+  final TikTokCommandAudience audience;
+  final TikTokCommandPermissions permissions;
+  final AppStrings strings;
+  final _TikTokCommandPermissionChanged onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      key: ValueKey('tiktok-command-section-${audience.name}'),
+      color: AppColors.cardSurfaceFor(context),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(_icon, size: 20, color: colorScheme.primary),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _title,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _hint,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 7),
+            for (final command in TikTokLiveCommand.values)
+              _commandTile(context, command),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _commandTile(BuildContext context, TikTokLiveCommand command) {
+    final inherited =
+        audience != TikTokCommandAudience.everyone &&
+        permissions.everyone.contains(command);
+    final selected =
+        inherited || permissions.isExplicitlyEnabled(audience, command);
+    final description = _commandDescription(command);
+    return CheckboxListTile(
+      key: ValueKey('tiktok-command-${audience.name}-${command.name}'),
+      value: selected,
+      onChanged: inherited
+          ? null
+          : (value) => onChanged(audience, command, value ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+      dense: true,
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+      contentPadding: EdgeInsets.zero,
+      title: Text(
+        _commandLabel(command),
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+      ),
+      subtitle: Text(
+        inherited
+            ? '$description ${strings.commandAllowedForEveryone}'
+            : description,
+      ),
+    );
+  }
+
+  IconData get _icon => switch (audience) {
+    TikTokCommandAudience.everyone => Icons.groups_rounded,
+    TikTokCommandAudience.followers => Icons.person_add_alt_1_rounded,
+    TikTokCommandAudience.moderators => Icons.shield_rounded,
+    TikTokCommandAudience.subscribers => Icons.workspace_premium_rounded,
+  };
+
+  String get _title => switch (audience) {
+    TikTokCommandAudience.everyone => strings.everyone,
+    TikTokCommandAudience.followers => strings.followers,
+    TikTokCommandAudience.moderators => strings.moderators,
+    TikTokCommandAudience.subscribers => strings.subscribers,
+  };
+
+  String get _hint => switch (audience) {
+    TikTokCommandAudience.everyone => strings.everyoneCommandPermissionsHint,
+    TikTokCommandAudience.followers => strings.followerCommandPermissionsHint,
+    TikTokCommandAudience.moderators => strings.moderatorCommandPermissionsHint,
+    TikTokCommandAudience.subscribers =>
+      strings.subscriberCommandPermissionsHint,
+  };
+
+  String _commandLabel(TikTokLiveCommand command) => switch (command) {
+    TikTokLiveCommand.play => strings.livePlayCommand,
+    TikTokLiveCommand.skip => strings.liveSkipCommand,
+    TikTokLiveCommand.revoke => strings.liveRevokeCommand,
+    TikTokLiveCommand.stop => strings.liveStopCommand,
+  };
+
+  String _commandDescription(TikTokLiveCommand command) => switch (command) {
+    TikTokLiveCommand.play => strings.livePlayCommandDescription,
+    TikTokLiveCommand.skip => strings.liveSkipCommandDescription,
+    TikTokLiveCommand.revoke => strings.liveRevokeCommandDescription,
+    TikTokLiveCommand.stop => strings.liveStopCommandDescription,
+  };
+}
+
+class _PathField extends StatelessWidget {
+  const _PathField({
+    required this.controller,
+    required this.focusNode,
+    required this.label,
+    required this.icon,
+    required this.browseTooltip,
+    required this.onBrowse,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final String label;
+  final IconData icon;
+  final String browseTooltip;
+  final VoidCallback? onBrowse;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxWidth: _settingsContentMaxWidth(context, 760),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('download-directory-field'),
+              controller: controller,
+              focusNode: focusNode,
+              readOnly: true,
+              decoration: InputDecoration(
+                labelText: label,
+                prefixIcon: Icon(icon),
+              ),
+            ),
+          ),
+          if (onBrowse != null) ...[
+            const SizedBox(width: 10),
+            IconButton.filledTonal(
+              key: const ValueKey('download-directory-browse'),
+              tooltip: browseTooltip,
+              icon: const Icon(Icons.folder_open_rounded),
+              onPressed: onBrowse,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}

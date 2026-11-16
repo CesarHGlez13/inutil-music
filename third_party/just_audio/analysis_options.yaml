@@ -1,0 +1,18 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  exclude:
+    - build/**
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
+
+linter:
+  rules:
+    prefer_single_quotes: false
+    unawaited_futures: false
+    # Keep the vendored 0.10.6 Dart API source identical to upstream. Flutter
+    # 3.47's Linux analyzer otherwise promotes these style suggestions to a
+    # failing release gate merely because the package lives in this checkout.
+    use_super_parameters: false

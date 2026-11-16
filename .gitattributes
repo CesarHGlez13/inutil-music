@@ -1,0 +1,6 @@
+*.sh text eol=lf
+packaging/linux/bstream-music text eol=lf
+*.swift text eol=lf
+*.entitlements text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

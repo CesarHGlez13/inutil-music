@@ -1,0 +1,53 @@
+import '../../../../services/storage/local_database_service.dart';
+import '../../domain/entities/local_track.dart';
+import '../../domain/entities/playlist.dart';
+
+class LocalMusicDataSource {
+  const LocalMusicDataSource(this._databaseService);
+
+  final LocalDatabaseService _databaseService;
+
+  Future<List<LocalTrack>> getLocalTracks() {
+    return _databaseService.getLocalTracks();
+  }
+
+  Future<void> saveLocalTrack(LocalTrack track) {
+    return _databaseService.saveLocalTrack(track);
+  }
+
+  Future<void> deleteLocalTrack(String trackId) {
+    return _databaseService.deleteLocalTrack(trackId);
+  }
+
+  Future<Set<String>> purgeMissingLocalTracks(List<LocalTrack> tracks) {
+    return _databaseService.purgeMissingLocalTracks(tracks);
+  }
+
+  Future<void> markPlayed(
+    String trackId,
+    DateTime playedAt, {
+    String? playlistId,
+  }) {
+    return _databaseService.markPlayed(
+      trackId,
+      playedAt,
+      playlistId: playlistId,
+    );
+  }
+
+  Future<List<LocalTrack>> getHistory() {
+    return _databaseService.getHistory();
+  }
+
+  Future<List<Playlist>> getPlaylists() {
+    return _databaseService.getPlaylists();
+  }
+
+  Future<void> savePlaylist(Playlist playlist) {
+    return _databaseService.savePlaylist(playlist);
+  }
+
+  Future<void> deletePlaylist(String playlistId) {
+    return _databaseService.deletePlaylist(playlistId);
+  }
+}

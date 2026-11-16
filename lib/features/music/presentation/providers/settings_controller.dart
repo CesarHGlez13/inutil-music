@@ -1,0 +1,1520 @@
+part of 'music_providers.dart';
+
+final settingsControllerProvider =
+    AsyncNotifierProvider<SettingsController, SettingsState>(
+      SettingsController.new,
+    );
+
+final appBackgroundImageServiceProvider = Provider<AppBackgroundImageService>(
+  (ref) => AppBackgroundImageService(),
+);
+
+const _unchangedAppBackground = Object();
+
+const supportedCrossfadeDurations = <Duration>[
+  Duration(seconds: 1),
+  Duration(seconds: 2),
+  Duration(seconds: 3),
+  Duration(seconds: 4),
+  Duration(seconds: 5),
+  Duration(seconds: 6),
+  Duration(seconds: 7),
+  Duration(seconds: 8),
+  Duration(seconds: 9),
+  Duration(seconds: 10),
+  Duration(seconds: 11),
+  Duration(seconds: 12),
+  Duration(seconds: 13),
+  Duration(seconds: 14),
+  Duration(seconds: 15),
+];
+
+const defaultCrossfadeDuration = Duration(seconds: 5);
+const defaultAnimatedArtworkEnabled = true;
+
+/// iOS application containers can receive a different absolute prefix after
+/// an update or restore. Always reconstruct the private media root from the
+/// current container; startup then migrates/rebases any persisted references.
+@visibleForTesting
+String downloadDirectoryForPlatform({
+  required AppPlatformType platform,
+  required String candidateDirectory,
+  required String defaultDirectory,
+}) => platform == AppPlatformType.ios ? defaultDirectory : candidateDirectory;
+
+Duration crossfadeDurationFromStoredSeconds(int? seconds) {
+  return supportedCrossfadeDurations.firstWhere(
+    (duration) => duration.inSeconds == seconds,
+    orElse: () => defaultCrossfadeDuration,
+  );
+}
+
+enum LyricsTextAlignment {
+  normal,
+  centered;
+
+  String get code => name;
+
+  static LyricsTextAlignment fromCode(String? code) {
+    return switch (code) {
+      'centered' => LyricsTextAlignment.centered,
+      _ => LyricsTextAlignment.normal,
+    };
+  }
+}
+
+enum LocalMusicFilter {
+  hideWhatsAppAudio,
+  hideTelegramAudio,
+  hideAudioRecordings,
+  hideTracksUnder30Seconds;
+
+  String get code => name;
+
+  static Set<LocalMusicFilter> fromCodes(List<String>? codes) {
+    if (codes == null) {
+      return defaultLocalMusicFilters;
+    }
+    final storedCodes = codes.toSet();
+    return Set<LocalMusicFilter>.unmodifiable(
+      LocalMusicFilter.values.where(
+        (filter) => storedCodes.contains(filter.code),
+      ),
+    );
+  }
+}
+
+const defaultLocalMusicFilters = <LocalMusicFilter>{
+  LocalMusicFilter.hideWhatsAppAudio,
+  LocalMusicFilter.hideTelegramAudio,
+  LocalMusicFilter.hideAudioRecordings,
+  LocalMusicFilter.hideTracksUnder30Seconds,
+};
+
+AudioQualityProfile _audioQualityProfileFromCode(
+  String? code, {
+  required AudioQualityProfile fallback,
+}) => switch (code) {
+  'high' => AudioQualityProfile.high,
+  'standard' => AudioQualityProfile.standard,
+  _ => fallback,
+};
+
+class SettingsState {
+  const SettingsState({
+    required this.downloadDirectory,
+    required this.language,
+    this.themeMode = AppThemeMode.system,
+    this.accent = AppAccent.white,
+    this.surfaceBackgroundMode = SurfaceBackgroundMode.accent,
+    this.appBackgroundFileName,
+    this.appBackgroundPath,
+    this.playerStyle = defaultPlayerStyle,
+    this.playerFont = defaultPlayerFont,
+    this.liveWidgetStyle = LiveWidgetStyle.classic,
+    this.showAudioQuality = false,
+    this.jioSaavnEnabled = true,
+    this.wifiAudioQuality = AudioQualityProfile.high,
+    this.mobileAudioQuality = AudioQualityProfile.standard,
+    this.animatedArtworkEnabled = defaultAnimatedArtworkEnabled,
+    this.playerArtworkStyle = defaultPlayerArtworkStyle,
+    this.appleAnimatedArtworkEnabled = false,
+    this.spotifyCanvasEnabled = false,
+    this.miniPlayerMode = defaultMiniPlayerMode,
+    this.miniPlayerBackgroundMode = defaultMiniPlayerBackgroundMode,
+    this.lyricsTextAlignment = LyricsTextAlignment.normal,
+    this.enabledLyricsProviders = defaultLyricsProviders,
+    this.lyricsAnimationStyle = LyricsAnimationStyle.smooth,
+    this.lyricsRomanizationEnabled = false,
+    this.lyricsTranslationEnabled = false,
+    this.lyricsRomanizationLanguages = defaultLyricsRomanizationLanguages,
+    this.recommendationHistoryEnabled = true,
+    this.localMusicFilters = defaultLocalMusicFilters,
+    this.crossfadeEnabled = false,
+    this.crossfadeDuration = defaultCrossfadeDuration,
+    this.skipSilenceEnabled = false,
+  });
+
+  final String downloadDirectory;
+  final AppLanguage language;
+  final AppThemeMode themeMode;
+  final AppAccent accent;
+  final SurfaceBackgroundMode surfaceBackgroundMode;
+
+  /// Relative file name owned by [AppBackgroundImageService].
+  final String? appBackgroundFileName;
+
+  /// Resolved path in the current app container; never persisted directly.
+  final String? appBackgroundPath;
+  final PlayerStyle playerStyle;
+  final PlayerFont playerFont;
+  final LiveWidgetStyle liveWidgetStyle;
+  final bool showAudioQuality;
+  final bool jioSaavnEnabled;
+  final AudioQualityProfile wifiAudioQuality;
+  final AudioQualityProfile mobileAudioQuality;
+  final bool animatedArtworkEnabled;
+  final PlayerArtworkStyle playerArtworkStyle;
+  final bool appleAnimatedArtworkEnabled;
+  final bool spotifyCanvasEnabled;
+  final MiniPlayerMode miniPlayerMode;
+  final MiniPlayerBackgroundMode miniPlayerBackgroundMode;
+  final LyricsTextAlignment lyricsTextAlignment;
+  final Set<LyricsProvider> enabledLyricsProviders;
+  final LyricsAnimationStyle lyricsAnimationStyle;
+  final bool lyricsRomanizationEnabled;
+  final bool lyricsTranslationEnabled;
+  final Set<LyricsRomanizationLanguage> lyricsRomanizationLanguages;
+  final bool recommendationHistoryEnabled;
+  final Set<LocalMusicFilter> localMusicFilters;
+  final bool crossfadeEnabled;
+  final Duration crossfadeDuration;
+  final bool skipSilenceEnabled;
+
+  SettingsState copyWith({
+    String? downloadDirectory,
+    AppLanguage? language,
+    AppThemeMode? themeMode,
+    AppAccent? accent,
+    SurfaceBackgroundMode? surfaceBackgroundMode,
+    Object? appBackgroundFileName = _unchangedAppBackground,
+    Object? appBackgroundPath = _unchangedAppBackground,
+    PlayerStyle? playerStyle,
+    PlayerFont? playerFont,
+    LiveWidgetStyle? liveWidgetStyle,
+    bool? showAudioQuality,
+    bool? jioSaavnEnabled,
+    AudioQualityProfile? wifiAudioQuality,
+    AudioQualityProfile? mobileAudioQuality,
+    bool? animatedArtworkEnabled,
+    PlayerArtworkStyle? playerArtworkStyle,
+    bool? appleAnimatedArtworkEnabled,
+    bool? spotifyCanvasEnabled,
+    MiniPlayerMode? miniPlayerMode,
+    MiniPlayerBackgroundMode? miniPlayerBackgroundMode,
+    LyricsTextAlignment? lyricsTextAlignment,
+    Set<LyricsProvider>? enabledLyricsProviders,
+    LyricsAnimationStyle? lyricsAnimationStyle,
+    bool? lyricsRomanizationEnabled,
+    bool? lyricsTranslationEnabled,
+    Set<LyricsRomanizationLanguage>? lyricsRomanizationLanguages,
+    bool? recommendationHistoryEnabled,
+    Set<LocalMusicFilter>? localMusicFilters,
+    bool? crossfadeEnabled,
+    Duration? crossfadeDuration,
+    bool? skipSilenceEnabled,
+  }) {
+    return SettingsState(
+      downloadDirectory: downloadDirectory ?? this.downloadDirectory,
+      language: language ?? this.language,
+      themeMode: themeMode ?? this.themeMode,
+      accent: accent ?? this.accent,
+      surfaceBackgroundMode:
+          surfaceBackgroundMode ?? this.surfaceBackgroundMode,
+      appBackgroundFileName:
+          identical(appBackgroundFileName, _unchangedAppBackground)
+          ? this.appBackgroundFileName
+          : appBackgroundFileName as String?,
+      appBackgroundPath: identical(appBackgroundPath, _unchangedAppBackground)
+          ? this.appBackgroundPath
+          : appBackgroundPath as String?,
+      playerStyle: playerStyle ?? this.playerStyle,
+      playerFont: playerFont ?? this.playerFont,
+      liveWidgetStyle: liveWidgetStyle ?? this.liveWidgetStyle,
+      showAudioQuality: showAudioQuality ?? this.showAudioQuality,
+      jioSaavnEnabled: jioSaavnEnabled ?? this.jioSaavnEnabled,
+      wifiAudioQuality: wifiAudioQuality ?? this.wifiAudioQuality,
+      mobileAudioQuality: mobileAudioQuality ?? this.mobileAudioQuality,
+      animatedArtworkEnabled:
+          animatedArtworkEnabled ?? this.animatedArtworkEnabled,
+      playerArtworkStyle: playerArtworkStyle ?? this.playerArtworkStyle,
+      appleAnimatedArtworkEnabled:
+          appleAnimatedArtworkEnabled ?? this.appleAnimatedArtworkEnabled,
+      spotifyCanvasEnabled: spotifyCanvasEnabled ?? this.spotifyCanvasEnabled,
+      miniPlayerMode: miniPlayerMode ?? this.miniPlayerMode,
+      miniPlayerBackgroundMode:
+          miniPlayerBackgroundMode ?? this.miniPlayerBackgroundMode,
+      lyricsTextAlignment: lyricsTextAlignment ?? this.lyricsTextAlignment,
+      enabledLyricsProviders:
+          enabledLyricsProviders ?? this.enabledLyricsProviders,
+      lyricsAnimationStyle: lyricsAnimationStyle ?? this.lyricsAnimationStyle,
+      lyricsRomanizationEnabled:
+          lyricsRomanizationEnabled ?? this.lyricsRomanizationEnabled,
+      lyricsTranslationEnabled:
+          lyricsTranslationEnabled ?? this.lyricsTranslationEnabled,
+      lyricsRomanizationLanguages:
+          lyricsRomanizationLanguages ?? this.lyricsRomanizationLanguages,
+      recommendationHistoryEnabled:
+          recommendationHistoryEnabled ?? this.recommendationHistoryEnabled,
+      localMusicFilters: localMusicFilters ?? this.localMusicFilters,
+      crossfadeEnabled: crossfadeEnabled ?? this.crossfadeEnabled,
+      crossfadeDuration: crossfadeDuration ?? this.crossfadeDuration,
+      skipSilenceEnabled: skipSilenceEnabled ?? this.skipSilenceEnabled,
+    );
+  }
+}
+
+class SettingsController extends AsyncNotifier<SettingsState> {
+  SettingsController() : _platformOverride = null;
+
+  @visibleForTesting
+  SettingsController.forPlatform(this._platformOverride);
+
+  final AppPlatformType? _platformOverride;
+
+  AppPlatformType get _platform => _platformOverride ?? AppPlatform.current;
+
+  static const _downloadDirectoryKey = 'settings.downloadDirectory';
+  static const _downloadDirectoryMigrationJournalKey =
+      'settings.downloadDirectoryMigration.v1';
+  static const _languageKey = 'settings.language';
+  static const _themeModeKey = 'settings.themeMode';
+  static const _accentKey = 'settings.accent';
+  static const _surfaceBackgroundModeKey = 'settings.surfaceBackgroundMode';
+  static const _appBackgroundFileNameKey = 'settings.appBackgroundFileName';
+  static const _playerStyleKey = 'settings.playerStyle';
+  static const _playerFontKey = 'settings.playerFont';
+  static const _liveWidgetStyleKey = 'settings.liveWidgetStyle';
+  static const _showAudioQualityKey = 'settings.showAudioQuality';
+  static const _jioSaavnEnabledKey = 'settings.jioSaavnEnabled';
+  static const _wifiAudioQualityKey = 'settings.wifiAudioQuality';
+  static const _mobileAudioQualityKey = 'settings.mobileAudioQuality';
+  static const _animatedArtworkEnabledKey = 'settings.animatedArtworkEnabled';
+  static const _playerArtworkStyleKey = 'settings.playerArtworkStyle';
+  static const _appleAnimatedArtworkEnabledKey =
+      'settings.appleAnimatedArtworkEnabled';
+  static const _spotifyCanvasEnabledKey = 'settings.spotifyCanvasEnabled';
+  static const _miniPlayerModeKey = 'settings.miniPlayerMode';
+  static const _miniPlayerBackgroundModeKey =
+      'settings.miniPlayerBackgroundMode';
+  static const _lyricsTextAlignmentKey = 'settings.lyricsAlignment';
+  static const _enabledLyricsProvidersKey = 'settings.enabledLyricsProviders';
+  static const _lyricsAnimationStyleKey = 'settings.lyricsAnimation';
+  static const _lyricsRomanizationEnabledKey =
+      'settings.lyricsRomanizationEnabled';
+  static const _lyricsTranslationEnabledKey =
+      'settings.lyricsTranslationEnabled';
+  static const _lyricsRomanizationLanguagesKey =
+      'settings.lyricsRomanizationLanguages';
+  static const _recommendationHistoryEnabledKey =
+      'settings.recommendationHistoryEnabled';
+  static const _localMusicFiltersKey = 'settings.localMusicFilters';
+  static const _crossfadeEnabledKey = 'settings.crossfadeEnabled';
+  static const _crossfadeSecondsKey = 'settings.crossfadeSeconds';
+  static const _skipSilenceEnabledKey = 'settings.skipSilenceEnabled';
+  static const _mediaRootDirectoryName = 'BStream-Music';
+  Future<void> _lyricsTextAlignmentWriteTail = Future<void>.value();
+  Future<void> _enabledLyricsProvidersWriteTail = Future<void>.value();
+  Future<void> _animatedArtworkWriteTail = Future<void>.value();
+  Future<void> _audioSourceSettingsWriteTail = Future<void>.value();
+  Future<void> _remoteArtworkWriteTail = Future<void>.value();
+  Future<void> _lyricsAnimationStyleWriteTail = Future<void>.value();
+  Future<void> _lyricsRomanizationWriteTail = Future<void>.value();
+  Future<void> _recommendationHistoryWriteTail = Future<void>.value();
+  Future<void> _localMusicFiltersWriteTail = Future<void>.value();
+  Future<void> _crossfadeWriteTail = Future<void>.value();
+  Future<void> _skipSilenceWriteTail = Future<void>.value();
+  Future<void> _appBackgroundWriteTail = Future<void>.value();
+  Future<void> _liveWidgetStyleWriteTail = Future<void>.value();
+
+  @override
+  Future<SettingsState> build() async {
+    final prefs = await SharedPreferences.getInstance();
+    final defaultDirectory = await _defaultDownloadDirectory();
+    final language = AppLanguageLabel.fromCode(prefs.getString(_languageKey));
+    final themeMode = AppThemeMode.fromCode(prefs.getString(_themeModeKey));
+    final storedAccentCode = prefs.getString(_accentKey);
+    final accent = AppAccent.fromCode(storedAccentCode);
+    if (storedAccentCode == 'amber') {
+      await prefs.setString(_accentKey, accent.code);
+    }
+    final surfaceBackgroundMode = SurfaceBackgroundMode.fromCode(
+      prefs.getString(_surfaceBackgroundModeKey),
+    );
+    final appBackgroundService = ref.read(appBackgroundImageServiceProvider);
+    var appBackgroundFileName = prefs.getString(_appBackgroundFileNameKey);
+    var appBackgroundPath = await appBackgroundService.resolve(
+      appBackgroundFileName,
+    );
+    if (appBackgroundFileName != null && appBackgroundPath == null) {
+      await prefs.remove(_appBackgroundFileNameKey);
+      appBackgroundFileName = null;
+    }
+    // Android can reclaim the activity while the system photo picker is open.
+    // Recover that choice without ever discarding a previously selected photo
+    // unless the optimized copy and preference write both succeed.
+    if (_platform == AppPlatformType.android && Platform.isAndroid) {
+      try {
+        final lyricsPhotoPending =
+            prefs.getBool(lyricsSharePhotoPendingKey) ?? false;
+        final lost = await ImagePicker().retrieveLostData();
+        if (lyricsPhotoPending) {
+          await prefs.remove(lyricsSharePhotoPendingKey);
+        }
+        // A lyric-card image belongs only to its editor. After activity death
+        // its recovered result must never replace the user's app wallpaper.
+        final files = lyricsPhotoPending ? null : lost.files;
+        if (files != null && files.isNotEmpty) {
+          final recoveredName = await appBackgroundService.saveFile(
+            File(files.first.path),
+          );
+          if (await prefs.setString(_appBackgroundFileNameKey, recoveredName)) {
+            final previousName = appBackgroundFileName;
+            appBackgroundFileName = recoveredName;
+            appBackgroundPath = await appBackgroundService.resolve(
+              recoveredName,
+            );
+            try {
+              await appBackgroundService.delete(previousName);
+            } catch (error) {
+              debugPrint('Could not remove old app background: $error');
+            }
+          } else {
+            await appBackgroundService.delete(recoveredName);
+          }
+        }
+      } catch (error) {
+        debugPrint('Could not recover selected app background: $error');
+      }
+    }
+    final playerStyle = PlayerStyle.fromCode(prefs.getString(_playerStyleKey));
+    final playerFont = PlayerFont.fromCode(prefs.getString(_playerFontKey));
+    final liveWidgetStyle = LiveWidgetStyle.fromCode(
+      prefs.getString(_liveWidgetStyleKey),
+    );
+    final showAudioQuality = prefs.getBool(_showAudioQualityKey) ?? false;
+    final jioSaavnEnabled = prefs.getBool(_jioSaavnEnabledKey) ?? true;
+    final wifiAudioQuality = _audioQualityProfileFromCode(
+      prefs.getString(_wifiAudioQualityKey),
+      fallback: AudioQualityProfile.high,
+    );
+    final mobileAudioQuality = _audioQualityProfileFromCode(
+      prefs.getString(_mobileAudioQualityKey),
+      fallback: AudioQualityProfile.standard,
+    );
+    final animatedArtworkEnabled =
+        prefs.getBool(_animatedArtworkEnabledKey) ??
+        defaultAnimatedArtworkEnabled;
+    final playerArtworkStyle = PlayerArtworkStyle.fromCode(
+      prefs.getString(_playerArtworkStyleKey),
+    );
+    final spotifyCanvasEnabled =
+        prefs.getBool(_spotifyCanvasEnabledKey) ?? false;
+    // Old or concurrently written preferences must never enable both sources.
+    final appleAnimatedArtworkEnabled =
+        (prefs.getBool(_appleAnimatedArtworkEnabledKey) ?? false) &&
+        !spotifyCanvasEnabled;
+    final miniPlayerMode = MiniPlayerMode.fromCode(
+      prefs.getString(_miniPlayerModeKey),
+      platform: defaultTargetPlatform,
+    );
+    final miniPlayerBackgroundMode = MiniPlayerBackgroundMode.fromCode(
+      prefs.getString(_miniPlayerBackgroundModeKey),
+    );
+    final lyricsTextAlignment = LyricsTextAlignment.fromCode(
+      prefs.getString(_lyricsTextAlignmentKey),
+    );
+    final enabledLyricsProviders = LyricsProvider.fromCodes(
+      prefs.getStringList(_enabledLyricsProvidersKey),
+    );
+    final storedLyricsAnimationStyle = prefs.getString(
+      _lyricsAnimationStyleKey,
+    );
+    final lyricsAnimationStyle = LyricsAnimationStyle.fromCode(
+      storedLyricsAnimationStyle,
+    );
+    if (storedLyricsAnimationStyle == 'none') {
+      await prefs.setString(
+        _lyricsAnimationStyleKey,
+        lyricsAnimationStyle.code,
+      );
+    }
+    final lyricsTranslationEnabled =
+        prefs.getBool(_lyricsTranslationEnabledKey) ?? false;
+    final lyricsRomanizationEnabled =
+        (prefs.getBool(_lyricsRomanizationEnabledKey) ?? false) &&
+        !lyricsTranslationEnabled;
+    final lyricsRomanizationLanguages = LyricsRomanizationLanguage.fromCodes(
+      prefs.getStringList(_lyricsRomanizationLanguagesKey),
+    );
+    final recommendationHistoryEnabled =
+        prefs.getBool(_recommendationHistoryEnabledKey) ?? true;
+    final localMusicFilters = LocalMusicFilter.fromCodes(
+      prefs.getStringList(_localMusicFiltersKey),
+    );
+    final crossfadeSeconds = prefs.getInt(_crossfadeSecondsKey);
+    final crossfadeDuration = crossfadeDurationFromStoredSeconds(
+      crossfadeSeconds,
+    );
+    final crossfadeEnabled = prefs.getBool(_crossfadeEnabledKey) ?? false;
+    final skipSilenceEnabled = prefs.getBool(_skipSilenceEnabledKey) ?? false;
+    final storedDirectory = prefs.getString(_downloadDirectoryKey);
+    final encodedMigrationJournal = prefs.getString(
+      _downloadDirectoryMigrationJournalKey,
+    );
+    var pendingMigration = DownloadDirectoryMigrationJournal.tryDecode(
+      encodedMigrationJournal,
+    );
+    if (encodedMigrationJournal != null && pendingMigration == null) {
+      await prefs.remove(_downloadDirectoryMigrationJournalKey);
+    }
+
+    final iosJournal = pendingMigration;
+    if (_platform == AppPlatformType.ios &&
+        iosJournal != null &&
+        await _isUnreachableIosMigrationJournal(iosJournal)) {
+      // iOS can restore the app's Documents contents under a new container
+      // UUID while SharedPreferences still contains the previous absolute
+      // prefix. Never recreate an unreachable source or target below that old
+      // sandbox. Dropping the journal lets the normal iOS path-rebase branch
+      // below repair persisted database references against today's container.
+      debugPrint(
+        'Discarding a download migration journal from a relocated iOS '
+        'container.',
+      );
+      await prefs.remove(_downloadDirectoryMigrationJournalKey);
+      pendingMigration = null;
+    }
+
+    // A journal is untrusted persisted input. Validate its canonical source
+    // relationship before entering the exclusive migration phase so a stale,
+    // hand-edited, or corrupted journal cannot brick Settings on every start.
+    // Recoverable I/O failures after a valid migration starts still keep the
+    // journal and are handled by the migrator's idempotent resume path.
+    final journalToValidate = pendingMigration;
+    if (journalToValidate != null) {
+      try {
+        final migrator = const DownloadDirectoryMigrator();
+        final paths = await migrator.validatePaths(
+          sourceRoot: journalToValidate.sourceRoot,
+          targetRoot: journalToValidate.targetRoot,
+        );
+        await migrator.validateReferenceSourceRoot(
+          referenceSourceRoot: journalToValidate.referenceSourceRoot,
+          canonicalSourceRoot: paths.sourceRoot,
+        );
+      } on ArgumentError catch (error) {
+        debugPrint('Discarding an invalid download migration journal: $error');
+        await prefs.remove(_downloadDirectoryMigrationJournalKey);
+        pendingMigration = null;
+      }
+    }
+
+    late String downloadDirectory;
+    final migrationToRecover = pendingMigration;
+    if (migrationToRecover != null) {
+      final coordinator = ref.read(libraryOperationCoordinatorProvider);
+      downloadDirectory = await coordinator.runExclusive(
+        LibraryMaintenancePhase.migratingDirectory,
+        () => _migrateDownloadDirectory(
+          prefs: prefs,
+          oldDirectory: migrationToRecover.sourceRoot,
+          newDirectory: migrationToRecover.targetRoot,
+          stopPlayer: false,
+          recoveringJournal: true,
+          referenceSourceDirectory: migrationToRecover.referenceSourceRoot,
+        ),
+      );
+    } else {
+      final candidateDirectory = _migrateLegacyDownloadDirectory(
+        storedDirectory ?? defaultDirectory,
+        defaultDirectory: defaultDirectory,
+      );
+      var canMigrateStoredDirectory = storedDirectory != null;
+      try {
+        final normalizedCandidate =
+            DownloadDirectoryMigrator.normalizeAbsoluteRoot(
+              candidateDirectory,
+              parameterName: 'downloadDirectory',
+            );
+        downloadDirectory = downloadDirectoryForPlatform(
+          platform: _platform,
+          candidateDirectory: normalizedCandidate,
+          defaultDirectory: DownloadDirectoryMigrator.normalizeAbsoluteRoot(
+            defaultDirectory,
+            parameterName: 'defaultDownloadDirectory',
+          ),
+        );
+      } on ArgumentError catch (error) {
+        // A download root persisted by an older or hand-edited installation is
+        // untrusted input. In particular, never pass a filesystem root into
+        // migration: falling back must only create BStream's default folders.
+        debugPrint(
+          'Discarding an invalid persisted download directory: $error',
+        );
+        downloadDirectory = DownloadDirectoryMigrator.normalizeAbsoluteRoot(
+          defaultDirectory,
+          parameterName: 'defaultDownloadDirectory',
+        );
+        canMigrateStoredDirectory = false;
+      }
+      if (_platform == AppPlatformType.android &&
+          !await _isAndroidWritableDownloadDirectory(downloadDirectory)) {
+        downloadDirectory = DownloadDirectoryMigrator.normalizeAbsoluteRoot(
+          defaultDirectory,
+          parameterName: 'defaultDownloadDirectory',
+        );
+      }
+      if (canMigrateStoredDirectory &&
+          _platform == AppPlatformType.ios &&
+          !DownloadDirectoryMigrator.rootsEqual(
+            storedDirectory!,
+            downloadDirectory,
+          )) {
+        // iOS may relocate the whole app container while preserving its
+        // contents. The previous absolute root is then inaccessible, but the
+        // same relative files already exist below today's container root.
+        // Rebase database references lexically instead of trying to copy from
+        // the stale container path. This is idempotent across interrupted
+        // preference writes.
+        await _ensureMediaDirectories(downloadDirectory);
+        await ref
+            .read(databaseServiceProvider)
+            .rewriteLocalTrackMediaRoot(
+              mediaRoot: downloadDirectory,
+              oldMediaRoot: storedDirectory,
+            );
+        await _writeDownloadDirectoryPreference(prefs, downloadDirectory);
+        canMigrateStoredDirectory = false;
+      }
+      if (canMigrateStoredDirectory &&
+          !DownloadDirectoryMigrator.rootsEqual(
+            storedDirectory!,
+            downloadDirectory,
+          )) {
+        final coordinator = ref.read(libraryOperationCoordinatorProvider);
+        downloadDirectory = await coordinator.runExclusive(
+          LibraryMaintenancePhase.migratingDirectory,
+          () => _migrateDownloadDirectory(
+            prefs: prefs,
+            oldDirectory: storedDirectory,
+            newDirectory: downloadDirectory,
+            stopPlayer: false,
+          ),
+        );
+      }
+    }
+    await _ensureMediaDirectories(downloadDirectory);
+    await const DownloadDirectoryMigrator().cleanupStaleArtifacts(
+      downloadDirectory,
+    );
+    await _writeDownloadDirectoryPreference(prefs, downloadDirectory);
+    return SettingsState(
+      downloadDirectory: downloadDirectory,
+      language: language,
+      themeMode: themeMode,
+      accent: accent,
+      surfaceBackgroundMode: surfaceBackgroundMode,
+      appBackgroundFileName: appBackgroundPath == null
+          ? null
+          : appBackgroundFileName,
+      appBackgroundPath: appBackgroundPath,
+      playerStyle: playerStyle,
+      playerFont: playerFont,
+      liveWidgetStyle: liveWidgetStyle,
+      showAudioQuality: showAudioQuality,
+      jioSaavnEnabled: jioSaavnEnabled,
+      wifiAudioQuality: wifiAudioQuality,
+      mobileAudioQuality: mobileAudioQuality,
+      animatedArtworkEnabled: animatedArtworkEnabled,
+      playerArtworkStyle: playerArtworkStyle,
+      appleAnimatedArtworkEnabled: appleAnimatedArtworkEnabled,
+      spotifyCanvasEnabled: spotifyCanvasEnabled,
+      miniPlayerMode: miniPlayerMode,
+      miniPlayerBackgroundMode: miniPlayerBackgroundMode,
+      lyricsTextAlignment: lyricsTextAlignment,
+      enabledLyricsProviders: enabledLyricsProviders,
+      lyricsAnimationStyle: lyricsAnimationStyle,
+      lyricsRomanizationEnabled: lyricsRomanizationEnabled,
+      lyricsTranslationEnabled: lyricsTranslationEnabled,
+      lyricsRomanizationLanguages: lyricsRomanizationLanguages,
+      recommendationHistoryEnabled: recommendationHistoryEnabled,
+      localMusicFilters: localMusicFilters,
+      crossfadeEnabled: crossfadeEnabled,
+      crossfadeDuration: crossfadeDuration,
+      skipSilenceEnabled: skipSilenceEnabled,
+    );
+  }
+
+  Future<void> setDownloadDirectory(String path) async {
+    final coordinator = ref.read(libraryOperationCoordinatorProvider);
+    return coordinator.runExclusive(
+      LibraryMaintenancePhase.migratingDirectory,
+      () => _setDownloadDirectoryInternal(path),
+    );
+  }
+
+  Future<void> _setDownloadDirectoryInternal(String path) async {
+    final prefs = await SharedPreferences.getInstance();
+    final defaultDirectory = await _defaultDownloadDirectory();
+    var normalized = _migrateLegacyDownloadDirectory(
+      path.trim(),
+      defaultDirectory: defaultDirectory,
+    );
+    if (AppPlatform.isAndroid &&
+        !await _isAndroidWritableDownloadDirectory(normalized)) {
+      normalized = defaultDirectory;
+    }
+    normalized = DownloadDirectoryMigrator.normalizeAbsoluteRoot(
+      normalized,
+      parameterName: 'path',
+    );
+
+    final current = await future;
+    final oldDirectory = current.downloadDirectory.trim();
+    if (oldDirectory.isEmpty ||
+        DownloadDirectoryMigrator.rootsEqual(oldDirectory, normalized)) {
+      await _ensureMediaDirectories(normalized);
+      await _writeDownloadDirectoryPreference(prefs, normalized);
+      final latest = state.asData?.value ?? await future;
+      state = AsyncData(latest.copyWith(downloadDirectory: normalized));
+      return;
+    }
+
+    normalized = await _migrateDownloadDirectory(
+      prefs: prefs,
+      oldDirectory: oldDirectory,
+      newDirectory: normalized,
+      stopPlayer: true,
+    );
+    ref
+      ..invalidate(libraryTracksProvider)
+      ..invalidate(historyProvider)
+      ..invalidate(playlistsControllerProvider);
+    final latest = state.asData?.value ?? await future;
+    state = AsyncData(latest.copyWith(downloadDirectory: normalized));
+  }
+
+  Future<String> _migrateDownloadDirectory({
+    required SharedPreferences prefs,
+    required String oldDirectory,
+    required String newDirectory,
+    required bool stopPlayer,
+    bool recoveringJournal = false,
+    String? referenceSourceDirectory,
+  }) async {
+    final migrator = const DownloadDirectoryMigrator();
+    final paths = await migrator.validatePaths(
+      sourceRoot: oldDirectory,
+      targetRoot: newDirectory,
+    );
+    final referenceSourceRoot = await migrator.validateReferenceSourceRoot(
+      referenceSourceRoot: referenceSourceDirectory ?? oldDirectory,
+      canonicalSourceRoot: paths.sourceRoot,
+    );
+    await _writeDownloadDirectoryMigrationJournal(
+      prefs,
+      paths,
+      referenceSourceRoot: referenceSourceRoot,
+    );
+
+    try {
+      if (stopPlayer && await migrator.hasManagedContent(paths.sourceRoot)) {
+        await ref.read(playerControllerProvider.notifier).stop();
+      }
+
+      final database = ref.read(databaseServiceProvider);
+      LocalTrackMediaRootRewrite? databaseRewrite;
+      final result = await migrator.migrate(
+        sourceRoot: paths.sourceRoot,
+        targetRoot: paths.targetRoot,
+        commitReferences: (committedPaths) async {
+          // The durable journal records an arbitrary user-selected target.
+          // Database paths commit first and the visible preference commits
+          // last; startup can therefore resume every interruption point.
+          databaseRewrite = await database
+              .rewriteLocalTrackMediaRootWithSnapshot(
+                mediaRoot: committedPaths.targetRoot,
+                oldMediaRoot: referenceSourceRoot,
+                canonicalOldMediaRoot: committedPaths.sourceRoot,
+              );
+          await _writeDownloadDirectoryPreference(
+            prefs,
+            committedPaths.targetRoot,
+          );
+        },
+        rollbackReferences: (_) async {
+          Object? firstError;
+          StackTrace? firstStackTrace;
+          final rewrite = databaseRewrite;
+          if (rewrite != null) {
+            try {
+              // Restore only rows changed by this operation. A broad target to
+              // source rewrite could corrupt tracks that already belonged to
+              // the destination before migration started.
+              await database.restoreLocalTrackMediaPaths(rewrite);
+            } catch (error, stackTrace) {
+              firstError = error;
+              firstStackTrace = stackTrace;
+            }
+          }
+          try {
+            await _writeDownloadDirectoryPreference(prefs, referenceSourceRoot);
+          } catch (error, stackTrace) {
+            firstError ??= error;
+            firstStackTrace ??= stackTrace;
+          }
+          if (firstError != null) {
+            Error.throwWithStackTrace(firstError, firstStackTrace!);
+          }
+        },
+      );
+      await _clearDownloadDirectoryMigrationJournal(prefs);
+      return result.targetRoot;
+    } catch (error, stackTrace) {
+      // A regular failure with a complete rollback has no work to resume. A
+      // failed rollback, or any failure while recovering an earlier crash,
+      // keeps the journal so startup cannot forget the selected target.
+      if (!recoveringJournal && error is! DownloadDirectoryMigrationException) {
+        try {
+          await _removeDownloadDirectoryMigrationJournal(prefs);
+        } catch (journalError) {
+          throw DownloadDirectoryMigrationException(
+            cause: error,
+            rollbackErrors: <Object>[journalError],
+          );
+        }
+      }
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
+  Future<void> _writeDownloadDirectoryMigrationJournal(
+    SharedPreferences prefs,
+    DownloadDirectoryMigrationPaths paths, {
+    required String referenceSourceRoot,
+  }) async {
+    final journal = DownloadDirectoryMigrationJournal(
+      sourceRoot: paths.sourceRoot,
+      targetRoot: paths.targetRoot,
+      referenceSourceRoot: referenceSourceRoot,
+    );
+    if (!await prefs.setString(
+      _downloadDirectoryMigrationJournalKey,
+      journal.encode(),
+    )) {
+      throw StateError('No se pudo preparar la migración de descargas.');
+    }
+  }
+
+  Future<void> _removeDownloadDirectoryMigrationJournal(
+    SharedPreferences prefs,
+  ) async {
+    if (!await prefs.remove(_downloadDirectoryMigrationJournalKey)) {
+      throw StateError('No se pudo cerrar la migración de descargas.');
+    }
+  }
+
+  Future<void> _clearDownloadDirectoryMigrationJournal(
+    SharedPreferences prefs,
+  ) async {
+    try {
+      await prefs.remove(_downloadDirectoryMigrationJournalKey);
+    } catch (_) {
+      // A stale success journal is safe: recovery is idempotent and simply
+      // reaffirms the already committed target on the next startup.
+    }
+  }
+
+  Future<void> _writeDownloadDirectoryPreference(
+    SharedPreferences prefs,
+    String path,
+  ) async {
+    if (!await prefs.setString(_downloadDirectoryKey, path)) {
+      throw StateError('No se pudo guardar el directorio de descargas.');
+    }
+  }
+
+  Future<void> setLanguage(AppLanguage language) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageKey, language.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(language: language));
+  }
+
+  Future<void> setThemeMode(AppThemeMode themeMode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_themeModeKey, themeMode.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(themeMode: themeMode));
+  }
+
+  Future<void> setAccent(AppAccent accent) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_accentKey, accent.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(accent: accent));
+  }
+
+  Future<void> setSurfaceBackgroundMode(SurfaceBackgroundMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_surfaceBackgroundModeKey, mode.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(surfaceBackgroundMode: mode));
+  }
+
+  Future<void> setAppBackgroundPhoto(File file) =>
+      _queueAppBackgroundWrite(() => _setAppBackgroundPhoto(file));
+
+  Future<void> _setAppBackgroundPhoto(File file) async {
+    final current = state.asData?.value ?? await future;
+    final service = ref.read(appBackgroundImageServiceProvider);
+    final nextFileName = await service.saveFile(file);
+    final nextPath = await service.resolve(nextFileName);
+    if (nextPath == null) {
+      await service.delete(nextFileName);
+      throw StateError('No se pudo guardar el fondo de la app.');
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (!await prefs.setString(_appBackgroundFileNameKey, nextFileName)) {
+        throw StateError('No se pudo guardar el fondo de la app.');
+      }
+    } catch (_) {
+      await service.delete(nextFileName);
+      rethrow;
+    }
+    state = AsyncData(
+      current.copyWith(
+        appBackgroundFileName: nextFileName,
+        appBackgroundPath: nextPath,
+      ),
+    );
+    if (current.appBackgroundFileName != null) {
+      try {
+        await service.delete(current.appBackgroundFileName);
+      } catch (error) {
+        debugPrint('Could not remove old app background: $error');
+      }
+    }
+  }
+
+  Future<void> clearAppBackgroundPhoto() =>
+      _queueAppBackgroundWrite(_clearAppBackgroundPhoto);
+
+  Future<void> _clearAppBackgroundPhoto() async {
+    final current = state.asData?.value ?? await future;
+    if (current.appBackgroundFileName == null) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.remove(_appBackgroundFileNameKey)) {
+      throw StateError('No se pudo quitar el fondo de la app.');
+    }
+    state = AsyncData(
+      current.copyWith(appBackgroundFileName: null, appBackgroundPath: null),
+    );
+    try {
+      await ref
+          .read(appBackgroundImageServiceProvider)
+          .delete(current.appBackgroundFileName);
+    } catch (error) {
+      debugPrint('Could not remove old app background: $error');
+    }
+  }
+
+  Future<void> _queueAppBackgroundWrite(Future<void> Function() operation) {
+    final write = _appBackgroundWriteTail
+        .catchError((_) {})
+        .then((_) => operation());
+    _appBackgroundWriteTail = write.catchError((_) {});
+    return write;
+  }
+
+  Future<void> setPlayerStyle(PlayerStyle style) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_playerStyleKey, style.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(playerStyle: style));
+  }
+
+  Future<void> setPlayerFont(PlayerFont font) async {
+    final current = state.asData?.value ?? await future;
+    if (current.playerFont == font) return;
+    state = AsyncData(current.copyWith(playerFont: font));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_playerFontKey, font.code);
+  }
+
+  Future<void> setShowAudioQuality(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.showAudioQuality == enabled) return;
+    state = AsyncData(current.copyWith(showAudioQuality: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_showAudioQualityKey, enabled);
+  }
+
+  Future<void> setJioSaavnEnabled(bool enabled) async {
+    final loaded = state.asData?.value ?? await future;
+    final current = state.asData?.value ?? loaded;
+    if (current.jioSaavnEnabled == enabled) return;
+    state = AsyncData(current.copyWith(jioSaavnEnabled: enabled));
+    await _persistAudioSourceSetting(
+      (prefs) => prefs.setBool(_jioSaavnEnabledKey, enabled),
+    );
+  }
+
+  Future<void> setWifiAudioQuality(AudioQualityProfile profile) async {
+    final loaded = state.asData?.value ?? await future;
+    final current = state.asData?.value ?? loaded;
+    if (current.wifiAudioQuality == profile) return;
+    state = AsyncData(current.copyWith(wifiAudioQuality: profile));
+    await _persistAudioSourceSetting(
+      (prefs) => prefs.setString(_wifiAudioQualityKey, profile.name),
+    );
+  }
+
+  Future<void> setMobileAudioQuality(AudioQualityProfile profile) async {
+    final loaded = state.asData?.value ?? await future;
+    final current = state.asData?.value ?? loaded;
+    if (current.mobileAudioQuality == profile) return;
+    state = AsyncData(current.copyWith(mobileAudioQuality: profile));
+    await _persistAudioSourceSetting(
+      (prefs) => prefs.setString(_mobileAudioQualityKey, profile.name),
+    );
+  }
+
+  Future<void> _persistAudioSourceSetting(
+    Future<bool> Function(SharedPreferences prefs) persist,
+  ) async {
+    final write = _audioSourceSettingsWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await persist(prefs);
+    });
+    _audioSourceSettingsWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setLiveWidgetStyle(LiveWidgetStyle style) async {
+    final current = state.asData?.value ?? await future;
+    if (current.liveWidgetStyle == style) return;
+    state = AsyncData(current.copyWith(liveWidgetStyle: style));
+    final write = _liveWidgetStyleWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_liveWidgetStyleKey, style.code);
+    });
+    _liveWidgetStyleWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setAnimatedArtworkEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.animatedArtworkEnabled == enabled) {
+      return;
+    }
+    state = AsyncData(current.copyWith(animatedArtworkEnabled: enabled));
+    final write = _animatedArtworkWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_animatedArtworkEnabledKey, enabled);
+    });
+    _animatedArtworkWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setPlayerArtworkStyle(PlayerArtworkStyle style) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_playerArtworkStyleKey, style.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(playerArtworkStyle: style));
+  }
+
+  Future<void> setSpotifyCanvasEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.spotifyCanvasEnabled == enabled &&
+        (!enabled || !current.appleAnimatedArtworkEnabled)) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(
+        spotifyCanvasEnabled: enabled,
+        appleAnimatedArtworkEnabled: enabled
+            ? false
+            : current.appleAnimatedArtworkEnabled,
+      ),
+    );
+    final write = _remoteArtworkWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_spotifyCanvasEnabledKey, enabled);
+      if (enabled) await prefs.setBool(_appleAnimatedArtworkEnabledKey, false);
+    });
+    _remoteArtworkWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setAppleAnimatedArtworkEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.appleAnimatedArtworkEnabled == enabled &&
+        (!enabled || !current.spotifyCanvasEnabled)) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(
+        appleAnimatedArtworkEnabled: enabled,
+        spotifyCanvasEnabled: enabled ? false : current.spotifyCanvasEnabled,
+      ),
+    );
+    final write = _remoteArtworkWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_appleAnimatedArtworkEnabledKey, enabled);
+      if (enabled) await prefs.setBool(_spotifyCanvasEnabledKey, false);
+    });
+    _remoteArtworkWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setMiniPlayerMode(MiniPlayerMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_miniPlayerModeKey, mode.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(miniPlayerMode: mode));
+  }
+
+  Future<void> setMiniPlayerBackgroundMode(
+    MiniPlayerBackgroundMode mode,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_miniPlayerBackgroundModeKey, mode.code);
+    final current = await future;
+    state = AsyncData(current.copyWith(miniPlayerBackgroundMode: mode));
+  }
+
+  Future<void> setEnabledLyricsProviders(Set<LyricsProvider> providers) async {
+    final selected = Set<LyricsProvider>.unmodifiable(providers);
+    final loaded = state.asData?.value ?? await future;
+    // Re-read after startup: other pending toggles may already have updated
+    // the state while this invocation was waiting for preferences to load.
+    final current = state.asData?.value ?? loaded;
+    if (current.enabledLyricsProviders.length == selected.length &&
+        current.enabledLyricsProviders.containsAll(selected)) {
+      return;
+    }
+    state = AsyncData(current.copyWith(enabledLyricsProviders: selected));
+    final write = _enabledLyricsProvidersWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_enabledLyricsProvidersKey, [
+        for (final provider in LyricsProvider.values)
+          if (selected.contains(provider)) provider.code,
+      ]);
+    });
+    _enabledLyricsProvidersWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> toggleLyricsProvider(
+    LyricsProvider provider,
+    bool enabled,
+  ) async {
+    final loaded = state.asData?.value ?? await future;
+    final current = state.asData?.value ?? loaded;
+    final selected = current.enabledLyricsProviders.toSet();
+    if (enabled) {
+      selected.add(provider);
+    } else {
+      selected.remove(provider);
+    }
+    await setEnabledLyricsProviders(selected);
+  }
+
+  Future<void> setLyricsTextAlignment(
+    LyricsTextAlignment lyricsTextAlignment,
+  ) async {
+    final current = state.asData?.value ?? await future;
+    if (current.lyricsTextAlignment == lyricsTextAlignment) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(lyricsTextAlignment: lyricsTextAlignment),
+    );
+    final write = _lyricsTextAlignmentWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lyricsTextAlignmentKey, lyricsTextAlignment.code);
+    });
+    _lyricsTextAlignmentWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> toggleLyricsTextAlignment() async {
+    final current = state.asData?.value ?? await future;
+    final next = current.lyricsTextAlignment == LyricsTextAlignment.centered
+        ? LyricsTextAlignment.normal
+        : LyricsTextAlignment.centered;
+    await setLyricsTextAlignment(next);
+  }
+
+  Future<void> setLyricsAnimationStyle(
+    LyricsAnimationStyle lyricsAnimationStyle,
+  ) async {
+    final current = state.asData?.value ?? await future;
+    if (current.lyricsAnimationStyle == lyricsAnimationStyle) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(lyricsAnimationStyle: lyricsAnimationStyle),
+    );
+    final write = _lyricsAnimationStyleWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(
+        _lyricsAnimationStyleKey,
+        lyricsAnimationStyle.code,
+      );
+    });
+    _lyricsAnimationStyleWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setLyricsRomanizationEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.lyricsRomanizationEnabled == enabled &&
+        (!enabled || !current.lyricsTranslationEnabled)) {
+      return;
+    }
+    await _setLyricsModes(
+      current.copyWith(
+        lyricsRomanizationEnabled: enabled,
+        lyricsTranslationEnabled: enabled
+            ? false
+            : current.lyricsTranslationEnabled,
+      ),
+    );
+  }
+
+  Future<void> setLyricsTranslationEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.lyricsTranslationEnabled == enabled &&
+        (!enabled || !current.lyricsRomanizationEnabled)) {
+      return;
+    }
+    await _setLyricsModes(
+      current.copyWith(
+        lyricsTranslationEnabled: enabled,
+        lyricsRomanizationEnabled: enabled
+            ? false
+            : current.lyricsRomanizationEnabled,
+      ),
+    );
+  }
+
+  Future<void> _setLyricsModes(SettingsState next) async {
+    state = AsyncData(next);
+    final write = _lyricsRomanizationWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(
+        _lyricsRomanizationEnabledKey,
+        next.lyricsRomanizationEnabled,
+      );
+      await prefs.setBool(
+        _lyricsTranslationEnabledKey,
+        next.lyricsTranslationEnabled,
+      );
+    });
+    _lyricsRomanizationWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setLyricsRomanizationLanguages(
+    Set<LyricsRomanizationLanguage> languages,
+  ) async {
+    if (languages.isEmpty) {
+      return;
+    }
+    final selected = Set<LyricsRomanizationLanguage>.unmodifiable(languages);
+    final current = state.asData?.value ?? await future;
+    if (current.lyricsRomanizationLanguages.length == selected.length &&
+        current.lyricsRomanizationLanguages.containsAll(selected)) {
+      return;
+    }
+    state = AsyncData(current.copyWith(lyricsRomanizationLanguages: selected));
+    final write = _lyricsRomanizationWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_lyricsRomanizationLanguagesKey, [
+        for (final language in LyricsRomanizationLanguage.values)
+          if (selected.contains(language)) language.code,
+      ]);
+    });
+    _lyricsRomanizationWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> toggleLyricsRomanizationLanguage(
+    LyricsRomanizationLanguage language,
+  ) async {
+    final current = state.asData?.value ?? await future;
+    final selected = current.lyricsRomanizationLanguages.toSet();
+    if (!selected.add(language) && selected.length > 1) {
+      selected.remove(language);
+    }
+    await setLyricsRomanizationLanguages(selected);
+  }
+
+  Future<void> setRecommendationHistoryEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.recommendationHistoryEnabled == enabled) {
+      return;
+    }
+    state = AsyncData(current.copyWith(recommendationHistoryEnabled: enabled));
+    final write = _recommendationHistoryWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_recommendationHistoryEnabledKey, enabled);
+    });
+    _recommendationHistoryWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> clearRecommendationHistory() async {
+    final player = ref.read(playerControllerProvider.notifier);
+    final database = ref.read(databaseServiceProvider);
+    final coordinator = ref.read(libraryOperationCoordinatorProvider);
+    await coordinator.runWithGate(() async {
+      await player.resetRecommendationHistoryTracking();
+      await database.clearRecommendationHistory();
+    });
+    ref
+      ..invalidate(historyProvider)
+      // Drop the in-memory artist-release cache together with SQLite data.
+      // A later qualifying listen creates a completely fresh engine.
+      ..invalidate(personalizedHomeFeedSourceProvider)
+      ..invalidate(homeRecommendationsProvider);
+  }
+
+  Future<void> setLocalMusicFilters(Set<LocalMusicFilter> filters) async {
+    final selected = Set<LocalMusicFilter>.unmodifiable(filters);
+    final current = state.asData?.value ?? await future;
+    if (current.localMusicFilters.length == selected.length &&
+        current.localMusicFilters.containsAll(selected)) {
+      return;
+    }
+    state = AsyncData(current.copyWith(localMusicFilters: selected));
+    final write = _localMusicFiltersWriteTail.catchError((_) {}).then((
+      _,
+    ) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_localMusicFiltersKey, [
+        for (final filter in LocalMusicFilter.values)
+          if (selected.contains(filter)) filter.code,
+      ]);
+    });
+    _localMusicFiltersWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> toggleLocalMusicFilter(LocalMusicFilter filter) async {
+    final current = state.asData?.value ?? await future;
+    final selected = current.localMusicFilters.toSet();
+    if (!selected.add(filter)) {
+      selected.remove(filter);
+    }
+    await setLocalMusicFilters(selected);
+  }
+
+  Future<void> setCrossfadeEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.crossfadeEnabled == enabled) {
+      return;
+    }
+    state = AsyncData(current.copyWith(crossfadeEnabled: enabled));
+    final write = _crossfadeWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_crossfadeEnabledKey, enabled);
+    });
+    _crossfadeWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setCrossfadeDuration(Duration duration) async {
+    if (!supportedCrossfadeDurations.contains(duration)) {
+      throw ArgumentError.value(
+        duration,
+        'duration',
+        'Crossfade must be a whole number of seconds from 1 through 15.',
+      );
+    }
+    final current = state.asData?.value ?? await future;
+    if (current.crossfadeDuration == duration) {
+      return;
+    }
+    state = AsyncData(current.copyWith(crossfadeDuration: duration));
+    final write = _crossfadeWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_crossfadeSecondsKey, duration.inSeconds);
+    });
+    _crossfadeWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setSkipSilenceEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.skipSilenceEnabled == enabled) {
+      return;
+    }
+    state = AsyncData(current.copyWith(skipSilenceEnabled: enabled));
+    final write = _skipSilenceWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_skipSilenceEnabledKey, enabled);
+    });
+    _skipSilenceWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<File> createBackupFile() async {
+    final current = await future;
+    final player = ref.read(playerControllerProvider.notifier);
+    await player.suspendRecommendationHistoryTracking();
+    try {
+      return await ref
+          .read(backupServiceProvider)
+          .createBackupFile(mediaRoot: current.downloadDirectory);
+    } finally {
+      await player.resumeRecommendationHistoryTracking();
+    }
+  }
+
+  Future<void> restoreBackupFile(String backupPath) async {
+    final current = await future;
+    final player = ref.read(playerControllerProvider.notifier);
+    final database = ref.read(databaseServiceProvider);
+    await player.suspendRecommendationHistoryTracking();
+    database.advanceRecommendationGeneration();
+    try {
+      await ref
+          .read(backupServiceProvider)
+          .restoreBackupFile(
+            backupPath: backupPath,
+            mediaRoot: current.downloadDirectory,
+          );
+    } finally {
+      // The restore operation advances the epoch while it still owns the
+      // maintenance barrier. Advance it once more before rebuilding providers
+      // so work from the previous source can never publish into the restored
+      // database during the hand-off.
+      database.advanceRecommendationGeneration();
+      await player.resumeRecommendationHistoryTracking();
+      ref
+        ..invalidate(libraryTracksProvider)
+        ..invalidate(historyProvider)
+        ..invalidate(playlistsControllerProvider)
+        ..invalidate(personalizedHomeFeedSourceProvider)
+        ..invalidate(homeRecommendationsProvider);
+    }
+  }
+
+  Future<String> _defaultDownloadDirectory() async {
+    if (_platform == AppPlatformType.android) {
+      final appRoot = await _androidAppDataRootDirectory();
+      return p.join(appRoot.path, _mediaRootDirectoryName);
+    }
+
+    if (_platform == AppPlatformType.ios) {
+      // NSDownloadsDirectory is not an application-owned writable location on
+      // iOS. In particular, re-signed/sideloaded builds can receive a path such
+      // as `<container>/Downloads` even though the sandbox only grants the app
+      // access to its standard Documents/Library/tmp directories. Selecting
+      // that value bricks Settings and every provider awaiting Settings before
+      // the first download even starts. Documents is stable, private to the
+      // current container, and is also the root expected by our iOS path-rebase
+      // migration when the container UUID changes after an update or restore.
+      final documents = await getApplicationDocumentsDirectory();
+      return p.join(documents.path, _mediaRootDirectoryName);
+    }
+
+    try {
+      final downloads = await getDownloadsDirectory();
+      if (downloads != null) {
+        return p.join(downloads.path, _mediaRootDirectoryName);
+      }
+    } catch (_) {
+      // Some platforms do not expose a downloads directory through path_provider.
+    }
+    final documents = await getApplicationDocumentsDirectory();
+    return p.join(documents.path, _mediaRootDirectoryName);
+  }
+
+  Future<bool> _isAndroidWritableDownloadDirectory(String path) async {
+    if (_platform != AppPlatformType.android || path.trim().isEmpty) {
+      return path.trim().isNotEmpty;
+    }
+
+    final appRoot = await _androidAppDataRootDirectory();
+    final normalizedBase = appRoot.absolute.path;
+    final normalizedPath = Directory(path).absolute.path;
+    return normalizedPath == normalizedBase ||
+        normalizedPath.startsWith('$normalizedBase${Platform.pathSeparator}');
+  }
+
+  Future<bool> _isUnreachableIosMigrationJournal(
+    DownloadDirectoryMigrationJournal journal,
+  ) async {
+    final roots = <String>{
+      journal.sourceRoot,
+      journal.targetRoot,
+      journal.referenceSourceRoot,
+    };
+    for (final root in roots) {
+      try {
+        if (await FileSystemEntity.type(root, followLinks: false) !=
+            FileSystemEntityType.notFound) {
+          return false;
+        }
+      } on FileSystemException {
+        // An old iOS container is outside the current sandbox and may report
+        // either "not found" or a permission failure depending on OS version.
+      }
+    }
+    return true;
+  }
+
+  Future<Directory> _androidAppDataRootDirectory() async {
+    final documents = await getApplicationDocumentsDirectory();
+    final directory = Directory(documents.path);
+    if (p.basename(directory.path) == 'app_flutter') {
+      return directory.parent;
+    }
+    return directory;
+  }
+
+  String _migrateLegacyDownloadDirectory(
+    String path, {
+    required String defaultDirectory,
+  }) {
+    if (path.isEmpty) {
+      return path;
+    }
+
+    var normalized = path;
+    if (p.basename(normalized) == 'BStream') {
+      normalized = p.join(p.dirname(normalized), _mediaRootDirectoryName);
+    }
+
+    if (_platform == AppPlatformType.android &&
+        p.basename(normalized) == _mediaRootDirectoryName &&
+        p.basename(p.dirname(normalized)) == 'app_flutter') {
+      final appRootCandidate = p.dirname(p.dirname(normalized));
+      final defaultParent = p.dirname(defaultDirectory);
+      if (appRootCandidate == defaultParent) {
+        return defaultDirectory;
+      }
+      return p.join(appRootCandidate, _mediaRootDirectoryName);
+    }
+
+    return normalized;
+  }
+
+  Future<void> _ensureMediaDirectories(String rootPath) async {
+    if (rootPath.trim().isEmpty) {
+      return;
+    }
+    await Directory(p.join(rootPath, 'audio')).create(recursive: true);
+    await Directory(p.join(rootPath, 'thumbnails')).create(recursive: true);
+  }
+}

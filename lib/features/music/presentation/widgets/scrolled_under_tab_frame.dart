@@ -1,0 +1,353 @@
+import 'dart:ui';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart'
+    show ScrollCacheExtent, ScrollDirection, SliverPaintOrder;
+
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_ui.dart';
+import '../../../../core/widgets/liquid_glass_surface.dart';
+import 'surface_detail_app_bar.dart';
+
+/// Pinned title bars need a little more optical depth than floating pills so
+/// text stays legible while rows and artwork move directly behind them.
+const tabHeaderLiquidGlassIntensity = 1.2;
+
+/// Hosts a tab's slivers in one scroll view and pins its dynamic header above
+/// them. Keeping both in the same viewport lets content genuinely paint behind
+/// translucent headers without predicting their text-scaled height.
+class ScrolledUnderTabFrame extends StatefulWidget {
+  const ScrolledUnderTabFrame({
+    required this.header,
+    required this.slivers,
+    this.surfaceKey,
+    this.pinnedFooter,
+    this.pinnedFooterSurfaceKey,
+    this.pinnedFooterHasOwnSurface = false,
+    this.hidePinnedFooterOnScroll = false,
+    this.scrollKey,
+    this.scrollCacheExtent,
+    this.headerTransitionKey,
+    this.headerTransitionDuration = Duration.zero,
+    this.headerHorizontalPadding = appTabTitleHorizontalPadding,
+    super.key,
+  });
+
+  final Widget? header;
+  final List<Widget> slivers;
+  final Key? surfaceKey;
+  final Widget? pinnedFooter;
+  final Key? pinnedFooterSurfaceKey;
+
+  /// A rounded input can supply its own fill and backdrop instead of painting
+  /// another full-width surface underneath it.
+  final bool pinnedFooterHasOwnSurface;
+  final bool hidePinnedFooterOnScroll;
+  final Key? scrollKey;
+  final ScrollCacheExtent? scrollCacheExtent;
+  final Key? headerTransitionKey;
+  final Duration headerTransitionDuration;
+  final double headerHorizontalPadding;
+
+  @override
+  State<ScrolledUnderTabFrame> createState() => _ScrolledUnderTabFrameState();
+}
+
+class _ScrolledUnderTabFrameState extends State<ScrolledUnderTabFrame> {
+  bool _scrolledUnder = false;
+  bool _footerVisible = true;
+  final GlassScrollMotionNotifier _glassScrollMotion =
+      GlassScrollMotionNotifier();
+
+  @override
+  void dispose() {
+    _glassScrollMotion.dispose();
+    super.dispose();
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    _glassScrollMotion.handleNotification(notification);
+    if (widget.hidePinnedFooterOnScroll &&
+        notification.depth == 0 &&
+        notification.metrics.axis == Axis.vertical &&
+        notification is UserScrollNotification &&
+        notification.direction != ScrollDirection.idle) {
+      _setFooterVisible(notification.direction == ScrollDirection.forward);
+    }
+    if (notification.depth == 0 && notification is ScrollUpdateNotification) {
+      _updateFromMetrics(notification.metrics);
+    }
+    return false;
+  }
+
+  bool _handleMetricsNotification(ScrollMetricsNotification notification) {
+    if (notification.depth == 0) {
+      _updateFromMetrics(notification.metrics);
+    }
+    return false;
+  }
+
+  void _updateFromMetrics(ScrollMetrics metrics) {
+    if (widget.hidePinnedFooterOnScroll && metrics.extentBefore <= 0) {
+      _setFooterVisible(true);
+    }
+    final next = switch (metrics.axisDirection) {
+      AxisDirection.down => metrics.extentBefore > 0,
+      AxisDirection.up => metrics.extentAfter > 0,
+      AxisDirection.left || AxisDirection.right => _scrolledUnder,
+    };
+    if (next == _scrolledUnder || !mounted) return;
+    setState(() => _scrolledUnder = next);
+  }
+
+  void _setFooterVisible(bool visible) {
+    if (!mounted || _footerVisible == visible) return;
+    setState(() => _footerVisible = visible);
+  }
+
+  Widget _buildHeaderSurface(
+    BuildContext context,
+    Widget header, {
+    required Duration animationDuration,
+  }) {
+    final mode = AppColors.surfaceBackgroundModeFor(context);
+    final liquidGlass = mode.isLiquidGlass;
+    final surface = Material(
+      key: widget.surfaceKey,
+      color: AppColors.tabHeaderSurfaceFor(
+        context,
+        scrolledUnder: _scrolledUnder,
+      ),
+      elevation: liquidGlass ? 0 : (_scrolledUnder ? 1 : 0),
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      animationDuration: animationDuration,
+      child: DecoratedBox(
+        key: const ValueKey('tab-header-accent-gradient'),
+        decoration: BoxDecoration(
+          gradient: liquidGlass
+              ? null
+              : AppColors.glassAccentGradientFor(
+                  context,
+                  intensity: _scrolledUnder ? 1 : 0.76,
+                ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: widget.headerHorizontalPadding,
+            vertical: appTabTitleVerticalPadding,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Align(alignment: Alignment.centerLeft, child: header),
+          ),
+        ),
+      ),
+    );
+    if (!mode.usesBackdrop) {
+      return surface;
+    }
+    if (mode.isLiquidGlass) {
+      return ValueListenableBuilder<bool>(
+        valueListenable: _glassScrollMotion,
+        child: surface,
+        builder: (context, moving, child) => LiquidGlassSurface(
+          key: const ValueKey('tab-header-liquid-glass'),
+          borderRadius: BorderRadius.zero,
+          blurSigma: 8,
+          intensity: tabHeaderLiquidGlassIntensity,
+          edgeTreatment: LiquidGlassEdgeTreatment.bottom,
+          backdropMotion: moving,
+          child: child!,
+        ),
+      );
+    }
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: surface,
+      ),
+    );
+  }
+
+  Widget _buildPinnedFooterSurface(
+    BuildContext context,
+    Widget footer, {
+    required Duration animationDuration,
+  }) {
+    if (widget.pinnedFooterHasOwnSurface) {
+      return Material(
+        key: widget.pinnedFooterSurfaceKey,
+        color: Colors.transparent,
+        child: footer,
+      );
+    }
+    final mode = AppColors.surfaceBackgroundModeFor(context);
+    final liquidGlass = mode.isLiquidGlass;
+    final surface = Material(
+      key: widget.pinnedFooterSurfaceKey,
+      color: liquidGlass
+          ? Theme.of(context).colorScheme.surface
+          : AppColors.tabHeaderSurfaceFor(
+              context,
+              scrolledUnder: _scrolledUnder,
+            ),
+      elevation: liquidGlass ? 0 : (_scrolledUnder ? 1 : 0),
+      shadowColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      animationDuration: animationDuration,
+      child: DecoratedBox(
+        key: const ValueKey('tab-pinned-footer-accent-gradient'),
+        decoration: BoxDecoration(
+          gradient: liquidGlass
+              ? null
+              : AppColors.glassAccentGradientFor(
+                  context,
+                  intensity: _scrolledUnder ? 1 : 0.76,
+                ),
+        ),
+        child: footer,
+      ),
+    );
+    if (!mode.usesBackdrop) {
+      return surface;
+    }
+    if (mode.isLiquidGlass) {
+      return surface;
+    }
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+        child: surface,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final animationDuration = disableAnimations
+        ? Duration.zero
+        : kThemeChangeDuration;
+    final headerTransitionDuration = disableAnimations
+        ? Duration.zero
+        : widget.headerTransitionDuration;
+    final header = switch (widget.header) {
+      final header? => _buildHeaderSurface(
+        context,
+        header,
+        animationDuration: animationDuration,
+      ),
+      null => const SizedBox.shrink(
+        key: ValueKey('scrolled-under-tab-hidden-header'),
+      ),
+    };
+    final footerSurface = switch (widget.pinnedFooter) {
+      final footer? => _buildPinnedFooterSurface(
+        context,
+        footer,
+        animationDuration: animationDuration,
+      ),
+      null => null,
+    };
+    final pinnedFooter = footerSurface == null
+        ? null
+        : !widget.hidePinnedFooterOnScroll
+        ? footerSurface
+        : ClipRect(
+            child: AnimatedSize(
+              key: const ValueKey('tab-floating-footer'),
+              duration: disableAnimations
+                  ? Duration.zero
+                  : const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: Align(
+                alignment: Alignment.topCenter,
+                heightFactor: _footerVisible ? 1 : 0,
+                child: IgnorePointer(
+                  ignoring: !_footerVisible,
+                  child: ExcludeSemantics(
+                    excluding: !_footerVisible,
+                    child: footerSurface,
+                  ),
+                ),
+              ),
+            ),
+          );
+
+    final hasHeaderTransition =
+        widget.headerTransitionKey != null ||
+        widget.headerTransitionDuration != Duration.zero;
+    final transitioningHeader = hasHeaderTransition
+        ? ConstrainedBox(
+            // A transitioning pinned sliver needs a positive extent even when
+            // hidden. Otherwise the viewport may lazily unmount it and defer
+            // an incoming header by a frame when the extent becomes non-zero.
+            constraints: const BoxConstraints(minHeight: 0.001),
+            child: ClipRect(
+              child: AnimatedSwitcher(
+                key: widget.headerTransitionKey,
+                duration: headerTransitionDuration,
+                reverseDuration: headerTransitionDuration,
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                layoutBuilder: (currentChild, previousChildren) => Stack(
+                  alignment: Alignment.topCenter,
+                  children: <Widget>[...previousChildren, ?currentChild],
+                ),
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SizeTransition(
+                    sizeFactor: animation,
+                    alignment: AlignmentDirectional.topStart,
+                    child: child,
+                  ),
+                ),
+                child: header,
+              ),
+            ),
+          )
+        : widget.header == null
+        ? null
+        : header;
+    final pinnedHeader = switch ((transitioningHeader, pinnedFooter)) {
+      (final header?, final footer?) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [header, footer],
+      ),
+      (final header?, null) => header,
+      (null, final footer?) => footer,
+      (null, null) => null,
+    };
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppColors.tabBackgroundOverlayFor(context),
+      ),
+      child: NotificationListener<ScrollMetricsNotification>(
+        onNotification: _handleMetricsNotification,
+        child: NotificationListener<ScrollNotification>(
+          onNotification: _handleScrollNotification,
+          child: LiquidGlassMotionScope(
+            motion: _glassScrollMotion,
+            child: CustomScrollView(
+              key: widget.scrollKey,
+              scrollCacheExtent: widget.scrollCacheExtent,
+              keyboardDismissBehavior: widget.hidePinnedFooterOnScroll
+                  ? ScrollViewKeyboardDismissBehavior.onDrag
+                  : ScrollViewKeyboardDismissBehavior.manual,
+              // The first sliver paints last, keeping pinned chrome above rows.
+              paintOrder: SliverPaintOrder.firstIsTop,
+              slivers: [
+                if (pinnedHeader != null)
+                  PinnedHeaderSliver(child: pinnedHeader),
+                ...widget.slivers,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

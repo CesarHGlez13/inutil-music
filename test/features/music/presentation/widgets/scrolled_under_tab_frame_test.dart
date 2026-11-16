@@ -1,0 +1,670 @@
+import 'package:bstream_music/core/theme/app_colors.dart';
+import 'package:bstream_music/core/theme/app_theme.dart';
+import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
+import 'package:bstream_music/features/music/presentation/widgets/scrolled_under_tab_frame.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+void main() {
+  for (final platform in [
+    TargetPlatform.android,
+    TargetPlatform.iOS,
+    TargetPlatform.windows,
+  ]) {
+    testWidgets('native overscroll keeps $platform physics and full glass', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        _FrameHarness(
+          platform: platform,
+          surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
+        ),
+      );
+      final scrollFinder = find.byKey(const ValueKey('test-tab-scroll'));
+      final scroll = tester.widget<CustomScrollView>(scrollFinder);
+      final context = tester.element(scrollFinder);
+      final behavior = scroll.scrollBehavior ?? ScrollConfiguration.of(context);
+      expect(scroll.scrollBehavior, isNull);
+      expect(
+        find.byType(StretchingOverscrollIndicator),
+        platform == TargetPlatform.android ? findsOneWidget : findsNothing,
+      );
+      expect(
+        behavior.getScrollPhysics(context),
+        platform == TargetPlatform.iOS
+            ? isA<BouncingScrollPhysics>()
+            : isA<ClampingScrollPhysics>(),
+      );
+      final glass = tester.widget<LiquidGlassSurface>(
+        find.byKey(const ValueKey('tab-header-liquid-glass')),
+      );
+      expect(glass.blurSigma, 8);
+      expect(glass.intensity, tabHeaderLiquidGlassIntensity);
+      expect(glass.adaptiveEdgeEnabled, isTrue);
+      expect(glass.perimeterOpticsEnabled, isTrue);
+      expect(glass.edgeTreatment, LiquidGlassEdgeTreatment.bottom);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'filter hides downwards and reappears below the pinned title upwards',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await tester.pumpWidget(
+        const _FrameHarness(
+          showPinnedFooter: true,
+          hidePinnedFooterOnScroll: true,
+        ),
+      );
+      final header = find.byKey(const ValueKey('test-tab-header-surface'));
+      final footer = find.byKey(const ValueKey('tab-floating-footer'));
+      final initialHeader = tester.getRect(header);
+      expect(tester.getSize(footer).height, 54);
+      await tester.drag(
+        find.byKey(const ValueKey('test-tab-scroll')),
+        const Offset(0, -320),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(footer).height, 0);
+      expect(tester.getRect(header), initialHeader);
+      expect(find.text('Filtro').hitTestable(), findsNothing);
+      await tester.drag(
+        find.byKey(const ValueKey('test-tab-scroll')),
+        const Offset(0, 70),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(footer).height, 54);
+      expect(tester.getRect(header), initialHeader);
+      expect(tester.getRect(footer).top, closeTo(initialHeader.bottom, 0.1));
+      expect(find.text('Filtro').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'uses a translucent neutral scrolled-under surface and returns to top',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(const _FrameHarness());
+
+      final surfaceFinder = find.byKey(
+        const ValueKey('test-tab-header-surface'),
+      );
+      final titleFinder = find.byKey(const ValueKey('test-tab-title'));
+      Material surface() => tester.widget<Material>(surfaceFinder);
+
+      final initialTitleRect = tester.getRect(titleFinder);
+      expect(
+        surface().color,
+        AppColors.tabHeaderSurfaceFor(
+          tester.element(surfaceFinder),
+          scrolledUnder: false,
+        ),
+      );
+      expect(surface().elevation, 0);
+      expect(surface().surfaceTintColor, Colors.transparent);
+      expect(surface().shape, isNull);
+      expect(tester.getSize(surfaceFinder).height, 64);
+      expect(find.byType(PinnedHeaderSliver), findsOneWidget);
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('test-item-0'))).dy,
+        closeTo(tester.getBottomLeft(surfaceFinder).dy, 0.01),
+      );
+
+      await tester.drag(
+        find.byKey(const ValueKey('test-tab-scroll')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        surface().color,
+        AppColors.tabHeaderSurfaceFor(
+          tester.element(surfaceFinder),
+          scrolledUnder: true,
+        ),
+      );
+      expect(surface().elevation, 1);
+      expect(surface().surfaceTintColor, Colors.transparent);
+      expect(surface().shape, isNull);
+      expect(tester.getRect(titleFinder), initialTitleRect);
+      final overlappingItem = tester.getRect(
+        find.byKey(const ValueKey('test-item-6')),
+      );
+      final pinnedHeader = tester.getRect(surfaceFinder);
+      expect(overlappingItem.top, lessThan(pinnedHeader.bottom));
+      expect(overlappingItem.bottom, greaterThan(pinnedHeader.top));
+
+      tester.state<ScrollableState>(find.byType(Scrollable)).position.jumpTo(0);
+      await tester.pumpAndSettle();
+
+      expect(
+        surface().color,
+        AppColors.tabHeaderSurfaceFor(
+          tester.element(surfaceFinder),
+          scrolledUnder: false,
+        ),
+      );
+      expect(surface().elevation, 0);
+      expect(surface().surfaceTintColor, Colors.transparent);
+      expect(tester.getRect(titleFinder), initialTitleRect);
+    },
+  );
+
+  testWidgets('transparent surface uses real glass with a translucent tint', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const _FrameHarness(
+        surfaceBackgroundMode: SurfaceBackgroundMode.transparent,
+      ),
+    );
+
+    final surfaceFinder = find.byKey(const ValueKey('test-tab-header-surface'));
+    final surface = tester.widget<Material>(surfaceFinder);
+    final glass = find.ancestor(
+      of: surfaceFinder,
+      matching: find.byType(BackdropFilter),
+    );
+    final accentGradient = tester.widget<DecoratedBox>(
+      find.byKey(const ValueKey('tab-header-accent-gradient')),
+    );
+
+    expect(glass, findsOneWidget);
+    expect(surface.color?.a, greaterThan(0.3));
+    expect(surface.color?.a, lessThan(0.5));
+    expect(
+      (accentGradient.decoration as BoxDecoration).gradient,
+      isA<LinearGradient>(),
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('test-tab-scroll')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    final headerRect = tester.getRect(surfaceFinder);
+    final itemRect = tester.getRect(find.byKey(const ValueKey('test-item-6')));
+    expect(itemRect.top, lessThan(headerRect.bottom));
+    expect(itemRect.bottom, greaterThan(headerRect.top));
+  });
+
+  testWidgets('liquid glass layers the title and keeps its footer tonal', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      const _FrameHarness(
+        showPinnedFooter: true,
+        surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
+      ),
+    );
+
+    final headerSurface = find.byKey(const ValueKey('test-tab-header-surface'));
+    final footerSurface = find.byKey(
+      const ValueKey('test-pinned-footer-surface'),
+    );
+    final headerMaterial = tester.widget<Material>(headerSurface);
+    final footerMaterial = tester.widget<Material>(footerSurface);
+    final tonalSurface = Theme.of(
+      tester.element(headerSurface),
+    ).colorScheme.surface;
+    final glassFinder = find.byKey(const ValueKey('tab-header-liquid-glass'));
+    final headerGlass = tester.widget<LiquidGlassSurface>(glassFinder);
+
+    expect(
+      find.byKey(const ValueKey('tab-combined-liquid-glass')),
+      findsNothing,
+    );
+    expect(glassFinder, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('tab-pinned-footer-liquid-glass')),
+      findsNothing,
+    );
+    expect(find.byType(LiquidGlassSurface), findsOneWidget);
+    expect(
+      find.ancestor(
+        of: footerSurface,
+        matching: find.byType(LiquidGlassSurface),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.backdropKey),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.surfaceTintKey),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.opticsKey),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.shadowKey),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.adaptiveEdgeKey),
+      ),
+      findsNothing,
+    );
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(
+      headerMaterial.color,
+      AppColors.tabHeaderSurfaceFor(
+        tester.element(headerSurface),
+        scrolledUnder: false,
+      ),
+    );
+    expect(footerMaterial.color, tonalSurface);
+    expect(headerMaterial.color?.a, greaterThan(0));
+    expect(headerMaterial.color?.a, lessThan(0.2));
+    expect(footerMaterial.color?.a, 1);
+    expect(headerMaterial.elevation, 0);
+    expect(footerMaterial.elevation, 0);
+    expect(headerMaterial.surfaceTintColor, Colors.transparent);
+    expect(footerMaterial.surfaceTintColor, Colors.transparent);
+    expect(tester.getSize(headerSurface).height, 64);
+    expect(tester.getSize(footerSurface).height, 54);
+    expect(headerGlass.blurSigma, 8);
+    expect(headerGlass.intensity, tabHeaderLiquidGlassIntensity);
+    expect(headerGlass.borderRadius, BorderRadius.zero);
+    expect(headerGlass.edgeTreatment, LiquidGlassEdgeTreatment.bottom);
+    expect(
+      (tester
+                  .widget<DecoratedBox>(
+                    find.byKey(const ValueKey('tab-header-accent-gradient')),
+                  )
+                  .decoration
+              as BoxDecoration)
+          .gradient,
+      isNull,
+      reason: 'Liquid Glass supplies the title bar layers without a gradient.',
+    );
+    expect(
+      (tester
+                  .widget<DecoratedBox>(
+                    find.byKey(
+                      const ValueKey('tab-pinned-footer-accent-gradient'),
+                    ),
+                  )
+                  .decoration
+              as BoxDecoration)
+          .gradient,
+      isNull,
+      reason: 'The pinned footer shares the same solid tonal treatment.',
+    );
+
+    final initialHeaderRect = tester.getRect(headerSurface);
+    final initialFooterRect = tester.getRect(footerSurface);
+    expect(initialFooterRect.top, initialHeaderRect.bottom);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('test-item-0'))).dy,
+      closeTo(initialFooterRect.bottom, 0.01),
+    );
+
+    await tester.drag(
+      find.byKey(const ValueKey('test-tab-scroll')),
+      const Offset(0, -300),
+    );
+    await tester.pumpAndSettle();
+
+    final scrolledHeaderMaterial = tester.widget<Material>(headerSurface);
+    expect(
+      scrolledHeaderMaterial.color,
+      AppColors.tabHeaderSurfaceFor(
+        tester.element(headerSurface),
+        scrolledUnder: true,
+      ),
+    );
+    expect(
+      scrolledHeaderMaterial.color!.a,
+      greaterThan(headerMaterial.color!.a),
+    );
+    expect(scrolledHeaderMaterial.elevation, 0);
+    expect(tester.widget<Material>(footerSurface).elevation, 0);
+    final headerRect = tester.getRect(headerSurface);
+    final footerRect = tester.getRect(footerSurface);
+    final itemRect = tester.getRect(find.byKey(const ValueKey('test-item-6')));
+    expect(headerRect, initialHeaderRect);
+    expect(footerRect, initialFooterRect);
+    expect(footerRect.top, headerRect.bottom);
+    expect(itemRect.top, lessThan(footerRect.bottom));
+    expect(itemRect.bottom, greaterThan(headerRect.top));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('liquid glass layers a lone pinned title without a boxed edge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      const _FrameHarness(
+        surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
+      ),
+    );
+
+    final headerSurface = find.byKey(const ValueKey('test-tab-header-surface'));
+    final headerMaterial = tester.widget<Material>(headerSurface);
+    final glassFinder = find.byKey(const ValueKey('tab-header-liquid-glass'));
+    final headerGlass = tester.widget<LiquidGlassSurface>(glassFinder);
+    final tint =
+        tester
+                .widget<DecoratedBox>(
+                  find.descendant(
+                    of: glassFinder,
+                    matching: find.byKey(LiquidGlassSurface.surfaceTintKey),
+                  ),
+                )
+                .decoration
+            as BoxDecoration;
+    final effectiveAlpha =
+        1 - (1 - tint.color!.a) * (1 - headerMaterial.color!.a);
+
+    expect(glassFinder, findsOneWidget);
+    expect(find.byType(LiquidGlassSurface), findsOneWidget);
+    expect(find.byType(BackdropFilter), findsOneWidget);
+    expect(
+      headerMaterial.color,
+      AppColors.tabHeaderSurfaceFor(
+        tester.element(headerSurface),
+        scrolledUnder: false,
+      ),
+    );
+    expect(headerMaterial.color?.a, greaterThan(0));
+    expect(headerMaterial.color?.a, lessThan(0.2));
+    expect(headerMaterial.elevation, 0);
+    expect(headerMaterial.surfaceTintColor, Colors.transparent);
+    expect(headerGlass.blurSigma, 8);
+    expect(headerGlass.intensity, tabHeaderLiquidGlassIntensity);
+    expect(headerGlass.borderRadius, BorderRadius.zero);
+    expect(headerGlass.edgeTreatment, LiquidGlassEdgeTreatment.bottom);
+    expect(effectiveAlpha, greaterThan(tint.color!.a));
+    expect(effectiveAlpha, lessThan(1));
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.opticsKey),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: glassFinder,
+        matching: find.byKey(LiquidGlassSurface.shadowKey),
+      ),
+      findsNothing,
+    );
+    expect(
+      (tester
+                  .widget<DecoratedBox>(
+                    find.byKey(const ValueKey('tab-header-accent-gradient')),
+                  )
+                  .decoration
+              as BoxDecoration)
+          .gradient,
+      isNull,
+    );
+    expect(tester.getSize(headerSurface).height, 64);
+    expect(
+      tester.getTopLeft(find.byKey(const ValueKey('test-item-0'))).dy,
+      closeTo(tester.getBottomLeft(headerSurface).dy, 0.01),
+    );
+  });
+
+  testWidgets(
+    'liquid title uses motion optics only during vertical scrolling',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+      await tester.pumpWidget(
+        const _FrameHarness(
+          surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
+        ),
+      );
+
+      final glassFinder = find.byKey(const ValueKey('tab-header-liquid-glass'));
+      bool isMoving() =>
+          tester.widget<LiquidGlassSurface>(glassFinder).backdropMotion;
+      expect(isMoving(), isFalse);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const ValueKey('test-tab-scroll'))),
+      );
+      await gesture.moveBy(const Offset(0, -180));
+      await tester.pump();
+      expect(isMoving(), isTrue);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(isMoving(), isFalse);
+    },
+  );
+
+  testWidgets(
+    'pinned footer stays compact and blurs content from the shared scroll',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const _FrameHarness(
+          showPinnedFooter: true,
+          surfaceBackgroundMode: SurfaceBackgroundMode.transparent,
+        ),
+      );
+
+      final header = find.byKey(const ValueKey('test-tab-header-surface'));
+      final footer = find.byKey(const ValueKey('test-pinned-footer-surface'));
+      final initialHeaderRect = tester.getRect(header);
+      final initialFooterRect = tester.getRect(footer);
+
+      expect(initialHeaderRect.height, 64);
+      expect(initialFooterRect.height, 54);
+      expect(initialFooterRect.top, initialHeaderRect.bottom);
+      expect(
+        find.ancestor(of: footer, matching: find.byType(BackdropFilter)),
+        findsOneWidget,
+      );
+      expect(
+        tester.getTopLeft(find.byKey(const ValueKey('test-item-0'))).dy,
+        closeTo(initialFooterRect.bottom, 0.01),
+      );
+
+      await tester.drag(
+        find.byKey(const ValueKey('test-tab-scroll')),
+        const Offset(0, -300),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.getRect(header), initialHeaderRect);
+      expect(tester.getRect(footer), initialFooterRect);
+      final overlappingItem = tester.getRect(
+        find.byKey(const ValueKey('test-item-6')),
+      );
+      expect(overlappingItem.top, lessThan(initialFooterRect.bottom));
+      expect(overlappingItem.bottom, greaterThan(initialHeaderRect.top));
+      expect(tester.widget<Material>(footer).elevation, 1);
+    },
+  );
+
+  testWidgets(
+    'pinned header follows large text height without hiding content',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
+
+      await tester.pumpWidget(
+        const _FrameHarness(textScaler: TextScaler.linear(4)),
+      );
+
+      final surfaceFinder = find.byKey(
+        const ValueKey('test-tab-header-surface'),
+      );
+      final titleFinder = find.byKey(const ValueKey('test-tab-title'));
+      final initialHeader = tester.getRect(surfaceFinder);
+      final initialTitle = tester.getRect(titleFinder);
+      final firstItem = tester.getRect(
+        find.byKey(const ValueKey('test-item-0')),
+      );
+
+      expect(initialHeader.height, greaterThan(64));
+      expect(firstItem.top, closeTo(initialHeader.bottom, 0.01));
+
+      await tester.drag(
+        find.byKey(const ValueKey('test-tab-scroll')),
+        const Offset(0, -360),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        tester.getRect(surfaceFinder).top,
+        closeTo(initialHeader.top, 0.01),
+      );
+      expect(tester.getRect(titleFinder).top, closeTo(initialTitle.top, 0.01));
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'removes the header entirely and disables motion when requested',
+    (tester) async {
+      await tester.pumpWidget(
+        const _FrameHarness(showHeader: false, disableAnimations: true),
+      );
+
+      expect(
+        find.byKey(const ValueKey('test-tab-header-surface')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('test-tab-title')), findsNothing);
+      expect(find.byKey(const ValueKey('test-tab-scroll')), findsOneWidget);
+
+      await tester.pumpWidget(const _FrameHarness(disableAnimations: true));
+
+      expect(
+        tester
+            .widget<Material>(
+              find.byKey(const ValueKey('test-tab-header-surface')),
+            )
+            .animationDuration,
+        Duration.zero,
+      );
+    },
+  );
+}
+
+class _FrameHarness extends StatelessWidget {
+  const _FrameHarness({
+    this.platform,
+    this.showHeader = true,
+    this.disableAnimations = false,
+    this.surfaceBackgroundMode = SurfaceBackgroundMode.accent,
+    this.textScaler = TextScaler.noScaling,
+    this.showPinnedFooter = false,
+    this.hidePinnedFooterOnScroll = false,
+  });
+
+  final bool showHeader;
+  final TargetPlatform? platform;
+  final bool disableAnimations;
+  final SurfaceBackgroundMode surfaceBackgroundMode;
+  final TextScaler textScaler;
+  final bool showPinnedFooter;
+  final bool hidePinnedFooterOnScroll;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      theme: ThemeData(
+        useMaterial3: true,
+        platform: platform,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+        extensions: [AppSurfaceTheme(backgroundMode: surfaceBackgroundMode)],
+      ),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations: disableAnimations,
+          textScaler: textScaler,
+        ),
+        child: child!,
+      ),
+      home: Scaffold(
+        body: ScrolledUnderTabFrame(
+          surfaceKey: const ValueKey('test-tab-header-surface'),
+          pinnedFooterSurfaceKey: const ValueKey('test-pinned-footer-surface'),
+          hidePinnedFooterOnScroll: hidePinnedFooterOnScroll,
+          scrollKey: const ValueKey('test-tab-scroll'),
+          header: showHeader
+              ? const Row(
+                  children: [
+                    Expanded(
+                      child: Text('Pestaña', key: ValueKey('test-tab-title')),
+                    ),
+                  ],
+                )
+              : null,
+          pinnedFooter: showPinnedFooter
+              ? const SizedBox(height: 54, child: Center(child: Text('Filtro')))
+              : null,
+          slivers: [
+            SliverFixedExtentList.builder(
+              itemExtent: 48,
+              itemCount: 40,
+              itemBuilder: (_, index) => SizedBox(
+                key: ValueKey('test-item-$index'),
+                child: Text('Elemento $index'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

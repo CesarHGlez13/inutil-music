@@ -1,0 +1,5054 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollCacheExtent;
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
+
+import '../../../../core/platform/app_platform.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_dialog.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/app_ui.dart';
+import '../../../../core/utils/duration_formatter.dart';
+import '../../../../core/utils/share_position_origin.dart';
+import '../../../../core/widgets/app_shared_widgets.dart';
+import '../../../../core/widgets/marquee_text.dart';
+import '../../../../services/player/player_service.dart';
+import '../../../../services/youtube_music/account/youtube_music_account.dart';
+import '../../domain/entities/catalog_playlist.dart';
+import '../../domain/entities/download_result.dart';
+import '../../domain/entities/local_track.dart';
+import '../../domain/entities/playlist.dart';
+import '../../domain/entities/playlist_entry.dart';
+import '../../domain/entities/track_info.dart';
+import '../providers/local_audio_availability.dart';
+import '../providers/music_providers.dart';
+import '../providers/playback_queue_selection_provider.dart';
+import '../providers/subscribed_artists_controller.dart';
+import '../providers/youtube_music_auth_controller.dart';
+import '../pages/artist_profile_page.dart';
+import 'favorite_star_badge.dart';
+import 'artwork_gradient_header_background.dart';
+import 'gradient_progress_bar.dart';
+import 'glass_popup_menu_button.dart';
+import 'library_subscribed_artists_shelf.dart';
+import 'now_playing_equalizer.dart';
+import 'playlist_artwork.dart';
+import 'playlist_artwork_editor.dart';
+import 'playlist_artwork_mosaic.dart';
+import 'playlist_picker_dialog.dart';
+import 'playlist_track_subtitle.dart';
+import 'scrolled_under_tab_frame.dart';
+import 'source_image.dart';
+import 'track_play_button.dart';
+
+enum _LibraryRouteType { root, downloads, live, playlist }
+
+enum _DownloadsMenuAction { refreshMetadata }
+
+enum _TrackMenuAction {
+  download,
+  renameTrack,
+  addToPlaylist,
+  toggleFavorite,
+  deleteTrack,
+  removeFromPlaylist,
+}
+
+enum _TrackSelectionAction { addToPlaylist, download, remove }
+
+enum _PlaylistMenuAction {
+  searchSongs,
+  downloadAll,
+  cancelDownloads,
+  sharePlaylist,
+  renamePlaylist,
+  deletePlaylist,
+}
+
+enum _PlaylistShareFormat { csv, youtubeMusicUrl }
+
+// Keep overview covers at the same visual size as artwork in downloaded-song
+// and playlist detail rows. The shared card icon token is intentionally
+// smaller and is better suited to settings/action icons than album artwork.
+const double _libraryOverviewArtworkSize = 56;
+const double _libraryArtworkRowMinHeight = 70;
+const EdgeInsets _libraryOverviewContentPadding = EdgeInsets.only(
+  left: 12,
+  right: 4,
+);
+
+class _LibraryRoute {
+  const _LibraryRoute.root() : type = _LibraryRouteType.root, playlistId = null;
+
+  const _LibraryRoute.downloads()
+    : type = _LibraryRouteType.downloads,
+      playlistId = null;
+
+  const _LibraryRoute.live() : type = _LibraryRouteType.live, playlistId = null;
+
+  const _LibraryRoute.playlist(this.playlistId)
+    : type = _LibraryRouteType.playlist;
+
+  final _LibraryRouteType type;
+  final String? playlistId;
+
+  String get key => switch (type) {
+    _LibraryRouteType.root => 'root',
+    _LibraryRouteType.downloads => 'downloads',
+    _LibraryRouteType.live => 'live',
+    _LibraryRouteType.playlist => 'playlist-$playlistId',
+  };
+}
+
+class LibraryPanel extends ConsumerStatefulWidget {
+  const LibraryPanel({
+    required this.onOpenPlayer,
+    this.navigationController,
+    this.bottomContentPadding = 0,
+    super.key,
+  });
+
+  final VoidCallback onOpenPlayer;
+  final LibraryNavigationController? navigationController;
+  final double bottomContentPadding;
+
+  @override
+  ConsumerState<LibraryPanel> createState() => _LibraryPanelState();
+}
+
+class LibraryNavigationController extends ChangeNotifier {
+  _LibraryPanelState? _state;
+  _LibraryRoute _route = const _LibraryRoute.root();
+
+  bool get canPop => _state?._canPop ?? _route.type != _LibraryRouteType.root;
+
+  bool maybePop() {
+    final state = _state;
+    if (state != null) {
+      return state._popRoute();
+    }
+    if (_route.type == _LibraryRouteType.root) {
+      return false;
+    }
+    _route = const _LibraryRoute.root();
+    notifyListeners();
+    return true;
+  }
+
+  void openPlaylist(String playlistId) {
+    _route = _LibraryRoute.playlist(playlistId);
+    final state = _state;
+    if (state != null) {
+      state._openPlaylist(playlistId);
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void _attach(_LibraryPanelState state) {
+    _state = state;
+    notifyListeners();
+  }
+
+  void _detach(_LibraryPanelState state) {
+    if (_state == state) {
+      _state = null;
+      notifyListeners();
+    }
+  }
+
+  void _notifyRouteChanged(_LibraryRoute route) {
+    _route = route;
+    notifyListeners();
+  }
+}
+
+class _LibraryPanelState extends ConsumerState<LibraryPanel> {
+  final _filterController = TextEditingController();
+  final _playlistSearchFocusNode = FocusNode();
+  final Set<String> _selectedTrackIds = <String>{};
+  late _LibraryRoute _route;
+  String _filter = '';
+  bool _selectionActionInProgress = false;
+  bool _playlistSearchVisible = false;
+  int _routeDirection = 1;
+  int _artworkRotationSeed = DateTime.now().microsecondsSinceEpoch;
+  bool? _artworkVisitActive;
+
+  @override
+  void initState() {
+    super.initState();
+    _route = widget.navigationController?._route ?? const _LibraryRoute.root();
+    widget.navigationController?._attach(this);
+    _filterController.addListener(() {
+      setState(() {
+        _filter = _filterController.text;
+        _selectedTrackIds.clear();
+      });
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.valuesOf(context).enabled;
+    if (active &&
+        _artworkVisitActive == false &&
+        _route.type == _LibraryRouteType.root) {
+      _artworkRotationSeed++;
+    }
+    _artworkVisitActive = active;
+  }
+
+  @override
+  void didUpdateWidget(covariant LibraryPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.navigationController != widget.navigationController) {
+      oldWidget.navigationController?._detach(this);
+      _route = widget.navigationController?._route ?? _route;
+      widget.navigationController?._attach(this);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.navigationController?._detach(this);
+    _filterController.dispose();
+    _playlistSearchFocusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tracks = ref.watch(libraryTracksProvider);
+    final playlists = ref.watch(playlistsControllerProvider);
+    final catalogPlaylists = ref.watch(catalogPlaylistsProvider);
+    final subscribedArtists = ref.watch(subscribedArtistsProvider);
+    final strings = ref.watch(appStringsProvider);
+    final enablesTrackSelection = AppPlatform.isMobileTargetPlatform(
+      Theme.of(context).platform,
+    );
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final transitionDuration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 260);
+    final currentRouteKey = ValueKey(_route.key);
+
+    return AnimatedSwitcher(
+      key: const ValueKey('library-route-switcher'),
+      duration: transitionDuration,
+      reverseDuration: transitionDuration,
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final incoming = child.key == currentRouteKey;
+        final horizontalOffset = incoming
+            ? 0.04 * _routeDirection
+            : -0.03 * _routeDirection;
+        final offset = Tween<Offset>(
+          begin: Offset(horizontalOffset, 0),
+          end: Offset.zero,
+        ).animate(animation);
+        return ClipRect(
+          child: FadeTransition(
+            opacity: animation,
+            child: SlideTransition(position: offset, child: child),
+          ),
+        );
+      },
+      child: RepaintBoundary(
+        key: currentRouteKey,
+        child: KeyedSubtree(
+          child: switch (_route.type) {
+            _LibraryRouteType.root => _LibraryRootView(
+              artworkRotationSeed: _artworkRotationSeed,
+              bottomContentPadding: widget.bottomContentPadding,
+              tracks: tracks,
+              playlists: playlists,
+              catalogPlaylists: catalogPlaylists,
+              subscribedArtists: subscribedArtists,
+              strings: strings,
+              onOpenDownloads: _openDownloads,
+              supportsTikTokLive: _supportsTikTokLive,
+              onOpenLive: _openLive,
+              onOpenPlaylist: _openPlaylist,
+              onCreatePlaylist: () => _showCreateDialog(context),
+              onOpenArtist: _openSubscribedArtist,
+            ),
+            _LibraryRouteType.downloads => tracks.when(
+              data: (items) => _TrackListView(
+                bottomContentPadding: widget.bottomContentPadding,
+                title: strings.downloadedSongs,
+                subtitle: strings.songCountWithDuration(
+                  items.length,
+                  sumKnownDurations(items.map((track) => track.duration)),
+                ),
+                tracks: _filteredTracks(items),
+                queueTracks: items,
+                filterController: _filterController,
+                filterVisible: true,
+                onBack: _goRoot,
+                onOpenPlayer: widget.onOpenPlayer,
+                mode: _TrackListMode.downloads,
+                selectionEnabled: enablesTrackSelection,
+                selectionBusy: _selectionActionInProgress,
+                selectedTrackIds: _selectedTrackIds,
+                onSelectTrack: _selectTrack,
+                onToggleTrack: _toggleTrackSelection,
+                onClearSelection: _clearTrackSelection,
+                onAddSelected: (context) =>
+                    _addSelectedTracksToPlaylist(context, allTracks: items),
+                onDeleteSelected: (context) =>
+                    _deleteSelectedLibraryTracks(context, items),
+                onReorderTracks: _reorderDownloadedTracks,
+              ),
+              loading: () =>
+                  const _PanelLoading(key: ValueKey('downloads-load')),
+              error: (error, _) => _PanelError(
+                error: error,
+                onBack: _goRoot,
+                title: strings.library,
+              ),
+            ),
+            _LibraryRouteType.live => _LibraryLiveRoute(
+              bottomContentPadding: widget.bottomContentPadding,
+              supported: _supportsTikTokLive,
+              strings: strings,
+              onBack: _goRoot,
+              onOpenPlayer: widget.onOpenPlayer,
+            ),
+            _LibraryRouteType.playlist => playlists.when(
+              data: (items) {
+                final playlist = items
+                    .where((item) => item.id == _route.playlistId)
+                    .firstOrNull;
+                if (playlist == null) {
+                  return _PanelError(
+                    title: strings.playlist,
+                    error: strings.playlistMissing,
+                    onBack: _goRoot,
+                  );
+                }
+                return ref
+                    .watch(catalogPlaylistProvider(playlist.id))
+                    .when(
+                      data: (catalogPlaylist) {
+                        if (catalogPlaylist == null) {
+                          return _PanelError(
+                            error: strings.playlistMissing,
+                            onBack: _goRoot,
+                            title: playlist.isFavorites
+                                ? strings.favorites
+                                : playlist.name,
+                          );
+                        }
+                        return tracks.when(
+                          data: (libraryTracks) {
+                            final allItems = ref.watch(
+                              _catalogDisplayItemsProvider((
+                                playlist: catalogPlaylist,
+                                libraryTracks: libraryTracks,
+                              )),
+                            );
+                            // A legacy backup can briefly expose playlist.trackIds
+                            // before its v8 catalog entries are repaired. Keep the
+                            // old local-only view as a recovery path instead of
+                            // presenting an empty playlist.
+                            if (allItems.isEmpty &&
+                                playlist.trackIds.isNotEmpty) {
+                              final byId = <String, LocalTrack>{
+                                for (final track in libraryTracks)
+                                  track.id: track,
+                              };
+                              final playlistTracks = playlist.trackIds
+                                  .map((id) => byId[id])
+                                  .whereType<LocalTrack>()
+                                  .toList(growable: false);
+                              return _TrackListView(
+                                artworkSources: playlistArtworkSourcesFor(
+                                  ref,
+                                  playlist,
+                                  () => _playlistThumbnailSources(
+                                    playlist,
+                                    byId,
+                                    rotationSeed: _artworkRotationSeed,
+                                  ),
+                                ),
+                                bottomContentPadding:
+                                    widget.bottomContentPadding,
+                                title: playlist.isFavorites
+                                    ? strings.favorites
+                                    : playlist.name,
+                                subtitle: strings.songCountWithDuration(
+                                  playlistTracks.length,
+                                  sumKnownDurations(
+                                    playlistTracks.map(
+                                      (track) => track.duration,
+                                    ),
+                                  ),
+                                ),
+                                tracks: _filteredTracks(playlistTracks),
+                                queueTracks: playlistTracks,
+                                filterController: _filterController,
+                                filterVisible: _playlistSearchVisible,
+                                searchFocusNode: _playlistSearchFocusNode,
+                                onClearOrCloseSearch:
+                                    _clearOrClosePlaylistSearch,
+                                onSearchRequested: _showPlaylistSearch,
+                                onPlayAll: () => _playLocalPlaylist(
+                                  playlist,
+                                  playlistTracks,
+                                ),
+                                onBack: _backFromPlaylistDetail,
+                                onOpenPlayer: widget.onOpenPlayer,
+                                mode: _TrackListMode.playlist,
+                                playlist: playlist,
+                                playlistId: playlist.id,
+                                selectionEnabled: enablesTrackSelection,
+                                selectionBusy: _selectionActionInProgress,
+                                selectedTrackIds: _selectedTrackIds,
+                                onSelectTrack: _selectTrack,
+                                onToggleTrack: _toggleTrackSelection,
+                                onClearSelection: _clearTrackSelection,
+                                onAddSelected: (context) =>
+                                    _addSelectedTracksToPlaylist(
+                                      context,
+                                      allTracks: libraryTracks,
+                                      currentPlaylistId: playlist.id,
+                                    ),
+                                onDeleteSelected: (context) =>
+                                    _removeSelectedTracksFromPlaylist(
+                                      context,
+                                      playlist,
+                                      playlistTracks,
+                                    ),
+                              );
+                            }
+                            return _CatalogTrackListView(
+                              artworkSources: playlistArtworkSourcesFor(
+                                ref,
+                                playlist,
+                                () => _catalogPlaylistThumbnailSources(
+                                  playlist.id,
+                                  allItems,
+                                  rotationSeed: _artworkRotationSeed,
+                                ),
+                              ),
+                              bottomContentPadding: widget.bottomContentPadding,
+                              title: playlist.isFavorites
+                                  ? strings.favorites
+                                  : playlist.name,
+                              subtitle: strings.songCountWithDuration(
+                                allItems.length,
+                                sumKnownDurations(
+                                  allItems.map((item) => item.duration),
+                                ),
+                              ),
+                              items: _filteredCatalogItems(allItems),
+                              queueItems: allItems,
+                              filterController: _filterController,
+                              filterVisible: _playlistSearchVisible,
+                              searchFocusNode: _playlistSearchFocusNode,
+                              onClearOrCloseSearch: _clearOrClosePlaylistSearch,
+                              onSearchRequested: _showPlaylistSearch,
+                              onPlayAll: () =>
+                                  _playCatalogPlaylist(playlist, allItems),
+                              onBack: _backFromPlaylistDetail,
+                              onOpenPlayer: widget.onOpenPlayer,
+                              playlist: playlist,
+                              selectedEntryIds: _selectedTrackIds,
+                              selectionBusy: _selectionActionInProgress,
+                              onSelectEntry: _selectTrack,
+                              onToggleEntry: _toggleTrackSelection,
+                              onClearSelection: _clearTrackSelection,
+                              onAddSelected: (context) =>
+                                  _addSelectedCatalogItems(
+                                    context,
+                                    playlist,
+                                    allItems,
+                                  ),
+                              onDownloadSelected: (context) =>
+                                  _downloadSelectedCatalogItems(
+                                    context,
+                                    allItems,
+                                  ),
+                              onRemoveSelected: (context) =>
+                                  _removeSelectedCatalogItems(
+                                    context,
+                                    playlist,
+                                    allItems,
+                                  ),
+                              onReorderEntries: (entryIds) => ref
+                                  .read(playlistsControllerProvider.notifier)
+                                  .reorderCatalogPlaylist(
+                                    playlist.id,
+                                    entryIds,
+                                  ),
+                            );
+                          },
+                          loading: () => const _PanelLoading(
+                            key: ValueKey('playlist-load'),
+                          ),
+                          error: (error, _) => _PanelError(
+                            error: error,
+                            onBack: _goRoot,
+                            title: playlist.isFavorites
+                                ? strings.favorites
+                                : playlist.name,
+                          ),
+                        );
+                      },
+                      loading: () =>
+                          const _PanelLoading(key: ValueKey('playlist-load')),
+                      error: (error, _) => _PanelError(
+                        error: error,
+                        onBack: _goRoot,
+                        title: playlist.isFavorites
+                            ? strings.favorites
+                            : playlist.name,
+                      ),
+                    );
+              },
+              loading: () =>
+                  const _PanelLoading(key: ValueKey('playlists-load')),
+              error: (error, _) => _PanelError(
+                error: error,
+                onBack: _goRoot,
+                title: strings.playlist,
+              ),
+            ),
+          },
+        ),
+      ),
+    );
+  }
+
+  void _openDownloads() {
+    _selectedTrackIds.clear();
+    _closePlaylistSearch();
+    _filterController.clear();
+    setState(() {
+      _routeDirection = 1;
+      _route = const _LibraryRoute.downloads();
+    });
+    widget.navigationController?._notifyRouteChanged(_route);
+  }
+
+  void _openLive() {
+    if (!_supportsTikTokLive) {
+      return;
+    }
+    _closePlaylistSearch();
+    _filterController.clear();
+    setState(() {
+      _routeDirection = 1;
+      _route = const _LibraryRoute.live();
+    });
+    widget.navigationController?._notifyRouteChanged(_route);
+  }
+
+  bool get _supportsTikTokLive =>
+      AppPlatform.supportsTikTokLive ||
+      AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+
+  void _openPlaylist(String playlistId) {
+    _selectedTrackIds.clear();
+    _closePlaylistSearch();
+    _filterController.clear();
+    setState(() {
+      _routeDirection = 1;
+      _route = _LibraryRoute.playlist(playlistId);
+    });
+    widget.navigationController?._notifyRouteChanged(_route);
+  }
+
+  void _goRoot() {
+    _selectedTrackIds.clear();
+    _closePlaylistSearch();
+    _filterController.clear();
+    setState(() {
+      _artworkRotationSeed++;
+      _routeDirection = -1;
+      _route = const _LibraryRoute.root();
+    });
+    widget.navigationController?._notifyRouteChanged(_route);
+  }
+
+  void _backFromPlaylistDetail() {
+    if (_playlistSearchVisible) {
+      _closePlaylistSearch();
+      return;
+    }
+    _goRoot();
+  }
+
+  bool get _canPop =>
+      _playlistSearchVisible ||
+      _selectedTrackIds.isNotEmpty ||
+      _route.type != _LibraryRouteType.root;
+
+  bool _popRoute() {
+    if (_playlistSearchVisible) {
+      _closePlaylistSearch();
+      return true;
+    }
+    if (_selectedTrackIds.isNotEmpty) {
+      _clearTrackSelection();
+      return true;
+    }
+    if (!_canPop) {
+      return false;
+    }
+    _goRoot();
+    return true;
+  }
+
+  void _showPlaylistSearch() {
+    if (!_playlistSearchVisible) {
+      setState(() => _playlistSearchVisible = true);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _playlistSearchVisible) {
+        _playlistSearchFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _closePlaylistSearch() {
+    _playlistSearchFocusNode.unfocus();
+    if (_filterController.text.isNotEmpty) {
+      _filterController.clear();
+    }
+    if (_playlistSearchVisible && mounted) {
+      setState(() => _playlistSearchVisible = false);
+    }
+  }
+
+  void _clearOrClosePlaylistSearch() {
+    if (_filterController.text.isNotEmpty) {
+      _filterController.clear();
+      _playlistSearchFocusNode.requestFocus();
+      return;
+    }
+    _closePlaylistSearch();
+  }
+
+  void _playLocalPlaylist(Playlist playlist, List<LocalTrack> tracks) {
+    if (tracks.isEmpty) return;
+    unawaited(
+      ref
+          .read(playerControllerProvider.notifier)
+          .playLocal(
+            tracks.first,
+            queue: tracks,
+            queueSourceId: PlayerController.playlistQueueSourceId(playlist.id),
+          ),
+    );
+    widget.onOpenPlayer();
+  }
+
+  void _playCatalogPlaylist(
+    Playlist playlist,
+    List<_CatalogDisplayItem> items,
+  ) {
+    final queue = items
+        .map((item) => item.playback)
+        .whereType<CatalogPlaybackItem>()
+        .toList(growable: false);
+    if (queue.isEmpty) return;
+    unawaited(
+      ref
+          .read(playerControllerProvider.notifier)
+          .playCatalogPlaylist(
+            queue.first,
+            queue: queue,
+            playlistId: playlist.id,
+          ),
+    );
+    widget.onOpenPlayer();
+  }
+
+  void _selectTrack(String trackId) {
+    if (trackId.trim().isEmpty || _selectedTrackIds.contains(trackId)) {
+      return;
+    }
+    setState(() => _selectedTrackIds.add(trackId));
+  }
+
+  void _toggleTrackSelection(String trackId) {
+    setState(() {
+      if (!_selectedTrackIds.remove(trackId)) {
+        _selectedTrackIds.add(trackId);
+      }
+    });
+  }
+
+  void _clearTrackSelection() {
+    if (_selectedTrackIds.isEmpty) {
+      return;
+    }
+    setState(_selectedTrackIds.clear);
+  }
+
+  List<LocalTrack> _selectedTracks(Iterable<LocalTrack> tracks) {
+    return tracks
+        .where((track) => _selectedTrackIds.contains(track.id))
+        .toList(growable: false);
+  }
+
+  Future<void> _addSelectedTracksToPlaylist(
+    BuildContext context, {
+    required List<LocalTrack> allTracks,
+    String? currentPlaylistId,
+  }) async {
+    if (_selectionActionInProgress) {
+      return;
+    }
+    setState(() => _selectionActionInProgress = true);
+    try {
+      await _addSelectedTracksToPlaylistUnlocked(
+        context,
+        allTracks: allTracks,
+        currentPlaylistId: currentPlaylistId,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _selectionActionInProgress = false);
+      }
+    }
+  }
+
+  Future<void> _addSelectedTracksToPlaylistUnlocked(
+    BuildContext context, {
+    required List<LocalTrack> allTracks,
+    String? currentPlaylistId,
+  }) async {
+    final selectedTracks = _selectedTracks(allTracks);
+    if (selectedTracks.isEmpty) {
+      _clearTrackSelection();
+      return;
+    }
+
+    final playlists = (await ref.read(playlistsControllerProvider.future))
+        .where(
+          (playlist) =>
+              !playlist.isFavorites && playlist.id != currentPlaylistId,
+        )
+        .toList(growable: false);
+    final catalogPlaylists = await ref.read(catalogPlaylistsProvider.future);
+    if (!mounted) {
+      return;
+    }
+    if (playlists.isEmpty) {
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        SnackBar(
+          content: Text(ref.read(appStringsProvider).createPlaylistFirst),
+        ),
+      );
+      return;
+    }
+
+    final playlistId = await showAppDialog<String>(
+      context: this.context,
+      builder: (_) => PlaylistPickerDialog(
+        title: ref.read(appStringsProvider).choosePlaylist,
+        playlists: playlists,
+        tracks: allTracks,
+        catalogPlaylists: catalogPlaylists,
+      ),
+    );
+    if (playlistId == null || !mounted) {
+      return;
+    }
+
+    final added = await ref
+        .read(playlistsControllerProvider.notifier)
+        .addTracksToPlaylist(
+          playlistId,
+          selectedTracks.map((track) => track.id),
+        );
+    if (!mounted) {
+      return;
+    }
+    _clearTrackSelection();
+    final strings = ref.read(appStringsProvider);
+    ScaffoldMessenger.of(this.context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            added == 0
+                ? strings.songsAlreadyInPlaylist
+                : strings.songsAddedToPlaylist(added),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _removeSelectedTracksFromPlaylist(
+    BuildContext context,
+    Playlist playlist,
+    List<LocalTrack> playlistTracks,
+  ) async {
+    if (_selectionActionInProgress) {
+      return;
+    }
+    setState(() => _selectionActionInProgress = true);
+    try {
+      await _removeSelectedTracksFromPlaylistUnlocked(
+        context,
+        playlist,
+        playlistTracks,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _selectionActionInProgress = false);
+      }
+    }
+  }
+
+  Future<void> _removeSelectedTracksFromPlaylistUnlocked(
+    BuildContext context,
+    Playlist playlist,
+    List<LocalTrack> playlistTracks,
+  ) async {
+    final selectedTracks = _selectedTracks(playlistTracks);
+    if (selectedTracks.isEmpty) {
+      _clearTrackSelection();
+      return;
+    }
+
+    final strings = ref.read(appStringsProvider);
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        title: Text(
+          playlist.isFavorites
+              ? strings.removeFromFavorites
+              : strings.removeFromPlaylist,
+        ),
+        content: Text(
+          strings.removeSelectedSongs(
+            selectedTracks.length,
+            favorites: playlist.isFavorites,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.playlist_remove_rounded),
+            label: Text(
+              playlist.isFavorites
+                  ? strings.removeFromFavorites
+                  : strings.removeFromPlaylist,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    final removed = await ref
+        .read(playlistsControllerProvider.notifier)
+        .removeTracksFromPlaylist(
+          playlist.id,
+          selectedTracks.map((track) => track.id),
+        );
+    if (!mounted) {
+      return;
+    }
+    _clearTrackSelection();
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          strings.songsRemovedFromPlaylist(
+            removed,
+            favorites: playlist.isFavorites,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _deleteSelectedLibraryTracks(
+    BuildContext context,
+    List<LocalTrack> allTracks,
+  ) async {
+    if (_selectionActionInProgress) {
+      return;
+    }
+    setState(() => _selectionActionInProgress = true);
+    try {
+      await _deleteSelectedLibraryTracksUnlocked(context, allTracks);
+    } finally {
+      if (mounted) {
+        setState(() => _selectionActionInProgress = false);
+      }
+    }
+  }
+
+  Future<void> _deleteSelectedLibraryTracksUnlocked(
+    BuildContext context,
+    List<LocalTrack> allTracks,
+  ) async {
+    final selectedTracks = _selectedTracks(allTracks);
+    if (selectedTracks.isEmpty) {
+      _clearTrackSelection();
+      return;
+    }
+
+    final strings = ref.read(appStringsProvider);
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        title: Text(strings.deleteSelectedSongs),
+        content: Text(strings.confirmDeleteSongs(selectedTracks.length)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.delete_outline_rounded),
+            label: Text(strings.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    final deleted = await _deleteLibraryTracks(ref, selectedTracks);
+    if (!mounted) {
+      return;
+    }
+    _clearTrackSelection();
+    ScaffoldMessenger.of(
+      this.context,
+    ).showSnackBar(SnackBar(content: Text(strings.songsDeleted(deleted))));
+  }
+
+  List<LocalTrack> _filteredTracks(List<LocalTrack> tracks) {
+    final query = _filter.trim().toLowerCase();
+    if (query.isEmpty) {
+      return tracks;
+    }
+    return tracks
+        .where((track) {
+          return track.title.toLowerCase().contains(query) ||
+              track.artist.toLowerCase().contains(query);
+        })
+        .toList(growable: false);
+  }
+
+  List<_CatalogDisplayItem> _selectedCatalogItems(
+    List<_CatalogDisplayItem> items,
+  ) => items
+      .where((item) => _selectedTrackIds.contains(item.entry.id))
+      .toList(growable: false);
+
+  Future<void> _runCatalogSelectionAction(
+    Future<void> Function() action,
+  ) async {
+    if (_selectionActionInProgress) return;
+    setState(() => _selectionActionInProgress = true);
+    try {
+      await action();
+    } finally {
+      if (mounted) setState(() => _selectionActionInProgress = false);
+    }
+  }
+
+  Future<void> _addSelectedCatalogItems(
+    BuildContext context,
+    Playlist playlist,
+    List<_CatalogDisplayItem> items,
+  ) => _runCatalogSelectionAction(() async {
+    final selected = _selectedCatalogItems(items);
+    final destination = await _pickDestinationPlaylist(
+      context,
+      ref,
+      excludePlaylistId: playlist.id,
+    );
+    if (destination == null || !mounted) return;
+    final controller = ref.read(playlistsControllerProvider.notifier);
+    var added = await controller.addTracksToPlaylist(
+      destination,
+      selected.map((item) => item.localTrack?.id).whereType<String>(),
+    );
+    added += await controller.addRemoteTracksToPlaylist(
+      destination,
+      selected
+          .where((item) => item.localTrack == null)
+          .map((item) => item.playback?.remoteTrack)
+          .whereType<TrackInfo>(),
+    );
+    if (!mounted) return;
+    _clearTrackSelection();
+    final strings = ref.read(appStringsProvider);
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          added == 0
+              ? strings.songsAlreadyInPlaylist
+              : strings.songsAddedToPlaylist(added),
+        ),
+      ),
+    );
+  });
+
+  Future<void> _downloadSelectedCatalogItems(
+    BuildContext context,
+    List<_CatalogDisplayItem> items,
+  ) => _runCatalogSelectionAction(() async {
+    final selected = _selectedCatalogItems(items);
+    // The shared queue checks local file availability, in-flight tasks and
+    // video identity, so existing downloads and repeated occurrences are safe.
+    final tracks = selected
+        .map(
+          (item) =>
+              item.playback?.remoteTrack ??
+              (item.localTrack == null
+                  ? null
+                  : _remoteTrackInfoForLocal(item.localTrack!)),
+        )
+        .whereType<TrackInfo>();
+    final queued = await ref
+        .read(downloadControllerProvider.notifier)
+        .downloadTracks(tracks);
+    if (!mounted) return;
+    _clearTrackSelection();
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ref.read(appStringsProvider).songsQueuedForDownload(queued),
+        ),
+      ),
+    );
+  });
+
+  Future<void> _removeSelectedCatalogItems(
+    BuildContext context,
+    Playlist playlist,
+    List<_CatalogDisplayItem> items,
+  ) => _runCatalogSelectionAction(() async {
+    final selected = _selectedCatalogItems(items);
+    if (selected.isEmpty) return;
+    final strings = ref.read(appStringsProvider);
+    final label = playlist.isFavorites
+        ? strings.removeFromFavorites
+        : strings.removeFromPlaylist;
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        title: Text(label),
+        content: Text(
+          strings.removeSelectedSongs(
+            selected.length,
+            favorites: playlist.isFavorites,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(strings.cancel),
+          ),
+          FilledButton.icon(
+            key: const ValueKey('library-selection-confirm-remove'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            icon: const Icon(Icons.playlist_remove_rounded),
+            label: Text(label),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final removed = await ref
+        .read(playlistsControllerProvider.notifier)
+        .removeCatalogEntries(
+          playlist.id,
+          selected.map((item) => item.entry.id),
+        );
+    if (!mounted) return;
+    _clearTrackSelection();
+    ScaffoldMessenger.of(this.context).showSnackBar(
+      SnackBar(
+        content: Text(
+          strings.songsRemovedFromPlaylist(
+            removed,
+            favorites: playlist.isFavorites,
+          ),
+        ),
+      ),
+    );
+  });
+
+  List<_CatalogDisplayItem> _filteredCatalogItems(
+    List<_CatalogDisplayItem> items,
+  ) {
+    final query = _filter.trim().toLowerCase();
+    if (query.isEmpty) {
+      return items;
+    }
+    return items
+        .where(
+          (item) =>
+              item.title.toLowerCase().contains(query) ||
+              item.artist.toLowerCase().contains(query) ||
+              (item.album?.toLowerCase().contains(query) ?? false),
+        )
+        .toList(growable: false);
+  }
+
+  Future<void> _reorderDownloadedTracks(List<String> orderedIds) async {
+    final database = ref.read(databaseServiceProvider);
+    await database.reorderLocalTracks(orderedIds);
+    ref.invalidate(libraryTracksProvider);
+    final orderedTracks = await database.getLocalTracks();
+    await ref
+        .read(playerControllerProvider.notifier)
+        .syncLocalQueueSource(
+          PlayerController.downloadedLibraryQueueSourceId,
+          orderedTracks,
+        );
+  }
+
+  Future<void> _showCreateDialog(BuildContext context) async {
+    final strings = ref.read(appStringsProvider);
+    final rawName = await showAppDialog<String>(
+      context: context,
+      builder: (_) => CreatePlaylistDialog(strings: strings),
+    );
+    final name = rawName?.trim();
+    if (!mounted || name == null || name.isEmpty) {
+      return;
+    }
+    await ref.read(playlistsControllerProvider.notifier).create(name);
+  }
+
+  void _openSubscribedArtist(RemoteSubscribedArtist artist) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArtistProfilePage(
+          artistBrowseId: artist.browseId,
+          artistName: artist.name,
+          artistThumbnailUrl: artist.thumbnailUrl,
+          onOpenPlayer: widget.onOpenPlayer,
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryRootView extends StatelessWidget {
+  const _LibraryRootView({
+    required this.artworkRotationSeed,
+    required this.bottomContentPadding,
+    required this.tracks,
+    required this.playlists,
+    required this.catalogPlaylists,
+    required this.subscribedArtists,
+    required this.supportsTikTokLive,
+    required this.strings,
+    required this.onOpenDownloads,
+    required this.onOpenLive,
+    required this.onOpenPlaylist,
+    required this.onCreatePlaylist,
+    required this.onOpenArtist,
+  });
+
+  final double bottomContentPadding;
+  final int artworkRotationSeed;
+  final AsyncValue<List<LocalTrack>> tracks;
+  final AsyncValue<List<Playlist>> playlists;
+  final AsyncValue<List<CatalogPlaylist>> catalogPlaylists;
+  final AsyncValue<List<RemoteSubscribedArtist>> subscribedArtists;
+  final bool supportsTikTokLive;
+  final AppStrings strings;
+  final VoidCallback onOpenDownloads;
+  final VoidCallback onOpenLive;
+  final ValueChanged<String> onOpenPlaylist;
+  final VoidCallback onCreatePlaylist;
+  final ValueChanged<RemoteSubscribedArtist> onOpenArtist;
+
+  @override
+  Widget build(BuildContext context) {
+    final localTracks = tracks.value ?? const <LocalTrack>[];
+    final catalogsById = <String, CatalogPlaylist>{
+      for (final catalog in catalogPlaylists.value ?? const <CatalogPlaylist>[])
+        catalog.playlist.id: catalog,
+    };
+    final followedArtists =
+        subscribedArtists.value ?? const <RemoteSubscribedArtist>[];
+
+    return ScrolledUnderTabFrame(
+      surfaceKey: const ValueKey('library-tab-header-surface'),
+      header: Text(
+        key: const ValueKey('library-tab-title'),
+        strings.library,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: appTabTitleStyle(context),
+      ),
+      scrollKey: const ValueKey('library-root-scroll'),
+      scrollCacheExtent: const ScrollCacheExtent.pixels(800),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.only(top: appTabFirstSectionTopGap),
+            child: tracks.when(
+              data: (items) => Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: _LibraryEntry(
+                  key: const ValueKey('library-downloads-entry'),
+                  icon: Icons.library_music_rounded,
+                  title: strings.downloadedSongs,
+                  subtitle: strings.songCountWithDuration(
+                    items.length,
+                    sumKnownDurations(items.map((track) => track.duration)),
+                  ),
+                  onTap: onOpenDownloads,
+                ),
+              ),
+              loading: () => const _LoadingRow(),
+              error: (error, _) => _ErrorRow(error: error),
+            ),
+          ),
+        ),
+        if (supportsTikTokLive) ...[
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          SliverToBoxAdapter(
+            child: _LibraryLiveEntry(strings: strings, onOpenLive: onOpenLive),
+          ),
+        ],
+        const SliverToBoxAdapter(child: SizedBox(height: 28)),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(child: _SectionTitle(strings.playlist)),
+                _NeutralLibraryIconButton(
+                  key: const ValueKey('library-create-playlist-button'),
+                  tooltip: strings.newPlaylist,
+                  icon: Icons.add_rounded,
+                  onPressed: onCreatePlaylist,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 10)),
+        playlists.when(
+          data: (items) => _PlaylistList(
+            artworkRotationSeed: artworkRotationSeed,
+            playlists: items,
+            libraryTracks: localTracks,
+            catalogPlaylists: catalogsById,
+            strings: strings,
+            onOpenPlaylist: onOpenPlaylist,
+          ),
+          loading: () => const SliverToBoxAdapter(child: _LoadingRow()),
+          error: (error, _) =>
+              SliverToBoxAdapter(child: _ErrorRow(error: error)),
+        ),
+        if (followedArtists.isNotEmpty) ...[
+          const SliverToBoxAdapter(child: SizedBox(height: 28)),
+          SliverToBoxAdapter(
+            child: LibrarySubscribedArtistsShelf(
+              title: strings.choose('Artistas', 'Artists'),
+              artists: followedArtists,
+              onOpenArtist: onOpenArtist,
+            ),
+          ),
+        ],
+        SliverToBoxAdapter(
+          child: SizedBox(
+            key: const ValueKey('library-scroll-bottom-reserve'),
+            height: bottomContentPadding + 24,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LibraryLiveEntry extends ConsumerWidget {
+  const _LibraryLiveEntry({required this.strings, required this.onOpenLive});
+
+  final AppStrings strings;
+  final VoidCallback onOpenLive;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveQueue = ref.watch(
+      tiktokLiveControllerProvider.select(_selectLibraryLiveQueue),
+    );
+    return liveQueue.when(
+      data: (items) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: _LibraryEntry(
+          key: const ValueKey('library-live-entry'),
+          icon: Icons.sensors_rounded,
+          title: strings.liveQueue,
+          subtitle: strings.liveQueueSummary(
+            items.length,
+            items.where((item) => item.isReady).length,
+            items.where((item) => item.isPending).length,
+          ),
+          onTap: onOpenLive,
+        ),
+      ),
+      loading: () => const _LoadingRow(),
+      error: (error, _) => _ErrorRow(error: error),
+    );
+  }
+}
+
+AsyncValue<List<LiveQueueItem>> _selectLibraryLiveQueue(
+  AsyncValue<TikTokLiveState> state,
+) => state.whenData((value) => value.liveQueue);
+
+class _LibraryLiveRoute extends ConsumerWidget {
+  const _LibraryLiveRoute({
+    required this.bottomContentPadding,
+    required this.supported,
+    required this.strings,
+    required this.onBack,
+    required this.onOpenPlayer,
+  });
+
+  final double bottomContentPadding;
+  final bool supported;
+  final AppStrings strings;
+  final VoidCallback onBack;
+  final VoidCallback onOpenPlayer;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!supported) {
+      return _PanelError(
+        title: strings.library,
+        error: strings.playlistMissing,
+        onBack: onBack,
+      );
+    }
+    final liveQueue = ref.watch(
+      tiktokLiveControllerProvider.select(_selectLibraryLiveQueue),
+    );
+    return liveQueue.when(
+      data: (items) => _LiveQueueView(
+        bottomContentPadding: bottomContentPadding,
+        items: items,
+        strings: strings,
+        onBack: onBack,
+        onOpenPlayer: onOpenPlayer,
+      ),
+      loading: () => const _PanelLoading(key: ValueKey('live-load')),
+      error: (error, _) => _PanelError(
+        error: error,
+        onBack: onBack,
+        title: strings.liveQueueTitle,
+      ),
+    );
+  }
+}
+
+class _LiveQueueView extends ConsumerWidget {
+  const _LiveQueueView({
+    required this.bottomContentPadding,
+    required this.items,
+    required this.strings,
+    required this.onBack,
+    required this.onOpenPlayer,
+  });
+
+  final double bottomContentPadding;
+  final List<LiveQueueItem> items;
+  final AppStrings strings;
+  final VoidCallback onBack;
+  final VoidCallback onOpenPlayer;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return ScrolledUnderTabFrame(
+      surfaceKey: const ValueKey('library-detail-header-surface'),
+      scrollKey: const ValueKey('library-live-queue-scroll'),
+      header: _DetailHeader(
+        key: const ValueKey('library-detail-header'),
+        title: strings.liveQueueTitle,
+        subtitle: strings.liveQueueSummary(
+          items.length,
+          items.where((item) => item.isReady).length,
+          items.where((item) => item.isPending).length,
+        ),
+        onBack: onBack,
+        trailing: items.isEmpty
+            ? null
+            : IconButton.filledTonal(
+                tooltip: strings.clearLiveQueue,
+                icon: const Icon(Icons.playlist_remove_rounded),
+                onPressed: () async {
+                  await ref
+                      .read(tiktokLiveControllerProvider.notifier)
+                      .clearLiveQueue();
+                },
+              ),
+      ),
+      slivers: items.isEmpty
+          ? <Widget>[
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(
+                  child: Text(
+                    strings.liveQueueEmpty,
+                    style: TextStyle(
+                      color: AppColors.contentSubtitleFor(context),
+                    ),
+                  ),
+                ),
+              ),
+            ]
+          : <Widget>[
+              SliverPadding(
+                padding: EdgeInsets.fromLTRB(
+                  0,
+                  14,
+                  0,
+                  bottomContentPadding + 12,
+                ),
+                sliver: SliverList.builder(
+                  itemCount: items.length,
+                  itemBuilder: (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        6,
+                        0,
+                        6,
+                        appTrackRowGap,
+                      ),
+                      child: _LiveQueueTile(
+                        item: items[index],
+                        onOpenPlayer: onOpenPlayer,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+    );
+  }
+}
+
+class _LiveQueueTile extends ConsumerWidget {
+  const _LiveQueueTile({required this.item, required this.onOpenPlayer});
+
+  final LiveQueueItem item;
+  final VoidCallback onOpenPlayer;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final activeTrack = ref.watch(
+      playerControllerProvider.select(
+        (player) => (
+          trackId: player.value?.trackId,
+          sourceUrl: player.value?.sourceUrl,
+        ),
+      ),
+    );
+    final isCurrent = _matchesActiveTrack(
+      trackId: activeTrack.trackId,
+      sourceUrl: activeTrack.sourceUrl,
+    );
+    final statusColor = _statusColor(context, isCurrent: isCurrent);
+    final playButtonSize = AppPlatform.isMobile ? 48.0 : 52.0;
+    final playIconSize = AppPlatform.isMobile ? 30.0 : 26.0;
+    final subtitleStyle = appListCardSubtitleStyle(context);
+
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(8),
+      side: isCurrent
+          ? BorderSide(color: Theme.of(context).colorScheme.primary)
+          : BorderSide(
+              color: AppColors.cardBorderFor(context, solidInLiquidGlass: true),
+            ),
+    );
+    return AppCardGradientBorder(
+      radius: 8,
+      solidInLiquidGlass: true,
+      emphasized: isCurrent,
+      child: Material(
+        key: ValueKey('library-live-track-${item.id}'),
+        color: AppColors.cardSurfaceFor(context),
+        clipBehavior: Clip.antiAlias,
+        shape: shape,
+        child: ListTile(
+          dense: false,
+          minTileHeight: 86,
+          contentPadding: const EdgeInsets.only(left: 12, right: 4),
+          horizontalTitleGap: 10,
+          shape: shape,
+          tileColor: Colors.transparent,
+          leading: _LocalArtwork(source: _thumbnailSource),
+          title: MarqueeText(
+            item.displayTitle,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: AppColors.contentTitleFor(context),
+            ),
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '${strings.requestedBy}: ${item.requestedBy}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: subtitleStyle,
+                    ),
+                  ),
+                  if (item.requestedByModerator) ...[
+                    const SizedBox(width: 6),
+                    Icon(
+                      Icons.shield_rounded,
+                      size: 15,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 3),
+                    Text(
+                      strings.moderator,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              Text(
+                _statusText(strings, isCurrent: isCurrent),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: subtitleStyle.copyWith(
+                  color: statusColor,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (item.isReady)
+                IconButton.filledTonal(
+                  tooltip: strings.play,
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  iconSize: playIconSize,
+                  padding: EdgeInsets.zero,
+                  style: AppPlatform.isMobile
+                      ? IconButton.styleFrom(
+                          fixedSize: Size.square(playButtonSize),
+                          minimumSize: Size.square(playButtonSize),
+                          maximumSize: Size.square(playButtonSize),
+                          padding: EdgeInsets.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        )
+                      : null,
+                  constraints: BoxConstraints.tight(
+                    Size.square(playButtonSize),
+                  ),
+                  onPressed: () async {
+                    onOpenPlayer();
+                    await ref
+                        .read(tiktokLiveControllerProvider.notifier)
+                        .playLiveQueueItem(item.id);
+                  },
+                )
+              else
+                _LiveQueueStatusIcon(item: item, color: statusColor),
+              IconButton(
+                key: ValueKey('library-live-remove-${item.id}'),
+                tooltip: strings.removeFromQueue,
+                color: AppColors.contentSubtitleFor(context),
+                icon: const Icon(Icons.close_rounded, size: 20),
+                onPressed: () async {
+                  await ref
+                      .read(tiktokLiveControllerProvider.notifier)
+                      .removeLiveQueueItem(item.id);
+                },
+              ),
+            ],
+          ),
+          onTap: item.isReady
+              ? () async {
+                  onOpenPlayer();
+                  await ref
+                      .read(tiktokLiveControllerProvider.notifier)
+                      .playLiveQueueItem(item.id);
+                }
+              : null,
+        ),
+      ),
+    );
+  }
+
+  String? get _thumbnailSource {
+    final localTrack = item.localTrack;
+    if (localTrack != null) {
+      return localTrack.thumbnailPath ?? localTrack.thumbnailUrl;
+    }
+    return item.remoteTrack?.thumbnailUrl;
+  }
+
+  Color _statusColor(BuildContext context, {required bool isCurrent}) {
+    if (isCurrent) {
+      return Theme.of(context).colorScheme.primary;
+    }
+    return switch (item.status) {
+      LiveQueueItemStatus.ready => Theme.of(context).colorScheme.primary,
+      LiveQueueItemStatus.failed => Theme.of(context).colorScheme.error,
+      _ => Theme.of(context).colorScheme.onSurfaceVariant,
+    };
+  }
+
+  String _statusText(AppStrings strings, {required bool isCurrent}) {
+    if (isCurrent) {
+      return strings.nowPlaying;
+    }
+    return switch (item.status) {
+      LiveQueueItemStatus.resolving => item.message ?? strings.search,
+      LiveQueueItemStatus.downloading => item.message ?? strings.downloading,
+      LiveQueueItemStatus.ready =>
+        item.localTrack == null
+            ? strings.readyForRemotePlayback
+            : item.reusedExisting
+            ? strings.reusedDownload
+            : strings.completed,
+      LiveQueueItemStatus.failed => item.message ?? strings.error,
+    };
+  }
+
+  bool _matchesActiveTrack({String? trackId, String? sourceUrl}) {
+    final localTrack = item.localTrack;
+    if (localTrack != null && localTrack.id == trackId) {
+      return true;
+    }
+    final remoteTrack = item.remoteTrack;
+    if (remoteTrack == null) {
+      return false;
+    }
+    final remoteId = remoteTrack.id.trim();
+    if (remoteId.isNotEmpty && remoteId == trackId) {
+      return true;
+    }
+    final activeSource = sourceUrl?.trim();
+    return activeSource != null &&
+        activeSource.isNotEmpty &&
+        (activeSource == remoteTrack.url ||
+            activeSource == remoteTrack.streamUrl);
+  }
+}
+
+class _LiveQueueStatusIcon extends StatelessWidget {
+  const _LiveQueueStatusIcon({required this.item, required this.color});
+
+  final LiveQueueItem item;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (item.status) {
+      LiveQueueItemStatus.resolving => Icons.manage_search_rounded,
+      LiveQueueItemStatus.downloading => Icons.downloading_rounded,
+      LiveQueueItemStatus.ready => Icons.check_circle_rounded,
+      LiveQueueItemStatus.failed => Icons.error_rounded,
+    };
+    final spinning = item.status == LiveQueueItemStatus.downloading;
+    return SizedBox(
+      width: 52,
+      height: 52,
+      child: Center(
+        child: spinning
+            ? SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2, color: color),
+              )
+            : Icon(icon, color: color, size: 28),
+      ),
+    );
+  }
+}
+
+class _CatalogDisplayItem {
+  const _CatalogDisplayItem({required this.entry, this.playback});
+
+  final PlaylistEntry entry;
+  final CatalogPlaybackItem? playback;
+
+  LocalTrack? get localTrack => playback?.localTrack;
+  bool get isPlayable => playback != null;
+  String get title => localTrack?.title ?? entry.track.title;
+  String get artist {
+    final localArtist = localTrack?.artist.trim();
+    if (localArtist != null && localArtist.isNotEmpty) {
+      return localArtist;
+    }
+    return entry.track.artists.join(', ');
+  }
+
+  String? get album => localTrack?.album ?? entry.track.album;
+  Duration? get duration => localTrack?.duration ?? entry.track.duration;
+  PlaylistArtworkSource? get trackArtworkSource =>
+      preferredCatalogTrackArtworkSource(entry.track, localTrack: localTrack);
+  String? get artworkSource => trackArtworkSource?.source;
+  String? get artworkFallbackSource => trackArtworkSource?.fallbackSource;
+
+  PlaylistArtworkSource? get playlistArtworkSource =>
+      preferredCatalogPlaylistArtworkSource(
+        entry.track,
+        localTrack: localTrack,
+      );
+
+  bool matchesTrackId(String? trackId) {
+    return trackId != null &&
+        (trackId == playback?.localTrack?.id ||
+            trackId == playback?.remoteTrack?.id);
+  }
+}
+
+class _PlaylistDownloadProgress extends StatelessWidget {
+  const _PlaylistDownloadProgress({required this.task, super.key});
+
+  final DownloadTaskState task;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = switch (task.status) {
+      DownloadProgressStatus.queued => 0.0,
+      DownloadProgressStatus.running => (task.progress ?? 0).clamp(0.0, 0.98),
+      DownloadProgressStatus.completed => 1.0,
+      DownloadProgressStatus.failed => (task.progress ?? 0).clamp(0.0, 1.0),
+    };
+    final indeterminate =
+        task.status == DownloadProgressStatus.queued ||
+        (task.status == DownloadProgressStatus.running &&
+            task.progress == null);
+    final percentage =
+        task.status == DownloadProgressStatus.running && task.progress != null
+        ? '${(task.progress! * 100).clamp(0, 100).round()}%'
+        : null;
+    final colors = task.status == DownloadProgressStatus.failed
+        ? <Color>[Theme.of(context).colorScheme.error, const Color(0xFFFFA2A2)]
+        : AppColors.downloadGradientFor(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 5),
+      child: Row(
+        children: [
+          Expanded(
+            child: GradientProgressBar(
+              value: progress,
+              indeterminate: indeterminate,
+              height: 4,
+              colors: colors,
+            ),
+          ),
+          if (percentage != null) ...[
+            const SizedBox(width: 7),
+            Text(
+              percentage,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: AppColors.contentSubtitleFor(context),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final _catalogDisplayItemsProvider = Provider.autoDispose
+    .family<
+      List<_CatalogDisplayItem>,
+      ({CatalogPlaylist playlist, List<LocalTrack> libraryTracks})
+    >((ref, request) {
+      return _catalogDisplayItems(request.playlist, request.libraryTracks);
+    });
+
+List<_CatalogDisplayItem> _catalogDisplayItems(
+  CatalogPlaylist playlist,
+  Iterable<LocalTrack> libraryTracks,
+) {
+  return List<_CatalogDisplayItem>.unmodifiable(
+    catalogPlaylistResolvedEntries(playlist, libraryTracks).map(
+      (resolved) => _CatalogDisplayItem(
+        entry: resolved.entry,
+        playback: resolved.playback,
+      ),
+    ),
+  );
+}
+
+List<PlaylistArtworkSource> _catalogPlaylistThumbnailSources(
+  String playlistId,
+  List<_CatalogDisplayItem> items, {
+  int? rotationSeed,
+}) {
+  return rotatingPlaylistArtworkSources(
+    playlistId: playlistId,
+    candidates: items.map((item) => item.playlistArtworkSource),
+    rotationSeed: rotationSeed,
+  );
+}
+
+Widget _trackMenuItem(BuildContext context, IconData icon, String label) {
+  return Row(
+    children: <Widget>[
+      Icon(icon, color: AppColors.menuIconFor(context)),
+      const SizedBox(width: 12),
+      Expanded(
+        child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      ),
+    ],
+  );
+}
+
+Future<String?> _pickDestinationPlaylist(
+  BuildContext context,
+  WidgetRef ref, {
+  String? excludePlaylistId,
+}) async {
+  final strings = ref.read(appStringsProvider);
+  final playlists = (await ref.read(playlistsControllerProvider.future))
+      .where(
+        (playlist) => !playlist.isFavorites && playlist.id != excludePlaylistId,
+      )
+      .toList(growable: false);
+  if (!context.mounted) return null;
+  if (playlists.isEmpty) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(strings.createPlaylistFirst)));
+    return null;
+  }
+  final tracks = await ref.read(libraryTracksProvider.future);
+  final catalogs = await ref.read(catalogPlaylistsProvider.future);
+  if (!context.mounted) return null;
+  return showAppDialog<String>(
+    context: context,
+    builder: (_) => PlaylistPickerDialog(
+      title: strings.choosePlaylist,
+      playlists: playlists,
+      tracks: tracks,
+      catalogPlaylists: catalogs,
+    ),
+  );
+}
+
+TrackInfo? _remoteTrackInfoForLocal(LocalTrack track) {
+  final sourceUrl = track.sourceUrl?.trim();
+  final sourceId = track.sourceId?.trim();
+  if ((sourceUrl == null || sourceUrl.isEmpty) &&
+      (sourceId == null || sourceId.isEmpty)) {
+    return null;
+  }
+  final id = sourceId == null || sourceId.isEmpty ? sourceUrl! : sourceId;
+  final url = sourceUrl == null || sourceUrl.isEmpty
+      ? Uri.https('www.youtube.com', '/watch', <String, String>{
+          'v': id,
+        }).toString()
+      : sourceUrl;
+  final artists = track.artists.isEmpty
+      ? <String>[track.artist]
+      : track.artists;
+  return TrackInfo(
+    id: id,
+    title: track.title,
+    artist: track.artist,
+    artists: artists,
+    artistBrowseIds: track.artistBrowseIds,
+    album: track.album,
+    duration: track.duration,
+    thumbnailUrl: track.thumbnailUrl,
+    catalogThumbnailUrl: track.catalogThumbnailUrl ?? track.thumbnailUrl,
+    url: url,
+    metadataSource: TrackMetadataSource.youtubeMusic,
+  );
+}
+
+class _CatalogTrackListView extends ConsumerWidget {
+  const _CatalogTrackListView({
+    required this.artworkSources,
+    required this.bottomContentPadding,
+    required this.title,
+    required this.subtitle,
+    required this.items,
+    required this.queueItems,
+    required this.filterController,
+    required this.filterVisible,
+    required this.searchFocusNode,
+    required this.onClearOrCloseSearch,
+    required this.onSearchRequested,
+    required this.onPlayAll,
+    required this.onBack,
+    required this.onOpenPlayer,
+    required this.playlist,
+    required this.onReorderEntries,
+    required this.selectedEntryIds,
+    required this.selectionBusy,
+    required this.onSelectEntry,
+    required this.onToggleEntry,
+    required this.onClearSelection,
+    required this.onAddSelected,
+    required this.onDownloadSelected,
+    required this.onRemoveSelected,
+  });
+
+  final double bottomContentPadding;
+  final List<PlaylistArtworkSource> artworkSources;
+  final String title;
+  final String subtitle;
+  final List<_CatalogDisplayItem> items;
+  final List<_CatalogDisplayItem> queueItems;
+  final TextEditingController filterController;
+  final bool filterVisible;
+  final FocusNode searchFocusNode;
+  final VoidCallback onClearOrCloseSearch;
+  final VoidCallback onSearchRequested;
+  final VoidCallback onPlayAll;
+  final VoidCallback onBack;
+  final VoidCallback onOpenPlayer;
+  final Playlist playlist;
+  final Future<void> Function(List<String> orderedEntryIds) onReorderEntries;
+  final Set<String> selectedEntryIds;
+  final bool selectionBusy;
+  final ValueChanged<String> onSelectEntry;
+  final ValueChanged<String> onToggleEntry;
+  final VoidCallback onClearSelection;
+  final Future<void> Function(BuildContext) onAddSelected;
+  final Future<void> Function(BuildContext) onDownloadSelected;
+  final Future<void> Function(BuildContext) onRemoveSelected;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final selectionActive = selectedEntryIds.isNotEmpty;
+    final frame = ScrolledUnderTabFrame(
+      surfaceKey: const ValueKey('library-detail-header-surface'),
+      pinnedFooterSurfaceKey: const ValueKey('library-filter-region-surface'),
+      pinnedFooterHasOwnSurface: true,
+      hidePinnedFooterOnScroll: false,
+      scrollKey: const ValueKey('library-catalog-track-scroll'),
+      header: selectionActive
+          ? _TrackSelectionToolbar(
+              key: const ValueKey('library-selection-toolbar'),
+              count: selectedEntryIds.length,
+              removesFromPlaylist: true,
+              favorites: playlist.isFavorites,
+              busy: selectionBusy,
+              onClose: onClearSelection,
+              onAddToPlaylist: () => onAddSelected(context),
+              onDownload: () => onDownloadSelected(context),
+              onDelete: () => onRemoveSelected(context),
+            )
+          : _DetailHeader(
+              key: const ValueKey('library-detail-header'),
+              title: title,
+              subtitle: subtitle,
+              onBack: onBack,
+              trailing: _PlaylistMenu(
+                playlist: playlist,
+                onBack: onBack,
+                onSearchRequested: onSearchRequested,
+              ),
+            ),
+      pinnedFooter: _PlaylistSearchFooter(
+        controller: filterController,
+        hintText: strings.filterSongs,
+        focusNode: searchFocusNode,
+        visible: filterVisible,
+        closeTooltip: strings.close,
+        onClearOrClose: onClearOrCloseSearch,
+      ),
+      slivers: [
+        SliverToBoxAdapter(
+          child: _PlaylistArtworkHeader(
+            playlist: playlist,
+            title: title,
+            subtitle: subtitle,
+            sources: artworkSources,
+            onPlayAll: queueItems.any((item) => item.isPlayable)
+                ? onPlayAll
+                : null,
+          ),
+        ),
+        ...(items.isEmpty
+            ? <Widget>[
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text(
+                      strings.noSongsToShow,
+                      style: TextStyle(
+                        color: AppColors.contentSubtitleFor(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ]
+            : <Widget>[
+                SliverPadding(
+                  padding: EdgeInsets.only(bottom: bottomContentPadding + 12),
+                  sliver:
+                      filterController.text.trim().isEmpty && !selectionActive
+                      ? SliverReorderableList(
+                          itemCount: items.length,
+                          onReorderItem: (oldIndex, newIndex) async {
+                            final reordered = items.toList();
+                            final moved = reordered.removeAt(oldIndex);
+                            reordered.insert(newIndex, moved);
+                            try {
+                              await onReorderEntries(
+                                reordered
+                                    .map((item) => item.entry.id)
+                                    .toList(growable: false),
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text('$error')));
+                            }
+                          },
+                          itemBuilder: (context, index) {
+                            final item = items[index];
+                            return Padding(
+                              key: ValueKey(
+                                'library-catalog-row-${item.entry.id}',
+                              ),
+                              padding: const EdgeInsets.fromLTRB(
+                                6,
+                                0,
+                                6,
+                                appTrackRowGap,
+                              ),
+                              child: _CatalogTrackTile(
+                                key: ValueKey(
+                                  'library-catalog-entry-${item.entry.id}',
+                                ),
+                                item: item,
+                                queueItems: queueItems,
+                                playlist: playlist,
+                                onOpenPlayer: onOpenPlayer,
+                                selectionActive: false,
+                                selected: false,
+                                onLongPress: () => onSelectEntry(item.entry.id),
+                                reorderHandle: _LibraryReorderHandle(
+                                  index: index,
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : SliverList.builder(
+                          itemCount: items.length,
+                          itemBuilder: (context, index) => Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              6,
+                              0,
+                              6,
+                              appTrackRowGap,
+                            ),
+                            child: _CatalogTrackTile(
+                              key: ValueKey(
+                                'library-catalog-entry-${items[index].entry.id}',
+                              ),
+                              item: items[index],
+                              queueItems: queueItems,
+                              playlist: playlist,
+                              onOpenPlayer: onOpenPlayer,
+                              selectionActive: selectionActive,
+                              selected: selectedEntryIds.contains(
+                                items[index].entry.id,
+                              ),
+                              onLongPress: () =>
+                                  onSelectEntry(items[index].entry.id),
+                              onSelectionTap: selectionActive
+                                  ? () => onToggleEntry(items[index].entry.id)
+                                  : null,
+                            ),
+                          ),
+                        ),
+                ),
+              ]),
+      ],
+    );
+    return _PlaylistDetailBackdrop(sources: artworkSources, child: frame);
+  }
+}
+
+class _CatalogTrackTile extends ConsumerStatefulWidget {
+  const _CatalogTrackTile({
+    required this.item,
+    required this.queueItems,
+    required this.playlist,
+    required this.onOpenPlayer,
+    required this.selectionActive,
+    required this.selected,
+    required this.onLongPress,
+    this.onSelectionTap,
+    this.reorderHandle,
+    super.key,
+  });
+
+  final _CatalogDisplayItem item;
+  final List<_CatalogDisplayItem> queueItems;
+  final Playlist playlist;
+  final VoidCallback onOpenPlayer;
+  final bool selectionActive;
+  final bool selected;
+  final VoidCallback onLongPress;
+  final VoidCallback? onSelectionTap;
+  final Widget? reorderHandle;
+
+  @override
+  ConsumerState<_CatalogTrackTile> createState() => _CatalogTrackTileState();
+}
+
+class _CatalogTrackTileState extends ConsumerState<_CatalogTrackTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final strings = ref.watch(appStringsProvider);
+    final playback = ref.watch(
+      playerControllerProvider.select((player) {
+        final snapshot = player.value;
+        return (trackId: snapshot?.trackId, status: snapshot?.status);
+      }),
+    );
+    final currentLogicalEntryId = ref.watch(currentQueueLogicalEntryIdProvider);
+    final isCurrent = currentLogicalEntryId != null
+        ? currentLogicalEntryId == widget.item.entry.id
+        : widget.item.matchesTrackId(playback.trackId);
+    final isPlaying = isCurrent && playback.status == PlayerStatus.playing;
+    final localTrack = widget.item.localTrack;
+    final remoteTrack = widget.item.playback?.remoteTrack;
+    final remoteUrl = remoteTrack?.url;
+    final downloadState = ref.watch(
+      downloadControllerProvider.select(
+        (tasks) => remoteUrl == null ? null : tasks[remoteUrl],
+      ),
+    );
+    final canCancelDownload = downloadState?.isCancellable == true;
+    final isDownloaded =
+        localTrack != null &&
+        ref
+            .watch(localTrackAudioAvailabilityProvider(localTrack))
+            .maybeWhen(data: (available) => available, orElse: () => true);
+    final menuIconSize = AppPlatform.isMobile ? 32.0 : 28.0;
+    final menuIconColor = AppColors.menuIconFor(context);
+    final borderRadius = BorderRadius.circular(appCardRadius);
+    final baseColor = appListCardSurface(context);
+    final activeColor = Color.alphaBlend(
+      colors.primary.withValues(alpha: 0.13),
+      baseColor,
+    );
+    final resolvedSurfaceColor = widget.selected || isCurrent
+        ? activeColor
+        : _hovered
+        ? Color.alphaBlend(colors.onSurface.withValues(alpha: 0.075), baseColor)
+        : baseColor;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AppCardGradientBorder(
+        solidInLiquidGlass: true,
+        emphasized: widget.selected || isCurrent || _hovered,
+        width: widget.selected || isCurrent || _hovered ? 1.4 : 1,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          decoration: BoxDecoration(
+            color: resolvedSurfaceColor,
+            borderRadius: borderRadius,
+            border: Border.all(
+              color: widget.selected || isCurrent || _hovered
+                  ? colors.primary
+                  : appListCardBorder(context, solidInLiquidGlass: true),
+              width: widget.selected || isCurrent || _hovered ? 1.4 : 1,
+            ),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: ListTile(
+              minTileHeight: _libraryArtworkRowMinHeight,
+              minVerticalPadding: 7,
+              contentPadding: _libraryOverviewContentPadding,
+              horizontalTitleGap: 10,
+              selected: widget.selectionActive ? widget.selected : false,
+              shape: RoundedRectangleBorder(borderRadius: borderRadius),
+              leading: Stack(
+                children: <Widget>[
+                  _LocalArtwork(
+                    source: widget.item.artworkSource,
+                    fallbackSource: widget.item.artworkFallbackSource,
+                  ),
+                  if (isDownloaded)
+                    Positioned(
+                      right: 1,
+                      bottom: 1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: colors.surface.withValues(alpha: 0.9),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Icon(
+                            Icons.download_done_rounded,
+                            size: 14,
+                            color: colors.primary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (isCurrent || _hovered)
+                    NowPlayingEqualizerOverlay(isPlaying: isPlaying),
+                ],
+              ),
+              title: MarqueeText(
+                widget.item.title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w700,
+                  color: isCurrent
+                      ? colors.primary
+                      : AppColors.contentTitleFor(context),
+                ),
+              ),
+              subtitle: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PlaylistTrackSubtitle(
+                    artist: widget.item.artist,
+                    duration: formatDuration(widget.item.duration),
+                    isDownloaded: isDownloaded,
+                    streamOnlyLabel: strings.streamOnlySong,
+                    cloudKey: ValueKey(
+                      'library-catalog-cloud-${widget.item.entry.id}',
+                    ),
+                    textStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.contentSubtitleFor(context),
+                    ),
+                  ),
+                  if (downloadState != null)
+                    _PlaylistDownloadProgress(
+                      key: ValueKey(
+                        'library-catalog-download-${widget.item.entry.id}',
+                      ),
+                      task: downloadState,
+                    ),
+                ],
+              ),
+              trailing: widget.selectionActive
+                  ? SizedBox(
+                      width: 44,
+                      child: Icon(
+                        widget.selected
+                            ? Icons.check_circle_rounded
+                            : Icons.circle_outlined,
+                        key: ValueKey(
+                          'library-catalog-selection-${widget.item.entry.id}',
+                        ),
+                        color: widget.selected
+                            ? colors.primary
+                            : colors.onSurfaceVariant,
+                      ),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        ?widget.reorderHandle,
+                        TrackPlayButton(
+                          key: ValueKey(
+                            'library-catalog-play-${widget.item.entry.id}',
+                          ),
+                          tooltip: widget.item.isPlayable
+                              ? isPlaying
+                                    ? strings.pause
+                                    : strings.play
+                              : strings.choose(
+                                  'Canción no disponible en YouTube Music',
+                                  'Song unavailable on YouTube Music',
+                                ),
+                          isPlaying: isPlaying,
+                          onPressed: widget.item.isPlayable
+                              ? _togglePlayback
+                              : null,
+                        ),
+                        SizedBox(
+                          width: 36,
+                          height: 44,
+                          child: GlassPopupMenuButton<_TrackMenuAction>(
+                            key: ValueKey(
+                              'library-catalog-menu-${widget.item.entry.id}',
+                            ),
+                            tooltip: strings.moreOptions,
+                            padding: EdgeInsets.zero,
+                            iconSize: menuIconSize,
+                            child: Center(
+                              child: Icon(
+                                Icons.more_vert_rounded,
+                                size: menuIconSize,
+                                color: menuIconColor,
+                              ),
+                            ),
+                            onSelected: (action) =>
+                                _handleAction(context, action),
+                            itemBuilder: (context) {
+                              final entries =
+                                  <PopupMenuEntry<_TrackMenuAction>>[];
+                              final remote = widget.item.playback?.remoteTrack;
+                              if (remote != null &&
+                                  (!isDownloaded || canCancelDownload)) {
+                                entries.add(
+                                  PopupMenuItem<_TrackMenuAction>(
+                                    value: _TrackMenuAction.download,
+                                    child: _trackMenuItem(
+                                      context,
+                                      canCancelDownload
+                                          ? Icons.close_rounded
+                                          : Icons.download_rounded,
+                                      canCancelDownload
+                                          ? strings.cancelDownload
+                                          : strings.download,
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (widget.item.isPlayable) {
+                                entries.add(
+                                  PopupMenuItem<_TrackMenuAction>(
+                                    value: _TrackMenuAction.addToPlaylist,
+                                    child: _trackMenuItem(
+                                      context,
+                                      Icons.playlist_add_rounded,
+                                      strings.addToPlaylist,
+                                    ),
+                                  ),
+                                );
+                              }
+                              entries.add(
+                                PopupMenuItem<_TrackMenuAction>(
+                                  value: _TrackMenuAction.removeFromPlaylist,
+                                  child: _trackMenuItem(
+                                    context,
+                                    Icons.playlist_remove_rounded,
+                                    widget.playlist.isFavorites
+                                        ? strings.removeFromFavorites
+                                        : strings.removeFromPlaylist,
+                                  ),
+                                ),
+                              );
+                              return entries;
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+              onTap:
+                  widget.onSelectionTap ??
+                  (widget.item.isPlayable ? _openOrPlay : null),
+              onLongPress: widget.onLongPress,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _togglePlayback() async {
+    if (!widget.item.isPlayable) return;
+    final snapshot = ref.read(playerControllerProvider).value;
+    final queue = ref.read(playbackQueueProvider);
+    final player = ref.read(playerControllerProvider.notifier);
+    if (_isCurrentOccurrence(snapshot?.trackId, queue)) {
+      if (snapshot?.status == PlayerStatus.playing) {
+        await player.pause();
+        return;
+      }
+      if (snapshot?.status == PlayerStatus.paused) {
+        await player.resume();
+        return;
+      }
+    }
+    await _play(player);
+  }
+
+  Future<void> _openOrPlay() async {
+    if (!widget.item.isPlayable) return;
+    final snapshot = ref.read(playerControllerProvider).value;
+    final queue = ref.read(playbackQueueProvider);
+    final alreadyLoaded =
+        _isCurrentOccurrence(snapshot?.trackId, queue) &&
+        (snapshot?.status == PlayerStatus.loading ||
+            snapshot?.status == PlayerStatus.playing ||
+            snapshot?.status == PlayerStatus.paused);
+    if (alreadyLoaded) {
+      widget.onOpenPlayer();
+      return;
+    }
+    final player = ref.read(playerControllerProvider.notifier);
+    final future = _play(player);
+    widget.onOpenPlayer();
+    await future;
+  }
+
+  Future<void> _play(PlayerController player) {
+    final playback = widget.item.playback;
+    if (playback == null) return Future<void>.value();
+    return player.playCatalogPlaylist(
+      playback,
+      queue: widget.queueItems
+          .map((item) => item.playback)
+          .whereType<CatalogPlaybackItem>()
+          .toList(growable: false),
+      playlistId: widget.playlist.id,
+    );
+  }
+
+  bool _isCurrentOccurrence(String? trackId, PlaybackQueueState queue) {
+    final currentLogicalEntryId =
+        queue.currentIndex >= 0 && queue.currentIndex < queue.entries.length
+        ? queue.entries[queue.currentIndex].logicalEntryId
+        : null;
+    return currentLogicalEntryId != null
+        ? currentLogicalEntryId == widget.item.entry.id
+        : widget.item.matchesTrackId(trackId);
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    _TrackMenuAction action,
+  ) async {
+    final controller = ref.read(playlistsControllerProvider.notifier);
+    switch (action) {
+      case _TrackMenuAction.download:
+        final remote = widget.item.playback?.remoteTrack;
+        if (remote == null) return;
+        final downloads = ref.read(downloadControllerProvider);
+        final downloadController = ref.read(
+          downloadControllerProvider.notifier,
+        );
+        final cancelling = downloads[remote.url]?.isCancellable == true;
+        if (cancelling) {
+          await downloadController.cancelDownload(remote.url);
+        } else {
+          await downloadController.downloadAudio(remote);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                cancelling
+                    ? ref.read(appStringsProvider).downloadCancelled
+                    : ref.read(appStringsProvider).downloadQueued,
+              ),
+            ),
+          );
+        }
+      case _TrackMenuAction.addToPlaylist:
+        final playlistId = await _pickDestinationPlaylist(
+          context,
+          ref,
+          excludePlaylistId: widget.playlist.id,
+        );
+        if (playlistId == null || !context.mounted) return;
+        final local = widget.item.localTrack;
+        final remote = widget.item.playback?.remoteTrack;
+        if (local != null) {
+          await controller.addTrackToPlaylist(playlistId, local.id);
+        } else if (remote != null) {
+          await controller.addRemoteTrackToPlaylist(playlistId, remote);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(ref.read(appStringsProvider).songAddedToPlaylist),
+            ),
+          );
+        }
+      case _TrackMenuAction.removeFromPlaylist:
+        await controller.removeCatalogEntry(
+          widget.playlist.id,
+          widget.item.entry.id,
+        );
+      case _TrackMenuAction.renameTrack:
+      case _TrackMenuAction.toggleFavorite:
+      case _TrackMenuAction.deleteTrack:
+        return;
+    }
+  }
+}
+
+class _TrackListView extends ConsumerWidget {
+  const _TrackListView({
+    required this.bottomContentPadding,
+    required this.title,
+    required this.subtitle,
+    required this.tracks,
+    required this.queueTracks,
+    required this.filterController,
+    this.filterVisible = true,
+    this.searchFocusNode,
+    this.onClearOrCloseSearch,
+    this.onSearchRequested,
+    this.onPlayAll,
+    required this.onBack,
+    required this.onOpenPlayer,
+    required this.mode,
+    required this.selectionEnabled,
+    required this.selectionBusy,
+    required this.selectedTrackIds,
+    required this.onSelectTrack,
+    required this.onToggleTrack,
+    required this.onClearSelection,
+    required this.onAddSelected,
+    required this.onDeleteSelected,
+    this.playlist,
+    this.playlistId,
+    this.onReorderTracks,
+    this.artworkSources = const [],
+  });
+
+  final double bottomContentPadding;
+  final List<PlaylistArtworkSource> artworkSources;
+  final String title;
+  final String subtitle;
+  final List<LocalTrack> tracks;
+  final List<LocalTrack> queueTracks;
+  final TextEditingController filterController;
+  final bool filterVisible;
+  final FocusNode? searchFocusNode;
+  final VoidCallback? onClearOrCloseSearch;
+  final VoidCallback? onSearchRequested;
+  final VoidCallback? onPlayAll;
+  final VoidCallback onBack;
+  final VoidCallback onOpenPlayer;
+  final _TrackListMode mode;
+  final bool selectionEnabled;
+  final bool selectionBusy;
+  final Set<String> selectedTrackIds;
+  final ValueChanged<String> onSelectTrack;
+  final ValueChanged<String> onToggleTrack;
+  final VoidCallback onClearSelection;
+  final Future<void> Function(BuildContext context) onAddSelected;
+  final Future<void> Function(BuildContext context) onDeleteSelected;
+  final Playlist? playlist;
+  final String? playlistId;
+  final Future<void> Function(List<String> orderedTrackIds)? onReorderTracks;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final selectionActive = selectionEnabled && selectedTrackIds.isNotEmpty;
+    final canReorder =
+        onReorderTracks != null &&
+        filterController.text.trim().isEmpty &&
+        !selectionActive;
+    final frame = ScrolledUnderTabFrame(
+      surfaceKey: ValueKey(
+        selectionActive
+            ? 'library-selection-toolbar-padding'
+            : 'library-detail-header-surface',
+      ),
+      pinnedFooterSurfaceKey: const ValueKey('library-filter-region-surface'),
+      pinnedFooterHasOwnSurface: true,
+      hidePinnedFooterOnScroll: playlist == null,
+      scrollKey: const ValueKey('library-track-scroll'),
+      header: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        child: selectionActive
+            ? _TrackSelectionToolbar(
+                key: const ValueKey('library-selection-toolbar'),
+                count: selectedTrackIds.length,
+                removesFromPlaylist: mode == _TrackListMode.playlist,
+                favorites: playlist?.isFavorites ?? false,
+                busy: selectionBusy,
+                onClose: onClearSelection,
+                onAddToPlaylist: () => onAddSelected(context),
+                onDelete: () => onDeleteSelected(context),
+              )
+            : _DetailHeader(
+                key: const ValueKey('library-detail-header'),
+                title: title,
+                subtitle: subtitle,
+                onBack: onBack,
+                trailing: playlist == null
+                    ? _DownloadedMetadataMenu(trackCount: queueTracks.length)
+                    : _PlaylistMenu(
+                        playlist: playlist!,
+                        onBack: onBack,
+                        onSearchRequested: onSearchRequested,
+                      ),
+              ),
+      ),
+      pinnedFooter: playlist == null
+          ? _LibraryFilterSurface(
+              controller: filterController,
+              hintText: strings.filterSongs,
+            )
+          : _PlaylistSearchFooter(
+              controller: filterController,
+              hintText: strings.filterSongs,
+              focusNode: searchFocusNode!,
+              visible: filterVisible,
+              closeTooltip: strings.close,
+              onClearOrClose: onClearOrCloseSearch!,
+            ),
+      slivers: [
+        if (playlist != null)
+          SliverToBoxAdapter(
+            child: _PlaylistArtworkHeader(
+              playlist: playlist!,
+              title: title,
+              subtitle: subtitle,
+              sources: artworkSources,
+              onPlayAll: queueTracks.isNotEmpty ? onPlayAll : null,
+            ),
+          ),
+        ...(tracks.isEmpty
+            ? <Widget>[
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Text(
+                      strings.noSongsToShow,
+                      style: TextStyle(
+                        color: AppColors.contentSubtitleFor(context),
+                      ),
+                    ),
+                  ),
+                ),
+              ]
+            : <Widget>[
+                SliverPadding(
+                  padding: EdgeInsets.only(bottom: bottomContentPadding + 12),
+                  sliver: canReorder
+                      ? SliverReorderableList(
+                          itemCount: tracks.length,
+                          onReorderItem: (oldIndex, newIndex) async {
+                            final reordered = tracks.toList();
+                            final moved = reordered.removeAt(oldIndex);
+                            reordered.insert(newIndex, moved);
+                            try {
+                              await onReorderTracks!(
+                                reordered
+                                    .map((track) => track.id)
+                                    .toList(growable: false),
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(
+                                context,
+                              ).showSnackBar(SnackBar(content: Text('$error')));
+                            }
+                          },
+                          itemBuilder: (context, index) => _buildTrackRow(
+                            context,
+                            index,
+                            selectionActive: selectionActive,
+                            reorderHandle: _LibraryReorderHandle(index: index),
+                          ),
+                        )
+                      : SliverList.builder(
+                          itemCount: tracks.length,
+                          itemBuilder: (context, index) => _buildTrackRow(
+                            context,
+                            index,
+                            selectionActive: selectionActive,
+                          ),
+                        ),
+                ),
+              ]),
+      ],
+    );
+    return playlist == null
+        ? frame
+        : _PlaylistDetailBackdrop(sources: artworkSources, child: frame);
+  }
+
+  Widget _buildTrackRow(
+    BuildContext context,
+    int index, {
+    required bool selectionActive,
+    Widget? reorderHandle,
+  }) {
+    final track = tracks[index];
+    return Padding(
+      key: ValueKey('library-track-row-${track.id}'),
+      padding: const EdgeInsets.fromLTRB(6, 0, 6, appTrackRowGap),
+      child: _LocalTrackTile(
+        key: ValueKey('library-track-${track.id}'),
+        track: track,
+        mode: mode,
+        playlistId: playlistId,
+        queueTracks: queueTracks,
+        onOpenPlayer: onOpenPlayer,
+        selectionActive: selectionActive,
+        selected: selectedTrackIds.contains(track.id),
+        onLongPress: selectionEnabled ? () => onSelectTrack(track.id) : null,
+        onSelectionTap: selectionActive ? () => onToggleTrack(track.id) : null,
+        reorderHandle: reorderHandle,
+      ),
+    );
+  }
+}
+
+class _TrackSelectionToolbar extends ConsumerWidget {
+  const _TrackSelectionToolbar({
+    required this.count,
+    required this.removesFromPlaylist,
+    required this.favorites,
+    required this.busy,
+    required this.onClose,
+    required this.onAddToPlaylist,
+    required this.onDelete,
+    this.onDownload,
+    super.key,
+  });
+
+  final int count;
+  final bool removesFromPlaylist;
+  final bool favorites;
+  final bool busy;
+  final VoidCallback onClose;
+  final VoidCallback onAddToPlaylist;
+  final VoidCallback onDelete;
+  final VoidCallback? onDownload;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    return SizedBox(
+      height: 48,
+      child: Row(
+        children: [
+          IconButton(
+            key: const ValueKey('library-selection-close'),
+            tooltip: strings.close,
+            onPressed: onClose,
+            icon: const Icon(Icons.close_rounded),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              strings.selectedSongs(count),
+              key: const ValueKey('library-selection-count'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: AppColors.contentHeadingFor(context),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          GlassPopupMenuButton<_TrackSelectionAction>(
+            key: const ValueKey('library-selection-menu'),
+            tooltip: strings.moreOptions,
+            enabled: !busy,
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: AppColors.menuIconFor(context),
+            ),
+            onSelected: (action) {
+              switch (action) {
+                case _TrackSelectionAction.addToPlaylist:
+                  onAddToPlaylist();
+                case _TrackSelectionAction.download:
+                  onDownload?.call();
+                case _TrackSelectionAction.remove:
+                  onDelete();
+              }
+            },
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                key: const ValueKey('library-selection-add-to-playlist'),
+                value: _TrackSelectionAction.addToPlaylist,
+                child: _trackMenuItem(
+                  context,
+                  Icons.playlist_add_rounded,
+                  strings.addToPlaylist,
+                ),
+              ),
+              if (onDownload != null)
+                PopupMenuItem(
+                  key: const ValueKey('library-selection-download'),
+                  value: _TrackSelectionAction.download,
+                  child: _trackMenuItem(
+                    context,
+                    Icons.download_rounded,
+                    strings.download,
+                  ),
+                ),
+              PopupMenuItem(
+                key: ValueKey(
+                  removesFromPlaylist
+                      ? 'library-selection-remove-from-playlist'
+                      : 'library-selection-delete',
+                ),
+                value: _TrackSelectionAction.remove,
+                child: _trackMenuItem(
+                  context,
+                  removesFromPlaylist
+                      ? (favorites
+                            ? Icons.favorite_border_rounded
+                            : Icons.playlist_remove_rounded)
+                      : Icons.delete_outline_rounded,
+                  removesFromPlaylist
+                      ? (favorites
+                            ? strings.removeFromFavorites
+                            : strings.removeFromPlaylist)
+                      : strings.deleteSelectedSongs,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _TrackListMode { downloads, playlist }
+
+class _DownloadedMetadataMenu extends ConsumerWidget {
+  const _DownloadedMetadataMenu({required this.trackCount});
+
+  final int trackCount;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final state = ref.watch(downloadMetadataRefreshControllerProvider);
+    final progress = strings.downloadedMetadataProgress(
+      state.processed,
+      state.total,
+    );
+    return SizedBox.square(
+      dimension: 48,
+      child: GlassPopupMenuButton<_DownloadsMenuAction>(
+        key: const ValueKey('downloads-metadata-menu'),
+        tooltip: state.running ? progress : strings.moreOptions,
+        enabled: !state.running && trackCount > 0,
+        icon: state.running
+            ? Semantics(
+                liveRegion: true,
+                label: progress,
+                child: SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    value: state.total == 0
+                        ? null
+                        : state.processed / state.total,
+                  ),
+                ),
+              )
+            : const Icon(Icons.more_vert_rounded),
+        onSelected: (_) => unawaited(_refresh(context, ref)),
+        itemBuilder: (context) => [
+          PopupMenuItem(
+            key: const ValueKey('downloads-refresh-metadata'),
+            value: _DownloadsMenuAction.refreshMetadata,
+            child: _trackMenuItem(
+              context,
+              Icons.sync_rounded,
+              strings.refreshDownloadedMetadata,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _refresh(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final controller = ref.read(
+      downloadMetadataRefreshControllerProvider.notifier,
+    );
+    final messenger = ScaffoldMessenger.of(context);
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(strings.downloadedMetadataProgress(0, trackCount)),
+        ),
+      );
+    try {
+      final result = await controller.refresh();
+      if (!messenger.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              strings.downloadedMetadataSummary(
+                result.updated,
+                result.skipped,
+                result.failed,
+              ),
+            ),
+          ),
+        );
+    } catch (_) {
+      if (!messenger.mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(content: Text(strings.downloadedMetadataFailed)),
+        );
+    }
+  }
+}
+
+class _LibraryFilterSurface extends StatelessWidget {
+  const _LibraryFilterSurface({
+    required this.controller,
+    required this.hintText,
+    this.focusNode,
+    this.onClearOrClose,
+    this.closeTooltip,
+    super.key,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final FocusNode? focusNode;
+  final VoidCallback? onClearOrClose;
+  final String? closeTooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 4, 6, 6),
+      child: AppSurfaceInput(
+        key: const ValueKey('library-filter-surface'),
+        child: TextField(
+          controller: controller,
+          focusNode: focusNode,
+          textAlignVertical: TextAlignVertical.center,
+          decoration: InputDecoration(
+            hintText: hintText,
+            prefixIcon: const Icon(Icons.search_rounded),
+            suffixIcon: onClearOrClose == null
+                ? null
+                : IconButton(
+                    key: const ValueKey('library-filter-clear-or-close'),
+                    tooltip: closeTooltip,
+                    onPressed: onClearOrClose,
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistSearchFooter extends StatelessWidget {
+  const _PlaylistSearchFooter({
+    required this.controller,
+    required this.hintText,
+    required this.focusNode,
+    required this.visible,
+    required this.closeTooltip,
+    required this.onClearOrClose,
+  });
+
+  final TextEditingController controller;
+  final String hintText;
+  final FocusNode focusNode;
+  final bool visible;
+  final String closeTooltip;
+  final VoidCallback onClearOrClose;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+    return IgnorePointer(
+      ignoring: !visible,
+      child: ExcludeSemantics(
+        excluding: !visible,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: duration,
+          curve: Curves.easeOut,
+          child: ClipRect(
+            child: AnimatedSize(
+              duration: duration,
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: visible
+                  ? _LibraryFilterSurface(
+                      key: const ValueKey('library-playlist-search-visible'),
+                      controller: controller,
+                      hintText: hintText,
+                      focusNode: focusNode,
+                      closeTooltip: closeTooltip,
+                      onClearOrClose: onClearOrClose,
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('library-playlist-search-hidden'),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryReorderHandle extends ConsumerWidget {
+  const _LibraryReorderHandle({required this.index});
+
+  final int index;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    return Tooltip(
+      message: strings.reorderSong,
+      child: ReorderableDragStartListener(
+        index: index,
+        child: SizedBox(
+          width: 30,
+          height: 48,
+          child: Center(
+            child: Icon(
+              Icons.drag_indicator_rounded,
+              size: 20,
+              color: AppColors.contentSubtitleFor(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DetailHeader extends StatelessWidget {
+  const _DetailHeader({
+    required this.title,
+    required this.subtitle,
+    required this.onBack,
+    this.trailing,
+    super.key,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onBack;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        _NeutralLibraryIconButton(
+          tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+          icon: Icons.arrow_back_rounded,
+          iconSize: 28,
+          buttonSize: 48,
+          onPressed: onBack,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.contentHeadingFor(context),
+                  height: 1,
+                ),
+              ),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: AppColors.contentSubtitleFor(context),
+                  height: 1.1,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+      ],
+    );
+  }
+}
+
+class _NeutralLibraryIconButton extends StatelessWidget {
+  const _NeutralLibraryIconButton({
+    super.key,
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.iconSize,
+    this.buttonSize,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final double? iconSize;
+  final double? buttonSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return IconButton(
+      tooltip: tooltip,
+      icon: Icon(icon, size: iconSize),
+      style: IconButton.styleFrom(
+        foregroundColor: colors.onSurface,
+        backgroundColor: colors.surfaceContainerHighest.withValues(alpha: 0.84),
+        hoverColor: colors.onSurface.withValues(alpha: 0.1),
+        focusColor: colors.onSurface.withValues(alpha: 0.12),
+        highlightColor: colors.onSurface.withValues(alpha: 0.14),
+        shape: CircleBorder(
+          side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.8)),
+        ),
+        fixedSize: buttonSize == null ? null : Size.square(buttonSize!),
+        tapTargetSize: buttonSize == null
+            ? null
+            : MaterialTapTargetSize.shrinkWrap,
+      ),
+      constraints: buttonSize == null
+          ? null
+          : BoxConstraints.tightFor(width: buttonSize, height: buttonSize),
+      padding: buttonSize == null ? null : EdgeInsets.zero,
+      onPressed: onPressed,
+    );
+  }
+}
+
+class _PlaylistMenu extends ConsumerWidget {
+  const _PlaylistMenu({
+    required this.playlist,
+    required this.onBack,
+    this.onSearchRequested,
+  });
+
+  final Playlist playlist;
+  final VoidCallback onBack;
+  final VoidCallback? onSearchRequested;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    final hasPendingDownloads = ref.watch(
+      playlistHasPendingDownloadsProvider(playlist.id),
+    );
+    final preparingDownloads = ref.watch(
+      playlistDownloadPreparationsProvider.select(
+        (ids) => ids.contains(playlist.id),
+      ),
+    );
+    final canCancelDownloads = hasPendingDownloads || preparingDownloads;
+    final buttonSize = AppPlatform.isMobile ? 48.0 : 52.0;
+    final buttonWidth = AppPlatform.isMobile ? 36.0 : 40.0;
+    final iconSize = AppPlatform.isMobile ? 32.0 : 24.0;
+    final menuIconColor = AppColors.menuIconFor(context);
+    return SizedBox(
+      width: buttonWidth,
+      height: buttonSize,
+      child: GlassPopupMenuButton<_PlaylistMenuAction>(
+        tooltip: strings.moreOptions,
+        padding: EdgeInsets.zero,
+        iconSize: iconSize,
+        child: Center(
+          child: Icon(
+            Icons.more_vert_rounded,
+            size: iconSize,
+            color: menuIconColor,
+          ),
+        ),
+        onSelected: (action) => _handleAction(context, ref, action),
+        itemBuilder: (context) => [
+          if (onSearchRequested != null)
+            PopupMenuItem(
+              key: ValueKey('playlist-search-${playlist.id}'),
+              value: _PlaylistMenuAction.searchSongs,
+              child: _trackMenuItem(
+                context,
+                Icons.search_rounded,
+                strings.searchPlaylistSongs,
+              ),
+            ),
+          PopupMenuItem(
+            key: ValueKey(
+              canCancelDownloads
+                  ? 'playlist-cancel-downloads-${playlist.id}'
+                  : 'playlist-download-all-${playlist.id}',
+            ),
+            value: canCancelDownloads
+                ? _PlaylistMenuAction.cancelDownloads
+                : _PlaylistMenuAction.downloadAll,
+            child: _trackMenuItem(
+              context,
+              canCancelDownloads ? Icons.close_rounded : Icons.download_rounded,
+              canCancelDownloads
+                  ? strings.cancelDownloads
+                  : strings.downloadAll,
+            ),
+          ),
+          PopupMenuItem(
+            key: ValueKey('playlist-share-${playlist.id}'),
+            value: _PlaylistMenuAction.sharePlaylist,
+            child: Row(
+              children: [
+                Icon(Icons.share_rounded, color: menuIconColor),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    strings.sharePlaylist,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!playlist.isFavorites) ...[
+            PopupMenuItem(
+              value: _PlaylistMenuAction.renamePlaylist,
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.drive_file_rename_outline_rounded,
+                    color: menuIconColor,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      strings.renamePlaylist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            PopupMenuItem(
+              value: _PlaylistMenuAction.deletePlaylist,
+              child: Row(
+                children: [
+                  Icon(Icons.delete_outline_rounded, color: menuIconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      strings.deletePlaylist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    WidgetRef ref,
+    _PlaylistMenuAction action,
+  ) async {
+    switch (action) {
+      case _PlaylistMenuAction.searchSongs:
+        onSearchRequested?.call();
+      case _PlaylistMenuAction.cancelDownloads:
+        final strings = ref.read(appStringsProvider);
+        try {
+          await ref
+              .read(downloadControllerProvider.notifier)
+              .cancelPlaylistDownloads(playlist);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(strings.downloadsCancelled)));
+        } catch (error) {
+          debugPrint('Could not cancel playlist downloads: $error');
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(strings.bulkDownloadCancelFailed)),
+          );
+        }
+      case _PlaylistMenuAction.downloadAll:
+        final strings = ref.read(appStringsProvider);
+        try {
+          final queued = await ref
+              .read(downloadControllerProvider.notifier)
+              .downloadPlaylist(playlist);
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                queued == 0
+                    ? strings.noPendingPlaylistDownloads
+                    : strings.songsQueuedForDownload(queued),
+              ),
+            ),
+          );
+        } catch (error) {
+          debugPrint('Could not queue playlist downloads: $error');
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(strings.playlistDownloadFailed)),
+          );
+        }
+      case _PlaylistMenuAction.sharePlaylist:
+        await _sharePlaylist(context, ref);
+      case _PlaylistMenuAction.renamePlaylist:
+        await _renamePlaylist(context, ref);
+      case _PlaylistMenuAction.deletePlaylist:
+        await _deletePlaylist(context, ref);
+    }
+  }
+
+  Future<void> _sharePlaylist(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final isAuthenticated = ref
+        .read(youtubeMusicAuthControllerProvider)
+        .isAuthenticated;
+    final format = isAuthenticated
+        ? await showAppDialog<_PlaylistShareFormat>(
+            context: context,
+            builder: (dialogContext) => AppAlertDialog(
+              key: const Key('playlist-share-format-dialog'),
+              title: Text(strings.sharePlaylistTitle),
+              scrollable: true,
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      key: const Key('playlist-share-csv'),
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.description_outlined),
+                      title: Text(strings.sharePlaylistCsv),
+                      subtitle: Text(strings.sharePlaylistCsvDescription),
+                      onTap: () => Navigator.of(
+                        dialogContext,
+                      ).pop(_PlaylistShareFormat.csv),
+                    ),
+                    ListTile(
+                      key: const Key('playlist-share-url'),
+                      enabled: !playlist.isFavorites,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.link_rounded),
+                      title: Text(strings.sharePlaylistYouTubeMusicUrl),
+                      subtitle: Text(
+                        playlist.isFavorites
+                            ? strings.favoritesPlaylistUrlUnavailable
+                            : strings.sharePlaylistUrlDescription,
+                      ),
+                      onTap: () => Navigator.of(
+                        dialogContext,
+                      ).pop(_PlaylistShareFormat.youtubeMusicUrl),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  key: const Key('playlist-share-format-cancel'),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: Text(strings.cancel),
+                ),
+              ],
+            ),
+          )
+        : _PlaylistShareFormat.csv;
+    if (!context.mounted || format == null) return;
+    switch (format) {
+      case _PlaylistShareFormat.csv:
+        await _sharePlaylistCsv(context, ref);
+      case _PlaylistShareFormat.youtubeMusicUrl:
+        await _sharePlaylistUrl(context, ref);
+    }
+  }
+
+  Future<void> _sharePlaylistCsv(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    try {
+      final snapshot = await ref
+          .read(libraryOperationCoordinatorProvider)
+          .runWithGate(() async {
+            final catalog = await ref.read(
+              catalogPlaylistProvider(playlist.id).future,
+            );
+            if (catalog == null) {
+              throw StateError('The playlist is no longer available.');
+            }
+            final tracks = await ref.read(libraryTracksProvider.future);
+            return (catalog: catalog, tracks: tracks);
+          });
+      if (!context.mounted) return;
+      await ref
+          .read(playlistCsvShareServiceProvider)
+          .sharePlaylist(
+            playlist: snapshot.catalog,
+            localTracks: snapshot.tracks,
+            title: strings.sharePlaylistTitle,
+            subject: snapshot.catalog.playlist.name,
+            sharePositionOrigin: sharePositionOriginForContext(context),
+          );
+    } catch (error) {
+      debugPrint('Could not share playlist CSV: $error');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(strings.playlistShareFailed)));
+    }
+  }
+
+  Future<void> _sharePlaylistUrl(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    if (!ref.read(youtubeMusicAuthControllerProvider).isAuthenticated ||
+        playlist.isFavorites) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.playlistShareUrlUnavailable)),
+      );
+      return;
+    }
+    late final Map<String, YouTubeMusicShareablePlaylistBinding> bindings;
+    try {
+      bindings = await ref.read(
+        youtubeMusicShareablePlaylistBindingDetailsProvider.future,
+      );
+    } catch (error) {
+      debugPrint('Could not read synchronized playlist binding: $error');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.playlistShareUrlUnavailable)),
+      );
+      return;
+    }
+    final binding = bindings[playlist.id];
+    final service = ref.read(youtubeMusicPlaylistShareServiceProvider);
+    if (binding == null ||
+        !service.canShare(
+          remotePlaylistId: binding.remotePlaylistId,
+          playlistName: playlist.name,
+        )) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.playlistShareUrlUnavailable)),
+      );
+      return;
+    }
+
+    var visibilityChanged = false;
+    if (!binding.isDirectlyShareable) {
+      if (!context.mounted) return;
+      final confirmed = await showAppDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AppAlertDialog(
+          title: Text(strings.sharePlaylistTitle),
+          content: Text(strings.sharePrivatePlaylistExplanation),
+          actions: [
+            TextButton(
+              key: const Key('playlist-share-private-cancel'),
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(strings.cancel),
+            ),
+            FilledButton.icon(
+              key: const Key('playlist-share-make-unlisted'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              icon: const Icon(Icons.link_rounded),
+              label: Text(strings.makeUnlistedAndShare),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !context.mounted) return;
+      final preparationError = await showAppDialog<Object>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _PlaylistSharePreparationDialog(
+          message: strings.preparingPlaylistShare,
+          operation: () =>
+              ref.read(youtubeMusicMakePlaylistUnlistedForSharingProvider)(
+                localPlaylistId: playlist.id,
+                expectedRemotePlaylistId: binding.remotePlaylistId,
+              ),
+        ),
+      );
+      if (preparationError != null) {
+        debugPrint(
+          'Could not make synchronized playlist unlisted: $preparationError',
+        );
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(strings.playlistVisibilityChangeFailed)),
+        );
+        return;
+      }
+      visibilityChanged = true;
+    }
+
+    try {
+      if (!context.mounted) return;
+      await service.sharePlaylist(
+        remotePlaylistId: binding.remotePlaylistId,
+        playlistName: playlist.name,
+        message: strings.sharePlaylistMessage(playlist.name),
+        title: strings.sharePlaylistTitle,
+        subject: strings.sharePlaylistTitle,
+        // Recalculate after any visibility dialog/network wait so iPad never
+        // receives a stale popover anchor after a rotation or layout change.
+        sharePositionOrigin: sharePositionOriginForContext(context),
+      );
+    } catch (error) {
+      debugPrint('Could not share synchronized playlist: $error');
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            visibilityChanged
+                ? strings.playlistShareFailedAfterVisibilityChange
+                : strings.playlistShareFailed,
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _renamePlaylist(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final rawName = await showAppDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(
+        title: strings.renamePlaylist,
+        initialValue: playlist.name,
+        hint: strings.name,
+        cancelLabel: strings.cancel,
+        confirmLabel: strings.rename,
+      ),
+    );
+    final name = rawName?.trim();
+    if (name == null || name.isEmpty || name == playlist.name) {
+      return;
+    }
+
+    await ref
+        .read(playlistsControllerProvider.notifier)
+        .renamePlaylist(playlist.id, name);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ref.read(appStringsProvider).playlistRenamed)),
+    );
+  }
+
+  Future<void> _deletePlaylist(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final controller = ref.read(playlistsControllerProvider.notifier);
+    final options = await controller.playlistDeleteOptions(playlist.id);
+    if (!context.mounted) return;
+    final scope = await showAppDialog<PlaylistDeleteScope>(
+      context: context,
+      builder: (dialogContext) {
+        final linked = options.isYouTubeMusicLinked;
+        final canDeleteRemote = options.canDeleteFromYouTubeMusic;
+        return AppAlertDialog(
+          title: Text(strings.deletePlaylist),
+          content: Text(
+            linked
+                ? canDeleteRemote
+                      ? strings.confirmDeleteSyncedPlaylist
+                      : strings.confirmDeleteReadOnlySyncedPlaylist
+                : strings.confirmDeletePlaylist,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(strings.cancel),
+            ),
+            if (linked)
+              TextButton(
+                key: const Key('playlist-delete-local-only'),
+                onPressed: () => Navigator.of(
+                  dialogContext,
+                ).pop(PlaylistDeleteScope.localOnly),
+                child: Text(strings.removePlaylistFromBStream),
+              )
+            else
+              FilledButton.icon(
+                icon: const Icon(Icons.delete_outline_rounded),
+                label: Text(strings.delete),
+                onPressed: () => Navigator.of(
+                  dialogContext,
+                ).pop(PlaylistDeleteScope.localOnly),
+              ),
+            if (canDeleteRemote)
+              FilledButton.icon(
+                key: const Key('playlist-delete-youtube-too'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(dialogContext).colorScheme.error,
+                  foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+                ),
+                icon: const Icon(Icons.delete_forever_outlined),
+                label: Text(strings.deletePlaylistFromYouTubeMusic),
+                onPressed: () => Navigator.of(
+                  dialogContext,
+                ).pop(PlaylistDeleteScope.youtubeMusicToo),
+              ),
+          ],
+        );
+      },
+    );
+    if (scope == null) {
+      return;
+    }
+
+    await controller.deletePlaylist(playlist.id, scope: scope);
+    if (!context.mounted) {
+      return;
+    }
+    onBack();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          scope == PlaylistDeleteScope.youtubeMusicToo
+              ? ref
+                    .read(appStringsProvider)
+                    .youtubeMusicPlaylistDeletionScheduled
+              : ref.read(appStringsProvider).playlistDeleted,
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistSharePreparationDialog extends StatefulWidget {
+  const _PlaylistSharePreparationDialog({
+    required this.message,
+    required this.operation,
+  });
+
+  final String message;
+  final Future<void> Function() operation;
+
+  @override
+  State<_PlaylistSharePreparationDialog> createState() =>
+      _PlaylistSharePreparationDialogState();
+}
+
+class _PlaylistSharePreparationDialogState
+    extends State<_PlaylistSharePreparationDialog> {
+  @override
+  void initState() {
+    super.initState();
+    _run();
+  }
+
+  Future<void> _run() async {
+    Object? error;
+    try {
+      await widget.operation();
+    } catch (caughtError) {
+      error = caughtError;
+    }
+    if (!mounted) return;
+    Navigator.of(context).pop<Object>(error);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AppAlertDialog(
+        key: const Key('playlist-share-preparing'),
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox.square(
+              dimension: 24,
+              child: CircularProgressIndicator(strokeWidth: 2.5),
+            ),
+            const SizedBox(width: 16),
+            Flexible(child: Text(widget.message)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NameDialog extends StatefulWidget {
+  const _NameDialog({
+    required this.title,
+    required this.initialValue,
+    required this.hint,
+    required this.cancelLabel,
+    required this.confirmLabel,
+  });
+
+  final String title;
+  final String initialValue;
+  final String hint;
+  final String cancelLabel;
+  final String confirmLabel;
+
+  @override
+  State<_NameDialog> createState() => _NameDialogState();
+}
+
+class _NameDialogState extends State<_NameDialog> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(hintText: widget.hint),
+        onSubmitted: _closeWithName,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(widget.cancelLabel),
+        ),
+        FilledButton.icon(
+          icon: const Icon(Icons.check_rounded),
+          label: Text(widget.confirmLabel),
+          onPressed: () => _closeWithName(_controller.text),
+        ),
+      ],
+    );
+  }
+
+  void _closeWithName(String value) {
+    Navigator.of(context).pop(value.trim());
+  }
+}
+
+class _PanelLoading extends StatelessWidget {
+  const _PanelLoading({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(child: CircularProgressIndicator());
+  }
+}
+
+class _PanelError extends StatelessWidget {
+  const _PanelError({
+    required this.error,
+    required this.onBack,
+    required this.title,
+  });
+
+  final Object error;
+  final VoidCallback onBack;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DetailHeader(title: title, subtitle: 'Error', onBack: onBack),
+        Padding(
+          padding: const EdgeInsets.all(18),
+          child: Text(
+            error.toString(),
+            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionTitle(text);
+  }
+}
+
+class _PlaylistList extends StatelessWidget {
+  const _PlaylistList({
+    required this.artworkRotationSeed,
+    required this.playlists,
+    required this.libraryTracks,
+    required this.catalogPlaylists,
+    required this.strings,
+    required this.onOpenPlaylist,
+  });
+
+  final List<Playlist> playlists;
+  final int artworkRotationSeed;
+  final List<LocalTrack> libraryTracks;
+  final Map<String, CatalogPlaylist> catalogPlaylists;
+  final AppStrings strings;
+  final ValueChanged<String> onOpenPlaylist;
+
+  @override
+  Widget build(BuildContext context) {
+    if (playlists.isEmpty) {
+      return SliverToBoxAdapter(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Text(
+            strings.noLocalPlaylists,
+            style: TextStyle(color: AppColors.contentSubtitleFor(context)),
+          ),
+        ),
+      );
+    }
+
+    final tracksById = {for (final track in libraryTracks) track.id: track};
+
+    return SliverList.builder(
+      itemCount: playlists.length,
+      itemBuilder: (context, index) {
+        final playlist = playlists[index];
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, appCardGap),
+          child: _PlaylistSummaryRow(
+            playlist: playlist,
+            catalog: catalogPlaylists[playlist.id],
+            libraryTracks: libraryTracks,
+            tracksById: tracksById,
+            artworkRotationSeed: artworkRotationSeed,
+            strings: strings,
+            onTap: () => onOpenPlaylist(playlist.id),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlaylistSummaryRow extends ConsumerWidget {
+  const _PlaylistSummaryRow({
+    required this.playlist,
+    required this.catalog,
+    required this.libraryTracks,
+    required this.tracksById,
+    required this.artworkRotationSeed,
+    required this.strings,
+    required this.onTap,
+  });
+
+  final Playlist playlist;
+  final CatalogPlaylist? catalog;
+  final List<LocalTrack> libraryTracks;
+  final Map<String, LocalTrack> tracksById;
+  final int artworkRotationSeed;
+  final AppStrings strings;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlistTracks = playlist.trackIds
+        .map((id) => tracksById[id])
+        .whereType<LocalTrack>()
+        .toList(growable: false);
+    final currentCatalog = catalog;
+    final catalogItems = currentCatalog == null
+        ? const <_CatalogDisplayItem>[]
+        : ref.watch(
+            _catalogDisplayItemsProvider((
+              playlist: currentCatalog,
+              libraryTracks: libraryTracks,
+            )),
+          );
+    final itemCount = currentCatalog == null
+        ? playlistTracks.length
+        : catalogItems.length;
+    final duration = currentCatalog == null
+        ? sumKnownDurations(playlistTracks.map((track) => track.duration))
+        : sumKnownDurations(catalogItems.map((item) => item.duration));
+    final thumbnailSources = playlistArtworkSourcesFor(
+      ref,
+      playlist,
+      () =>
+          catalogItems.isEmpty && playlistTracks.isNotEmpty ||
+              currentCatalog == null
+          ? _playlistThumbnailSources(
+              playlist,
+              tracksById,
+              rotationSeed: artworkRotationSeed,
+            )
+          : _catalogPlaylistThumbnailSources(
+              playlist.id,
+              catalogItems,
+              rotationSeed: artworkRotationSeed,
+            ),
+    );
+    return _PlaylistRow(
+      key: ValueKey('library-playlist-${playlist.id}'),
+      playlist: playlist,
+      thumbnailSources: thumbnailSources,
+      subtitle: strings.songCountWithDuration(itemCount, duration),
+      strings: strings,
+      onTap: onTap,
+    );
+  }
+}
+
+class _PlaylistRow extends StatelessWidget {
+  const _PlaylistRow({
+    required this.playlist,
+    required this.thumbnailSources,
+    required this.subtitle,
+    required this.strings,
+    required this.onTap,
+    super.key,
+  });
+
+  final Playlist playlist;
+  final List<PlaylistArtworkSource> thumbnailSources;
+  final String subtitle;
+  final AppStrings strings;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _LibraryEntry(
+      icon: playlist.isFavorites
+          ? Icons.favorite_rounded
+          : Icons.queue_music_rounded,
+      leading: PlaylistArtworkEditor(
+        playlist: playlist,
+        child: thumbnailSources.isEmpty
+            ? _FolderIcon(
+                icon: playlist.isFavorites
+                    ? Icons.favorite_rounded
+                    : Icons.queue_music_rounded,
+              )
+            : Stack(
+                children: [
+                  _PlaylistCover(
+                    key: ValueKey('library-playlist-artwork-${playlist.id}'),
+                    sources: thumbnailSources,
+                  ),
+                  if (playlist.isFavorites)
+                    const Positioned(
+                      top: 1,
+                      right: 1,
+                      child: FavoriteStarBadge(iconSize: 15),
+                    ),
+                ],
+              ),
+      ),
+      title: playlist.isFavorites ? strings.favorites : playlist.name,
+      subtitle: subtitle,
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: onTap,
+    );
+  }
+}
+
+List<PlaylistArtworkSource> _playlistThumbnailSources(
+  Playlist playlist,
+  Map<String, LocalTrack> tracksById, {
+  int? rotationSeed,
+}) {
+  final sources = playlist.trackIds
+      .map((id) => tracksById[id])
+      .whereType<LocalTrack>()
+      .map(preferredLocalPlaylistArtworkSource);
+  return rotatingPlaylistArtworkSources(
+    playlistId: playlist.id,
+    candidates: sources,
+    rotationSeed: rotationSeed,
+  );
+}
+
+class _LibraryEntry extends StatelessWidget {
+  const _LibraryEntry({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.leading,
+    this.trailing,
+    super.key,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final Widget? leading;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    return _FolderShell(
+      child: ListTile(
+        minTileHeight: _libraryArtworkRowMinHeight,
+        minVerticalPadding: 7,
+        contentPadding: _libraryOverviewContentPadding,
+        horizontalTitleGap: 10,
+        leading: leading ?? _FolderIcon(icon: icon),
+        title: MarqueeText(title, style: appListCardTitleStyle(context)),
+        subtitle: Text(
+          subtitle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: appListCardSubtitleStyle(context),
+        ),
+        trailing: trailing ?? const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// The photo stays in the scrollable header; the list only inherits its tone.
+class _PlaylistDetailBackdrop extends StatelessWidget {
+  const _PlaylistDetailBackdrop({required this.sources, required this.child});
+
+  final List<PlaylistArtworkSource> sources;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RepaintBoundary(
+          child: ArtworkColorPageBackground(
+            artworkSource: sources.firstOrNull?.source,
+            keyPrefix: 'library-playlist',
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+}
+
+class _PlaylistArtworkHeader extends ConsumerWidget {
+  const _PlaylistArtworkHeader({
+    required this.playlist,
+    required this.title,
+    required this.subtitle,
+    required this.sources,
+    this.onPlayAll,
+  });
+
+  final Playlist playlist;
+  final String title;
+  final String subtitle;
+  final List<PlaylistArtworkSource> sources;
+  final VoidCallback? onPlayAll;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = ref.watch(appStringsProvider);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= 700;
+        final artworkSize = wide
+            ? 180.0
+            : (constraints.maxWidth * 0.44).clamp(120.0, 200.0).toDouble();
+        // Foreground and blur reuse the same four bounded cache entries.
+        final decodeWidth =
+            ((sources.length > 1 ? artworkSize / 2 : artworkSize) *
+                    MediaQuery.devicePixelRatioOf(context))
+                .ceil()
+                .clamp(1, 1280);
+        final artwork = PlaylistArtworkEditor(
+          playlist: playlist,
+          child: PlaylistArtworkMosaic(
+            key: ValueKey('library-playlist-hero-${playlist.id}'),
+            sources: sources,
+            size: artworkSize,
+            borderRadius: 16,
+            cacheWidth: decodeWidth,
+          ),
+        );
+        final description = Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: wide
+              ? CrossAxisAlignment.start
+              : CrossAxisAlignment.center,
+          children: [
+            Text(
+              title,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              textAlign: wide ? TextAlign.start : TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: AppColors.contentTitleFor(context),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: wide ? TextAlign.start : TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppColors.contentSubtitleFor(context),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: FilledButton.icon(
+                key: ValueKey('library-play-all-${playlist.id}'),
+                onPressed: onPlayAll,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(strings.play),
+              ),
+            ),
+          ],
+        );
+        return RepaintBoundary(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: ArtworkGradientHeaderBackground(
+                  artworkSource: sources.firstOrNull?.source,
+                  cacheWidth: decodeWidth,
+                  keyPrefix: 'library-playlist',
+                  backgroundArtwork: FittedBox(
+                    fit: BoxFit.cover,
+                    child: PlaylistArtworkMosaic(
+                      sources: sources,
+                      size: artworkSize,
+                      borderRadius: 0,
+                      cacheWidth: decodeWidth,
+                    ),
+                  ),
+                ),
+              ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1080),
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, wide ? 28 : 24),
+                    child: wide
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              artwork,
+                              const SizedBox(width: 28),
+                              Expanded(child: description),
+                            ],
+                          )
+                        : Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              artwork,
+                              const SizedBox(height: 16),
+                              description,
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _PlaylistCover extends StatelessWidget {
+  const _PlaylistCover({required this.sources, super.key});
+
+  final List<PlaylistArtworkSource> sources;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sources.isEmpty) {
+      return const _FolderIcon(icon: Icons.queue_music_rounded);
+    }
+    return PlaylistArtworkMosaic(
+      sources: sources,
+      size: _libraryOverviewArtworkSize,
+      borderRadius: appArtworkRadius,
+    );
+  }
+}
+
+class _FolderShell extends StatefulWidget {
+  const _FolderShell({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_FolderShell> createState() => _FolderShellState();
+}
+
+class _FolderShellState extends State<_FolderShell> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final shape = RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(appCardRadius),
+      side: BorderSide(
+        color: _hovered
+            ? colors.primary
+            : appListCardBorder(context, solidInLiquidGlass: true),
+      ),
+    );
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AppCardGradientBorder(
+        solidInLiquidGlass: true,
+        emphasized: _hovered,
+        width: _hovered ? 1.4 : 1,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          decoration: ShapeDecoration(
+            color: appListCardSurface(context),
+            shape: shape,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            elevation: 0,
+            shadowColor: const Color(0x14000000),
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(appCardRadius),
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FolderIcon extends StatelessWidget {
+  const _FolderIcon({required this.icon});
+
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = Theme.of(context).extension<AppAccentTheme>();
+    final gradientColors = accent == null
+        ? const [Color(0xFF18C75A), Color(0xFF0B8F43), Color(0xFF076B35)]
+        : [accent.seed, accent.dark, accent.dark.withValues(alpha: 0.78)];
+    return Container(
+      width: _libraryOverviewArtworkSize,
+      height: _libraryOverviewArtworkSize,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: gradientColors,
+        ),
+        borderRadius: BorderRadius.circular(appListCardIconRadius),
+      ),
+      child: Icon(icon, color: Theme.of(context).colorScheme.onPrimary),
+    );
+  }
+}
+
+class _LocalTrackTile extends ConsumerStatefulWidget {
+  const _LocalTrackTile({
+    required this.track,
+    required this.mode,
+    required this.onOpenPlayer,
+    required this.queueTracks,
+    required this.selectionActive,
+    required this.selected,
+    required this.onLongPress,
+    required this.onSelectionTap,
+    this.reorderHandle,
+    this.playlistId,
+    super.key,
+  });
+
+  final LocalTrack track;
+  final _TrackListMode mode;
+  final VoidCallback onOpenPlayer;
+  final List<LocalTrack> queueTracks;
+  final bool selectionActive;
+  final bool selected;
+  final VoidCallback? onLongPress;
+  final VoidCallback? onSelectionTap;
+  final Widget? reorderHandle;
+  final String? playlistId;
+
+  @override
+  ConsumerState<_LocalTrackTile> createState() => _LocalTrackTileState();
+}
+
+class _LocalTrackTileState extends ConsumerState<_LocalTrackTile> {
+  bool _hovered = false;
+
+  LocalTrack get track => widget.track;
+  _TrackListMode get mode => widget.mode;
+  VoidCallback get onOpenPlayer => widget.onOpenPlayer;
+  List<LocalTrack> get queueTracks => widget.queueTracks;
+  String? get playlistId => widget.playlistId;
+  bool get selectionActive => widget.selectionActive;
+  bool get selected => widget.selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = ref.watch(appStringsProvider);
+    final isFavorite = ref.watch(
+      favoriteTrackIdsProvider.select((ids) => ids.contains(track.id)),
+    );
+    final playback = ref.watch(
+      playerControllerProvider.select((player) {
+        final snapshot = player.value;
+        return (trackId: snapshot?.trackId, status: snapshot?.status);
+      }),
+    );
+    final isCurrent =
+        playback.trackId == track.id &&
+        (playback.status == PlayerStatus.loading ||
+            playback.status == PlayerStatus.playing ||
+            playback.status == PlayerStatus.paused);
+    final isPlaying = isCurrent && playback.status == PlayerStatus.playing;
+    final colors = Theme.of(context).colorScheme;
+    final artwork = preferredLocalTrackArtworkSource(track);
+    final menuButtonSize = AppPlatform.isMobile ? 48.0 : 52.0;
+    final menuButtonWidth = AppPlatform.isMobile ? 36.0 : 40.0;
+    final menuIconSize = AppPlatform.isMobile ? 32.0 : 28.0;
+    final menuItemIconColor = AppColors.menuIconFor(context);
+    final localAudioAvailable = ref
+        .watch(localTrackAudioAvailabilityProvider(track))
+        .maybeWhen(data: (available) => available, orElse: () => true);
+    final remoteTrack = mode == _TrackListMode.playlist
+        ? _remoteTrackInfoForLocal(track)
+        : null;
+    final remoteUrl = remoteTrack?.url;
+    final downloadState = ref.watch(
+      downloadControllerProvider.select(
+        (tasks) => remoteUrl == null ? null : tasks[remoteUrl],
+      ),
+    );
+    final canCancelDownload = downloadState?.isCancellable == true;
+    final borderRadius = BorderRadius.circular(appCardRadius);
+    final baseColor = AppColors.cardSurfaceFor(context);
+    final resolvedSurfaceColor = selected
+        ? Color.alphaBlend(colors.primary.withValues(alpha: 0.14), baseColor)
+        : isCurrent
+        ? Color.alphaBlend(colors.onSurface.withValues(alpha: 0.075), baseColor)
+        : baseColor;
+    final borderColor = selected
+        ? colors.primary
+        : isCurrent
+        ? colors.primary
+        : _hovered
+        ? colors.primary
+        : AppColors.cardBorderFor(context, solidInLiquidGlass: true);
+    return Semantics(
+      selected: selectionActive ? selected : null,
+      container: true,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: AppCardGradientBorder(
+          solidInLiquidGlass: true,
+          emphasized: selected || isCurrent || _hovered,
+          width: selected || _hovered ? 1.4 : 1,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: resolvedSurfaceColor,
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: borderColor,
+                width: selected || _hovered ? 1.4 : 1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: ListTile(
+                dense: false,
+                minTileHeight: 70,
+                minVerticalPadding: 7,
+                contentPadding: const EdgeInsets.only(left: 12, right: 4),
+                horizontalTitleGap: 10,
+                shape: RoundedRectangleBorder(borderRadius: borderRadius),
+                tileColor: Colors.transparent,
+                leading: Stack(
+                  children: [
+                    _LocalArtwork(
+                      key: ValueKey('library-track-artwork-${track.id}'),
+                      source: artwork?.source,
+                      fallbackSource: artwork?.fallbackSource,
+                    ),
+                    if (isFavorite)
+                      const Positioned(
+                        top: 1,
+                        right: 1,
+                        child: FavoriteStarBadge(iconSize: 15),
+                      ),
+                    if (isCurrent || _hovered)
+                      NowPlayingEqualizerOverlay(
+                        key: ValueKey('now-playing-${track.id}'),
+                        isPlaying: isPlaying,
+                      ),
+                  ],
+                ),
+                title: Text(
+                  track.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w700,
+                    color: AppColors.contentTitleFor(context),
+                  ),
+                ),
+                subtitle: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    PlaylistTrackSubtitle(
+                      artist: track.artist,
+                      duration: formatDuration(track.duration),
+                      isDownloaded:
+                          mode != _TrackListMode.playlist ||
+                          localAudioAvailable,
+                      streamOnlyLabel: strings.streamOnlySong,
+                      cloudKey: ValueKey('library-legacy-cloud-${track.id}'),
+                      textStyle: Theme.of(context).textTheme.bodyMedium
+                          ?.copyWith(
+                            color: AppColors.contentSubtitleFor(context),
+                          ),
+                    ),
+                    if (downloadState != null)
+                      _PlaylistDownloadProgress(
+                        key: ValueKey('library-legacy-download-${track.id}'),
+                        task: downloadState,
+                      ),
+                  ],
+                ),
+                trailing: selectionActive
+                    ? SizedBox.square(
+                        dimension: 48,
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 160),
+                            child: Icon(
+                              selected
+                                  ? Icons.check_circle_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              key: ValueKey(
+                                selected
+                                    ? 'selection-check-${track.id}'
+                                    : 'selection-empty-${track.id}',
+                              ),
+                              color: selected
+                                  ? colors.primary
+                                  : colors.onSurfaceVariant,
+                              size: 28,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ?widget.reorderHandle,
+                          TrackPlayButton(
+                            key: ValueKey('library-track-play-${track.id}'),
+                            tooltip: isPlaying ? strings.pause : strings.play,
+                            isPlaying: isPlaying,
+                            onPressed: () => _togglePlayback(ref),
+                          ),
+                          SizedBox(
+                            width: menuButtonWidth,
+                            height: menuButtonSize,
+                            child: GlassPopupMenuButton<_TrackMenuAction>(
+                              key: ValueKey('library-track-menu-${track.id}'),
+                              tooltip: strings.moreOptions,
+                              padding: EdgeInsets.zero,
+                              splashRadius: menuButtonSize / 2,
+                              iconSize: menuIconSize,
+                              child: Center(
+                                child: Icon(
+                                  Icons.more_vert_rounded,
+                                  size: menuIconSize,
+                                  color: menuItemIconColor,
+                                ),
+                              ),
+                              onSelected: (action) =>
+                                  _handleAction(context, ref, action),
+                              itemBuilder: (context) => switch (mode) {
+                                _TrackListMode.downloads => [
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.renameTrack,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons
+                                              .drive_file_rename_outline_rounded,
+                                          color: menuItemIconColor,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(strings.rename),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.addToPlaylist,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.playlist_add_rounded,
+                                          color: menuItemIconColor,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(strings.addToPlaylist),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.toggleFavorite,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          isFavorite
+                                              ? Icons.favorite_rounded
+                                              : Icons.favorite_border_rounded,
+                                          color: isFavorite
+                                              ? Theme.of(
+                                                  context,
+                                                ).colorScheme.primary
+                                              : menuItemIconColor,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          isFavorite
+                                              ? strings.removeFromFavorites
+                                              : strings.addToFavorites,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.deleteTrack,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete_outline_rounded,
+                                          color: menuItemIconColor,
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(strings.deleteSong),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                _TrackListMode.playlist => [
+                                  if (remoteTrack != null)
+                                    PopupMenuItem(
+                                      value: _TrackMenuAction.download,
+                                      child: _trackMenuItem(
+                                        context,
+                                        canCancelDownload
+                                            ? Icons.close_rounded
+                                            : Icons.download_rounded,
+                                        canCancelDownload
+                                            ? strings.cancelDownload
+                                            : strings.download,
+                                      ),
+                                    ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.addToPlaylist,
+                                    child: _trackMenuItem(
+                                      context,
+                                      Icons.playlist_add_rounded,
+                                      strings.addToPlaylist,
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.renameTrack,
+                                    child: _trackMenuItem(
+                                      context,
+                                      Icons.drive_file_rename_outline_rounded,
+                                      strings.rename,
+                                    ),
+                                  ),
+                                  PopupMenuItem(
+                                    value: _TrackMenuAction.toggleFavorite,
+                                    child: _trackMenuItem(
+                                      context,
+                                      isFavorite
+                                          ? Icons.favorite_rounded
+                                          : Icons.favorite_border_rounded,
+                                      isFavorite
+                                          ? strings.removeFromFavorites
+                                          : strings.addToFavorites,
+                                    ),
+                                  ),
+                                  if (playlistId != Playlist.favoritesId)
+                                    PopupMenuItem(
+                                      value:
+                                          _TrackMenuAction.removeFromPlaylist,
+                                      child: _trackMenuItem(
+                                        context,
+                                        Icons.playlist_remove_rounded,
+                                        strings.removeFromPlaylist,
+                                      ),
+                                    ),
+                                ],
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                onLongPress: widget.onLongPress,
+                onTap: widget.onSelectionTap ?? () => _openOrPlay(ref),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _togglePlayback(WidgetRef ref) async {
+    final snapshot = ref.read(playerControllerProvider).value;
+    final player = ref.read(playerControllerProvider.notifier);
+    if (snapshot?.trackId == track.id) {
+      if (snapshot?.status == PlayerStatus.playing) {
+        await player.pause();
+        return;
+      }
+      if (snapshot?.status == PlayerStatus.paused) {
+        await player.resume();
+        return;
+      }
+    }
+
+    final queueSourceId = switch (mode) {
+      _TrackListMode.downloads =>
+        PlayerController.downloadedLibraryQueueSourceId,
+      _TrackListMode.playlist =>
+        playlistId == null
+            ? null
+            : PlayerController.playlistQueueSourceId(playlistId!),
+    };
+    await player.playLocal(
+      track,
+      queue: queueTracks,
+      useNativeQueue: mode == _TrackListMode.downloads || queueSourceId == null,
+      queueSourceId: queueSourceId,
+    );
+  }
+
+  Future<void> _openOrPlay(WidgetRef ref) async {
+    final snapshot = ref.read(playerControllerProvider).value;
+    final alreadyLoaded =
+        snapshot?.trackId == track.id &&
+        (snapshot?.status == PlayerStatus.loading ||
+            snapshot?.status == PlayerStatus.playing ||
+            snapshot?.status == PlayerStatus.paused);
+    if (alreadyLoaded) {
+      onOpenPlayer();
+      return;
+    }
+
+    final queueSourceId = switch (mode) {
+      _TrackListMode.downloads =>
+        PlayerController.downloadedLibraryQueueSourceId,
+      _TrackListMode.playlist =>
+        playlistId == null
+            ? null
+            : PlayerController.playlistQueueSourceId(playlistId!),
+    };
+    final playFuture = ref
+        .read(playerControllerProvider.notifier)
+        .playLocal(
+          track,
+          queue: queueTracks,
+          useNativeQueue:
+              mode == _TrackListMode.downloads || queueSourceId == null,
+          queueSourceId: queueSourceId,
+        );
+    onOpenPlayer();
+    await playFuture;
+  }
+
+  Future<void> _handleAction(
+    BuildContext context,
+    WidgetRef ref,
+    _TrackMenuAction action,
+  ) async {
+    switch (action) {
+      case _TrackMenuAction.download:
+        final remote = _remoteTrackInfoForLocal(track);
+        if (remote == null) return;
+        final downloads = ref.read(downloadControllerProvider);
+        final downloadController = ref.read(
+          downloadControllerProvider.notifier,
+        );
+        final cancelling = downloads[remote.url]?.isCancellable == true;
+        if (cancelling) {
+          await downloadController.cancelDownload(remote.url);
+        } else {
+          await downloadController.downloadAudio(remote);
+        }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                cancelling
+                    ? ref.read(appStringsProvider).downloadCancelled
+                    : ref.read(appStringsProvider).downloadQueued,
+              ),
+            ),
+          );
+        }
+      case _TrackMenuAction.renameTrack:
+        await _renameTrack(context, ref);
+      case _TrackMenuAction.addToPlaylist:
+        await _addToPlaylist(context, ref);
+      case _TrackMenuAction.toggleFavorite:
+        final isNowFavorite = await ref
+            .read(playlistsControllerProvider.notifier)
+            .toggleFavorite(track.id);
+        if (!context.mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: Text(
+                isNowFavorite
+                    ? ref.read(appStringsProvider).addedToFavorites
+                    : ref.read(appStringsProvider).removedFromFavorites,
+              ),
+            ),
+          );
+      case _TrackMenuAction.deleteTrack:
+        await _deleteTrack(context, ref);
+      case _TrackMenuAction.removeFromPlaylist:
+        final id = playlistId;
+        if (id == null) {
+          return;
+        }
+        await ref
+            .read(playlistsControllerProvider.notifier)
+            .removeTrackFromPlaylist(id, track.id);
+    }
+  }
+
+  Future<void> _renameTrack(BuildContext context, WidgetRef ref) async {
+    final strings = ref.read(appStringsProvider);
+    final rawName = await showAppDialog<String>(
+      context: context,
+      builder: (_) => _NameDialog(
+        title: strings.renameSong,
+        initialValue: track.title,
+        hint: strings.name,
+        cancelLabel: strings.cancel,
+        confirmLabel: strings.rename,
+      ),
+    );
+    final name = rawName?.trim();
+    if (name == null || name.isEmpty || name == track.title) {
+      return;
+    }
+
+    await ref
+        .read(libraryRepositoryProvider)
+        .saveLocalTrack(track.copyWith(title: name));
+    ref
+      ..invalidate(libraryTracksProvider)
+      ..invalidate(historyProvider);
+
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ref.read(appStringsProvider).songRenamed)),
+    );
+  }
+
+  Future<void> _addToPlaylist(BuildContext context, WidgetRef ref) async {
+    final playlistId = await _pickDestinationPlaylist(
+      context,
+      ref,
+      excludePlaylistId: this.playlistId,
+    );
+    if (playlistId == null || !context.mounted) {
+      return;
+    }
+
+    await ref
+        .read(playlistsControllerProvider.notifier)
+        .addTrackToPlaylist(playlistId, track.id);
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ref.read(appStringsProvider).songAddedToPlaylist)),
+    );
+  }
+
+  Future<void> _deleteTrack(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showAppDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AppAlertDialog(
+          title: Text(ref.read(appStringsProvider).deleteSong),
+          content: Text(track.title),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(ref.read(appStringsProvider).cancel),
+            ),
+            FilledButton.icon(
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: Text(ref.read(appStringsProvider).delete),
+              onPressed: () => Navigator.of(context).pop(true),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true) {
+      return;
+    }
+
+    await _deleteLibraryTracks(ref, [track]);
+
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ref.read(appStringsProvider).songDeleted)),
+    );
+  }
+}
+
+Future<int> _deleteLibraryTracks(
+  WidgetRef ref,
+  Iterable<LocalTrack> requestedTracks,
+) async {
+  final requestedIds = requestedTracks.map((track) => track.id).toSet();
+  if (requestedIds.isEmpty) {
+    return 0;
+  }
+
+  final repository = ref.read(libraryRepositoryProvider);
+  final currentTracks = await repository.getLocalTracks();
+  final targets = currentTracks
+      .where((track) => requestedIds.contains(track.id))
+      .toList(growable: false);
+  if (targets.isEmpty) {
+    return 0;
+  }
+
+  // The repository implementation performs this ID + file-path guarded delete
+  // and playlist pruning in one database transaction. Reusing the same
+  // primitive as reconciliation also protects against a stale UI selection.
+  final deletedIds = await repository.purgeMissingLocalTracks(targets);
+  if (deletedIds.isEmpty) {
+    return 0;
+  }
+
+  final deletedTracks = targets
+      .where((track) => deletedIds.contains(track.id))
+      .toList(growable: false);
+  await ref
+      .read(playerControllerProvider.notifier)
+      .removeDeletedLocalTracks(deletedIds);
+  await ref.read(playlistsControllerProvider.notifier).reloadFromRepository();
+  ref
+    ..invalidate(libraryTracksProvider)
+    ..invalidate(historyProvider);
+
+  // Re-read after the transaction and queue replacement so a concurrently
+  // restored/downloaded record sharing a legacy path keeps its file.
+  final survivors = await repository.getLocalTracks();
+  final survivorPaths = survivors
+      .expand((track) => [track.filePath, track.thumbnailPath])
+      .map(_normalizedLocalPath)
+      .whereType<String>()
+      .toSet();
+  final filesToDelete = <String, String>{};
+  for (final target in deletedTracks) {
+    for (final path in [target.filePath, target.thumbnailPath]) {
+      final normalized = _normalizedLocalPath(path);
+      if (normalized != null && !survivorPaths.contains(normalized)) {
+        filesToDelete.putIfAbsent(normalized, () => path!);
+      }
+    }
+  }
+  // Let the list release FileImage listeners before unlinking thumbnails. This
+  // matters on Windows tests and keeps the same code safe if desktop selection
+  // is enabled later; Android itself permits unlinking open files.
+  await WidgetsBinding.instance.endOfFrame;
+  for (final path in filesToDelete.values) {
+    await _deleteFileBestEffort(path);
+  }
+  return deletedIds.length;
+}
+
+String? _normalizedLocalPath(String? path) {
+  final trimmed = path?.trim();
+  if (trimmed == null || trimmed.isEmpty) {
+    return null;
+  }
+  try {
+    final normalized = p.normalize(p.absolute(trimmed));
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  } on FileSystemException {
+    return Platform.isWindows ? trimmed.toLowerCase() : trimmed;
+  }
+}
+
+Future<void> _deleteFileBestEffort(String path) async {
+  final file = File(path);
+  await FileImage(file).evict();
+  await ResizeImage(FileImage(file), width: 256).evict();
+  await ResizeImage(FileImage(file), width: 640).evict();
+  for (var attempt = 0; attempt < 3; attempt++) {
+    try {
+      if (!await file.exists()) {
+        return;
+      }
+      await file.delete();
+      return;
+    } on FileSystemException {
+      if (attempt < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 40));
+      }
+    }
+  }
+}
+
+class _LocalArtwork extends StatelessWidget {
+  const _LocalArtwork({required this.source, this.fallbackSource, super.key});
+
+  final String? source;
+  final String? fallbackSource;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(appArtworkRadius),
+      child: SizedBox(
+        width: 56,
+        height: 56,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          ),
+          child: ProportionalArtwork(
+            source: source,
+            fallbackSource: fallbackSource,
+            cacheWidth: 256,
+            fallback: Icon(
+              Icons.audiotrack_rounded,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingRow extends StatelessWidget {
+  const _LoadingRow();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 18),
+      child: Center(child: CircularProgressIndicator()),
+    );
+  }
+}
+
+class _ErrorRow extends StatelessWidget {
+  const _ErrorRow({required this.error});
+
+  final Object error;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(
+        error.toString(),
+        style: TextStyle(color: Theme.of(context).colorScheme.error),
+      ),
+    );
+  }
+}
