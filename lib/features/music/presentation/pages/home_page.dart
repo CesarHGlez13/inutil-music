@@ -47,6 +47,7 @@ import '../providers/player/related_radio_queue_extender.dart';
 import '../widgets/inutil_logo.dart';
 import '../widgets/favorite_star_badge.dart';
 import '../widgets/home_loading_content.dart';
+import '../widgets/inutil_onboarding_tour.dart';
 import '../widgets/library_panel.dart';
 import '../widgets/library_csv_import_dialog.dart';
 import '../widgets/local_music_panel.dart';
@@ -140,10 +141,12 @@ class HomePage extends ConsumerStatefulWidget {
     super.key,
     this.initialDestination = HomeInitialDestination.home,
     this.checkForUpdatesOnStartup = false,
+    this.enableFirstRunExperience = false,
   });
 
   final HomeInitialDestination initialDestination;
   final bool checkForUpdatesOnStartup;
+  final bool enableFirstRunExperience;
 
   @override
   ConsumerState<HomePage> createState() => _HomePageState();
@@ -254,7 +257,9 @@ class _HomePageState extends ConsumerState<HomePage>
         unawaited(_reconcileLocalLibrary());
         if (widget.checkForUpdatesOnStartup) {
           unawaited(_checkForAppUpdateAtStartup());
-          _scheduleCreatorSupportPopup();
+        }
+        if (widget.enableFirstRunExperience) {
+          unawaited(_runFirstRunExperience());
         }
       }
     });
@@ -1138,6 +1143,21 @@ class _HomePageState extends ConsumerState<HomePage>
           content: Text(strings.exitPressesRemaining(remaining)),
         ),
       );
+  }
+
+  Future<void> _runFirstRunExperience() async {
+    await Future<void>.delayed(const Duration(milliseconds: 450));
+    if (!mounted || !_appForeground || !_rootRouteVisible) return;
+    final showTour = await InutilOnboardingTour.shouldShow();
+    if (!mounted || !_appForeground || !_rootRouteVisible) return;
+    if (showTour) {
+      await InutilOnboardingTour.show(
+        context,
+        inactivityDays: InutilAuthService.instance.inactivityPolicyDays,
+      );
+      return;
+    }
+    _scheduleCreatorSupportPopup();
   }
 
   void _scheduleCreatorSupportPopup() {

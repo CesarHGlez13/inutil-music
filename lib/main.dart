@@ -348,7 +348,10 @@ class InutilMusicApp extends ConsumerWidget {
       // widget montan el shell con las barreras apagadas porque nunca
       // inicializan Firebase.
       home: () {
-        final home = HomePage(checkForUpdatesOnStartup: checkForUpdatesOnStartup);
+        final home = HomePage(
+          checkForUpdatesOnStartup: checkForUpdatesOnStartup,
+          enableFirstRunExperience: enforceLicenseGates,
+        );
         if (!enforceLicenseGates) return home;
         return InutilUpdateGate(child: InutilAuthGate(child: home));
       }(),

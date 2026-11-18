@@ -234,8 +234,29 @@
           <div class="card kpi"><div class="kpi-label">Total</div><div class="kpi-val" id="kTotal">0</div></div>
           <div class="card kpi"><div class="kpi-label">Activos</div><div class="kpi-val" style="color:var(--green)" id="kActive">0</div></div>
           <div class="card kpi"><div class="kpi-label">Pendientes</div><div class="kpi-val" style="color:var(--cyan)" id="kPending">0</div></div>
+          <div class="card kpi"><div class="kpi-label">En pausa / Inactivos</div><div class="kpi-val" style="color:#a5b4fc" id="kInactive">0</div></div>
           <div class="card kpi"><div class="kpi-label">Vencidos / Susp.</div><div class="kpi-val" style="color:var(--red)" id="kExpired">0</div></div>
           <div class="card kpi"><div class="kpi-label">Admins</div><div class="kpi-val" style="color:var(--amber)" id="kAdmins">0</div></div>
+        </div>
+
+        <div class="card" style="margin-bottom:16px;padding:16px 18px">
+          <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+            <div style="min-width:240px;flex:1">
+              <div style="font-size:15px;font-weight:800">⏱️ Corte automático por inactividad (cuentas gratuitas)</div>
+              <div class="subtitle" style="margin:2px 0 0">Si una cuenta gratuita no abre la app durante el límite configurado, su acceso se pausa automáticamente (sus playlists siguen seguras en la nube). Admins, licencias permanentes y cuentas exentas nunca se pausan.</div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+              <label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--text);font-size:13px">
+                <input id="inactivityEnabled" type="checkbox" style="width:auto" checked />
+                Activo
+              </label>
+              <label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--muted);font-size:13px">
+                Límite (días):
+                <input id="inactivityDays" type="number" min="2" max="365" value="15" style="width:78px;margin:0;padding:8px 10px" />
+              </label>
+              <button id="saveInactivityBtn" class="btn btn-primary btn-sm" style="margin:0">Guardar política</button>
+            </div>
+          </div>
         </div>
 
         <div class="toolbar">
@@ -244,6 +265,8 @@
             <button class="pill active" data-filter="todos">Todos</button>
             <button class="pill" data-filter="pendientes">Pendientes</button>
             <button class="pill" data-filter="activos">Activos</button>
+            <button class="pill" data-filter="inactivos">Inactivos</button>
+            <button class="pill" data-filter="solicitudes">Solicitudes</button>
             <button class="pill" data-filter="vencidos">Vencidos</button>
             <button class="pill" data-filter="admins">Admins</button>
           </div>
@@ -439,6 +462,8 @@
     let allUsers = [];
     let currentFilter = "todos";
     let searchTerm = "";
+    let inactivityPolicy = { enabled: true, days: 15 };
+    const wrappedByUid = new Map();
 
     function toast(msg) {
       const el = $("toast");
@@ -514,10 +539,73 @@
       return false;
     }
 
+    function isPermanentUser(u) {
+      if (u.role === "admin") return true;
+      const d = parseExpiry(u.accountExpiresAt);
+      return Boolean(d && !isNaN(d.getTime()) && d.getFullYear() >= 2090);
+    }
+
+    function isInactivityExempt(u) {
+      return isPermanentUser(u) || Boolean(u.inactivityExempt);
+    }
+
+    function getLastActivityDate(u) {
+      return parseExpiry(u.lastActiveAt) || parseExpiry(u.lastValidatedAt) || parseExpiry(u.lastLoginAt);
+    }
+
+    function getInactiveDays(u) {
+      const d = parseExpiry(u.lastActiveAt);
+      if (!d || isNaN(d.getTime())) return null;
+      return Math.max(0, Math.floor((Date.now() - d.getTime()) / 86400000));
+    }
+
+    function isAutoPausedByInactivity(u) {
+      if (!inactivityPolicy.enabled || isInactivityExempt(u)) return false;
+      if (u.status === "pending" || !u.isActive || isExpired(u)) return false;
+      const days = getInactiveDays(u);
+      return days !== null && days >= inactivityPolicy.days;
+    }
+
+    function fmtRelative(val) {
+      const d = parseExpiry(val);
+      if (!d || isNaN(d.getTime())) return "Sin registro";
+      const diffMin = Math.max(0, Math.floor((Date.now() - d.getTime()) / 60000));
+      if (diffMin < 2) return "Ahora mismo";
+      if (diffMin < 60) return `Hace ${diffMin} min`;
+      const diffHr = Math.floor(diffMin / 60);
+      if (diffHr < 24) return `Hace ${diffHr} h`;
+      const diffDay = Math.floor(diffHr / 24);
+      return `Hace ${diffDay} ${diffDay === 1 ? "día" : "días"}`;
+    }
+
+    async function loadInactivityPolicy() {
+      try {
+        const snap = await getDoc(doc(db, "app_config", "inactivity_policy"));
+        if (snap.exists()) {
+          const d = snap.data();
+          inactivityPolicy.enabled = d.enabled !== false;
+          inactivityPolicy.days = Math.min(365, Math.max(2, Number(d.days || 15)));
+        }
+        $("inactivityEnabled").checked = inactivityPolicy.enabled;
+        $("inactivityDays").value = inactivityPolicy.days;
+      } catch (_) {}
+    }
+
     async function loadUsers() {
       const snap = await getDocs(collection(db, "users"));
       allUsers = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+      const yr = new Date().getFullYear();
+      await Promise.all(allUsers.map(async (u) => {
+        try {
+          const ws = await getDoc(doc(db, "users", u.uid, "data", `wrapped_${yr}`));
+          if (ws.exists()) wrappedByUid.set(u.uid, ws.data());
+          else wrappedByUid.delete(u.uid);
+        } catch (_) {}
+      }));
       allUsers.sort((a, b) => {
+        const aReq = Boolean(a.reactivationRequestedAt);
+        const bReq = Boolean(b.reactivationRequestedAt);
+        if (aReq !== bReq) return aReq ? -1 : 1;
         if ((a.role === "admin") !== (b.role === "admin")) return a.role === "admin" ? -1 : 1;
         if ((a.status === "pending") !== (b.status === "pending")) return a.status === "pending" ? -1 : 1;
         return (a.email || "").localeCompare(b.email || "");
@@ -526,13 +614,15 @@
     }
 
     function renderUsers() {
-      const activeCnt = allUsers.filter(u => u.isActive && !isExpired(u)).length;
+      const activeCnt = allUsers.filter(u => u.isActive && !isExpired(u) && !isAutoPausedByInactivity(u)).length;
       const pendingCnt = allUsers.filter(u => u.status === "pending").length;
+      const inactiveCnt = allUsers.filter(u => isAutoPausedByInactivity(u) || ((getInactiveDays(u) ?? 0) >= 4 && !isInactivityExempt(u))).length;
       const expiredCnt = allUsers.filter(u => u.status !== "pending" && (!u.isActive || isExpired(u))).length;
       const adminCnt = allUsers.filter(u => u.role === "admin").length;
       $("kTotal").textContent = allUsers.length;
       $("kActive").textContent = activeCnt;
       $("kPending").textContent = pendingCnt;
+      $("kInactive").textContent = inactiveCnt;
       $("kExpired").textContent = expiredCnt;
       $("kAdmins").textContent = adminCnt;
 
@@ -543,8 +633,10 @@
           (u.displayName || "").toLowerCase().includes(q) ||
           (u.uid || "").toLowerCase().includes(q);
         if (!matchQ) return false;
-        if (currentFilter === "activos") return u.isActive && !isExpired(u);
+        if (currentFilter === "activos") return u.isActive && !isExpired(u) && !isAutoPausedByInactivity(u);
         if (currentFilter === "pendientes") return u.status === "pending";
+        if (currentFilter === "inactivos") return isAutoPausedByInactivity(u) || ((getInactiveDays(u) ?? 0) >= 4 && !isInactivityExempt(u));
+        if (currentFilter === "solicitudes") return Boolean(u.reactivationRequestedAt);
         if (currentFilter === "vencidos") return !u.isActive || isExpired(u);
         if (currentFilter === "admins") return u.role === "admin";
         return true;
@@ -558,27 +650,47 @@
 
       list.innerHTML = filtered.map(u => {
         const exp = isExpired(u);
+        const paused = isAutoPausedByInactivity(u);
+        const daysInactive = getInactiveDays(u);
+        const exempt = isInactivityExempt(u);
+        const hasReq = Boolean(u.reactivationRequestedAt);
+        const w = wrappedByUid.get(u.uid);
         const badges = [];
         if (u.role === "admin") badges.push(`<span class="badge b-admin">Admin</span>`);
         if (u.status === "pending") badges.push(`<span class="badge b-pending">Pendiente</span>`);
-        else if (u.isActive && !exp) badges.push(`<span class="badge b-active">Activo</span>`);
-        else badges.push(`<span class="badge b-expired">${!u.isActive ? "Suspendido" : "Vencido"}</span>`);
-        const phone = u.currentPhoneDeviceId ? ` · 📱 Teléfono: ${u.currentPhoneDeviceId.slice(0, 12)}…` : "";
+        else if (!u.isActive || exp) badges.push(`<span class="badge b-expired">${!u.isActive ? "Suspendido" : "Vencido"}</span>`);
+        else if (paused) badges.push(`<span class="badge" style="background:rgba(139,156,255,0.2);color:#a5b4fc;border:1px solid rgba(139,156,255,0.4)">⏸️ Pausa (${daysInactive}d)</span>`);
+        else badges.push(`<span class="badge b-active">Activo</span>`);
+        if (!paused && !exempt && daysInactive !== null && daysInactive >= 4) {
+          badges.push(`<span class="badge b-admin">🟡 ${daysInactive}d sin uso</span>`);
+        }
+        if (hasReq) badges.push(`<span class="badge" style="background:rgba(34,211,238,0.2);color:#67e8f9;border:1px solid rgba(34,211,238,0.45)">🙋 Pidió reactivación</span>`);
+        if (u.inactivityExempt && !isPermanentUser(u)) badges.push(`<span class="badge b-pending">🛡️ Exento</span>`);
+
+        const phone = u.currentPhoneDeviceId ? ` · 📱 ${u.currentPhoneDeviceId.slice(0, 12)}…` : "";
+        const lastSeen = fmtRelative(getLastActivityDate(u));
+        const appInfo = u.lastActiveAppVersion ? ` (${u.lastActivePlatform || "app"} v${u.lastActiveAppVersion})` : "";
+        const usageStr = w && (w.totalSeconds > 0 || w.totalPlays > 0)
+          ? ` · 🎧 ${(Number(w.totalSeconds || 0) / 3600).toFixed(1)} h (${w.totalPlays || 0} plays)`
+          : "";
 
         return `
           <div class="card user-card" data-uid="${u.uid}">
             <div class="user-head">
               <div>
                 <div class="user-title">${escapeHtml(u.displayName || u.email || u.uid)} ${badges.join(" ")}</div>
-                <div class="user-meta">${escapeHtml(u.email || "sin correo")} · UID: ${escapeHtml(u.uid)} · Vigencia: <strong>${fmtDate(u.accountExpiresAt)}</strong>${escapeHtml(phone)}</div>
+                <div class="user-meta">${escapeHtml(u.email || "sin correo")} · Vigencia: <strong>${fmtDate(u.accountExpiresAt)}</strong>${escapeHtml(phone)}</div>
+                <div class="user-meta" style="margin-top:3px">⏱️ Último uso: <strong>${escapeHtml(lastSeen)}</strong>${escapeHtml(appInfo)}${escapeHtml(usageStr)}</div>
               </div>
             </div>
             <div class="actions">
+              ${(paused || hasReq) ? `<button class="btn btn-sm btn-green" data-act="reactivate">⚡ Reactivar ahora</button>` : ""}
               ${u.status === "pending" ? `<button class="btn btn-sm btn-green" data-act="grant" data-days="30">✔ Aprobar (+30d)</button>` : ""}
               <button class="btn btn-sm btn-cyan" data-act="grant" data-days="30">+30 días</button>
               <button class="btn btn-sm btn-cyan" data-act="grant" data-days="90">+90 días</button>
               <button class="btn btn-sm btn-cyan" data-act="grant" data-days="365">+1 año</button>
               <button class="btn btn-sm btn-amber" data-act="permanent">💎 Permanente</button>
+              ${!isPermanentUser(u) ? `<button class="btn btn-sm" data-act="toggleExempt">${u.inactivityExempt ? "Quitar exención" : "🛡️ Exentar corte"}</button>` : ""}
               <button class="btn btn-sm btn-violet" data-act="toggleActive">${u.isActive ? "Suspender" : "Reactivar"}</button>
               <button class="btn btn-sm" data-act="toggleRole">${u.role === "admin" ? "Quitar Admin" : "Hacer Admin"}</button>
               ${u.currentPhoneDeviceId ? `<button class="btn btn-sm btn-amber" data-act="releaseDevice">Liberar teléfono</button>` : ""}
@@ -596,7 +708,20 @@
       const u = allUsers.find(x => x.uid === uid);
       if (!u) return;
       const ref = doc(db, "users", uid);
-      if (act === "grant") {
+      const nowIso = new Date().toISOString();
+      if (act === "reactivate") {
+        await updateDoc(ref, {
+          isActive: true,
+          status: "active",
+          lastActiveAt: nowIso,
+          reactivationRequestedAt: null
+        });
+        toast(`⚡ Cuenta de ${u.email} reactivada`);
+      } else if (act === "toggleExempt") {
+        const next = !Boolean(u.inactivityExempt);
+        await updateDoc(ref, { inactivityExempt: next });
+        toast(`${u.email}: ${next ? "Exento de corte automático" : "Exención retirada"}`);
+      } else if (act === "grant") {
         const current = parseExpiry(u.accountExpiresAt);
         const base = current && current.getTime() > Date.now() ? current : new Date();
         const next = new Date(base.getTime() + Number(days) * 86400000);
@@ -604,7 +729,9 @@
           accountExpiresAt: next.toISOString(),
           accountDurationDays: Number(days),
           isActive: true,
-          status: "active"
+          status: "active",
+          lastActiveAt: nowIso,
+          reactivationRequestedAt: null
         });
         toast(`+${days} días otorgados a ${u.email}`);
       } else if (act === "permanent") {
@@ -612,12 +739,19 @@
           accountExpiresAt: "2099-12-31T23:59:59.000Z",
           accountDurationDays: 36500,
           isActive: true,
-          status: "active"
+          status: "active",
+          lastActiveAt: nowIso,
+          reactivationRequestedAt: null
         });
         toast(`💎 Licencia permanente concedida a ${u.email}`);
       } else if (act === "toggleActive") {
         const next = !u.isActive;
-        await updateDoc(ref, { isActive: next, status: next ? "active" : "suspended" });
+        const patch = { isActive: next, status: next ? "active" : "suspended" };
+        if (next) {
+          patch.lastActiveAt = nowIso;
+          patch.reactivationRequestedAt = null;
+        }
+        await updateDoc(ref, patch);
         toast(`Cuenta de ${u.email}: ${next ? "Activada" : "Suspendida"}`);
       } else if (act === "toggleRole") {
         const next = u.role === "admin" ? "user" : "admin";
@@ -858,7 +992,8 @@
           accountExpiresAt: expiry,
           accountDurationDays: days,
           createdAt: new Date().toISOString(),
-          lastLoginAt: new Date().toISOString()
+          lastLoginAt: new Date().toISOString(),
+          lastActiveAt: new Date().toISOString()
         });
 
         $("createModal").classList.add("hidden");
@@ -925,7 +1060,25 @@
       }
     });
 
-    $("refreshBtn").addEventListener("click", async () => { await Promise.all([loadUsers(), loadOta(), loadPromo(), loadWrappedCampaign()]); toast("Datos actualizados"); });
+    $("saveInactivityBtn").addEventListener("click", async () => {
+      try {
+        const enabled = $("inactivityEnabled").checked;
+        const days = Math.min(365, Math.max(2, parseInt($("inactivityDays").value, 10) || 15));
+        $("inactivityDays").value = days;
+        await setDoc(doc(db, "app_config", "inactivity_policy"), {
+          enabled,
+          days,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        inactivityPolicy = { enabled, days };
+        renderUsers();
+        toast(enabled ? `Corte automático fijado en ${days} días` : "Corte automático desactivado");
+      } catch (e) {
+        toast("Error política: " + e.message);
+      }
+    });
+
+    $("refreshBtn").addEventListener("click", async () => { await loadInactivityPolicy(); await Promise.all([loadUsers(), loadOta(), loadPromo(), loadWrappedCampaign()]); toast("Datos actualizados"); });
     $("logoutBtn").addEventListener("click", () => signOut(auth));
 
     onAuthStateChanged(auth, async (user) => {
@@ -944,6 +1097,7 @@
         $("adminIdentity").textContent = `${user.email} · Proyecto inutil-music-app`;
         $("loginView").classList.add("hidden");
         $("dashView").classList.remove("hidden");
+        await loadInactivityPolicy();
         await Promise.all([loadUsers(), loadOta(), loadPromo(), loadWrappedCampaign()]);
       } catch (err) {
         showLoginAlert("Error cargando panel: " + err.message);

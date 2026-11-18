@@ -35,6 +35,7 @@ import 'player_style_gallery.dart';
 import 'youtube_music_settings_account_card.dart';
 import 'inutil_account_dialog.dart';
 import 'inutil_connect_sheet.dart';
+import 'inutil_onboarding_tour.dart';
 import 'inutil_spotify_import_dialog.dart';
 import 'inutil_support_popup.dart';
 import 'inutil_wrapped_dialog.dart';
@@ -1822,6 +1823,8 @@ class _AboutApplicationSettings extends StatelessWidget {
         ),
         const SizedBox(height: appCardGap),
         const _WrappedPreviewEntryCard(),
+        const SizedBox(height: appCardGap),
+        const _OnboardingTourEntryCard(),
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-creator-popup'),
@@ -5806,6 +5809,24 @@ class _WrappedPreviewEntryCard extends ConsumerWidget {
           userName: user?.displayName ?? '',
           playlistCount: playlists.length,
         );
+      },
+    );
+  }
+}
+
+class _OnboardingTourEntryCard extends ConsumerWidget {
+  const _OnboardingTourEntryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _SettingsEntryCard(
+      key: const ValueKey('settings-about-onboarding-tour'),
+      glyph: InutilGlyph.info,
+      title: 'Recorrido guiado interactivo',
+      subtitle: 'Repasa gestos, letras, descargas y ajustes paso a paso',
+      onTap: () async {
+        final days = ref.read(inutilAuthProvider).inactivityPolicyDays;
+        await InutilOnboardingTour.show(context, inactivityDays: days);
       },
     );
   }

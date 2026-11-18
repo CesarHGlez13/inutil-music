@@ -7,6 +7,7 @@ import '../../features/music/presentation/providers/music_providers.dart';
 import '../theme/inutil_design_system.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_sync_providers.dart';
+import 'inutil_inactivity_paused_screen.dart';
 
 /// Barrera de autenticación obligatoria (Gatekeeper) para INÚTIL MUSIC.
 /// Bloquea el uso de la aplicación a usuarios no registrados o sin licencia activa
@@ -44,6 +45,7 @@ class _InutilAuthGateState extends ConsumerState<InutilAuthGate> {
     final allowed =
         user != null &&
         !auth.isKickedOut &&
+        !auth.isInactivityPaused &&
         (user.isAdmin || (user.isActive && !user.isExpired));
 
     if (!allowed && _wasAllowed) {
@@ -67,7 +69,22 @@ class _InutilAuthGateState extends ConsumerState<InutilAuthGate> {
       return InutilLicenseExpiredScreen(user: user);
     }
 
-    // 4. Acceso autorizado: Administrador o usuario con licencia activa
+    // 4. Cuenta gratuita en pausa automática por inactividad.
+    if (auth.isInactivityPaused) {
+      return InutilInactivityPausedScreen(
+        user: user,
+        inactiveDays: auth.inactiveDays,
+        policyDays: auth.inactivityPolicyDays,
+        onSignOut: () async {
+          try {
+            await ref.read(playerControllerProvider.notifier).stop();
+          } catch (_) {}
+          await InutilAuthService.instance.signOut();
+        },
+      );
+    }
+
+    // 5. Acceso autorizado: Administrador o usuario con licencia activa
     return widget.child;
   }
 }

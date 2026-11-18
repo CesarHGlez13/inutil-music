@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.4.0+240 — 2026-11-18
+
+### Added
+
+- Nuevo recorrido guiado interactivo de 8 pasos al abrir la app por primera vez (con demos reales para tocar, deslizar a la cola, guardar favoritos y personalizar colores), repetible en cualquier momento desde Ajustes → Acerca de → «Recorrido guiado interactivo».
+- Gestión automática de cupos gratuitos por inactividad con pantalla amigable de pausa («Tu música sigue a salvo en la nube») y botón de solicitud de reactivación a un toque.
+
 ## 2.3.0+230 — 2026-11-18
 
 ### Added

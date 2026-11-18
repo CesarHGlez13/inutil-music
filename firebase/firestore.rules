@@ -50,7 +50,8 @@ service cloud.firestore {
         .affectedKeys()
         .hasAny([
           'role', 'status', 'isActive', 'accountExpiresAt',
-          'accountDurationDays', 'phoneSwitchCount', 'phoneSwitchMonth'
+          'accountDurationDays', 'phoneSwitchCount', 'phoneSwitchMonth',
+          'inactivityExempt'
         ]);
     }
 

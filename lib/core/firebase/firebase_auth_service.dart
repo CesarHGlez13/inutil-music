@@ -9,6 +9,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../constants/app_constants.dart';
 import 'firebase_config.dart';
 import 'firebase_firestore_service.dart';
 
@@ -213,6 +214,34 @@ class InutilAuthService extends ChangeNotifier {
 
   static const Duration _validateInterval = Duration(minutes: 15);
 
+  /// Política de inactividad por defecto (se puede cambiar desde el portal
+  /// admin en `app_config/inactivity_policy`): las cuentas gratuitas que no
+  /// abren la app durante este número de días quedan en pausa automática.
+  static const int defaultInactivityDays = 15;
+  static const int _minInactivityDays = 2;
+  static const int _maxInactivityDays = 365;
+
+  /// Frecuencia máxima con la que se escribe `lastActiveAt` en Firestore.
+  static const Duration _heartbeatThrottle = Duration(hours: 1);
+
+  /// Decide si una cuenta debe quedar en pausa por inactividad.
+  ///
+  /// Devuelve los días transcurridos sin actividad cuando corresponde pausar,
+  /// o `null` si la cuenta sigue vigente. Las cuentas sin `lastActiveAt`
+  /// (anteriores a la v2.4.0) se consideran activas para no castigar a nadie
+  /// durante la migración.
+  static int? inactivityPauseDays({
+    required DateTime? lastActiveAt,
+    required bool exempt,
+    required bool enabled,
+    required int thresholdDays,
+    required DateTime now,
+  }) {
+    if (!enabled || exempt || lastActiveAt == null) return null;
+    final days = now.difference(lastActiveAt).inDays;
+    return days >= thresholdDays ? days : null;
+  }
+
   /// Tiempo máximo de espera al backend seguro antes de rendirse y usar prefs.
   /// En Linux sin anillo de claves (libsecret/D-Bus) el channel del plugin
   /// puede quedarse colgado indefinidamente, y en los widget tests simplemente
@@ -259,6 +288,22 @@ class InutilAuthService extends ChangeNotifier {
   /// control, cuenta bloqueada, etc.). Vacío si la sesión está vigente.
   String _kickedOutReason = '';
 
+  bool _inactivityPaused = false;
+  int _inactiveDays = 0;
+  bool _inactivityPolicyEnabled = true;
+  int _inactivityPolicyDays = defaultInactivityDays;
+  DateTime? _lastHeartbeatAt;
+
+  /// true si la cuenta gratuita quedó en pausa automática por inactividad.
+  bool get isInactivityPaused => _inactivityPaused;
+
+  /// Días sin actividad detectados al pausar la cuenta.
+  int get inactiveDays => _inactiveDays;
+
+  /// Límite vigente de días sin uso antes de la pausa automática.
+  int get inactivityPolicyDays => _inactivityPolicyDays;
+  bool get inactivityPolicyEnabled => _inactivityPolicyEnabled;
+
   InutilUser? get currentUser => _currentUser;
 
   /// Indica si hay una sesión iniciada
@@ -274,6 +319,7 @@ class InutilAuthService extends ChangeNotifier {
   bool get isAccessAllowed =>
       _currentUser != null &&
       _kickedOutReason.isEmpty &&
+      !_inactivityPaused &&
       (_currentUser!.isAdmin ||
           (_currentUser!.isActive && !_currentUser!.isExpired));
 
@@ -294,6 +340,10 @@ class InutilAuthService extends ChangeNotifier {
     }
     if (user.isExpired) {
       return 'Tu vigencia terminó. Solicita al administrador una renovación.';
+    }
+    if (_inactivityPaused) {
+      return 'Tu acceso gratuito está en pausa: no usaste la app durante '
+          '$_inactiveDays días (el límite es $_inactivityPolicyDays).';
     }
     if (!_phoneSessionOk(user)) {
       return 'Otro teléfono tomó el control de esta cuenta. En este teléfono '
@@ -730,6 +780,9 @@ class InutilAuthService extends ChangeNotifier {
     _validateTimer?.cancel();
     _validateTimer = null;
     _kickedOutReason = '';
+    _inactivityPaused = false;
+    _inactiveDays = 0;
+    _lastHeartbeatAt = null;
     _currentUser = null;
     if (!testSkipOnlineValidation) {
       try {
@@ -791,6 +844,7 @@ class InutilAuthService extends ChangeNotifier {
           'createdAt': DateTime.now(),
           'lastLoginAt': DateTime.now(),
           'lastValidatedAt': DateTime.now(),
+          'lastActiveAt': DateTime.now(),
           'schemaVersion': 3,
         };
         final ok = await InutilFirestoreService.instance.setDocument(
@@ -839,6 +893,9 @@ class InutilAuthService extends ChangeNotifier {
         }
       }
       await _claimPhoneDevice();
+      if (_currentUser?.licenseValid == true) {
+        await _enforceInactivityPolicy(remote);
+      }
     } catch (e) {
       debugPrint('Bootstrap de sesión sin respuesta remota: $e');
       // Sin red: se conserva el snapshot local y su fecha de validación.
@@ -852,6 +909,7 @@ class InutilAuthService extends ChangeNotifier {
     final user = _currentUser;
     if (user == null) return false;
     if (!user.licenseValid) return false;
+    if (_inactivityPaused) return false;
     if (!_phoneSessionOk(user)) return false;
     final validated = _lastValidatedAt;
     if (validated == null) return false;
@@ -967,6 +1025,8 @@ class InutilAuthService extends ChangeNotifier {
       }
       if (!_currentUser!.licenseValid) {
         _kickedOutReason = blockedReason;
+      } else {
+        await _enforceInactivityPolicy(remote);
       }
     } catch (e) {
       debugPrint('Validación de sesión ($reason) sin conexión: $e');
@@ -985,10 +1045,120 @@ class InutilAuthService extends ChangeNotifier {
       final remoteDoc = await InutilFirestoreService.instance.getUserProfile(_currentUser!.uid);
       if (remoteDoc != null && remoteDoc.isNotEmpty) {
         await _applyRemoteDoc(remoteDoc);
+        if (_currentUser?.licenseValid == true) {
+          await _enforceInactivityPolicy(remoteDoc);
+        }
       }
     } catch (e) {
       debugPrint('Error refrescando perfil de usuario: $e');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 3b. USO REAL Y PAUSA AUTOMÁTICA POR INACTIVIDAD
+  // ---------------------------------------------------------------------------
+
+  static DateTime? _parseRemoteDate(Object? raw) {
+    if (raw is DateTime) return raw;
+    if (raw == null) return null;
+    return DateTime.tryParse(raw.toString());
+  }
+
+  /// Lee la política vigente (`app_config/inactivity_policy`). Si no existe o
+  /// no hay red se conserva la última conocida (por defecto 15 días).
+  Future<void> _loadInactivityPolicy() async {
+    try {
+      final doc = await InutilFirestoreService.instance
+          .getDocument('app_config/inactivity_policy');
+      if (doc == null) return;
+      final enabled = doc['enabled'];
+      if (enabled is bool) _inactivityPolicyEnabled = enabled;
+      final days = (doc['days'] as num?)?.toInt() ??
+          int.tryParse(doc['days']?.toString() ?? '');
+      if (days != null) {
+        _inactivityPolicyDays =
+            days.clamp(_minInactivityDays, _maxInactivityDays);
+      }
+    } catch (e) {
+      debugPrint('Política de inactividad no disponible: $e');
+    }
+  }
+
+  /// Aplica la pausa automática por inactividad. Mientras la cuenta está en
+  /// pausa NO se actualiza `lastActiveAt`, así que reinstalar o volver a
+  /// iniciar sesión no la reactiva: solo el administrador (o una licencia
+  /// permanente/exención) la libera.
+  Future<void> _enforceInactivityPolicy(Map<String, dynamic> remote) async {
+    final user = _currentUser;
+    if (user == null) return;
+    await _loadInactivityPolicy();
+    final lastActiveAt = _parseRemoteDate(remote['lastActiveAt']);
+    final exempt = user.isAdmin ||
+        user.isPermanent ||
+        remote['inactivityExempt'] == true;
+    final days = inactivityPauseDays(
+      lastActiveAt: lastActiveAt,
+      exempt: exempt,
+      enabled: _inactivityPolicyEnabled,
+      thresholdDays: _inactivityPolicyDays,
+      now: DateTime.now(),
+    );
+    if (days != null) {
+      final changed = !_inactivityPaused || _inactiveDays != days;
+      _inactivityPaused = true;
+      _inactiveDays = days;
+      if (changed) notifyListeners();
+      return;
+    }
+    final wasPaused = _inactivityPaused;
+    _inactivityPaused = false;
+    _inactiveDays = 0;
+    await _writeActivityHeartbeat(force: lastActiveAt == null || wasPaused);
+    if (wasPaused) notifyListeners();
+  }
+
+  /// Registra el uso real de la app (`lastActiveAt`) como máximo 1 vez/hora.
+  Future<void> _writeActivityHeartbeat({bool force = false}) async {
+    final user = _currentUser;
+    if (user == null || user.uid.isEmpty || _inactivityPaused) return;
+    final now = DateTime.now();
+    final last = _lastHeartbeatAt;
+    if (!force && last != null && now.difference(last) < _heartbeatThrottle) {
+      return;
+    }
+    final ok = await InutilFirestoreService.instance.setDocument(
+      'users/${user.uid}',
+      {
+        'lastActiveAt': now,
+        'lastActivePlatform': devicePlatform,
+        'lastActiveAppVersion': AppConstants.appVersion,
+      },
+    );
+    if (ok) _lastHeartbeatAt = now;
+  }
+
+  /// El usuario en pausa solicita reactivación; el administrador la ve en el
+  /// portal web (badge «Pidió reactivación»).
+  Future<bool> requestReactivation() async {
+    final user = _currentUser;
+    if (user == null || user.uid.isEmpty) return false;
+    try {
+      await _ensureFreshIdToken();
+      return await InutilFirestoreService.instance.setDocument(
+        'users/${user.uid}',
+        {'reactivationRequestedAt': DateTime.now()},
+      );
+    } catch (e) {
+      debugPrint('No se pudo solicitar reactivación: $e');
+      return false;
+    }
+  }
+
+  @visibleForTesting
+  void testSetInactivityPaused({required bool paused, int days = 0}) {
+    _inactivityPaused = paused;
+    _inactiveDays = days;
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------
@@ -1182,6 +1352,8 @@ class InutilAuthService extends ChangeNotifier {
       'isActive': true,
       'status': 'active',
       'accountDurationDays': days,
+      // Renovar vigencia también reinicia el contador de inactividad.
+      'lastActiveAt': DateTime.now(),
     });
     if (!ok) {
       throw Exception('No se pudo guardar la vigencia en la nube. Revisa la conexión.');
@@ -1209,6 +1381,7 @@ class InutilAuthService extends ChangeNotifier {
       'accountExpiresAt': newExpiry,
       'isActive': true,
       'status': 'active',
+      'lastActiveAt': DateTime.now(),
     });
     if (!ok) {
       throw Exception('No se pudo guardar la fecha en la nube.');
@@ -1234,6 +1407,7 @@ class InutilAuthService extends ChangeNotifier {
     final ok = await InutilFirestoreService.instance.adminUpdateUser(uid, {
       'isActive': isActive,
       'status': isActive ? 'active' : 'blocked',
+      if (isActive) 'lastActiveAt': DateTime.now(),
     });
     if (!ok) {
       throw Exception('No se pudo actualizar la cuenta en la nube.');
