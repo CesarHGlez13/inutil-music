@@ -40,10 +40,10 @@ void main() {
         duration: const Duration(seconds: 30),
       ),
       _track('unknown-duration', path: r'C:\Music\unknown.m4a'),
-      _track('managed', path: r'C:\Downloads\BStream-Music\audio\managed.m4a'),
+      _track('managed', path: r'C:\Downloads\Inutil-Music\audio\managed.m4a'),
       _track(
         'similar-root',
-        path: r'C:\Downloads\BStream-Music-Other\kept.m4a',
+        path: r'C:\Downloads\Inutil-Music-Other\kept.m4a',
       ),
     ];
 
@@ -118,13 +118,13 @@ void main() {
 
   test('scoped-storage relative paths still exclude the Inutil root', () {
     final tracks = <DeviceAudioTrack>[
-      _track('managed-relative', relativePath: 'BStream-Music/audio/'),
-      _track('similar-relative', relativePath: 'BStream-Music-Other/audio/'),
+      _track('managed-relative', relativePath: 'Inutil-Music/audio/'),
+      _track('similar-relative', relativePath: 'Inutil-Music-Other/audio/'),
     ];
 
     final filtered = filterDeviceAudioTracks(
       tracks,
-      inutilRoot: '/storage/emulated/0/BStream-Music',
+      inutilRoot: '/storage/emulated/0/Inutil-Music',
     );
 
     expect(filtered.map((track) => track.id), <String>['similar-relative']);

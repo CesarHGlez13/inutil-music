@@ -446,9 +446,9 @@ final incomingTrackLinkProvider = StreamProvider<InutilTrackLink>((
 
 /// Public YouTube/YouTube Music links received from Android intents.
 ///
-/// This is deliberately separate from [incomingTrackLinkProvider] so older
-/// `bstreammusic://` links keep their exact compatibility contract while
-/// regular YouTube links can also be offered to Inutil by the operating
+/// This is deliberately separate from [incomingTrackLinkProvider] so app
+/// `inutilmusic://` links keep their exact contract while
+/// regular YouTube links can also be offered to Inútil Music by the operating
 /// system.
 final incomingYouTubeMusicLinkProvider = StreamProvider<YouTubeMusicLink>((
   ref,

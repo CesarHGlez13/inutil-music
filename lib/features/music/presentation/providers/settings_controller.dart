@@ -302,7 +302,7 @@ class SettingsController extends AsyncNotifier<SettingsState> {
   static const _crossfadeEnabledKey = 'settings.crossfadeEnabled';
   static const _crossfadeSecondsKey = 'settings.crossfadeSeconds';
   static const _skipSilenceEnabledKey = 'settings.skipSilenceEnabled';
-  static const _mediaRootDirectoryName = 'BStream-Music';
+  static const _mediaRootDirectoryName = 'Inutil-Music';
   Future<void> _lyricsTextAlignmentWriteTail = Future<void>.value();
   Future<void> _enabledLyricsProvidersWriteTail = Future<void>.value();
   Future<void> _animatedArtworkWriteTail = Future<void>.value();
@@ -1491,10 +1491,7 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       return path;
     }
 
-    var normalized = path;
-    if (p.basename(normalized) == 'BStream') {
-      normalized = p.join(p.dirname(normalized), _mediaRootDirectoryName);
-    }
+    final normalized = path;
 
     if (_platform == AppPlatformType.android &&
         p.basename(normalized) == _mediaRootDirectoryName &&

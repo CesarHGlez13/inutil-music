@@ -7,4 +7,4 @@ Icon=com.inutilmusic.app
 Terminal=false
 Categories=AudioVideo;Audio;Player;
 StartupWMClass=com.inutilmusic.app
-MimeType=x-scheme-handler/inutilmusic;x-scheme-handler/bstreammusic;text/csv;text/comma-separated-values;application/csv;
+MimeType=x-scheme-handler/inutilmusic;text/csv;text/comma-separated-values;application/csv;

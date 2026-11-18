@@ -493,7 +493,7 @@ class RemotePlaybackCache {
     final directory = Directory(
       _policy.useApplicationCacheDirectory
           ? p.join(root.path, _cacheFolderName)
-          : p.join(root.path, 'BStream-Music', _cacheFolderName),
+          : p.join(root.path, 'Inutil-Music', _cacheFolderName),
     );
     await directory.create(recursive: true);
     return directory;

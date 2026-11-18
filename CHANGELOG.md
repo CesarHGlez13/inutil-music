@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.6+256 — 2026-11-18
+
+### Changed
+
+- Eliminadas todas las referencias internas heredadas restantes (colección de Favoritos unificada a `inutil:favorites`, carpeta `Inutil-Music`, identificador Apple `com.inutilmusic.app`, esquema `inutilmusic://`, cabecera CSV `InutilCsvVersion`, claves de sesión y pie de Ajustes/instalador/CI).
+- Migración automática segura al abrir la base de datos y restaurar respaldos en la nube para conservar las colecciones de Favoritos existentes bajo `inutil:favorites`.
+
 ## 2.5.5+255 — 2026-11-18
 
 ### Fixed

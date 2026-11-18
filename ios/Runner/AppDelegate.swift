@@ -39,7 +39,7 @@ final class InutilWidgetActionRelay {
   private var audioOutputPlugin: InutilAudioOutputPlugin?
   private var localAudioQualityPlugin: IOSLocalAudioQualityPlugin?
   private var castPlugin: InutilCastPlugin?
-  private let widgetGroup = "group.com.bstream.bstreamMusic"
+  private let widgetGroup = "group.com.inutilmusic.app"
   private let widgetKind = "InutilNowPlaying"
   private let widgetArtworkQueue = DispatchQueue(label: "com.inutilmusic.homeWidget.artwork", qos: .utility)
 

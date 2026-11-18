@@ -1851,8 +1851,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         Center(
           child: Text(
             'Inútil Music v${AppConstants.appVersion} · '
-            '${AppConstants.supportEmail} · '
-            '${AppConstants.upstreamCredit}',
+            '${AppConstants.supportEmail}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 10.5,

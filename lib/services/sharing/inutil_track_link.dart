@@ -29,9 +29,6 @@ class InutilTrackLinkCodec {
   const InutilTrackLinkCodec();
 
   static const scheme = 'inutilmusic';
-  /// Esquema que usaron las versiones 2.0.x. Los enlaces ya compartidos
-  /// (`bstreammusic://track/<id>`) siguen abriendo Inútil Music.
-  static const legacyScheme = 'bstreammusic';
   static const host = 'track';
   static final RegExp _videoIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
 
@@ -45,7 +42,7 @@ class InutilTrackLinkCodec {
 
   InutilTrackLink? tryDecode(Uri uri) {
     final schemeName = uri.scheme.toLowerCase();
-    if (schemeName != scheme && schemeName != legacyScheme ||
+    if (schemeName != scheme ||
         uri.host.toLowerCase() != host ||
         uri.userInfo.isNotEmpty ||
         uri.hasPort ||

@@ -1,13 +1,11 @@
 # Third-party notices
 
-## Proyecto original: BStream Music
+## Licencia base (BSD 2-Clause)
 
-Inútil Music parte de **BStream Music**, proyecto original de Bryam Contreras
-publicado bajo la licencia BSD 2-Clause (el texto íntegro está en `LICENSE`).
-Se reproduce aquí el aviso porque la cláusula 2 de esa licencia exige que las
-redistribuciones en forma binaria incluyan el aviso de copyright y la lista de
-condiciones en la documentación que se distribuye con el programa, y este
-fichero es el que viaja dentro del bundle del binario.
+Inútil Music se distribuye bajo la licencia BSD 2-Clause (el texto íntegro
+está en `LICENSE`). Se reproduce aquí el aviso porque la cláusula 2 de esa
+licencia exige que las redistribuciones en forma binaria incluyan el aviso de
+copyright y la lista de condiciones en la documentación distribuida.
 
 Copyright (c) 2026, Bryam Contreras
 

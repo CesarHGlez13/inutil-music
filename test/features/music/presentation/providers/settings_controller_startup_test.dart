@@ -231,7 +231,7 @@ void main() {
       addTearDown(container.dispose);
 
       final settings = await container.read(settingsControllerProvider.future);
-      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final expectedRoot = p.normalize(p.join(documentsPath, 'Inutil-Music'));
       final preferences = await SharedPreferences.getInstance();
 
       expect(downloadsDirectoryRequests, 0);
@@ -250,9 +250,9 @@ void main() {
     'iOS repairs a persisted Downloads root from an affected install',
     () async {
       final invalidRoot = p.normalize(
-        p.join(sandbox.path, 'Downloads', 'BStream-Music'),
+        p.join(sandbox.path, 'Downloads', 'Inutil-Music'),
       );
-      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final expectedRoot = p.normalize(p.join(documentsPath, 'Inutil-Music'));
       final database = _RecordingLocalDatabaseService();
       SharedPreferences.setMockInitialValues({
         downloadDirectoryKey: invalidRoot,
@@ -650,7 +650,7 @@ void main() {
   test(
     'startup quarantines a semantically invalid migration journal',
     () async {
-      final currentRoot = p.join(documentsPath, 'BStream-Music');
+      final currentRoot = p.join(documentsPath, 'Inutil-Music');
       final sourceRoot = p.join(sandbox.path, 'migration-source');
       final targetRoot = p.join(sandbox.path, 'migration-target');
       final unrelatedReference = p.join(sandbox.path, 'unrelated-reference');
@@ -696,9 +696,9 @@ void main() {
         sandbox.path,
         '11111111-1111-1111-1111-111111111111',
       );
-      final oldRoot = p.join(oldContainer, 'Documents', 'BStream-Music');
+      final oldRoot = p.join(oldContainer, 'Documents', 'Inutil-Music');
       final oldTarget = p.join(oldContainer, 'Documents', 'alternate-media');
-      final currentRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final currentRoot = p.normalize(p.join(documentsPath, 'Inutil-Music'));
       final database = _RecordingLocalDatabaseService();
       SharedPreferences.setMockInitialValues({
         downloadDirectoryKey: oldRoot,
@@ -742,7 +742,7 @@ void main() {
     'startup replaces a persisted filesystem root without migrating it',
     () async {
       final filesystemRoot = p.rootPrefix(sandbox.path);
-      final expectedRoot = p.normalize(p.join(documentsPath, 'BStream-Music'));
+      final expectedRoot = p.normalize(p.join(documentsPath, 'Inutil-Music'));
       final database = _BlockingLocalDatabaseService();
       SharedPreferences.setMockInitialValues({
         downloadDirectoryKey: filesystemRoot,
@@ -772,7 +772,7 @@ void main() {
   test(
     'directory migration merges its result into the latest settings state',
     () async {
-      final currentRoot = p.join(documentsPath, 'BStream-Music');
+      final currentRoot = p.join(documentsPath, 'Inutil-Music');
       final targetRoot = p.join(sandbox.path, 'new-download-root');
       final database = _BlockingLocalDatabaseService();
       SharedPreferences.setMockInitialValues({

@@ -257,10 +257,10 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     env:
       APP_VERSION: ${{ needs.metadata.outputs.app_version }}
-      INUTIL_ANDROID_KEYSTORE_BASE64: ${{ secrets.BSTREAM_ANDROID_KEYSTORE_BASE64 }}
-      INUTIL_ANDROID_STORE_PASSWORD: ${{ secrets.BSTREAM_ANDROID_STORE_PASSWORD }}
-      INUTIL_ANDROID_KEY_ALIAS: ${{ secrets.BSTREAM_ANDROID_KEY_ALIAS }}
-      INUTIL_ANDROID_KEY_PASSWORD: ${{ secrets.BSTREAM_ANDROID_KEY_PASSWORD }}
+      INUTIL_ANDROID_KEYSTORE_BASE64: ${{ secrets.INUTIL_ANDROID_KEYSTORE_BASE64 }}
+      INUTIL_ANDROID_STORE_PASSWORD: ${{ secrets.INUTIL_ANDROID_STORE_PASSWORD }}
+      INUTIL_ANDROID_KEY_ALIAS: ${{ secrets.INUTIL_ANDROID_KEY_ALIAS }}
+      INUTIL_ANDROID_KEY_PASSWORD: ${{ secrets.INUTIL_ANDROID_KEY_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -859,7 +859,7 @@ jobs:
           pkgbuild \
             --root "$payload" \
             --install-location / \
-            --identifier com.bstream.bstreamMusic.pkg \
+            --identifier com.inutilmusic.app.pkg \
             --version "$APP_VERSION" \
             --ownership recommended \
             "$package"

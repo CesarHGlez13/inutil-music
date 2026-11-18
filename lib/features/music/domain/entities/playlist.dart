@@ -1,5 +1,5 @@
 class Playlist {
-  static const favoritesId = 'bstream:favorites';
+  static const favoritesId = 'inutil:favorites';
 
   const Playlist({
     required this.id,

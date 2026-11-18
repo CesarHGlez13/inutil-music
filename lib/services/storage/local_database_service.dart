@@ -2303,8 +2303,88 @@ class LocalDatabaseService {
     }
     await _backfillCatalogPlaylistData(db);
     await _createLibraryTrackOrderTable(db);
+    await _migrateLegacyFavoritesId(db);
     await _validateSchemaForVersion(db, AppConstants.databaseVersion);
     await _repairIndexes(db);
+  }
+
+  Future<void> _migrateLegacyFavoritesId(Database db) async {
+    const targetId = Playlist.favoritesId;
+    final legacyRows = await db.rawQuery(
+      "SELECT id FROM playlists WHERE id != ? AND id LIKE '%:favorites'",
+      <Object?>[targetId],
+    );
+    if (legacyRows.isEmpty) return;
+
+    final fkRows = await db.rawQuery('PRAGMA foreign_keys');
+    final fkWasOn =
+        fkRows.isNotEmpty && (fkRows.first.values.first as num?)?.toInt() == 1;
+    if (fkWasOn) {
+      await db.execute('PRAGMA foreign_keys = OFF');
+    }
+    try {
+      await db.transaction((txn) async {
+        final hasTarget = (await txn.rawQuery(
+          'SELECT 1 FROM playlists WHERE id = ? LIMIT 1',
+          <Object?>[targetId],
+        )).isNotEmpty;
+        for (final row in legacyRows) {
+          final oldId = row['id'] as String?;
+          if (oldId == null || oldId.isEmpty || oldId == targetId) continue;
+          if (!hasTarget) {
+            await txn.execute(
+              'UPDATE playlists SET id = ? WHERE id = ?',
+              <Object?>[targetId, oldId],
+            );
+          } else {
+            await txn.execute(
+              'DELETE FROM playlists WHERE id = ?',
+              <Object?>[oldId],
+            );
+          }
+          await txn.execute(
+            'UPDATE playlist_items SET playlist_id = ? WHERE playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+          await txn.execute(
+            'UPDATE OR IGNORE ytm_playlist_bindings SET playlist_id = ? WHERE playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+          await txn.execute(
+            'DELETE FROM ytm_playlist_bindings WHERE playlist_id = ?',
+            <Object?>[oldId],
+          );
+          await txn.execute(
+            'UPDATE OR IGNORE ytm_playlist_base_items SET playlist_id = ? WHERE playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+          await txn.execute(
+            'DELETE FROM ytm_playlist_base_items WHERE playlist_id = ?',
+            <Object?>[oldId],
+          );
+          await txn.execute(
+            'UPDATE OR IGNORE playlist_sync_intents SET playlist_id = ? WHERE playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+          await txn.execute(
+            'DELETE FROM playlist_sync_intents WHERE playlist_id = ?',
+            <Object?>[oldId],
+          );
+          await txn.execute(
+            'UPDATE playlist_sync_conflicts SET playlist_id = ? WHERE playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+          await txn.execute(
+            'UPDATE local_tracks SET last_played_playlist_id = ? WHERE last_played_playlist_id = ?',
+            <Object?>[targetId, oldId],
+          );
+        }
+      });
+    } finally {
+      if (fkWasOn) {
+        await db.execute('PRAGMA foreign_keys = ON');
+      }
+    }
   }
 
   Future<void> _validateSchemaForVersion(

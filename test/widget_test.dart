@@ -471,7 +471,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               miniPlayerMode: MiniPlayerMode.standard,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.accent,
@@ -681,7 +681,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               miniPlayerMode: MiniPlayerMode.standard,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.accent,
@@ -945,7 +945,7 @@ void main() {
 
       final settingsController = _FakeSettingsController(
         const SettingsState(
-          downloadDirectory: '/tmp/BStream-Music',
+          downloadDirectory: '/tmp/Inutil-Music',
           language: AppLanguage.spanish,
           playerStyle: PlayerStyle.inutilMusic,
         ),
@@ -1148,7 +1148,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             miniPlayerMode: MiniPlayerMode.standard,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.artwork,
@@ -1213,7 +1213,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             miniPlayerMode: MiniPlayerMode.standard,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.artwork,
@@ -1310,7 +1310,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               miniPlayerMode: MiniPlayerMode.capsule,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.transparent,
@@ -1400,7 +1400,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.transparent,
             ),
@@ -1613,7 +1613,7 @@ void main() {
       await tester.tap(find.byIcon(Icons.arrow_back_rounded).first);
       await tester.pump(const Duration(milliseconds: 300));
       final favoritesEntry = find.byKey(
-        const ValueKey('library-playlist-bstream:favorites'),
+        const ValueKey('library-playlist-inutil:favorites'),
       );
       await tester.ensureVisible(favoritesEntry);
       await tester.tap(favoritesEntry);
@@ -1670,7 +1670,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2112,7 +2112,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2255,7 +2255,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2415,7 +2415,7 @@ void main() {
           libraryRepository: repository,
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2524,7 +2524,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2858,7 +2858,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerMode: MiniPlayerMode.capsule,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.artwork,
@@ -2913,7 +2913,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -2989,7 +2989,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
               miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -3130,7 +3130,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
             ),
@@ -3357,7 +3357,7 @@ void main() {
           _testApp(
             settingsController: _FakeSettingsController(
               SettingsState(
-                downloadDirectory: '/tmp/BStream-Music',
+                downloadDirectory: '/tmp/Inutil-Music',
                 language: AppLanguage.spanish,
                 surfaceBackgroundMode: surfaceCase.mode,
               ),
@@ -3459,7 +3459,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
           ),
@@ -3581,7 +3581,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             const SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
             ),
@@ -3707,7 +3707,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
           ),
@@ -3766,7 +3766,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
           ),
@@ -3817,7 +3817,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.liquidGlass,
@@ -3909,7 +3909,7 @@ void main() {
             _testApp(
               settingsController: _FakeSettingsController(
                 SettingsState(
-                  downloadDirectory: '/tmp/BStream-Music',
+                  downloadDirectory: '/tmp/Inutil-Music',
                   language: AppLanguage.spanish,
                   surfaceBackgroundMode: surfaceMode,
                   miniPlayerBackgroundMode:
@@ -4077,7 +4077,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             miniPlayerMode: MiniPlayerMode.capsule,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.transparent,
@@ -4383,7 +4383,7 @@ void main() {
         _testApp(
           settingsController: _FakeSettingsController(
             SettingsState(
-              downloadDirectory: '/tmp/BStream-Music',
+              downloadDirectory: '/tmp/Inutil-Music',
               language: AppLanguage.spanish,
               playerStyle: PlayerStyle.inutilMusic,
               playerArtworkStyle: artworkStyle,
@@ -4471,7 +4471,7 @@ void main() {
       _testApp(
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             playerStyle: PlayerStyle.appleMusic,
           ),
@@ -4619,7 +4619,7 @@ void main() {
           _testApp(
             settingsController: _FakeSettingsController(
               SettingsState(
-                downloadDirectory: '/tmp/BStream-Music',
+                downloadDirectory: '/tmp/Inutil-Music',
                 language: AppLanguage.spanish,
                 playerStyle: playerStyle,
               ),
@@ -5310,7 +5310,7 @@ void main() {
         libraryRepository: repository,
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/BStream-Music',
+            downloadDirectory: '/tmp/Inutil-Music',
             language: AppLanguage.spanish,
             surfaceBackgroundMode: SurfaceBackgroundMode.liquidGlass,
           ),
@@ -6504,7 +6504,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 500));
 
-      final uri = Uri.parse('bstreammusic://track/dQw4w9WgXcQ');
+      final uri = Uri.parse('inutilmusic://track/dQw4w9WgXcQ');
       incomingLinks.add(uri);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -6745,7 +6745,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 500));
 
-    incomingLinks.add(Uri.parse('bstreammusic://track/M7lc1UVf-VE'));
+    incomingLinks.add(Uri.parse('inutilmusic://track/M7lc1UVf-VE'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 3100));
     await tester.pump();

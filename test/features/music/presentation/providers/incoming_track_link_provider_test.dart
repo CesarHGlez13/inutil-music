@@ -37,17 +37,17 @@ void main() {
         reason: 'ordinary YouTube links are not app links',
       );
 
-      service.add(Uri.parse('bstreammusic://track/dQw4w9WgXcQ'));
+      service.add(Uri.parse('inutilmusic://track/dQw4w9WgXcQ'));
       await pumpEventQueue();
       expect(emitted.map((link) => link.videoId), ['dQw4w9WgXcQ']);
 
-      service.add(Uri.parse('bstreammusic://track/dQw4w9WgXcQ'));
+      service.add(Uri.parse('inutilmusic://track/dQw4w9WgXcQ'));
       await pumpEventQueue();
       expect(emitted.map((link) => link.videoId), [
         'dQw4w9WgXcQ',
       ], reason: 'cold/warm duplicate delivery must not autoplay twice');
 
-      service.add(Uri.parse('bstreammusic://track/M7lc1UVf-VE'));
+      service.add(Uri.parse('inutilmusic://track/M7lc1UVf-VE'));
       await pumpEventQueue();
       expect(emitted.map((link) => link.videoId), [
         'dQw4w9WgXcQ',

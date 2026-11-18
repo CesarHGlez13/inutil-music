@@ -403,7 +403,10 @@ class LibraryCsvImportService {
 
   String? _playlistId(LibraryCsvMembership membership) {
     final id = membership.id?.trim();
-    if (id == Playlist.favoritesId || id == 'LM' || id == 'VLLM') {
+    if (id == Playlist.favoritesId ||
+        (id != null && id.endsWith(':favorites')) ||
+        id == 'LM' ||
+        id == 'VLLM') {
       return Playlist.favoritesId;
     }
     if (id != null && id.isNotEmpty) return id;

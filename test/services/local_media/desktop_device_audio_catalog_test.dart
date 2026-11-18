@@ -106,7 +106,7 @@ void main() {
     final music = Directory(p.join(temporary.path, 'Music'));
     final album = Directory(p.join(music.path, 'Album'));
     final managed = Directory(
-      p.join(music.path, 'Downloads', 'BStream-Music', 'audio'),
+      p.join(music.path, 'Downloads', 'Inutil-Music', 'audio'),
     );
     await album.create(recursive: true);
     await managed.create(recursive: true);
@@ -124,7 +124,7 @@ void main() {
       return <Directory>[music];
     });
     final result = await catalog.load(
-      inutilRoot: p.join(music.path, 'Downloads', 'BStream-Music'),
+      inutilRoot: p.join(music.path, 'Downloads', 'Inutil-Music'),
     );
 
     expect(result.status, DeviceAudioPermissionStatus.notRequired);

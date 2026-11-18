@@ -253,7 +253,7 @@ class _FixturePlayerController extends PlayerController {
 class _FixtureSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: 'BStream-Music',
+    downloadDirectory: 'Inutil-Music',
     language: AppLanguage.spanish,
     lyricsRomanizationLanguages: {LyricsRomanizationLanguage.korean},
   );

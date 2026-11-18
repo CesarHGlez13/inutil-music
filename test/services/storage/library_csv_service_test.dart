@@ -162,7 +162,7 @@ void main() {
         service,
         fileName: 'memberships.csv',
         content:
-            'BStreamCsvVersion,PlaylistName,Position,MediaId,Title,Artists\r\n'
+            'InutilCsvVersion,PlaylistName,Position,MediaId,Title,Artists\r\n'
             '1,Favoritas,1,dQw4w9WgXcQ,One,Artist\r\n'
             '1,Favoritas,1,dQw4w9WgXcQ,One,Artist\r\n'
             '1,Viaje,4,dQw4w9WgXcQ,One,Artist\r\n',

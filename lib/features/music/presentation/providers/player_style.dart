@@ -13,10 +13,7 @@ enum PlayerStyle {
 
   static PlayerStyle fromCode(String? code) {
     return switch (code) {
-      // 'bstreamMusic' es el valor que escribieron en Preferencias las
-      // versiones 2.0.x (nombre del proyecto original): se sigue aceptando
-      // para que nadie pierda el estilo de reproductor elegido.
-      'inutilMusic' || 'bstreamMusic' => PlayerStyle.inutilMusic,
+      'inutilMusic' => PlayerStyle.inutilMusic,
       'appleMusic' => PlayerStyle.appleMusic,
       'classicVinyl' => PlayerStyle.classicVinyl,
       'spotifyMusic' => PlayerStyle.spotifyMusic,

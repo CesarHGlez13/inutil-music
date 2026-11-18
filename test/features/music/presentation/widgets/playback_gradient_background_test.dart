@@ -397,8 +397,8 @@ class _BackgroundPlayerController extends PlayerController {
 class _PhotoSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
-    appBackgroundPath: '/tmp/BStream-Music/background.png',
+    appBackgroundPath: '/tmp/Inutil-Music/background.png',
   );
 }

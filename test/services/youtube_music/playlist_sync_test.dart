@@ -198,7 +198,7 @@ void main() {
         ]);
         final key = const PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final store = _MemoryStore(
           PlaylistSyncWork(
@@ -242,7 +242,7 @@ void main() {
         ).copyWith(localTrackId: 'download-b');
         const key = PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final store = _MemoryStore(
           PlaylistSyncWork(
@@ -301,7 +301,7 @@ void main() {
         );
         const key = PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final store = _MemoryStore(
           PlaylistSyncWork(
@@ -365,7 +365,7 @@ void main() {
       final b = _item('B', localId: 'b', setId: 'set-b');
       final key = const PlaylistSyncKey(
         accountKey: 'account',
-        playlistId: 'bstream:favorites',
+        playlistId: 'inutil:favorites',
       );
       final store = _MemoryStore(
         PlaylistSyncWork(
@@ -428,7 +428,7 @@ void main() {
         );
         const key = PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final local = PlaylistSyncSnapshot(
           remotePlaylistId: 'LM',
@@ -499,7 +499,7 @@ void main() {
         final desired = _snapshot('Favoritos', <PlaylistSyncItem>[a, b]);
         final key = const PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final store = _MemoryStore(
           PlaylistSyncWork(
@@ -537,7 +537,7 @@ void main() {
         final b = _item('B', localId: 'b');
         final key = const PlaylistSyncKey(
           accountKey: 'account',
-          playlistId: 'bstream:favorites',
+          playlistId: 'inutil:favorites',
         );
         final local = _snapshot('Favoritos', <PlaylistSyncItem>[a, b]);
         final store = _MemoryStore(

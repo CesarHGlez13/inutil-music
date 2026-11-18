@@ -80,18 +80,6 @@
                     android:host="track" />
             </intent-filter>
             <!--
-                 Enlaces compartidos por las versiones 2.0.x
-                 (bstreammusic://track/<id>): siguen abriendo la app.
-            -->
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data
-                    android:scheme="bstreammusic"
-                    android:host="track" />
-            </intent-filter>
-            <!--
                  Offer Inutil as an option for public YouTube links. This is
                  intentionally not autoVerify: without a domain-owned
                  assetlinks.json Android must keep the normal chooser instead

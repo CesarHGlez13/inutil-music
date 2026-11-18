@@ -104,7 +104,7 @@ void main() {
       expect(catalog.lastOptions?.excludeTelegramAudio, isTrue);
       expect(catalog.lastOptions?.excludeAudioRecordings, isTrue);
       expect(catalog.lastOptions?.excludeShortAudio, isTrue);
-      expect(catalog.lastInutilRoot, '/tmp/BStream-Music');
+      expect(catalog.lastInutilRoot, '/tmp/Inutil-Music');
 
       await tester.tap(find.byKey(const ValueKey('local-all-songs-entry')));
       await tester.pumpAndSettle();
@@ -280,7 +280,7 @@ const _tracks = <DeviceAudioTrack>[
 class _LocalSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
   );
 }

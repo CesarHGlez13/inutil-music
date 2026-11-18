@@ -1058,7 +1058,8 @@ class PlaylistSyncEngine {
   }
 
   bool _isFavoritesKey(PlaylistSyncKey key) =>
-      key.playlistId == 'bstream:favorites';
+      key.playlistId == 'inutil:favorites' ||
+      key.playlistId.endsWith(':favorites');
 
   PlaylistSyncSnapshot _deduplicateFavoriteItems(
     PlaylistSyncSnapshot snapshot, {

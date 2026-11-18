@@ -235,7 +235,7 @@ Widget _harness({
 class _TestSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
   );
 }

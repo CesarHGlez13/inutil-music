@@ -73,7 +73,7 @@ void main() {
         'Listen to this song:\n\n'
         'https://music.youtube.com/watch?v=$videoId',
       );
-      expect(gateway.text, isNot(contains('bstreammusic://track/')));
+      expect(gateway.text, isNot(contains('inutilmusic://track/')));
       expect(gateway.text, isNot(contains('https://www.youtube.com/')));
     });
 

@@ -8,7 +8,7 @@ import UIKit
 /// AVPlayer can consume, so they are deliberately omitted from the catalog.
 final class IOSLocalMediaPlugin {
   private let worker = DispatchQueue(
-    label: "com.bstream.bstreamMusic.local-media",
+    label: "com.inutilmusic.app.local-media",
     qos: .userInitiated
   )
   private var itemsByURL: [String: MPMediaItem] = [:]

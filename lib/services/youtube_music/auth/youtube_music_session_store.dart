@@ -47,16 +47,7 @@ class SharedPreferencesYouTubeMusicSessionRevocationStore
   @override
   Future<bool> isRevoked() async {
     final preferences = await SharedPreferences.getInstance();
-    if (preferences.getBool(storageKey) ?? false) return true;
-    // Marcador escrito por las versiones 2.0.x, que usaban el nombre del
-    // proyecto original como clave. Se adopta una sola vez.
-    final legacyKey = storageKey.replaceFirst('inutil.', 'bstream.');
-    if (legacyKey != storageKey && (preferences.getBool(legacyKey) ?? false)) {
-      await preferences.setBool(storageKey, true);
-      await preferences.remove(legacyKey);
-      return true;
-    }
-    return false;
+    return preferences.getBool(storageKey) ?? false;
   }
 
   @override
@@ -134,24 +125,7 @@ class SecureYouTubeMusicSessionStore implements YouTubeMusicSessionStore {
       await _retryRevokedCredentialCleanup();
       return null;
     }
-    var encoded = await _secureStore.read(storageKey);
-    if (encoded == null || encoded.isEmpty) {
-      // Las versiones 2.0.x guardaron la sesión bajo el nombre del proyecto
-      // original. Se adopta una sola vez para no exigir otro inicio de sesión.
-      final legacyKey = storageKey.replaceFirst('inutil.', 'bstream.');
-      if (legacyKey != storageKey) {
-        final legacy = await _secureStore.read(legacyKey);
-        if (legacy != null && legacy.isNotEmpty) {
-          encoded = legacy;
-          try {
-            await _secureStore.write(storageKey, legacy);
-            await _secureStore.delete(legacyKey);
-          } on Object {
-            // Sin migración durable: la sesión legacy sigue siendo válida.
-          }
-        }
-      }
-    }
+    final encoded = await _secureStore.read(storageKey);
     if (encoded == null || encoded.isEmpty) return null;
     try {
       return YouTubeMusicSessionCredential.decode(encoded);

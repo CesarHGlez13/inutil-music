@@ -130,7 +130,7 @@ void main() {
     });
 
     test('Now Playing widget is embedded with a shared App Group', () {
-      const group = 'group.com.bstream.bstreamMusic';
+      const group = 'group.com.inutilmusic.app';
       final project = File(
         'ios/Runner.xcodeproj/project.pbxproj',
       ).readAsStringSync();
@@ -139,7 +139,7 @@ void main() {
         project,
         contains('NowPlayingWidget.appex in Embed App Extensions'),
       );
-      expect(project, contains('com.bstream.bstreamMusic.NowPlayingWidget'));
+      expect(project, contains('com.inutilmusic.app.NowPlayingWidget'));
       for (final path in <String>[
         'ios/Runner/DebugProfile.entitlements',
         'ios/Runner/Release.entitlements',

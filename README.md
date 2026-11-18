@@ -8,11 +8,10 @@
 
 Inútil Music is a cross-platform music player and library manager built with Flutter. It lets you search for music, play and download tracks, organize a local library, and manage playlists on Android, iOS, Windows, Linux, and macOS.
 
-It is based on the open-source project BStream Music by Bryam Contreras
-(BSD-2-Clause); see `LICENSE`. Published artifacts and the update channel live
-in <https://github.com/CesarHGlez13/inutil-music>.
+Published artifacts and the update channel live in
+<https://github.com/CesarHGlez13/inutil-music>.
 
-Current version: **2.5.5+255**.
+Current version: **2.5.6+256**.
 
 > The repository does not store media content. YouTube search, playback, and
 > downloads use Inútil Music's self-contained Dart InnerTube pipeline. Supported
@@ -539,10 +538,10 @@ exports outside Inútil Music's sandbox.
 
 The Now Playing home-screen widget is available on iOS 14 or newer (small and
 medium sizes). Its artwork and metadata are copied into the shared App Group
-`group.com.bstream.bstreamMusic`; the widget never starts an audio engine or
+`group.com.inutilmusic.app`; the widget never starts an audio engine or
 downloads music. Its controls open Inútil Music to execute playback actions. For
 device signing, register that App Group for **both** the Runner and
-`com.bstream.bstreamMusic.NowPlayingWidget` extension and sign both targets
+`com.inutilmusic.app.NowPlayingWidget` extension and sign both targets
 with profiles that include the entitlement. An external signing tool that
 strips the group entitlement or does not sign the extension cannot provide a
 working widget. The Android home-screen widget uses the active media session
@@ -556,7 +555,7 @@ tracks remain in its own library as on the other platforms.
 
 The app cannot claim public `youtube.com` links as Universal Links because
 those domains do not publish an association for Inútil Music; app-owned
-`inutilmusic://` links are the current contract; `bstreammusic://` links shared by older versions remain supported.
+`inutilmusic://` links are the contract owned by Inútil Music.
 
 The repository's CI compiles both an unsigned simulator application and an
 unsigned Release application for physical devices. It packages the latter as
@@ -665,15 +664,13 @@ $env:INUTIL_ANDROID_KEY_PASSWORD="..."
 GitHub Actions uses the same signing key through encrypted repository secrets:
 
 ```text
-BSTREAM_ANDROID_KEYSTORE_BASE64
-BSTREAM_ANDROID_STORE_PASSWORD
-BSTREAM_ANDROID_KEY_ALIAS
-BSTREAM_ANDROID_KEY_PASSWORD
+INUTIL_ANDROID_KEYSTORE_BASE64
+INUTIL_ANDROID_STORE_PASSWORD
+INUTIL_ANDROID_KEY_ALIAS
+INUTIL_ANDROID_KEY_PASSWORD
 ```
 
-Los secretos conservan el prefijo histórico `BSTREAM_` porque viven en
-*Settings → Secrets* del repositorio, no en el árbol del código; el workflow los
-mapea a las variables `INUTIL_ANDROID_*` que lee Gradle.
+El workflow pasa esos secretos a las variables `INUTIL_ANDROID_*` que lee Gradle.
 
 The workflow verifies all three APK signatures before uploading the artifacts.
 
@@ -682,7 +679,7 @@ The workflow verifies all three APK signatures before uploading the artifacts.
 - Android, iOS, and macOS use `sqflite`; Windows and Linux use
   `sqflite_common_ffi`.
 - Incremental migrations preserve existing libraries.
-- Favorites are implemented as a reserved local playlist (`bstream:favorites`),
+- Favorites are implemented as a reserved local playlist (`inutil:favorites`),
   so no separate table is required. After account consent, it is bound to
   YouTube Music's special **Liked Music** collection (LM/VLLM): likes and
   unlikes use the same conservative playlist sync engine, without importing a

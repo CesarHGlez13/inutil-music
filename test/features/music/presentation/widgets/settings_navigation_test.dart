@@ -3417,7 +3417,7 @@ Card _sectionCard(WidgetTester tester, Finder row) {
 class _FixedSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
   );
 
@@ -3542,7 +3542,7 @@ class _FixedSettingsController extends SettingsController {
 class _PersistingCrossfadeSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
   );
 }

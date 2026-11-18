@@ -8111,7 +8111,7 @@ class _PlayerFontSettingsController extends SettingsController {
 
   @override
   Future<SettingsState> build() async => SettingsState(
-    downloadDirectory: '/tmp/BStream-Music',
+    downloadDirectory: '/tmp/Inutil-Music',
     language: AppLanguage.spanish,
     playerFont: font,
     showAudioQuality: showAudioQuality,

@@ -645,9 +645,7 @@ const _addedAtAliases = {'addedat', 'dateadded', 'addeddate', 'fechaagregada'};
 
 LibraryCsvDetectedFormat _detectFormat(List<String> headers) {
   final set = headers.toSet();
-  // 'BStreamCsvVersion' es la cabecera que exportaban las versiones 2.0.x;
-  // sigue siendo válida para importar copias antiguas.
-  if (set.contains('bstreamcsvversion') || set.contains('inutilcsvversion')) {
+  if (set.contains('inutilcsvversion')) {
     return LibraryCsvDetectedFormat.inutil;
   }
   if (set.contains('youtubevideoid') && set.contains('title')) {

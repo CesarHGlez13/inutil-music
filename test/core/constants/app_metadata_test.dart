@@ -28,7 +28,7 @@ void main() {
       r'#define MyAppVersion "([0-9]+\.[0-9]+\.[0-9]+)"',
     ).firstMatch(windowsInstaller)?.group(1);
 
-    expect(pubspecVersion, '2.5.5+255');
+    expect(pubspecVersion, '2.5.6+256');
     expect(readmeVersion, pubspecVersion);
     expect(changelogVersion, pubspecVersion);
     expect(runtimeVersion, AppConstants.appVersion);
@@ -60,9 +60,6 @@ void main() {
       startsWith('mailto:${AppConstants.supportEmail}'),
     );
     expect(AppConstants.supportDevelopmentUrl, isNot(contains('ko-fi')));
-    // El único resto del proyecto original en estas constantes es el credito
-    // legal que exige la licencia BSD-2-Clause del upstream.
-    expect(AppConstants.upstreamCredit, contains('BSD-2-Clause'));
   });
 
   test('brand strings point at Inútil Music, not the upstream project', () {
@@ -84,12 +81,12 @@ void main() {
     for (final stale in <String>[
       'BryamContreras/BStream-Music',
       'bstreammusic.pages.dev',
+      'BStream',
     ]) {
       expect(constants, isNot(contains(stale)), reason: '$stale must be gone');
     }
-    // El pie de Ajustes muestra la marca propia y conserva el credito legal.
+    // El pie de Ajustes muestra unicamente la marca y soporte propios.
     expect(settingsPanel, contains("'Inútil Music v\${AppConstants.appVersion} · '"));
-    expect(settingsPanel, contains('AppConstants.upstreamCredit'));
     expect(settingsPanel, contains('AppConstants.supportEmail'));
     // El nombre del widget visible en el launcher debe ser el nuestro.
     for (final xml in <String>[widgetEs, widgetEn]) {
@@ -101,41 +98,25 @@ void main() {
   });
 
   test(
-    'el producto ya no menciona el proyecto original salvo compatibilidad',
+    'el producto no contiene ninguna referencia interna o externa a bstream',
     () {
-      // Literales que siguen siendo válidos a propósito: identidad publicada
-      // en iOS, datos del usuario y el crédito legal de la licencia BSD-2.
-      const allowed = <String>[
-        'BStream-Music',                 // Music/BStream-Music (biblioteca descargada)
-        'bstream:favorites',             // id de playlist persistido en la BD
-        'BStreamCsvVersion',             // exportaciones CSV de las 2.0.x
-        'bstreamcsvversion',
-        'bstreamMusic',                  // estilo guardado en Preferencias
-        'bstreammusic',                  // esquema de enlaces de las 2.0.x
-        'com.bstream.bstreamMusic',      // bundle id y App Group de iOS/macOS
-        'BStream Music (BSD-2-Clause)',  // crédito legal
-        'open-source BStream Music',
-        'parte de BStream Music',
-        "'bstream.'",                    // claves legacy de Preferencias
-        "'BStream'",                     // carpeta descargada por las 1.x
-      ];
       final roots = <String>[
         'lib',
         'android/app/src',
         'ios/Runner',
+        'ios/NowPlayingWidget',
         'macos/Runner',
         'windows/runner',
         'linux/runner',
         'packaging',
+        'integration_test',
       ];
       final unexpected = <String>[];
       for (final root in roots) {
         for (final entry in Directory(root).listSync(recursive: true, followLinks: false)) {
           if (entry is! File) continue;
           final path = entry.path;
-          if (!path.endsWith(
-            '.dart',
-          ) &&
+          if (!path.endsWith('.dart') &&
               !path.endsWith('.kt') &&
               !path.endsWith('.java') &&
               !path.endsWith('.swift') &&
@@ -156,12 +137,11 @@ void main() {
           final lines = entry.readAsLinesSync();
           for (var i = 0; i < lines.length; i++) {
             if (!lines[i].toLowerCase().contains('bstream')) continue;
-            if (allowed.any((token) => lines[i].contains(token))) continue;
             unexpected.add('$path:${i + 1}  ${lines[i].trim()}');
           }
         }
       }
-      expect(unexpected, isEmpty, reason: 'menciones huérfanas: $unexpected');
+      expect(unexpected, isEmpty, reason: 'referencias residuales: $unexpected');
     },
   );
 

@@ -4,9 +4,9 @@ class AppConstants {
   static const appName = 'Inútil Music';
   /// Fuente única del número de versión mostrado en Ajustes y usado por el
   /// chequeo de actualizaciones OTA. Debe coincidir con la parte de versión de
-  /// `version:` en `pubspec.yaml` (actualmente `2.5.5+255`); el incremento
-  /// interno (`+255`) es el `versionCode` de Android y no se muestra.
-  static const appVersion = '2.5.5';
+  /// `version:` en `pubspec.yaml` (actualmente `2.5.6+256`); el incremento
+  /// interno (`+256`) es el `versionCode` de Android y no se muestra.
+  static const appVersion = '2.5.6';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 11;
   static const fileExportChannel = 'inutil_music/file_export';
@@ -39,8 +39,4 @@ class AppConstants {
   /// `bootstrapAdminEmail` (`firebase_auth_service.dart`) porque está ligada al
   /// usuario de Firebase Auth ya registrado y a las reglas de Firestore.
   static const supportEmail = 'cesarmaster133@gmail.com';
-  /// Crédito legal obligatorio: el proyecto parte de BStream Music, publicado
-  /// bajo BSD-2-Clause (ver `LICENSE`).
-  static const upstreamCredit =
-      'basado en el proyecto open-source BStream Music (BSD-2-Clause)';
 }

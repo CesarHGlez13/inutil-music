@@ -87,7 +87,7 @@ void main() {
 
   group('InutilTrackLinkCodec.decode', () {
     test('decodes the canonical custom-scheme URI', () {
-      final link = codec.decode(Uri.parse('bstreammusic://track/$videoId'));
+      final link = codec.decode(Uri.parse('inutilmusic://track/$videoId'));
 
       expect(link.videoId, videoId);
     });
@@ -100,14 +100,14 @@ void main() {
 
     for (final invalidUri in <String>[
       'https://track/$videoId',
-      'bstreammusic://album/$videoId',
-      'bstreammusic://track/too-short',
-      'bstreammusic://track/$videoId/extra',
-      'bstreammusic://track/$videoId?title=Injected',
-      'bstreammusic://track/$videoId#fragment',
-      'bstreammusic://user@track/$videoId',
-      'bstreammusic://track:1234/$videoId',
-      'bstreammusic://track/',
+      'inutilmusic://album/$videoId',
+      'inutilmusic://track/too-short',
+      'inutilmusic://track/$videoId/extra',
+      'inutilmusic://track/$videoId?title=Injected',
+      'inutilmusic://track/$videoId#fragment',
+      'inutilmusic://user@track/$videoId',
+      'inutilmusic://track:1234/$videoId',
+      'inutilmusic://track/',
     ]) {
       test('rejects non-canonical URI: $invalidUri', () {
         final uri = Uri.parse(invalidUri);

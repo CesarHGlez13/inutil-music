@@ -556,7 +556,8 @@ class InutilCloudBackupService {
   }
 
   Playlist? _playlistFromMap(Map<String, dynamic> map) {
-    final id = map['id'] as String? ?? '';
+    final rawId = map['id'] as String? ?? '';
+    final id = rawId.endsWith(':favorites') ? Playlist.favoritesId : rawId;
     final name = map['name'] as String? ?? '';
     if (id.isEmpty || name.isEmpty) return null;
     final trackIds =
@@ -579,7 +580,10 @@ class InutilCloudBackupService {
 
   PlaylistEntry? _entryFromMap(Map<String, dynamic> map) {
     final id = map['id'] as String? ?? '';
-    final playlistId = map['playlistId'] as String? ?? '';
+    final rawPlaylistId = map['playlistId'] as String? ?? '';
+    final playlistId = rawPlaylistId.endsWith(':favorites')
+        ? Playlist.favoritesId
+        : rawPlaylistId;
     final rawTrack = map['track'];
     if (id.isEmpty || playlistId.isEmpty || rawTrack is! Map) return null;
     final trackMap = rawTrack.cast<String, dynamic>();

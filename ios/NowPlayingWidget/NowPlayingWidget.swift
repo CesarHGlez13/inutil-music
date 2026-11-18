@@ -1,7 +1,7 @@
 import SwiftUI
 import WidgetKit
 
-private let groupId = "group.com.bstream.bstreamMusic"
+private let groupId = "group.com.inutilmusic.app"
 private let widgetKind = "InutilNowPlaying"
 
 struct NowPlayingEntry: TimelineEntry {
@@ -122,7 +122,7 @@ private struct NowPlayingWidgetView: View {
   let entry: NowPlayingEntry
 
   private func action(_ name: String) -> URL {
-    URL(string: "bstreammusic://widget?action=\(name)")!
+    URL(string: "inutilmusic://widget?action=\(name)")!
   }
 
   @ViewBuilder var body: some View {

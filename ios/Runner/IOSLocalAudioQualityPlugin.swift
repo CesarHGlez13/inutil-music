@@ -66,7 +66,7 @@ final class IOSLocalAudioQualityReader {
     deinit { close() }
   }
 
-  private let worker = DispatchQueue(label: "com.bstream.bstreamMusic.local-audio-quality", qos: .utility)
+  private let worker = DispatchQueue(label: "com.inutilmusic.app.local-audio-quality", qos: .utility)
   private var pending: [Request] = []
   private var active: Session?
   private var disposed = false

@@ -378,7 +378,7 @@ void main() {
 class _FakeSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: 'BStream-Music',
+    downloadDirectory: 'Inutil-Music',
     language: AppLanguage.spanish,
   );
 
