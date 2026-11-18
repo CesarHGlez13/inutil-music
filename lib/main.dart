@@ -86,12 +86,11 @@ AppStartupCoordinator launchInutilMusicApp({
   WidgetsFlutterBinding.ensureInitialized();
   configureArtworkVideoRendering();
   unawaited(_startLicenceServices());
-  // Keep artwork memory bounded across long sessions with many searches and
-  // queue transitions. The default Flutter image cache allows 100 MiB and
-  // 1,000 entries, which is excessive for music thumbnails.
+  // Keep artwork thumbnails cached cleanly across Home, Search, Library, and
+  // Local tabs without hitting Flutter's default 100 MiB / 1,000-entry limit.
   final imageCache = PaintingBinding.instance.imageCache;
-  imageCache.maximumSize = 100;
-  imageCache.maximumSizeBytes = 48 * 1024 * 1024;
+  imageCache.maximumSize = 240;
+  imageCache.maximumSizeBytes = 64 * 1024 * 1024;
   // Begin compiling the optional Impeller lens before Liquid Glass surfaces
   // mount. Unsupported desktop renderers keep the portable fallback.
   unawaited(LiquidGlassSurface.warmUp());

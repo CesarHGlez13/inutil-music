@@ -24,7 +24,20 @@ class InutilConnectSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final syncService = ref.watch(inutilPlaybackSyncProvider);
     final authService = ref.watch(inutilAuthProvider);
-    final playerSnapshot = ref.watch(playerControllerProvider).value;
+    // Select only static track metadata so 200 ms playback position ticks
+    // never rebuild the Connect bottom sheet and peer cards.
+    final playerTrack = ref.watch(
+      playerControllerProvider.select((player) {
+        final snapshot = player.value;
+        return (
+          trackId: snapshot?.trackId,
+          title: snapshot?.title,
+          artist: snapshot?.artist,
+          album: snapshot?.album,
+          thumbnailUrl: snapshot?.thumbnailUrl,
+        );
+      }),
+    );
     final remoteSession = syncService.remoteSession;
     final isLocalActive = syncService.isCurrentDeviceActive;
     final autoPairedPeer = syncService.autoPairedPeer;
@@ -188,23 +201,28 @@ class InutilConnectSheet extends ConsumerWidget {
                         child: FilledButton.icon(
                           onPressed: () async {
                             final trackId =
-                                playerSnapshot?.trackId ??
+                                playerTrack.trackId ??
                                 remoteSession?.trackId;
                             final title =
-                                playerSnapshot?.title ??
+                                playerTrack.title ??
                                 remoteSession?.title ??
                                 'Canción';
                             final artist =
-                                playerSnapshot?.artist ??
+                                playerTrack.artist ??
                                 remoteSession?.artist ??
                                 'Inútil Music';
                             final album =
-                                playerSnapshot?.album ?? remoteSession?.album;
+                                playerTrack.album ?? remoteSession?.album;
                             final thumb =
-                                playerSnapshot?.thumbnailUrl ??
+                                playerTrack.thumbnailUrl ??
                                 remoteSession?.thumbnailUrl;
                             final pos =
-                                playerSnapshot?.position.inMilliseconds ?? 0;
+                                ref
+                                    .read(playerControllerProvider)
+                                    .value
+                                    ?.position
+                                    .inMilliseconds ??
+                                0;
 
                             if (trackId != null && trackId.isNotEmpty) {
                               await syncService.playTrackOnPeer(

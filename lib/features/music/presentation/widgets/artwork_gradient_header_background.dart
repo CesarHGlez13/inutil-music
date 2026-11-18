@@ -67,21 +67,23 @@ class ArtworkGradientHeaderBackground extends ConsumerWidget {
                 ),
                 if (source != null && source.isNotEmpty)
                   ExcludeSemantics(
-                    child: ImageFiltered(
-                      key: ValueKey('$keyPrefix-background-blur'),
-                      imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                      child: Transform.scale(
-                        scale: 1.16,
-                        child:
-                            backgroundArtwork ??
-                            SourceImage(
-                              key: ValueKey('$keyPrefix-background-image'),
-                              source: source,
-                              fit: BoxFit.cover,
-                              // Foreground and background share the bounded image cache.
-                              cacheWidth: cacheWidth,
-                              fallback: const SizedBox.expand(),
-                            ),
+                    child: RepaintBoundary(
+                      child: ImageFiltered(
+                        key: ValueKey('$keyPrefix-background-blur'),
+                        imageFilter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                        child: Transform.scale(
+                          scale: 1.16,
+                          child:
+                              backgroundArtwork ??
+                              SourceImage(
+                                key: ValueKey('$keyPrefix-background-image'),
+                                source: source,
+                                fit: BoxFit.cover,
+                                // Foreground and background share the bounded image cache.
+                                cacheWidth: cacheWidth,
+                                fallback: const SizedBox.expand(),
+                              ),
+                        ),
                       ),
                     ),
                   ),

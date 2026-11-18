@@ -125,6 +125,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                           child: ProportionalArtwork(
                             source: artworkSource,
                             fallbackSource: artworkFallbackSource,
+                            cacheWidth: 256,
                             fallback: const ColoredBox(color: Color(0xFF0A0C10)),
                           ),
                         ),
@@ -619,6 +620,35 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
   }
 }
 
+/// Resolves the active synced lyric line for [position] using binary search
+/// over ordered [doc.lines], falling back to the first non-empty line before
+/// the initial timestamp.
+String activeSyncedLyricLineText(LyricsDocument doc, Duration position) {
+  final lines = doc.lines;
+  if (lines.isEmpty) return '';
+  var low = 0;
+  var high = lines.length - 1;
+  var upperBound = -1;
+  while (low <= high) {
+    final mid = (low + high) ~/ 2;
+    if (position >= lines[mid].timestamp) {
+      upperBound = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  for (var i = upperBound; i >= 0; i--) {
+    final candidate = lines[i].text.trim();
+    if (candidate.isNotEmpty) return candidate;
+  }
+  for (final line in lines) {
+    final candidate = line.text.trim();
+    if (candidate.isNotEmpty) return candidate;
+  }
+  return '';
+}
+
 class _CanvasFloatingLyricLine extends ConsumerWidget {
   const _CanvasFloatingLyricLine({required this.onTap});
 
@@ -630,52 +660,45 @@ class _CanvasFloatingLyricLine extends ConsumerWidget {
     if (doc == null || !doc.hasSyncedLyrics) {
       return const SizedBox.shrink();
     }
-    final position = ref.watch(
+    // Select only the resolved lyric line string so 200 ms position ticks
+    // do not rebuild or allocate until the active lyric text changes.
+    final activeText = ref.watch(
       playerControllerProvider.select(
-        (player) => player.value?.position ?? Duration.zero,
+        (player) => activeSyncedLyricLineText(
+          doc,
+          player.value?.position ?? Duration.zero,
+        ),
       ),
     );
-    final lines = doc.lines;
-    String? activeText;
-    for (var i = lines.length - 1; i >= 0; i--) {
-      if (position >= lines[i].timestamp) {
-        final candidate = lines[i].text.trim();
-        if (candidate.isNotEmpty) {
-          activeText = candidate;
-          break;
-        }
-      }
-    }
-    activeText ??= lines
-        .map((l) => l.text.trim())
-        .firstWhere((t) => t.isNotEmpty, orElse: () => '');
     if (activeText.isEmpty) return const SizedBox.shrink();
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        child: Align(
-          key: ValueKey(activeText),
-          alignment: Alignment.centerLeft,
-          child: Text(
-            activeText,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
-              height: 1.28,
-              shadows: [
-                Shadow(
-                  color: Color(0xCC000000),
-                  blurRadius: 12,
-                  offset: Offset(0, 2),
-                ),
-              ],
+    return RepaintBoundary(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: Align(
+            key: ValueKey(activeText),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              activeText,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.28,
+                shadows: [
+                  Shadow(
+                    color: Color(0xCC000000),
+                    blurRadius: 12,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

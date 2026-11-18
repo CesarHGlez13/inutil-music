@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -242,15 +243,25 @@ class _AnimatedPlaybackArtworkState extends State<_AnimatedPlaybackArtwork> {
     final source = widget.source;
     Widget background = widget.fallback;
     if (source != null && source.isNotEmpty) {
+      final hasSharpReflection = widget.reflectionArtworkRect != null;
+      // Non-reflected surfaces sit under a radius-44 Gaussian blur, so decoding
+      // above 256 px wastes texture memory and fragment fill rate with zero
+      // visible sharpness gain.
+      final effectiveCacheWidth = hasSharpReflection
+          ? widget.cacheWidth
+          : math.min(widget.cacheWidth, 256);
       final image = _PlaybackBackgroundImage(
         source: source,
         fallbackSource: widget.fallbackSource,
-        cacheWidth: widget.cacheWidth,
+        cacheWidth: effectiveCacheWidth,
         fallback: widget.fallback,
         reflectionArtworkRect: widget.reflectionArtworkRect,
+        filterQuality: hasSharpReflection
+            ? FilterQuality.medium
+            : FilterQuality.low,
       );
       background = ClipRect(
-        child: widget.reflectionArtworkRect != null
+        child: hasSharpReflection
             ? image
             : ImageFiltered(
                 imageFilter: ImageFilter.blur(sigmaX: 44, sigmaY: 44),
@@ -295,6 +306,7 @@ class _PlaybackBackgroundImage extends StatelessWidget {
     required this.fallbackSource,
     required this.cacheWidth,
     required this.reflectionArtworkRect,
+    this.filterQuality = FilterQuality.medium,
   });
 
   final String source;
@@ -302,6 +314,7 @@ class _PlaybackBackgroundImage extends StatelessWidget {
   final int cacheWidth;
   final Widget fallback;
   final Rect? reflectionArtworkRect;
+  final FilterQuality filterQuality;
 
   @override
   Widget build(BuildContext context) {
@@ -310,6 +323,7 @@ class _PlaybackBackgroundImage extends StatelessWidget {
       source: source,
       fallbackSource: fallbackSource,
       cacheWidth: cacheWidth,
+      filterQuality: filterQuality,
       fit: BoxFit.cover,
       fallback: fallback,
       imageBuilder: reflectionRect == null

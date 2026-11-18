@@ -3927,14 +3927,16 @@ class _PlaylistList extends StatelessWidget {
         final playlist = playlists[index];
         return Padding(
           padding: const EdgeInsets.fromLTRB(6, 0, 6, appCardGap),
-          child: _PlaylistSummaryRow(
-            playlist: playlist,
-            catalog: catalogPlaylists[playlist.id],
-            libraryTracks: libraryTracks,
-            tracksById: tracksById,
-            artworkRotationSeed: artworkRotationSeed,
-            strings: strings,
-            onTap: () => onOpenPlaylist(playlist.id),
+          child: RepaintBoundary(
+            child: _PlaylistSummaryRow(
+              playlist: playlist,
+              catalog: catalogPlaylists[playlist.id],
+              libraryTracks: libraryTracks,
+              tracksById: tracksById,
+              artworkRotationSeed: artworkRotationSeed,
+              strings: strings,
+              onTap: () => onOpenPlaylist(playlist.id),
+            ),
           ),
         );
       },

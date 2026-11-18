@@ -223,88 +223,90 @@ class AppListCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final highlight = accent ?? colors.primary;
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: appContentMaxWidth),
-      child: AppCardGradientBorder(
-        child: Material(
-          color: appListCardSurface(context),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(appCardRadius),
-            side: BorderSide(color: appListCardBorder(context)),
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: onTap,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                minHeight: appListCardMinHeight,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  appListCardPaddingHorizontal,
-                  appListCardPaddingVertical,
-                  12,
-                  appListCardPaddingVertical,
+    return RepaintBoundary(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: appContentMaxWidth),
+        child: AppCardGradientBorder(
+          child: Material(
+            color: appListCardSurface(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(appCardRadius),
+              side: BorderSide(color: appListCardBorder(context)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onTap,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minHeight: appListCardMinHeight,
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: appListCardIconSize,
-                      height: appListCardIconSize,
-                      decoration: BoxDecoration(
-                        color: highlight.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(
-                          appListCardIconRadius,
-                        ),
-                        border: Border.all(
-                          color: highlight.withValues(alpha: 0.24),
-                        ),
-                      ),
-                      child: Icon(icon, color: highlight, size: 24),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: appListCardTitleStyle(context),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    appListCardPaddingHorizontal,
+                    appListCardPaddingVertical,
+                    12,
+                    appListCardPaddingVertical,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: appListCardIconSize,
+                        height: appListCardIconSize,
+                        decoration: BoxDecoration(
+                          color: highlight.withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(
+                            appListCardIconRadius,
                           ),
-                          const SizedBox(height: 3),
-                          Text(
-                            subtitle,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: appListCardSubtitleStyle(context),
+                          border: Border.all(
+                            color: highlight.withValues(alpha: 0.24),
                           ),
-                        ],
+                        ),
+                        child: Icon(icon, color: highlight, size: 24),
                       ),
-                    ),
-                    if (status != null) ...[
-                      const SizedBox(width: 8),
-                      Icon(
-                        status!
-                            ? Icons.check_circle_rounded
-                            : Icons.error_rounded,
-                        color: status! ? colors.primary : colors.error,
-                        size: 19,
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: appListCardTitleStyle(context),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              subtitle,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: appListCardSubtitleStyle(context),
+                            ),
+                          ],
+                        ),
                       ),
+                      if (status != null) ...[
+                        const SizedBox(width: 8),
+                        Icon(
+                          status!
+                              ? Icons.check_circle_rounded
+                              : Icons.error_rounded,
+                          color: status! ? colors.primary : colors.error,
+                          size: 19,
+                        ),
+                      ],
+                      if (trailing case final trailing?) ...[
+                        const SizedBox(width: 8),
+                        trailing,
+                      ] else if (onTap != null) ...[
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.chevron_right_rounded,
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ],
                     ],
-                    if (trailing case final trailing?) ...[
-                      const SizedBox(width: 8),
-                      trailing,
-                    ] else if (onTap != null) ...[
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
             ),

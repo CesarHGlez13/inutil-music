@@ -29,6 +29,7 @@ import '../../../../services/spotify_canvas/spotify_canvas_resolver.dart';
 import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../domain/entities/local_track.dart';
+import '../../domain/entities/lyrics_document.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/music_providers.dart';
 import '../providers/audio_source_providers.dart';

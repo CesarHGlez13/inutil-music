@@ -66,6 +66,7 @@ class MainActivity : AudioServiceActivity() {
             window.decorView.importantForAutofill =
                 View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
         }
+        enablePreferredHighRefreshRate()
         if (!IncomingCsvFileBridge.accept(this, intent) &&
             !handleHomeWidgetActionIntent(intent) && !handleExternalAudioIntent(intent)) {
             handleAppActivationIntent(intent)
@@ -488,10 +489,44 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        enablePreferredHighRefreshRate()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus && statusBarHidden) {
             applyStatusBarVisibility()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun enablePreferredHighRefreshRate() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            val activeDisplay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                windowManager?.defaultDisplay
+            } ?: return
+            val currentMode = activeDisplay.mode ?: return
+            val bestMode = activeDisplay.supportedModes
+                .filter {
+                    it.physicalWidth == currentMode.physicalWidth &&
+                        it.physicalHeight == currentMode.physicalHeight
+                }
+                .maxByOrNull { it.refreshRate }
+                ?: return
+            if (bestMode.modeId != window.attributes.preferredDisplayModeId &&
+                bestMode.refreshRate > currentMode.refreshRate + 0.5f
+            ) {
+                window.attributes = window.attributes.apply {
+                    preferredDisplayModeId = bestMode.modeId
+                }
+            }
+        } catch (_: Throwable) {
+            // Keep platform default display mode when OEM restricts mode switching.
         }
     }
 

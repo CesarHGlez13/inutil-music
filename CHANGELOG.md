@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.5.0+250 — 2026-11-18
+
+### Performance
+
+- Desbloqueo automático de tasa de refresco alta nativa en Android (90 Hz / 120 Hz+) en `MainActivity` para desplazamientos, transiciones de pestañas y gestos ultra fluidos.
+- Optimización del pipeline GPU y decodificación de carátulas: submuestreo inteligente (`<= 256 px` con `FilterQuality.low`) en fondos con desenfoque intenso (`PlaybackArtworkBackdrop` y fondo Canvas de Spotify), aislamiento con `RepaintBoundary` en cabeceras/tarjetas/listas y mayor capacidad de `imageCache` (`240` entradas / `64 MiB`) para cambiar de pestaña sin re-decodificaciones.
+- Eliminación de reconstrucciones innecesarias por ticks de posición de 200 ms en `InutilConnectSheet` y en letras flotantes de Canvas (búsqueda binaria `O(log N)` y selección por cambio real de verso).
+- Reemplazo de `GridView(shrinkWrap: true)` en accesos rápidos de Inicio por una rejilla de paso único (`Column`/`Row`) con aislamiento `RepaintBoundary` en tarjetas de Inicio, Biblioteca, Música local y Ajustes.
+- Última actualización marcada como obligatoria; a partir de la próxima versión las actualizaciones serán opcionales salvo emergencia.
+
 ## 2.4.1+241 — 2026-11-18
 
 ### Fixed

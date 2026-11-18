@@ -4101,61 +4101,80 @@ class _HomeQuickAccessGrid extends StatelessWidget {
     if (tracks.isEmpty) return const SizedBox.shrink();
     final colors = Theme.of(context).colorScheme;
     final columns = MediaQuery.sizeOf(context).width >= 700 ? 3 : 2;
-    return GridView.builder(
-      key: const ValueKey('home-quick-access-grid'),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
-        mainAxisExtent: 56,
-      ),
-      itemCount: tracks.length,
-      itemBuilder: (context, index) {
-        final track = tracks[index];
-        return Material(
-          color: colors.onSurface.withValues(alpha: 0.065),
-          borderRadius: BorderRadius.circular(12),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            onTap: () => onTrackSelected(track),
-            child: Row(
-              children: [
-                SizedBox.square(
-                  dimension: 56,
-                  child: SourceImage(
-                    source: track.thumbnailPath,
-                    fallbackSource: track.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    cacheWidth: 160,
-                    fallback: const _HomeImageFallback(
-                      icon: Icons.music_note_rounded,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Text(
-                      track.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        height: 1.18,
-                        color: colors.onSurface,
+    final rowCount = (tracks.length / columns).ceil();
+    final titleStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontWeight: FontWeight.w700,
+      height: 1.18,
+      color: colors.onSurface,
+    );
+
+    Widget buildTile(LocalTrack track) {
+      return RepaintBoundary(
+        child: SizedBox(
+          height: 56,
+          child: Material(
+            color: colors.onSurface.withValues(alpha: 0.065),
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => onTrackSelected(track),
+              child: Row(
+                children: [
+                  SizedBox.square(
+                    dimension: 56,
+                    child: SourceImage(
+                      source: track.thumbnailPath,
+                      fallbackSource: track.thumbnailUrl,
+                      fit: BoxFit.cover,
+                      cacheWidth: 160,
+                      fallback: const _HomeImageFallback(
+                        icon: Icons.music_note_rounded,
                       ),
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: Text(
+                        track.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: titleStyle,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        );
-      },
+        ),
+      );
+    }
+
+    return Padding(
+      key: const ValueKey('home-quick-access-grid'),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var row = 0; row < rowCount; row++) ...[
+            if (row > 0) const SizedBox(height: 8),
+            Row(
+              children: [
+                for (var col = 0; col < columns; col++) ...[
+                  if (col > 0) const SizedBox(width: 8),
+                  Expanded(
+                    child: (row * columns + col) < tracks.length
+                        ? buildTile(tracks[row * columns + col])
+                        : const SizedBox(height: 56),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -4563,49 +4582,51 @@ class _RecommendedTrackCard extends StatelessWidget {
           track.thumbnailUrl,
           track.catalogThumbnailUrl,
         ]);
-    return SizedBox(
-      key: ValueKey('home-recommendation-${track.id}'),
-      width: width,
-      child: Material(
-        color: AppColors.homeCardSurfaceFor(context),
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(appCardRadius),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(appCardRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _HomeArtwork(
-                  source: localArtworkSource ?? remoteArtworkSource,
-                  fallbackSource: localArtworkSource == null
-                      ? null
-                      : remoteArtworkSource,
-                  surfaceKey: ValueKey(
-                    'home-recommendation-artwork-${track.id}',
+    return RepaintBoundary(
+      child: SizedBox(
+        key: ValueKey('home-recommendation-${track.id}'),
+        width: width,
+        child: Material(
+          color: AppColors.homeCardSurfaceFor(context),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(appCardRadius),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(appCardRadius),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _HomeArtwork(
+                    source: localArtworkSource ?? remoteArtworkSource,
+                    fallbackSource: localArtworkSource == null
+                        ? null
+                        : remoteArtworkSource,
+                    surfaceKey: ValueKey(
+                      'home-recommendation-artwork-${track.id}',
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                MarqueeText(
-                  track.title,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                  const SizedBox(height: 8),
+                  MarqueeText(
+                    track.title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  track.artist,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 2),
+                  Text(
+                    track.artist,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -4648,52 +4669,54 @@ class _RecommendedArtistCard extends ConsumerWidget {
               ?.artist
               .thumbnailUrl
         : suppliedThumbnail;
-    return SizedBox(
-      key: ValueKey('home-artist-${artist.browseId}'),
-      width: width,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(appCardRadius),
-        child: Semantics(
-          button: true,
-          label: artist.name,
-          child: InkWell(
-            key: ValueKey('home-artist-open-${artist.browseId}'),
-            borderRadius: BorderRadius.circular(appCardRadius),
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              child: Column(
-                children: [
-                  ClipOval(
-                    key: ValueKey('home-artist-artwork-${artist.browseId}'),
-                    child: SizedBox.square(
-                      dimension: artworkExtent,
-                      child: SourceImage(
-                        source: progressiveThumbnail,
-                        cacheWidth: 384,
-                        fallback: ColoredBox(
-                          color: theme.colorScheme.surfaceContainerHighest,
-                          child: Icon(
-                            Icons.person_rounded,
-                            size: artworkExtent * 0.42,
-                            color: theme.colorScheme.onSurfaceVariant,
+    return RepaintBoundary(
+      child: SizedBox(
+        key: ValueKey('home-artist-${artist.browseId}'),
+        width: width,
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(appCardRadius),
+          child: Semantics(
+            button: true,
+            label: artist.name,
+            child: InkWell(
+              key: ValueKey('home-artist-open-${artist.browseId}'),
+              borderRadius: BorderRadius.circular(appCardRadius),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                child: Column(
+                  children: [
+                    ClipOval(
+                      key: ValueKey('home-artist-artwork-${artist.browseId}'),
+                      child: SizedBox.square(
+                        dimension: artworkExtent,
+                        child: SourceImage(
+                          source: progressiveThumbnail,
+                          cacheWidth: 256,
+                          fallback: ColoredBox(
+                            color: theme.colorScheme.surfaceContainerHighest,
+                            child: Icon(
+                              Icons.person_rounded,
+                              size: artworkExtent * 0.42,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    artist.name,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                    const SizedBox(height: 8),
+                    Text(
+                      artist.name,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -4726,70 +4749,72 @@ class _RecommendedCollectionCard extends StatelessWidget {
     final subtitle = rawSubtitle == null || rawSubtitle.isEmpty
         ? _collectionKindLabel(collection, strings)
         : rawSubtitle;
-    return SizedBox(
-      key: ValueKey('home-collection-${collection.browseId}'),
-      width: width,
-      child: Material(
-        color: AppColors.homeCardSurfaceFor(context),
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(appCardRadius),
-        ),
-        child: Semantics(
-          button: true,
-          label: strings.openCollection(collection.title),
-          child: InkWell(
-            key: ValueKey('home-collection-open-${collection.browseId}'),
+    return RepaintBoundary(
+      child: SizedBox(
+        key: ValueKey('home-collection-${collection.browseId}'),
+        width: width,
+        child: Material(
+          color: AppColors.homeCardSurfaceFor(context),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(appCardRadius),
-            onTap: () => _openCollection(context, subtitle),
-            child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      _HomeArtwork(
-                        source: collection.thumbnailUrl,
-                        surfaceKey: ValueKey(
-                          'home-collection-artwork-${collection.browseId}',
-                        ),
-                      ),
-                      Positioned(
-                        right: 7,
-                        bottom: 7,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surface.withValues(alpha: 0.88),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Padding(
-                            padding: EdgeInsets.all(7),
-                            child: Icon(Icons.chevron_right_rounded, size: 20),
+          ),
+          child: Semantics(
+            button: true,
+            label: strings.openCollection(collection.title),
+            child: InkWell(
+              key: ValueKey('home-collection-open-${collection.browseId}'),
+              borderRadius: BorderRadius.circular(appCardRadius),
+              onTap: () => _openCollection(context, subtitle),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Stack(
+                      children: [
+                        _HomeArtwork(
+                          source: collection.thumbnailUrl,
+                          surfaceKey: ValueKey(
+                            'home-collection-artwork-${collection.browseId}',
                           ),
                         ),
+                        Positioned(
+                          right: 7,
+                          bottom: 7,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.88),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Padding(
+                              padding: EdgeInsets.all(7),
+                              child: Icon(Icons.chevron_right_rounded, size: 20),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    MarqueeText(
+                      collection.title,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  MarqueeText(
-                    collection.title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -4850,54 +4875,56 @@ class _RecentTrackCard extends ConsumerWidget {
     final isFavorite = ref.watch(
       favoriteTrackIdsProvider.select((ids) => ids.contains(track.id)),
     );
-    return SizedBox(
-      key: const ValueKey('home-recent-card'),
-      width: width,
-      child: Material(
-        color: AppColors.homeCardSurfaceFor(context),
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(appCardRadius),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(appCardRadius),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    _HomeArtwork(
-                      source: track.thumbnailPath ?? track.thumbnailUrl,
-                      surfaceKey: ValueKey('home-recent-artwork-${track.id}'),
-                    ),
-                    if (isFavorite)
-                      const Positioned(
-                        top: 2,
-                        right: 2,
-                        child: FavoriteStarBadge(iconSize: 18),
+    return RepaintBoundary(
+      child: SizedBox(
+        key: const ValueKey('home-recent-card'),
+        width: width,
+        child: Material(
+          color: AppColors.homeCardSurfaceFor(context),
+          clipBehavior: Clip.antiAlias,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(appCardRadius),
+          ),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(appCardRadius),
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      _HomeArtwork(
+                        source: track.thumbnailPath ?? track.thumbnailUrl,
+                        surfaceKey: ValueKey('home-recent-artwork-${track.id}'),
                       ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                MarqueeText(
-                  track.title,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+                      if (isFavorite)
+                        const Positioned(
+                          top: 2,
+                          right: 2,
+                          child: FavoriteStarBadge(iconSize: 18),
+                        ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  track.artist,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                  const SizedBox(height: 8),
+                  MarqueeText(
+                    track.title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    track.artist,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -4924,7 +4951,7 @@ class _HomeArtwork extends StatelessWidget {
       child: ProportionalArtwork(
         source: source,
         fallbackSource: fallbackSource,
-        cacheWidth: 512,
+        cacheWidth: 320,
         fallback: const _HomeImageFallback(icon: Icons.music_note_rounded),
       ),
     );

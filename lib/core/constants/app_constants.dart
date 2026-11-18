@@ -4,9 +4,9 @@ class AppConstants {
   static const appName = 'Inútil Music';
   /// Fuente única del número de versión mostrado en Ajustes y usado por el
   /// chequeo de actualizaciones OTA. Debe coincidir con la parte de versión de
-  /// `version:` en `pubspec.yaml` (actualmente `2.4.1+241`); el incremento
-  /// interno (`+241`) es el `versionCode` de Android y no se muestra.
-  static const appVersion = '2.4.1';
+  /// `version:` en `pubspec.yaml` (actualmente `2.5.0+250`); el incremento
+  /// interno (`+250`) es el `versionCode` de Android y no se muestra.
+  static const appVersion = '2.5.0';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 11;
   static const fileExportChannel = 'inutil_music/file_export';
