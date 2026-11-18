@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
@@ -42,6 +43,7 @@ import 'artwork_fade_gradients.dart';
 import 'audio_routing_menus.dart';
 import 'classic_vinyl_deck.dart';
 import 'favorite_star_badge.dart';
+import 'inutil_connect_sheet.dart';
 import 'lyrics_page_route.dart';
 import 'now_playing_equalizer.dart';
 import 'playback_audio_quality.dart';
@@ -59,6 +61,7 @@ import 'wavy_playback_seek_bar.dart';
 export 'artwork_fade_gradients.dart';
 
 part 'classic_vinyl_player_layout.dart';
+part 'spotify_fullscreen_canvas_player.dart';
 part 'spotify_player_layout.dart';
 
 double _playerMetadataFontSize(BuildContext context, double fontSize) {
@@ -551,8 +554,41 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                   key: const ValueKey('player-playback-theme'),
                   data: playerTheme,
                   child: Builder(
-                    builder: (context) =>
-                        widget.style == PlayerStyle.spotifyMusic
+                    builder: (context) {
+                      final useSpotifyFullscreenCanvas =
+                          mobile &&
+                          !mobileLandscape &&
+                          !showSideQueue &&
+                          canvasUrl != null &&
+                          (widget.style == PlayerStyle.inutilMusic ||
+                              widget.style == PlayerStyle.spotifyMusic);
+                      if (useSpotifyFullscreenCanvas) {
+                        return _SpotifyFullscreenCanvasPlayer(
+                          snapshot: snapshot,
+                          artworkSource: artworkSource,
+                          artworkFallbackSource: artworkFallbackSource,
+                          visualIdentity: visualIdentity,
+                          trackTransitionsEnabled:
+                              widget.trackTransitionsEnabled,
+                          canvasUrl: canvasUrl,
+                          videoStartOffset: videoStartOffset,
+                          videoDurationHint: videoDurationHint,
+                          hasTrack: hasTrack,
+                          isFavorite: isFavorite,
+                          savedTrackId: savedTrackId,
+                          hasError: presentation.hasError,
+                          errorText: presentation.errorText,
+                          queueVisible: showSideQueue,
+                          onToggleQueue: toggleQueue,
+                          onCollapse: widget.onCollapse,
+                          onOpenLyrics: _openLyrics,
+                          onOpenSearch: widget.onOpenSearch,
+                          onOpenArtist: onOpenArtist,
+                          onOpenAlbum: onOpenAlbum,
+                          strings: strings,
+                        );
+                      }
+                      return widget.style == PlayerStyle.spotifyMusic
                         ? _SpotifyPlayerLayout(
                             snapshot: snapshot,
                             artworkSource: artworkSource,
@@ -1217,7 +1253,8 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 ),
                               ),
                             ],
-                          ),
+                          );
+                    },
                   ),
                 ),
               ),

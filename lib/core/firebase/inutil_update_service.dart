@@ -88,6 +88,12 @@ class InutilReleaseInfo {
   /// kill switch dejó esta versión obsoleta.
   bool get effectiveMandatory => mandatory || belowMinSupported;
 
+  /// Una actualización solo es bloqueante cuando realmente existe una versión
+  /// superior obligatoria o la instalada quedó por debajo del mínimo soportado.
+  /// Cuando el usuario ya está al día, jamás bloquea el cierre ni el gesto atrás.
+  bool get isBlockingUpdate =>
+      belowMinSupported || (updateAvailable && effectiveMandatory);
+
   /// Normaliza un identificador de ABI (`arm64-v8a` → `arm64_v8a`).
   static String normalizeAbiKey(String abi) => abi
       .trim()
@@ -894,7 +900,7 @@ Future<void> showInutilUpdateDialog(
 ) {
   return showDialog<void>(
     context: context,
-    barrierDismissible: !release.effectiveMandatory,
+    barrierDismissible: !release.isBlockingUpdate,
     builder: (dialogContext) {
       return Dialog(
         backgroundColor: Colors.transparent,
@@ -995,9 +1001,10 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
         ? (_receivedBytes / _totalBytes).clamp(0.0, 1.0)
         : null;
     final maxDialogHeight = MediaQuery.sizeOf(context).height * 0.72;
+    final canDismiss = !release.isBlockingUpdate && !_downloading;
 
     return PopScope(
-      canPop: !release.effectiveMandatory && !_downloading,
+      canPop: canDismiss,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: 440, maxHeight: maxDialogHeight),
         child: Material(
@@ -1063,6 +1070,12 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                         ],
                       ),
                     ),
+                    if (canDismiss)
+                      IconButton(
+                        tooltip: 'Cerrar',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                      ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -1196,14 +1209,13 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    if (!release.effectiveMandatory && !_downloading)
+                    if (canDismiss)
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: Text(hasUpdate ? 'Más tarde' : 'Aceptar'),
                       ),
                     if (hasUpdate && release.platformDownloadUrl.isNotEmpty) ...[
-                      if (!release.effectiveMandatory && !_downloading)
-                        const SizedBox(width: 8),
+                      if (canDismiss) const SizedBox(width: 8),
                       FilledButton.icon(
                         onPressed: _downloading ? null : _startDownload,
                         icon: const Icon(Icons.download_rounded, size: 18),

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.2+212 — 2026-11-17
+
+### Added
+
+- Reproductor Canvas a pantalla completa estilo Spotify: video oficial en loop de borde a borde, letra sincronizada flotante en vivo, mini portada, botón circular de favoritos, controles modernos y tarjeta inferior «Muestra de la letra».
+
+### Fixed
+
+- Corregidos gestos de retroceso y botón de cierre en el diálogo de actualizaciones cuando la app ya está al día.
+- Acentos y caracteres especiales mostrados correctamente en las notas de actualización.
+
 ## 2.1.1+211 — 2026-11-17
 
 ### Added
