@@ -50,8 +50,9 @@ void main() {
       AppConstants.appDownloadUrl,
       'https://github.com/CesarHGlez13/inutil-music/releases/latest',
     );
-    // El contacto propio coincide con el fundador de las reglas de Firestore.
-    expect(AppConstants.supportEmail, 'cesar@inutilmusic.com');
+    // El contacto visible es el correo propio del proyecto; la cuenta de
+    // administrador de Firebase vive aparte en `bootstrapAdminEmail`.
+    expect(AppConstants.supportEmail, 'cesarmaster133@gmail.com');
     // El único resto del proyecto original en estas constantes es el credito
     // legal que exige la licencia BSD-2-Clause del upstream.
     expect(AppConstants.upstreamCredit, contains('BSD-2-Clause'));

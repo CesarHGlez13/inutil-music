@@ -27,9 +27,11 @@ class AppConstants {
   /// la misma que resuelve `checkForUpdate()`.
   static const appDownloadUrl =
       'https://github.com/CesarHGlez13/inutil-music/releases/latest';
-  /// Contacto del proyecto (fundador, también `bootstrapAdminEmail` en
-  /// `firebase_auth_service.dart` y en las reglas de Firestore/Storage).
-  static const supportEmail = 'cesar@inutilmusic.com';
+  /// Contacto visible del proyecto (pie de la pantalla «Acerca de»).  La
+  /// cuenta de administrador de Firebase sigue en
+  /// `bootstrapAdminEmail` (`firebase_auth_service.dart`) porque está ligada al
+  /// usuario de Firebase Auth ya registrado y a las reglas de Firestore.
+  static const supportEmail = 'cesarmaster133@gmail.com';
   /// Crédito legal obligatorio: el proyecto parte de BStream Music, publicado
   /// bajo BSD-2-Clause (ver `LICENSE`).
   static const upstreamCredit =
