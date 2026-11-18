@@ -14,12 +14,18 @@ class PlayerControlsCapsule extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: isDark
-            ? Colors.white.withValues(alpha: .05)
-            : Colors.black.withValues(alpha: .04),
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.05),
         borderRadius: const BorderRadius.all(Radius.circular(40)),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.11)
+              : Colors.black.withValues(alpha: 0.08),
+          width: 0.85,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
         child: child,
       ),
     );

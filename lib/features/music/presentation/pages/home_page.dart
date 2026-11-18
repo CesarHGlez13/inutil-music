@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
+import '../../../../core/theme/inutil_icons.dart';
 import '../../../../core/widgets/app_shared_widgets.dart';
 import '../../../../core/widgets/horizontal_shelf_scroll_behavior.dart';
 import '../../../../core/widgets/marquee_text.dart';
@@ -21,6 +22,7 @@ import '../../../../core/utils/image_source.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../platform_channels/android_app_activation_channel.dart';
 import '../../../../platform_channels/android_external_audio_channel.dart';
+import '../../../../services/player/player_service.dart';
 import '../../../../services/recommendations/recommendation_feed_models.dart';
 import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/sharing/incoming_csv_file_service.dart';
@@ -1312,6 +1314,17 @@ class _HomePageState extends ConsumerState<HomePage>
         miniPlayerAppearance.surfaceMode ??
         AppColors.surfaceBackgroundModeFor(context);
     final transparentSurfaces = surfaceMode.usesBackdrop;
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select((player) {
+        final snapshot = player.value;
+        if (snapshot == null) return false;
+        return snapshot.status != PlayerStatus.idle ||
+            snapshot.title?.trim().isNotEmpty == true ||
+            snapshot.artist?.trim().isNotEmpty == true ||
+            snapshot.errorMessage?.trim().isNotEmpty == true;
+      }),
+    );
+    final miniPlayerVisible = !_isPlayerSelected && hasActivePlayback;
     final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
     final bottomNavigationHeight = useSideNavigation
         ? 0.0
@@ -1324,7 +1337,7 @@ class _HomePageState extends ConsumerState<HomePage>
         _keyboardVisible || transparentSurfaces ? 0.0 : bottomNavigationHeight;
     final browsingContentBottomPadding = _keyboardVisible
         ? 0.0
-        : miniPlayerHeight +
+        : (hasActivePlayback ? miniPlayerHeight : 0.0) +
               (transparentSurfaces ? bottomNavigationHeight : 0.0);
     final shellTransitionDuration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
@@ -1347,26 +1360,31 @@ class _HomePageState extends ConsumerState<HomePage>
             _AppDestination(
               index: _homeIndex,
               icon: Icons.home_rounded,
+              glyph: InutilGlyph.home,
               label: strings.home,
             ),
             _AppDestination(
               index: _searchIndex,
               icon: Icons.search_rounded,
+              glyph: InutilGlyph.search,
               label: strings.search,
             ),
             _AppDestination(
               index: _localIndex,
               icon: Icons.folder_rounded,
+              glyph: InutilGlyph.local,
               label: strings.localTab,
             ),
             _AppDestination(
               index: _libraryIndex,
               icon: Icons.library_music_rounded,
+              glyph: InutilGlyph.library,
               label: strings.library,
             ),
             _AppDestination(
               index: _settingsIndex,
               icon: Icons.settings_rounded,
+              glyph: InutilGlyph.settings,
               label: strings.settings,
             ),
           ]
@@ -1374,31 +1392,37 @@ class _HomePageState extends ConsumerState<HomePage>
             _AppDestination(
               index: _homeIndex,
               icon: Icons.home_rounded,
+              glyph: InutilGlyph.home,
               label: strings.home,
             ),
             _AppDestination(
               index: _searchIndex,
               icon: Icons.search_rounded,
+              glyph: InutilGlyph.search,
               label: strings.search,
             ),
             _AppDestination(
               index: _localIndex,
               icon: Icons.folder_rounded,
+              glyph: InutilGlyph.local,
               label: strings.localTab,
             ),
             _AppDestination(
               index: _playerIndex,
               icon: Icons.graphic_eq_rounded,
+              glyph: InutilGlyph.player,
               label: strings.player,
             ),
             _AppDestination(
               index: _libraryIndex,
               icon: Icons.library_music_rounded,
+              glyph: InutilGlyph.library,
               label: strings.library,
             ),
             _AppDestination(
               index: _settingsIndex,
               icon: Icons.settings_rounded,
+              glyph: InutilGlyph.settings,
               label: strings.settings,
             ),
           ];
@@ -1712,7 +1736,7 @@ class _HomePageState extends ConsumerState<HomePage>
                                 opacityKey: const ValueKey(
                                   'mini-player-shell-opacity',
                                 ),
-                                visible: !_isPlayerSelected,
+                                visible: miniPlayerVisible,
                                 suspended: _keyboardVisible,
                                 duration: chromeVisibilityDuration,
                                 hiddenTranslation:
@@ -1950,11 +1974,13 @@ class _AppDestination {
   const _AppDestination({
     required this.index,
     required this.icon,
+    required this.glyph,
     required this.label,
   });
 
   final int index;
   final IconData icon;
+  final InutilGlyph glyph;
   final String label;
 }
 
@@ -2004,7 +2030,7 @@ class _BottomNavigation extends StatelessWidget {
           Expanded(
             child: _BottomNavigationItem(
               destinationIndex: destination.index,
-              icon: destination.icon,
+              glyph: destination.glyph,
               label: destination.label,
               selected: selectedIndex == destination.index,
               onTap: () => onDestinationSelected(destination.index),
@@ -2048,7 +2074,7 @@ class _BottomNavigation extends StatelessWidget {
                     ).showMenuTooltip,
                     semanticsExpanded: false,
                     destinationIndex: homeDestination.index,
-                    icon: homeDestination.icon,
+                    glyph: homeDestination.glyph,
                     label: homeDestination.label,
                     selected: selectedIndex == homeDestination.index,
                     onTap: onExpandLiquidNavigation,
@@ -2686,9 +2712,10 @@ class _DetachedSearchButton extends StatelessWidget {
       builder: (context, value, _) => Transform.scale(
         key: ValueKey('bottom-navigation-icon-scale-${destination.index}'),
         scale: lerpDouble(1, 1.12, value)!,
-        child: Icon(
-          destination.icon,
-          size: 30,
+        child: InutilIcon(
+          destination.glyph,
+          size: 26,
+          filled: selected,
           color: Color.lerp(colors.onSurfaceVariant, colors.primary, value),
         ),
       ),
@@ -2734,7 +2761,7 @@ class _DetachedSearchButton extends StatelessWidget {
 class _BottomNavigationItem extends StatelessWidget {
   const _BottomNavigationItem({
     required this.destinationIndex,
-    required this.icon,
+    required this.glyph,
     required this.label,
     required this.selected,
     required this.onTap,
@@ -2746,7 +2773,7 @@ class _BottomNavigationItem extends StatelessWidget {
   });
 
   final int destinationIndex;
-  final IconData icon;
+  final InutilGlyph glyph;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -2760,7 +2787,7 @@ class _BottomNavigationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final active = colors.primary;
-    final inactive = colors.onSurfaceVariant;
+    final inactive = colors.onSurfaceVariant.withValues(alpha: 0.72);
     final duration = MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : const Duration(milliseconds: 260);
@@ -2776,13 +2803,23 @@ class _BottomNavigationItem extends StatelessWidget {
             child: Transform.scale(
               key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
               scale: lerpDouble(1, 1.12, value)!,
-              child: Icon(icon, color: foreground, size: 30),
+              child: InutilIcon(
+                glyph,
+                color: foreground,
+                size: 26,
+                filled: selected,
+              ),
             ),
           );
         }
         return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(22)),
+          margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: liquidGlass
+                ? Colors.transparent
+                : active.withValues(alpha: 0.08 * value),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
@@ -2790,20 +2827,36 @@ class _BottomNavigationItem extends StatelessWidget {
               Transform.scale(
                 key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
                 scale: lerpDouble(1, 1.12, value)!,
-                child: Icon(icon, color: foreground, size: 28),
+                child: InutilIcon(
+                  glyph,
+                  color: foreground,
+                  size: 25,
+                  filled: value > 0.5,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium!.copyWith(
+                style: Theme.of(context).textTheme.labelSmall!.copyWith(
                   color: foreground,
+                  fontSize: 11.2,
+                  letterSpacing: 0.1,
                   fontWeight: FontWeight.lerp(
-                    FontWeight.w600,
+                    FontWeight.w500,
                     FontWeight.w800,
                     value,
                   ),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Container(
+                width: lerpDouble(0, 16, value)!,
+                height: 2.5,
+                decoration: BoxDecoration(
+                  color: active.withValues(alpha: value),
+                  borderRadius: BorderRadius.circular(99),
                 ),
               ),
             ],
@@ -2934,7 +2987,7 @@ class _SideNavigation extends StatelessWidget {
                     final destination = destinations[index];
                     return _SideNavigationItem(
                       destinationIndex: destination.index,
-                      icon: destination.icon,
+                      glyph: destination.glyph,
                       label: destination.label,
                       selected: selectedIndex == destination.index,
                       onTap: () => onSelected(destination.index),
@@ -2972,14 +3025,14 @@ class _SideNavigation extends StatelessWidget {
 class _SideNavigationItem extends StatelessWidget {
   const _SideNavigationItem({
     required this.destinationIndex,
-    required this.icon,
+    required this.glyph,
     required this.label,
     required this.selected,
     required this.onTap,
   });
 
   final int destinationIndex;
-  final IconData icon;
+  final InutilGlyph glyph;
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -3023,7 +3076,12 @@ class _SideNavigationItem extends StatelessWidget {
               Transform.scale(
                 key: ValueKey('side-navigation-icon-scale-$destinationIndex'),
                 scale: lerpDouble(1, 1.12, value)!,
-                child: Icon(icon, color: foreground, size: 28),
+                child: InutilIcon(
+                  glyph,
+                  color: foreground,
+                  size: 25,
+                  filled: value > 0.5,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -3627,7 +3685,9 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
   }
 }
 
-class _HomeView extends ConsumerWidget {
+enum _HomeFeedFilter { all, recent, collections, artists }
+
+class _HomeView extends ConsumerStatefulWidget {
   const _HomeView({
     required this.bottomContentPadding,
     required this.onOpenPlayer,
@@ -3639,42 +3699,145 @@ class _HomeView extends ConsumerWidget {
   final AddRemoteTracksToPlaylist onAddRemoteTracksToPlaylist;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_HomeView> createState() => _HomeViewState();
+}
+
+class _HomeViewState extends ConsumerState<_HomeView> {
+  _HomeFeedFilter _filter = _HomeFeedFilter.all;
+
+  String _contextualGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Buenos días';
+    if (hour >= 12 && hour < 20) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
+
+  List<HomeRecommendationSection> _applyFilter(
+    List<HomeRecommendationSection> sections,
+  ) {
+    return switch (_filter) {
+      _HomeFeedFilter.all => sections,
+      _HomeFeedFilter.recent =>
+        sections.where((s) => s.isContinueListening).toList(growable: false),
+      _HomeFeedFilter.collections => sections
+          .where(
+            (s) => s.items.any((i) => i is HomeRecommendationCollectionItem),
+          )
+          .toList(growable: false),
+      _HomeFeedFilter.artists => sections
+          .where((s) => s.items.any((i) => i is HomeRecommendationArtistItem))
+          .toList(growable: false),
+    };
+  }
+
+  Widget _headerActionPill({
+    Key? key,
+    required String tooltip,
+    required VoidCallback? onPressed,
+    required Widget child,
+  }) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox.square(
+      dimension: 36,
+      child: Material(
+        color: colors.onSurface.withValues(alpha: 0.065),
+        shape: CircleBorder(
+          side: BorderSide(
+            color: colors.outlineVariant.withValues(alpha: 0.35),
+            width: 0.85,
+          ),
+        ),
+        child: IconButton(
+          key: key,
+          tooltip: tooltip,
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          iconSize: 19,
+          icon: child,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final compactViewport = MediaQuery.sizeOf(context).width < 700;
     final strings = ref.watch(appStringsProvider);
+    final colors = Theme.of(context).colorScheme;
     final history = ref.watch(historyProvider);
-    final hasHistory = history.value?.isNotEmpty ?? false;
+    final historyTracks = history.value ?? const <LocalTrack>[];
+    final hasHistory = historyTracks.isNotEmpty;
     final recommendationsState = ref.watch(homeRecommendationsProvider);
     final recommendations =
         (recommendationsState.value ?? const <HomeRecommendationSection>[])
             .where((section) => !_isHomeMixSection(section, strings))
             .toList(growable: false);
+    final filteredRecommendations = _applyFilter(recommendations);
     final hasPersonalizedContinue = recommendations.any(
       (section) => section.isContinueListening,
     );
-    final showLegacyHistory = hasHistory && !hasPersonalizedContinue;
+    final showQuickGrid =
+        hasHistory &&
+        (_filter == _HomeFeedFilter.all || _filter == _HomeFeedFilter.recent);
+    final showLegacyHistory =
+        hasHistory &&
+        !hasPersonalizedContinue &&
+        (_filter == _HomeFeedFilter.all || _filter == _HomeFeedFilter.recent);
     final localTrackIndex = ref.watch(localTrackIndexProvider);
 
-    return ScrolledUnderTabFrame(
-      surfaceKey: const ValueKey('home-tab-header-surface'),
-      header: Row(
-        children: [
-          Expanded(
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(
-                key: const ValueKey('home-tab-title'),
-                AppConstants.appName,
-                maxLines: 1,
-                style: appTabTitleStyle(context),
+    return RefreshIndicator(
+      onRefresh: () =>
+          ref.read(homeRecommendationsProvider.notifier).refresh(),
+      child: ScrolledUnderTabFrame(
+        surfaceKey: const ValueKey('home-tab-header-surface'),
+        header: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _contextualGreeting(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.35,
+                    ),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            key: const ValueKey('home-tab-title'),
+                            AppConstants.appName,
+                            maxLines: 1,
+                            style: appTabTitleStyle(context),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: colors.primary,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 4),
-          SizedBox.square(
-            dimension: 38,
-            child: IconButton(
+            const SizedBox(width: 8),
+            _headerActionPill(
               key: const ValueKey('home-recommendations-refresh'),
               tooltip: strings.refreshHomeRecommendations,
               onPressed: recommendationsState.isLoading
@@ -3682,91 +3845,256 @@ class _HomeView extends ConsumerWidget {
                   : () => unawaited(
                       ref.read(homeRecommendationsProvider.notifier).refresh(),
                     ),
-              iconSize: 22,
-              padding: EdgeInsets.zero,
-              icon: recommendationsState.isLoading
+              child: recommendationsState.isLoading
                   ? SizedBox.square(
-                      dimension: 20,
+                      dimension: 17,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
+                        strokeWidth: 2.0,
                         semanticsLabel: strings.refreshingHomeRecommendations,
                       ),
                     )
-                  : const Icon(Icons.refresh_rounded),
+                  : InutilIcon(
+                      InutilGlyph.refresh,
+                      size: 18,
+                      color: colors.onSurface.withValues(alpha: 0.88),
+                    ),
             ),
-          ),
-          SizedBox.square(
-            dimension: 38,
-            child: IconButton(
+            const SizedBox(width: 7),
+            _headerActionPill(
               tooltip: 'Dispositivos',
-              padding: EdgeInsets.zero,
-              iconSize: 21,
               onPressed: () => InutilConnectSheet.show(context),
-              icon: const Icon(Icons.devices_rounded),
+              child: InutilIcon(
+                InutilGlyph.devices,
+                size: 18,
+                color: colors.onSurface.withValues(alpha: 0.88),
+              ),
             ),
-          ),
-          SizedBox.square(
-            dimension: 38,
-            child: IconButton(
+            const SizedBox(width: 7),
+            _headerActionPill(
               tooltip: 'Mi cuenta',
-              padding: EdgeInsets.zero,
-              iconSize: 21,
               onPressed: () => InutilAccountDialog.show(context),
-              icon: const Icon(Icons.account_circle_rounded),
+              child: InutilIcon(
+                InutilGlyph.profile,
+                size: 18,
+                color: colors.onSurface.withValues(alpha: 0.88),
+              ),
+            ),
+            const SizedBox(width: 7),
+            SizedBox.square(
+              dimension: 36,
+              child: YouTubeMusicAccountButton(strings: strings),
+            ),
+          ],
+        ),
+        // A compact viewport only needs a few shelves ahead. Retaining almost
+        // another full screen of offstage artwork multiplies image/row work
+        // while music is playing and the user scrolls through recommendations.
+        scrollCacheExtent: compactViewport
+            ? const ScrollCacheExtent.pixels(600)
+            : const ScrollCacheExtent.pixels(900),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 12),
+              child: _HomeFilterPills(
+                selected: _filter,
+                onSelected: (next) {
+                  HapticFeedback.selectionClick();
+                  setState(() => _filter = next);
+                },
+              ),
             ),
           ),
-          SizedBox.square(
-            dimension: 38,
-            child: YouTubeMusicAccountButton(strings: strings),
+          if (showQuickGrid)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _HomeQuickAccessGrid(
+                  tracks: historyTracks.take(6).toList(growable: false),
+                  onTrackSelected: (track) {
+                    final playFuture = ref
+                        .read(playerControllerProvider.notifier)
+                        .playFromHistory(track, fallbackQueue: historyTracks);
+                    widget.onOpenPlayer();
+                    unawaited(playFuture);
+                  },
+                ),
+              ),
+            ),
+          if (showLegacyHistory && !showQuickGrid)
+            SliverToBoxAdapter(
+              child: _HomeRecentSection(
+                history: history,
+                strings: strings,
+                onTrackSelected: (track, queue) {
+                  final playFuture = ref
+                      .read(playerControllerProvider.notifier)
+                      .playFromHistory(track, fallbackQueue: queue);
+                  widget.onOpenPlayer();
+                  unawaited(playFuture);
+                },
+              ),
+            ),
+          if (recommendationsState.isLoading && recommendations.isEmpty)
+            SliverToBoxAdapter(
+              child: HomeLoadingContent(
+                key: const ValueKey('home-loading-content'),
+                label: strings.loadingHomeRecommendations,
+              ),
+            ),
+          for (final section in filteredRecommendations)
+            SliverToBoxAdapter(
+              child: _HomeRemoteRecommendationSection(
+                section: section,
+                localTrackIndex: localTrackIndex,
+                onOpenPlayer: widget.onOpenPlayer,
+                onAddRemoteTracksToPlaylist: widget.onAddRemoteTracksToPlaylist,
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: SizedBox(
+              key: const ValueKey('home-scroll-bottom-reserve'),
+              height: math.max(96, widget.bottomContentPadding + 20),
+            ),
           ),
         ],
       ),
-      // A compact viewport only needs a few shelves ahead. Retaining almost
-      // another full screen of offstage artwork multiplies image/row work
-      // while music is playing and the user scrolls through recommendations.
-      scrollCacheExtent: compactViewport
-          ? const ScrollCacheExtent.pixels(600)
-          : const ScrollCacheExtent.pixels(900),
-      slivers: [
-        if (showLegacyHistory)
-          SliverToBoxAdapter(
-            child: _HomeRecentSection(
-              history: history,
-              strings: strings,
-              onTrackSelected: (track, queue) {
-                final playFuture = ref
-                    .read(playerControllerProvider.notifier)
-                    .playFromHistory(track, fallbackQueue: queue);
-                onOpenPlayer();
-                unawaited(playFuture);
-              },
+    );
+  }
+}
+
+class _HomeFilterPills extends StatelessWidget {
+  const _HomeFilterPills({required this.selected, required this.onSelected});
+
+  final _HomeFeedFilter selected;
+  final ValueChanged<_HomeFeedFilter> onSelected;
+
+  static const _items = <(_HomeFeedFilter, String)>[
+    (_HomeFeedFilter.all, 'Todo'),
+    (_HomeFeedFilter.recent, 'Recientes'),
+    (_HomeFeedFilter.collections, 'Álbumes y Mixes'),
+    (_HomeFeedFilter.artists, 'Artistas'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        itemCount: _items.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final (filter, label) = _items[index];
+          final active = filter == selected;
+          return GestureDetector(
+            key: ValueKey('home-filter-pill-${filter.name}'),
+            onTap: () => onSelected(filter),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active
+                    ? colors.primary
+                    : colors.onSurface.withValues(alpha: 0.065),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: active
+                      ? colors.primary
+                      : colors.outlineVariant.withValues(alpha: 0.3),
+                  width: 0.9,
+                ),
+              ),
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.8,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                  color: active ? colors.onPrimary : colors.onSurface,
+                  letterSpacing: 0.1,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HomeQuickAccessGrid extends StatelessWidget {
+  const _HomeQuickAccessGrid({
+    required this.tracks,
+    required this.onTrackSelected,
+  });
+
+  final List<LocalTrack> tracks;
+  final ValueChanged<LocalTrack> onTrackSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tracks.isEmpty) return const SizedBox.shrink();
+    final colors = Theme.of(context).colorScheme;
+    final columns = MediaQuery.sizeOf(context).width >= 700 ? 3 : 2;
+    return GridView.builder(
+      key: const ValueKey('home-quick-access-grid'),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        mainAxisExtent: 56,
+      ),
+      itemCount: tracks.length,
+      itemBuilder: (context, index) {
+        final track = tracks[index];
+        return Material(
+          color: colors.onSurface.withValues(alpha: 0.065),
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onTrackSelected(track),
+            child: Row(
+              children: [
+                SizedBox.square(
+                  dimension: 56,
+                  child: SourceImage(
+                    source: track.thumbnailPath,
+                    fallbackSource: track.thumbnailUrl,
+                    fit: BoxFit.cover,
+                    cacheWidth: 160,
+                    fallback: const _HomeImageFallback(
+                      icon: Icons.music_note_rounded,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: Text(
+                      track.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        height: 1.18,
+                        color: colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        if (recommendations.isNotEmpty && showLegacyHistory)
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
-        if (recommendationsState.isLoading && recommendations.isEmpty)
-          SliverToBoxAdapter(
-            child: HomeLoadingContent(
-              key: const ValueKey('home-loading-content'),
-              label: strings.loadingHomeRecommendations,
-            ),
-          ),
-        for (final section in recommendations)
-          SliverToBoxAdapter(
-            child: _HomeRemoteRecommendationSection(
-              section: section,
-              localTrackIndex: localTrackIndex,
-              onOpenPlayer: onOpenPlayer,
-              onAddRemoteTracksToPlaylist: onAddRemoteTracksToPlaylist,
-            ),
-          ),
-        SliverToBoxAdapter(
-          child: SizedBox(
-            key: const ValueKey('home-scroll-bottom-reserve'),
-            height: math.max(96, bottomContentPadding + 20),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

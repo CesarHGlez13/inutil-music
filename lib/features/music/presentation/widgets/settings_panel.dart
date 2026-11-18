@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'player_lyrics_icon.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -16,6 +15,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_ui.dart';
+import '../../../../core/theme/inutil_icons.dart';
 import '../../../../core/widgets/app_shared_widgets.dart';
 import '../../../../platform_channels/android_file_export_channel.dart';
 import '../../../../platform_channels/android_supported_links_settings_channel.dart';
@@ -658,7 +658,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               children: [
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-language'),
-                  icon: Icons.language_rounded,
+                  glyph: InutilGlyph.globe,
                   title: strings.language,
                   subtitle: state.language.label,
                   onTap: () => _chooseLanguage(
@@ -673,7 +673,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               children: [
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-appearance'),
-                  icon: Icons.palette_rounded,
+                  glyph: InutilGlyph.palette,
                   title: strings.appearance,
                   subtitle:
                       '${strings.themeModeLabel(state.themeMode)} · '
@@ -684,7 +684,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 const SizedBox(height: appCardGap),
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-lyrics-appearance'),
-                  leading: const PlayerLyricsIcon(),
+                  glyph: InutilGlyph.lyrics,
                   title: strings.lyrics,
                   subtitle:
                       '${strings.lyricsAnimationLabel(state.lyricsAnimationStyle)}'
@@ -735,7 +735,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               children: [
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-recommendation-history'),
-                  icon: Icons.auto_awesome_rounded,
+                  glyph: InutilGlyph.sparkles,
                   title: strings.recommendationHistory,
                   subtitle: state.recommendationHistoryEnabled
                       ? strings.recommendationHistoryEnabled
@@ -760,7 +760,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 const SizedBox(height: appCardGap),
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-clear-recommendations'),
-                  icon: Icons.delete_sweep_outlined,
+                  glyph: InutilGlyph.trash,
                   title: strings.clearRecommendationHistory,
                   subtitle: strings.clearRecommendationHistorySummary,
                   accent: Theme.of(context).colorScheme.error,
@@ -781,7 +781,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               children: [
                 _SettingsEntryCard(
                   key: const ValueKey('storage-data-saving'),
-                  icon: Icons.data_saver_on_rounded,
+                  glyph: InutilGlyph.dataSaver,
                   title: strings.dataSaving,
                   subtitle: _usesSingleAudioQuality(context)
                       ? strings.desktopDataSavingSummary
@@ -791,7 +791,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 const SizedBox(height: appCardGap),
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-storage'),
-                  icon: Icons.storage_rounded,
+                  glyph: InutilGlyph.storage,
                   title: strings.backupAndRestore,
                   subtitle: strings.storageSummary,
                   onTap: () => _openRoute(_SettingsRoute.storage),
@@ -799,7 +799,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 const SizedBox(height: appCardGap),
                 _SettingsEntryCard(
                   key: const ValueKey('storage-local-music-filters'),
-                  icon: Icons.filter_alt_rounded,
+                  glyph: InutilGlyph.filter,
                   title: strings.localMusicFilters,
                   subtitle: strings.localMusicFiltersSummary(
                     state.localMusicFilters.length,
@@ -822,7 +822,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                   children: [
                     _SettingsEntryCard(
                       key: const ValueKey('settings-card-audio-sources'),
-                      icon: Icons.library_music_rounded,
+                      glyph: InutilGlyph.sources,
                       title: strings.audioSources,
                       subtitle: strings.audioSourcesSummary,
                       onTap: () => _openRoute(_SettingsRoute.audioSources),
@@ -832,7 +832,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                     if (showSupportedLinks)
                       _SettingsEntryCard(
                         key: const ValueKey('settings-card-supported-links'),
-                        icon: Icons.link_rounded,
+                        glyph: InutilGlyph.link,
                         title: strings.supportedLinks,
                         subtitle: strings.supportedLinksSummary,
                         onTap: _openSupportedLinksSettings,
@@ -842,7 +842,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                     if (tiktokLive != null) ...[
                       _SettingsEntryCard(
                         key: const ValueKey('settings-card-live'),
-                        icon: Icons.live_tv_rounded,
+                        glyph: InutilGlyph.live,
                         title: strings.liveConnection,
                         subtitle:
                             liveState?.message ?? strings.liveConnectionSummary,
@@ -872,7 +872,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
               children: [
                 _SettingsEntryCard(
                   key: const ValueKey('settings-card-about'),
-                  icon: Icons.info_outline_rounded,
+                  glyph: InutilGlyph.info,
                   title: strings.aboutApplication,
                   subtitle: strings.aboutApplicationSummary,
                   onTap: () => _openRoute(_SettingsRoute.about),
@@ -1623,6 +1623,7 @@ class _SettingsHeader extends StatelessWidget {
 class _SettingsEntryCard extends StatelessWidget {
   const _SettingsEntryCard({
     this.icon,
+    this.glyph,
     this.leading,
     required this.title,
     required this.subtitle,
@@ -1631,9 +1632,10 @@ class _SettingsEntryCard extends StatelessWidget {
     this.status,
     this.trailing,
     super.key,
-  }) : assert(icon != null || leading != null);
+  }) : assert(icon != null || glyph != null || leading != null);
 
   final IconData? icon;
+  final InutilGlyph? glyph;
   final Widget? leading;
   final String title;
   final String subtitle;
@@ -1653,25 +1655,41 @@ class _SettingsEntryCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 78),
+          constraints: const BoxConstraints(minHeight: 74),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             child: Row(
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: highlight.withValues(alpha: 0.14),
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        highlight.withValues(alpha: 0.22),
+                        highlight.withValues(alpha: 0.07),
+                      ],
+                    ),
                     borderRadius: BorderRadius.circular(appListCardIconRadius),
                     border: Border.all(
-                      color: highlight.withValues(alpha: 0.24),
+                      color: highlight.withValues(alpha: 0.22),
+                      width: 0.9,
                     ),
                   ),
                   child: IconTheme.merge(
-                    data: IconThemeData(color: highlight, size: 24),
+                    data: IconThemeData(color: highlight, size: 22),
                     child: Center(
-                      child: leading ?? Icon(icon, color: highlight, size: 24),
+                      child: leading ??
+                          (glyph != null
+                              ? InutilIcon(
+                                  glyph!,
+                                  color: highlight,
+                                  size: 22,
+                                  filled: true,
+                                )
+                              : Icon(icon, color: highlight, size: 22)),
                     ),
                   ),
                 ),
@@ -1753,7 +1771,7 @@ class _AboutApplicationSettings extends StatelessWidget {
       children: [
         _SettingsEntryCard(
           key: const ValueKey('settings-about-version'),
-          icon: Icons.sell_outlined,
+          glyph: InutilGlyph.tag,
           title: strings.versionLabel,
           subtitle: AppConstants.appVersion,
           onTap: checkingForUpdates ? null : onVersion,
@@ -1768,7 +1786,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-whats-new'),
-          icon: Icons.auto_awesome_rounded,
+          glyph: InutilGlyph.sparkles,
           title: strings.whatsNewTitle(AppConstants.appVersion),
           subtitle: strings.whatsNewSummary,
           onTap: () => _showWhatsNew(context),
@@ -1776,7 +1794,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-ota-update'),
-          icon: Icons.system_update_alt_rounded,
+          glyph: InutilGlyph.update,
           title: 'Buscar actualizaciones',
           subtitle: 'Verifica si hay una versión más reciente disponible',
           onTap: () async {
@@ -1789,7 +1807,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-support'),
-          icon: Icons.favorite_outline_rounded,
+          glyph: InutilGlyph.heart,
           title: strings.supportDevelopmentTitle,
           subtitle: strings.supportDevelopmentBody,
           onTap: onSupport,
@@ -1797,7 +1815,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-github'),
-          icon: Icons.code_rounded,
+          glyph: InutilGlyph.code,
           title: strings.githubRepositoryTitle,
           subtitle: strings.githubRepositoryBody,
           onTap: onGitHub,

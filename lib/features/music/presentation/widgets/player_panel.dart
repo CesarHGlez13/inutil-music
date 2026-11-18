@@ -15,6 +15,7 @@ import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
 import '../../../../core/theme/app_ui.dart';
+import '../../../../core/theme/inutil_icons.dart';
 import '../../../../core/utils/duration_formatter.dart';
 import '../../../../core/utils/image_source.dart';
 import '../../../../core/utils/share_position_origin.dart';
@@ -44,6 +45,7 @@ import 'audio_routing_menus.dart';
 import 'classic_vinyl_deck.dart';
 import 'favorite_star_badge.dart';
 import 'inutil_connect_sheet.dart';
+import 'inutil_sleep_timer_sheet.dart';
 import 'lyrics_page_route.dart';
 import 'now_playing_equalizer.dart';
 import 'playback_audio_quality.dart';
@@ -5656,6 +5658,9 @@ class _PlayerMenu extends ConsumerWidget {
                     case 'audio-output':
                       unawaited(showAudioOutputPicker(actionContext, ref));
                       return;
+                    case 'sleep-timer':
+                      unawaited(InutilSleepTimerSheet.show(actionContext));
+                      return;
                     case 'cast':
                       unawaited(showCastDevicesMenu(actionContext));
                       return;
@@ -5926,6 +5931,12 @@ class _PlayerOptionsMenu extends StatelessWidget {
                 label: strings.castTo,
               ),
             ],
+            action(
+              key: 'player-menu-sleep-timer',
+              value: 'sleep-timer',
+              icon: Icons.bedtime_outlined,
+              label: 'Temporizador de sueño',
+            ),
             action(
               key: 'player-menu-audio-output',
               value: 'audio-output',

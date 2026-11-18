@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.0+220 — 2026-11-17
+
+### Added
+
+- Nuevo sistema de iconos vectoriales propios de Inútil Music con estado delineado en reposo y relleno elegante al activar en navegación, cabecera, reproductor y ajustes.
+- Pantalla de Inicio renovada: saludo contextual, píldoras rápidas de filtro (Todo, Recientes, Álbumes y Mixes, Artistas), cuadrícula compacta 2x3 de acceso rápido y actualización deslizando hacia abajo.
+- Desliza cualquier canción a la derecha en listas para añadirla inmediatamente a la cola de reproducción.
+- Temporizador de sueño accesible a un toque directo desde el reproductor.
+
+### Changed
+
+- Nuevo lenguaje visual propio con tarjetas redondeadas, carátulas suaves, filas de canciones limpias sin bordes pesados y medallas con degradado en Ajustes.
+- El mini reproductor ahora se oculta automáticamente cuando no hay nada en reproducción para aprovechar mejor la pantalla.
+
 ## 2.1.3+213 — 2026-11-17
 
 ### Changed

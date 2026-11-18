@@ -45,35 +45,37 @@ const double appListCardPaddingVertical = 12.0;
 const double appListCardMinHeight = 78.0;
 
 /// Icon container size used inside list cards.
-const double appListCardIconSize = 46.0;
+const double appListCardIconSize = 44.0;
 
-/// Icon container radius used inside list cards.
-const double appListCardIconRadius = 10.0;
+/// Icon container radius used inside list cards (modern squircle).
+const double appListCardIconRadius = 14.0;
 
 /// Maximum width of constrained content (e.g. settings cards).
 const double appContentMaxWidth = 760.0;
 
-/// Border radius shared by all list cards across the app.
-const double appCardRadius = 6.0;
+/// Border radius shared by all list cards across the app (sleek rounded editorial).
+const double appCardRadius = 16.0;
 
 /// Shared radius for square artwork across search, library, player and lyrics.
-const double appArtworkRadius = 4.0;
+const double appArtworkRadius = 10.0;
 
 /// Border radius used for bottom navigation items.
-const double appNavItemRadius = 16.0;
+const double appNavItemRadius = 20.0;
 
 /// Shared text style for tab header titles (Home, Biblioteca, Ajustes, etc.).
 TextStyle appTabTitleStyle(BuildContext context) {
-  return Theme.of(
-    context,
-  ).textTheme.headlineMedium!.copyWith(fontWeight: FontWeight.w900);
+  return Theme.of(context).textTheme.headlineMedium!.copyWith(
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.65,
+  );
 }
 
 /// Shared text style for section headings inside a page
 /// (e.g. "Recently Played", "My Playlists", "General", "Appearance").
 TextStyle appSectionTitleStyle(BuildContext context) {
   return Theme.of(context).textTheme.titleLarge!.copyWith(
-    fontWeight: FontWeight.w900,
+    fontWeight: FontWeight.w800,
+    letterSpacing: -0.35,
     color: AppColors.contentHeadingFor(context),
   );
 }

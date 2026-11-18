@@ -1,13 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
 import '../../../../core/theme/app_ui.dart';
-import '../../../../core/widgets/app_shared_widgets.dart';
+import '../../../../core/theme/inutil_icons.dart';
 import '../../../../core/utils/duration_formatter.dart';
 import '../../../../core/widgets/marquee_text.dart';
 import '../../../../services/player/player_service.dart';
@@ -91,138 +92,140 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
     final isPlaying = isCurrent && playback.status == PlayerStatus.playing;
     final identity = track.id.trim().isNotEmpty ? track.id : track.url;
     final colors = Theme.of(context).colorScheme;
-    final borderRadius = BorderRadius.circular(appCardRadius);
+    final borderRadius = BorderRadius.circular(14);
     final cardSurface = AppColors.cardSurfaceFor(context);
     final baseColor = cardSurface.withValues(
       alpha: cardSurface.a * widget.surfaceOpacity.clamp(0.0, 1.0).toDouble(),
     );
+    final highlighted = selected || isCurrent || _hovered;
     final surfaceColor = selected
-        ? Color.alphaBlend(colors.primary.withValues(alpha: 0.13), baseColor)
-        : isCurrent || _hovered
-        ? Color.alphaBlend(
-            colors.onSurface.withValues(alpha: _hovered ? 0.09 : 0.075),
-            baseColor,
-          )
-        : baseColor;
-    final borderColor = selected || isCurrent || _hovered
-        ? colors.primary
-        : AppColors.cardBorderFor(context, solidInLiquidGlass: true);
+        ? Color.alphaBlend(colors.primary.withValues(alpha: 0.14), baseColor)
+        : isCurrent
+        ? colors.primary.withValues(alpha: 0.09)
+        : _hovered
+        ? colors.onSurface.withValues(alpha: 0.055)
+        : Colors.transparent;
+    final borderColor = selected
+        ? colors.primary.withValues(alpha: 0.65)
+        : isCurrent
+        ? colors.primary.withValues(alpha: 0.35)
+        : Colors.transparent;
     final artwork = preferredRemoteTrackArtworkSource(
       track,
       preferCatalogArtwork: widget.preferCatalogArtwork,
     );
 
-    return MouseRegion(
+    final tile = MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
-      child: AppCardGradientBorder(
-        solidInLiquidGlass: true,
-        emphasized: selected || isCurrent || _hovered,
-        width: _hovered ? 1.4 : 1,
-        child: AnimatedContainer(
-          key: ValueKey(
-            'track-result-surface-${track.id.isNotEmpty ? track.id : track.url}',
-          ),
-          duration: const Duration(milliseconds: 240),
-          curve: Curves.easeOutCubic,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: surfaceColor,
+      child: AnimatedContainer(
+        key: ValueKey(
+          'track-result-surface-${track.id.isNotEmpty ? track.id : track.url}',
+        ),
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        clipBehavior: Clip.antiAlias,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: borderRadius,
+          border: highlighted
+              ? Border.all(color: borderColor, width: 1)
+              : null,
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
             borderRadius: borderRadius,
-            border: Border.all(color: borderColor, width: _hovered ? 1.4 : 1),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: borderRadius,
-              onLongPress: selection == null || selection.busy
-                  ? null
-                  : () {
-                      FocusManager.instance.primaryFocus?.unfocus();
-                      selection.select(track);
-                    },
-              onTap: selecting
-                  ? selection!.busy
-                        ? null
-                        : () => selection.toggle(track)
-                  : () => _play(ref, openPlayer: true),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                child: Row(
-                  children: [
-                    Stack(
-                      children: [
-                        _Thumbnail(
-                          url: artwork?.source,
-                          fallbackUrl: artwork?.fallbackSource,
+            onLongPress: selection == null || selection.busy
+                ? null
+                : () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    selection.select(track);
+                  },
+            onTap: selecting
+                ? selection!.busy
+                      ? null
+                      : () => selection.toggle(track)
+                : () => _play(ref, openPlayer: true),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 8,
+              ),
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      _Thumbnail(
+                        url: artwork?.source,
+                        fallbackUrl: artwork?.fallbackSource,
+                      ),
+                      if (isCurrent || _hovered)
+                        NowPlayingEqualizerOverlay(
+                          key: ValueKey('track-result-now-playing-$identity'),
+                          isPlaying: isPlaying,
+                          width: 46,
+                          height: 18,
                         ),
-                        if (isCurrent || _hovered)
-                          NowPlayingEqualizerOverlay(
-                            key: ValueKey('track-result-now-playing-$identity'),
-                            isPlaying: isPlaying,
-                            width: 46,
-                            height: 18,
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          MarqueeText(
-                            track.title,
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(
-                                  fontWeight: isCurrent
-                                      ? FontWeight.w800
-                                      : FontWeight.w700,
-                                  color: AppColors.contentTitleFor(context),
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${track.artist}  -  ${formatDuration(track.duration)}',
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: AppColors.contentSubtitleFor(context),
-                                ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          if (downloadState != null) ...[
-                            const SizedBox(height: 5),
-                            GradientProgressBar(
-                              value: _visibleProgress(downloadState),
-                              indeterminate: _isIndeterminate(downloadState),
-                              height: 4,
-                              colors: _progressColors(
-                                context,
-                                downloadState.status,
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        MarqueeText(
+                          track.title,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(
+                                fontWeight: isCurrent
+                                    ? FontWeight.w800
+                                    : FontWeight.w700,
+                                color: isCurrent
+                                    ? colors.primary
+                                    : AppColors.contentTitleFor(context),
                               ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${track.artist} · ${formatDuration(track.duration)}',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: AppColors.contentSubtitleFor(context),
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (downloadState != null) ...[
+                          const SizedBox(height: 5),
+                          GradientProgressBar(
+                            value: _visibleProgress(downloadState),
+                            indeterminate: _isIndeterminate(downloadState),
+                            height: 4,
+                            colors: _progressColors(
+                              context,
+                              downloadState.status,
                             ),
-                            if (downloadState.errorMessage?.trim().isNotEmpty ==
-                                true) ...[
-                              const SizedBox(height: 4),
-                              Text(
-                                downloadState.errorMessage!.trim(),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.bodySmall
-                                    ?.copyWith(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.error,
-                                    ),
-                              ),
-                            ],
+                          ),
+                          if (downloadState.errorMessage?.trim().isNotEmpty ==
+                              true) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              downloadState.errorMessage!.trim(),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.error,
+                                  ),
+                            ),
                           ],
                         ],
-                      ),
+                      ],
                     ),
+                  ),
                     const SizedBox(width: 8),
                     if (selecting)
                       Checkbox(
@@ -251,7 +254,67 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
             ),
           ),
         ),
+      );
+    if (selecting || !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform)) {
+      return tile;
+    }
+    return Dismissible(
+      key: ValueKey('track-swipe-queue-$identity'),
+      direction: DismissDirection.startToEnd,
+      dismissThresholds: const {DismissDirection.startToEnd: 0.25},
+      confirmDismiss: (_) async {
+        HapticFeedback.mediumImpact();
+        unawaited(
+          ref.read(playerControllerProvider.notifier).enqueueRemoteNext(track),
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context)
+            ..hideCurrentSnackBar()
+            ..showSnackBar(
+              SnackBar(
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+                content: Text('«${track.title}» añadida a la cola'),
+              ),
+            );
+        }
+        return false;
+      },
+      background: Container(
+        margin: const EdgeInsets.symmetric(vertical: 2),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          gradient: LinearGradient(
+            colors: [
+              const Color(0xFF1DB954).withValues(alpha: 0.28),
+              const Color(0xFF1DB954).withValues(alpha: 0.08),
+            ],
+          ),
+        ),
+        alignment: Alignment.centerLeft,
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            InutilIcon(
+              InutilGlyph.queue,
+              size: 20,
+              color: Color(0xFF1DB954),
+              filled: true,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'A la cola',
+              style: TextStyle(
+                color: Color(0xFF1DB954),
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
       ),
+      child: tile,
     );
   }
 

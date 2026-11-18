@@ -65,6 +65,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     final player = ref.read(playerControllerProvider.notifier);
     final syncService = ref.watch(inutilPlaybackSyncProvider);
     final pairedDeviceName = syncService.autoPairedPeer?.deviceName;
+    final sleepTimer = ref.watch(sleepTimerControllerProvider);
     final shareTrack = snapshot.isExternal
         ? null
         : _shareTrackForSnapshot(
@@ -460,7 +461,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
 
               const SizedBox(height: 12),
 
-              // Bottom utility row: Devices (left), Share + Queue (right).
+              // Bottom utility row: Devices (left), Sleep Timer + Share + Queue (right).
               Row(
                 children: [
                   InkWell(
@@ -474,17 +475,18 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            Icons.devices_rounded,
+                          InutilIcon(
+                            InutilGlyph.devices,
                             size: 21,
+                            filled: pairedDeviceName != null,
                             color: pairedDeviceName != null
                                 ? _spotifyGreen
-                                : Colors.white.withValues(alpha: 0.85),
+                                : Colors.white.withValues(alpha: 0.88),
                           ),
                           if (pairedDeviceName != null) ...[
                             const SizedBox(width: 6),
                             ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 160),
+                              constraints: const BoxConstraints(maxWidth: 150),
                               child: Text(
                                 pairedDeviceName,
                                 maxLines: 1,
@@ -502,11 +504,40 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     ),
                   ),
                   const Spacer(),
+                  IconButton(
+                    key: const ValueKey('spotify-canvas-sleep-timer'),
+                    tooltip: 'Temporizador de sueño',
+                    onPressed: () => InutilSleepTimerSheet.show(context),
+                    icon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        InutilIcon(
+                          InutilGlyph.sleepTimer,
+                          size: 21,
+                          filled: sleepTimer.isActive,
+                          color: sleepTimer.isActive
+                              ? _spotifyGreen
+                              : Colors.white.withValues(alpha: 0.88),
+                        ),
+                        if (sleepTimer.isActive) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '${sleepTimer.remaining.inMinutes + 1}m',
+                            style: const TextStyle(
+                              color: _spotifyGreen,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
                   if (shareTrack != null)
                     IconButton(
                       tooltip: strings.shareSong,
                       color: Colors.white.withValues(alpha: 0.88),
-                      iconSize: 22,
+                      iconSize: 21,
                       onPressed: () => unawaited(
                         _shareTrack(
                           context: context,
@@ -519,12 +550,15 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     ),
                   IconButton(
                     tooltip: 'Cola de reproducción',
-                    color: queueVisible
-                        ? _spotifyGreen
-                        : Colors.white.withValues(alpha: 0.88),
-                    iconSize: 24,
                     onPressed: onToggleQueue,
-                    icon: const Icon(Icons.queue_music_rounded),
+                    icon: InutilIcon(
+                      InutilGlyph.queue,
+                      size: 22,
+                      filled: queueVisible,
+                      color: queueVisible
+                          ? _spotifyGreen
+                          : Colors.white.withValues(alpha: 0.88),
+                    ),
                   ),
                 ],
               ),

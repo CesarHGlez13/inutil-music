@@ -3767,6 +3767,23 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     }
   }
 
+  /// Inserts [track] right after the currently playing item in the active queue,
+  /// or starts playing it immediately if nothing is queued yet.
+  Future<void> enqueueRemoteNext(TrackInfo track) async {
+    if (_queue.isEmpty || _queueIndex < 0) {
+      await playRemote(track, queue: [track]);
+      return;
+    }
+    final nextQueue = List<_QueueItem>.from(_queue);
+    final insertIndex = (_queueIndex + 1).clamp(0, nextQueue.length);
+    nextQueue.insert(insertIndex, _remoteQueueEntries.newRemoteItem(track));
+    _queue = List<_QueueItem>.unmodifiable(nextQueue);
+    _resetShuffleHistory();
+    _publishPlaybackQueue();
+    _remotePrefetch.invalidate();
+    unawaited(_warmUpcomingRemoteTracks(_playRequestId));
+  }
+
   Future<void> stop() async {
     _releasePlaybackIntent();
     _userPaused = false;
