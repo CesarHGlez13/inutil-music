@@ -53,6 +53,13 @@ void main() {
     // El contacto visible es el correo propio del proyecto; la cuenta de
     // administrador de Firebase vive aparte en `bootstrapAdminEmail`.
     expect(AppConstants.supportEmail, 'cesarmaster133@gmail.com');
+    // «Apoyar el desarrollo» ya no apunta al Ko-fi del autor original: escribe a
+    // el correo propio mediante `mailto:`.
+    expect(
+      AppConstants.supportDevelopmentUrl,
+      startsWith('mailto:${AppConstants.supportEmail}'),
+    );
+    expect(AppConstants.supportDevelopmentUrl, isNot(contains('ko-fi')));
     // El único resto del proyecto original en estas constantes es el credito
     // legal que exige la licencia BSD-2-Clause del upstream.
     expect(AppConstants.upstreamCredit, contains('BSD-2-Clause'));

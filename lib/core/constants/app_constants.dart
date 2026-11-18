@@ -17,7 +17,14 @@ class AppConstants {
   static const androidExternalAudioChannel = 'inutil_music/external_audio';
   static const androidAppActivationChannel = 'inutil_music/app_activation';
   static const defaultSearchLimit = 20;
-  static const supportDevelopmentUrl = 'https://ko-fi.com/soybryam06c/donate';
+  /// «Apoyar el desarrollo» abre el cliente de correo del dispositivo
+  /// escribiendo a `supportEmail` (asunto prellenado); todavía no hay medio de
+  /// pago propio enlazado. Se usa `mailto:` en lugar de una URL web porque el
+  /// lanzador de Ajustes es `launchUrl(..., externalApplication)`, que resuelve
+  /// ese esquema en Android, Linux y Windows.
+  static const supportDevelopmentUrl =
+      'mailto:cesarmaster133@gmail.com'
+      '?subject=In%C3%BAtil%20Music%20-%20apoyo%20al%20desarrollo';
   /// Repositorio propio de Inútil Music (artefactos publicados y notas de
   /// versión). Es la fuente del manifiesto OTA `release.json`; ver §10 del
   /// informe y `docs/RELEASES.md`.
