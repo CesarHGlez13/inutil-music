@@ -8,6 +8,7 @@ import '../theme/inutil_design_system.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_sync_providers.dart';
 import 'inutil_inactivity_paused_screen.dart';
+import 'music_qr_login_panel.dart';
 
 /// Barrera de autenticación obligatoria (Gatekeeper) para INÚTIL MUSIC.
 /// Bloquea el uso de la aplicación a usuarios no registrados o sin licencia activa
@@ -292,7 +293,13 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
               child: Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-                  child: ConstrainedBox(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 36,
+                    runSpacing: 28,
+                    children: [
+                  ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: isDesktop ? 460 : 400),
                     child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -686,6 +693,11 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
                   ],
                 ),
               ),
+                      // Inicio de sesión por QR desde el celular (solo escritorio).
+                      if (MusicQrLoginPanel.isSupportedPlatform)
+                        const MusicQrLoginPanel(),
+                    ],
+                  ),
             ),
           ),
         ),

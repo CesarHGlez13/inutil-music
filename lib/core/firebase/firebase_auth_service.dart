@@ -768,6 +768,78 @@ class InutilAuthService extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Inicia sesión en la PC con el `refreshToken` recibido cifrado desde el
+  /// celular (vinculación por QR o código de 8 caracteres).
+  ///
+  /// Devuelve `null` si todo salió bien o un mensaje legible si falló. La PC
+  /// no reclama el slot de teléfono, así que el celular no queda expulsado.
+  Future<String?> signInWithPairedRefreshToken(
+    String refreshToken, {
+    String emailHint = '',
+    String displayNameHint = '',
+  }) async {
+    final token = refreshToken.trim();
+    if (token.isEmpty) return 'La sesión enviada desde el celular está vacía.';
+    try {
+      final tokenRes = await http
+          .post(
+            Uri.parse('${FirebaseConfig.secureTokenUrl}?${FirebaseConfig.keyParam}'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'grant_type': 'refresh_token',
+              'refresh_token': token,
+            }),
+          )
+          .timeout(const Duration(seconds: 12));
+      if (tokenRes.statusCode != 200) {
+        return 'La sesión del celular no es válida. Vuelve a iniciar sesión en el celular.';
+      }
+      final data = _tryDecode(tokenRes.body);
+      final idToken = data['id_token'] as String? ?? '';
+      final uid = data['user_id'] as String? ?? '';
+      final newRefresh = (data['refresh_token'] as String?) ?? token;
+      if (idToken.isEmpty || uid.isEmpty) {
+        return 'No se pudo validar la sesión recibida.';
+      }
+
+      var email = emailHint.trim().toLowerCase();
+      var displayName = displayNameHint.trim();
+      try {
+        final lookup = await _authPost('accounts:lookup', {'idToken': idToken});
+        final users = lookup['users'] as List?;
+        if (users != null && users.isNotEmpty && users.first is Map) {
+          final u = users.first as Map;
+          final e = (u['email'] ?? '').toString().trim().toLowerCase();
+          final d = (u['displayName'] ?? '').toString().trim();
+          if (e.isNotEmpty) email = e;
+          if (d.isNotEmpty) displayName = d;
+        }
+      } catch (_) {}
+
+      _currentUser = InutilUser(
+        uid: uid,
+        email: email,
+        displayName: displayName.isNotEmpty
+            ? displayName
+            : (email.contains('@') ? email.split('@').first : 'Usuario'),
+        idToken: idToken,
+        refreshToken: newRefresh,
+        createdAt: DateTime.now(),
+        lastLoginAt: DateTime.now(),
+      );
+      _kickedOutReason = '';
+      _inactivityPaused = false;
+      await _saveSession();
+      await _bootstrapSession(createIfMissing: true);
+      if (!testSkipOnlineValidation) _startValidationTimer();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('[InutilAuth] Error iniciando sesión por QR: $e');
+      return 'Error de conexión al iniciar sesión con el celular.';
+    }
+  }
+
   /// Cierre de sesión seguro. Libera el teléfono reclamado para que otro
   /// dispositivo pueda usar la cuenta sin gastar el cambio mensual.
   Future<void> signOut() async {

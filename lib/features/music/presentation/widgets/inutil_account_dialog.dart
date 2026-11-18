@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_auth_service.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
+import '../../../../core/firebase/music_qr_scanner_screen.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
 import '../../../../core/theme/app_ui.dart';
@@ -308,6 +309,55 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
                         : _pushCloudBackup,
                     icon: const Icon(Icons.cloud_upload_rounded, size: 18),
                     label: const Text('Respaldar ahora'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.cardSurfaceFor(context),
+            borderRadius: BorderRadius.circular(appCardRadius),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Iniciar sesión en PC',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Abre Inútil Music en tu computadora y escanea el QR (o escribe su código) para entrar sin contraseña.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('account-pc-login-qr'),
+                    onPressed: _signingOut ? null : () => openPcLoginFlow(context),
+                    icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                    label: const Text('Escanear QR de la PC'),
+                  ),
+                  OutlinedButton.icon(
+                    key: const ValueKey('account-pc-login-code'),
+                    onPressed: _signingOut ? null : () => showPcLoginCodeDialog(context),
+                    icon: const Icon(Icons.keyboard_rounded, size: 18),
+                    label: const Text('Escribir código'),
                   ),
                 ],
               ),

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.5.7+257 — 2026-11-18
+
+### Added
+
+- Inicio de sesión en la PC escaneando un código QR con el celular (igual que en la app de TV): la pantalla de acceso del escritorio muestra un QR en vivo con su código alternativo `XXXX-XXXX`; el celular, desde *Mi cuenta → Iniciar sesión en PC*, escanea el QR con la cámara o escribe el código.
+- Cifrado de extremo a extremo de la sesión compartida: AES-256-CBC + HMAC-SHA256 (Encrypt-then-MAC) con clave efímera que solo viaja dentro de la imagen QR (o derivada del código manual); Firestore nunca almacena la clave ni el token en claro. Sesión temporal `music_pairing/{code}` con expiración de 3 minutos y limpieza automática.
+- Permisos de cámara en Android (`CAMERA`, opcional) y iOS (`NSCameraUsageDescription`) exclusivamente para el escáner de vinculación.
+
+### Changed
+
+- Reglas de Firestore endurecidas para `music_pairing/{code}`: lectura directa permitida, enumeración bloqueada, creación limitada a documentos `pending` sin campos extra y aprobación solo para usuarios autenticados (`pending → approved`).
+
 ## 2.5.6+256 — 2026-11-18
 
 ### Changed

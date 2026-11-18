@@ -56,6 +56,8 @@
 	<true/>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Inútil Music necesita acceso para mostrar y reproducir la música guardada en tu dispositivo.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Inútil Music usa la cámara para escanear el código QR de inicio de sesión en tu PC.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Inútil Music necesita acceso a tus fotos para elegir un fondo personalizado.</string>
 	<key>NSLocalNetworkUsageDescription</key>
