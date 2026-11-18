@@ -348,6 +348,30 @@
             <button id="savePromoBtn" class="btn btn-primary" style="max-width:280px;margin-top:4px">Guardar campaña en Firestore</button>
           </div>
         </div>
+
+        <div class="card ota-grid" style="margin-top:16px">
+          <div>
+            <h2 style="font-size:18px;font-weight:800">✨ Inútil Wrapped (app_config/wrapped_campaign)</h2>
+            <p class="subtitle">Se lanza automáticamente del 1 de diciembre al 15 de enero. Actívalo aquí si quieres disparar el pop-up animado de agradecimiento en cualquier fecha, y consulta abajo lo que más escucha tu comunidad.</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input id="wrappedEnabled" type="checkbox" style="width:auto" />
+            <label for="wrappedEnabled" style="margin:0;color:var(--text)">Lanzar Inútil Wrapped ahora a todos los usuarios</label>
+          </div>
+          <div class="row-2">
+            <div>
+              <label for="wrappedYear">Año del resumen</label>
+              <input id="wrappedYear" type="number" min="2025" max="2099" value="2026" />
+            </div>
+            <div style="display:flex;align-items:flex-end;gap:10px">
+              <button id="saveWrappedBtn" class="btn btn-primary" style="margin-top:0">Guardar campaña Wrapped</button>
+              <button id="loadWrappedStatsBtn" class="btn btn-cyan" style="margin-top:0">Analizar gustos</button>
+            </div>
+          </div>
+          <div id="wrappedStatsBox" style="padding:14px;border-radius:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);font-size:13px;color:var(--muted)">
+            Pulsa «Analizar gustos» para agregar los datos de <code>users/*/data/wrapped_2026</code> (horas totales, artistas y canciones favoritas de tus usuarios).
+          </div>
+        </div>
       </section>
     </div>
   </div>
@@ -694,6 +718,101 @@
       }
     });
 
+    async function loadWrappedCampaign() {
+      try {
+        const snap = await getDoc(doc(db, "app_config", "wrapped_campaign"));
+        if (!snap.exists()) return;
+        const d = snap.data();
+        $("wrappedEnabled").checked = Boolean(d.enabled);
+        $("wrappedYear").value = d.year || new Date().getFullYear();
+      } catch (_) {}
+    }
+
+    $("saveWrappedBtn").addEventListener("click", async () => {
+      try {
+        const yr = parseInt($("wrappedYear").value, 10) || new Date().getFullYear();
+        await setDoc(doc(db, "app_config", "wrapped_campaign"), {
+          enabled: $("wrappedEnabled").checked,
+          year: yr,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        toast(`Campaña Wrapped ${yr} guardada en Firestore`);
+      } catch (e) {
+        toast("Error Wrapped: " + e.message);
+      }
+    });
+
+    function escHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+    }
+
+    $("loadWrappedStatsBtn").addEventListener("click", async () => {
+      const box = $("wrappedStatsBox");
+      const yr = parseInt($("wrappedYear").value, 10) || new Date().getFullYear();
+      box.textContent = `Analizando usuarios para Wrapped ${yr}…`;
+      try {
+        if (!allUsers.length) await loadUsers();
+        let totalSec = 0, totalPlays = 0, activeUsers = 0;
+        const artistAgg = new Map();
+        const trackAgg = new Map();
+        await Promise.all(allUsers.map(async (u) => {
+          try {
+            const snap = await getDoc(doc(db, "users", u.uid, "data", `wrapped_${yr}`));
+            if (!snap.exists()) return;
+            const d = snap.data();
+            const sec = Number(d.totalSeconds || 0);
+            const plays = Number(d.totalPlays || 0);
+            if (sec <= 0 && plays <= 0) return;
+            activeUsers += 1;
+            totalSec += sec;
+            totalPlays += plays;
+            for (const a of (d.artists || [])) {
+              const key = String(a.name || "").trim().toLowerCase();
+              if (!key) continue;
+              const prev = artistAgg.get(key) || { name: a.name, seconds: 0, plays: 0 };
+              prev.seconds += Number(a.seconds || 0);
+              prev.plays += Number(a.plays || 0);
+              artistAgg.set(key, prev);
+            }
+            for (const t of (d.tracks || [])) {
+              const key = String(t.id || t.title || "").trim().toLowerCase();
+              if (!key) continue;
+              const prev = trackAgg.get(key) || { title: t.title, artist: t.artist, seconds: 0, plays: 0 };
+              prev.seconds += Number(t.seconds || 0);
+              prev.plays += Number(t.plays || 0);
+              trackAgg.set(key, prev);
+            }
+          } catch (_) {}
+        }));
+        const topArtists = [...artistAgg.values()].sort((a, b) => b.seconds - a.seconds).slice(0, 5);
+        const topTracks = [...trackAgg.values()].sort((a, b) => b.seconds - a.seconds).slice(0, 5);
+        const hours = (totalSec / 3600).toFixed(1);
+        if (activeUsers === 0) {
+          box.innerHTML = `Aún no hay telemetría sincronizada para <b>Wrapped ${yr}</b>. En cuanto los usuarios escuchen música en v2.3.0+, sus gustos aparecerán aquí automáticamente.`;
+          return;
+        }
+        box.innerHTML = `
+          <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;color:var(--text)">
+            <span><b>${activeUsers}</b> usuarios con datos</span>
+            <span><b>${hours} h</b> reproducidas</span>
+            <span><b>${totalPlays}</b> reproducciones</span>
+          </div>
+          <div class="row-2">
+            <div>
+              <div style="font-weight:700;color:var(--text);margin-bottom:6px">Top 5 Artistas de la comunidad</div>
+              ${topArtists.map((a, i) => `<div>${i + 1}. <b>${escHtml(a.name)}</b> · ${(a.seconds / 60).toFixed(0)} min (${a.plays} plays)</div>`).join("") || "Sin datos"}
+            </div>
+            <div>
+              <div style="font-weight:700;color:var(--text);margin-bottom:6px">Top 5 Canciones de la comunidad</div>
+              ${topTracks.map((t, i) => `<div>${i + 1}. <b>${escHtml(t.title)}</b> — ${escHtml(t.artist)} · ${t.plays} plays</div>`).join("") || "Sin datos"}
+            </div>
+          </div>
+        `;
+      } catch (e) {
+        box.textContent = "Error leyendo estadísticas: " + e.message;
+      }
+    });
+
     document.querySelectorAll(".tab").forEach(t => {
       t.addEventListener("click", () => {
         document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
@@ -806,7 +925,7 @@
       }
     });
 
-    $("refreshBtn").addEventListener("click", async () => { await Promise.all([loadUsers(), loadOta(), loadPromo()]); toast("Datos actualizados"); });
+    $("refreshBtn").addEventListener("click", async () => { await Promise.all([loadUsers(), loadOta(), loadPromo(), loadWrappedCampaign()]); toast("Datos actualizados"); });
     $("logoutBtn").addEventListener("click", () => signOut(auth));
 
     onAuthStateChanged(auth, async (user) => {
@@ -825,7 +944,7 @@
         $("adminIdentity").textContent = `${user.email} · Proyecto inutil-music-app`;
         $("loginView").classList.add("hidden");
         $("dashView").classList.remove("hidden");
-        await Promise.all([loadUsers(), loadOta(), loadPromo()]);
+        await Promise.all([loadUsers(), loadOta(), loadPromo(), loadWrappedCampaign()]);
       } catch (err) {
         showLoginAlert("Error cargando panel: " + err.message);
       }
