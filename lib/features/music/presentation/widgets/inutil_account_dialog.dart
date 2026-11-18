@@ -31,6 +31,8 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
   bool _isLoading = false;
   bool _isGoogleLoading = false;
   bool _signingOut = false;
+  bool _cloudBusy = false;
+  String? _cloudMessage;
   String? _errorMessage;
 
   final _emailController = TextEditingController();
@@ -258,7 +260,61 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.cardSurfaceFor(context),
+            borderRadius: BorderRadius.circular(appCardRadius),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Respaldo en la nube',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _cloudMessage ??
+                    'Tus playlists y biblioteca se sincronizan automáticamente con tu cuenta.',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton.icon(
+                    key: const ValueKey('account-restore-backup'),
+                    onPressed: _cloudBusy || _signingOut
+                        ? null
+                        : _restoreCloudBackup,
+                    icon: const Icon(Icons.cloud_download_rounded, size: 18),
+                    label: const Text('Restaurar listas'),
+                  ),
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('account-push-backup'),
+                    onPressed: _cloudBusy || _signingOut
+                        ? null
+                        : _pushCloudBackup,
+                    icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                    label: const Text('Respaldar ahora'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
@@ -289,6 +345,63 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
         ),
       ],
     );
+  }
+
+  Future<void> _restoreCloudBackup() async {
+    setState(() {
+      _cloudBusy = true;
+      _cloudMessage = 'Buscando respaldo en la nube…';
+    });
+    try {
+      final backup = ref.read(inutilCloudBackupProvider);
+      final message = await backup.pullAndRestoreIfEmpty();
+      if (backup.lastRestoreHadChanges) {
+        ref
+          ..invalidate(libraryTracksProvider)
+          ..invalidate(playlistsControllerProvider)
+          ..invalidate(catalogPlaylistsProvider)
+          ..invalidate(catalogPlaylistProvider)
+          ..invalidate(favoriteTrackIdsProvider)
+          ..invalidate(historyProvider);
+      }
+      if (mounted) {
+        setState(() => _cloudMessage = message);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _cloudMessage = 'No se pudo restaurar: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cloudBusy = false);
+      }
+    }
+  }
+
+  Future<void> _pushCloudBackup() async {
+    setState(() {
+      _cloudBusy = true;
+      _cloudMessage = 'Respaldando playlists en la nube…';
+    });
+    try {
+      final backup = ref.read(inutilCloudBackupProvider);
+      await backup.pushNow();
+      if (mounted) {
+        setState(
+          () => _cloudMessage = backup.lastError.isEmpty
+              ? 'Respaldo completado correctamente.'
+              : backup.lastError,
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _cloudMessage = 'No se pudo respaldar: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _cloudBusy = false);
+      }
+    }
   }
 
   Widget _buildAuthForm(BuildContext context) {

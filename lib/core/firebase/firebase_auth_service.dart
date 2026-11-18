@@ -442,6 +442,10 @@ class InutilAuthService extends ChangeNotifier {
     await _validateSession(reason: 'reanudada');
   }
 
+  /// Renueva el token de sesión si está próximo a caducar antes de leer/escribir
+  /// documentos de respaldo en Firestore.
+  Future<bool> ensureFreshSession() => _ensureFreshIdToken();
+
   /// Migración desde el registro local antiguo (contraseñas en claro): se
   /// elimina por completo; la sesión solo puede renacer de Firebase Auth.
   Future<void> _migrateLegacy(SharedPreferences prefs) async {

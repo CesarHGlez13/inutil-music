@@ -119,6 +119,13 @@ class LibraryCsvTransferController extends Notifier<LibraryCsvTransferState> {
             .read(youtubeMusicPlaylistSyncControllerProvider.notifier)
             .requestAutomaticSync();
       }
+      if (result.successful > 0 || result.playlistsUpdated > 0) {
+        try {
+          unawaited(ref.read(inutilCloudBackupProvider).pushNow());
+        } catch (_) {
+          // Pruebas aisladas pueden montar el controlador sin respaldo nube.
+        }
+      }
       state = LibraryCsvTransferState(
         phase: LibraryCsvTransferPhase.completed,
         document: document,

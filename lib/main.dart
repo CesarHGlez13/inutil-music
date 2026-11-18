@@ -187,7 +187,9 @@ class _LocalArtworkMaintenanceState
         ..invalidate(libraryTracksProvider)
         ..invalidate(playlistsControllerProvider)
         ..invalidate(catalogPlaylistsProvider)
-        ..invalidate(catalogPlaylistProvider);
+        ..invalidate(catalogPlaylistProvider)
+        ..invalidate(favoriteTrackIdsProvider)
+        ..invalidate(historyProvider);
     }
   }
 
@@ -255,7 +257,39 @@ class _LocalArtworkMaintenanceState
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    // Reacciona inmediatamente cuando la sesión se carga de forma asíncrona en
+    // el arranque O cuando el usuario inicia sesión tras reinstalar la app. Sin
+    // este listener, initState() encontraba canSync == false antes del login y
+    // nunca restauraba playlists hasta un futuro resumed.
+    ref.listen<({String? uid, bool canSync})>(
+      inutilAuthProvider.select(
+        (auth) => (
+          uid: auth.currentUser?.uid,
+          canSync:
+              auth.currentUser?.idToken.isNotEmpty == true &&
+              auth.isAccessAllowed,
+        ),
+      ),
+      (previous, next) {
+        final backup = ref.read(inutilCloudBackupProvider);
+        if (next.uid == null) {
+          backup.stopAutoSync();
+          backup.resetSessionState();
+          return;
+        }
+        final userChanged = previous?.uid != next.uid;
+        if (userChanged) {
+          backup.resetSessionState();
+        }
+        if (next.canSync && (previous?.canSync != true || userChanged)) {
+          backup.startAutoSync();
+          unawaited(_restoreCloudBackupAndRefresh());
+        }
+      },
+    );
+    return widget.child;
+  }
 }
 
 class InutilMusicApp extends ConsumerWidget {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.1+251 — 2026-11-18
+
+### Fixed
+
+- Restauración automática inmediata de playlists y biblioteca al iniciar sesión tras reinstalar la app o borrar datos (`_LocalArtworkMaintenance` ahora reacciona en tiempo real a `inutilAuthProvider`), eliminando la condición de carrera que dejaba la Biblioteca vacía al entrar.
+- Respaldo y restauración completos de canciones dentro de playlists de catálogo (`playlist_items` + `catalog_tracks` en bloques `backup_entries_*`), incluyendo listas importadas de Spotify/CSV y canciones añadidas sin descarga local, con saneamiento seguro de `local_track_id` ante claves foráneas.
+- Sincronización inmediata a la nube al finalizar importaciones de Spotify/CSV (`LibraryCsvTransferController`), debounce de guardado reducido a 5 s y protección anti-sobrescritura que fusiona el respaldo remoto antes de subir cambios locales.
+- Botones directos **«Restaurar listas»** y **«Respaldar ahora»** en el diálogo **Mi cuenta** para sincronizar o recuperar bajo demanda en cualquier momento.
+
 ## 2.5.0+250 — 2026-11-18
 
 ### Performance
