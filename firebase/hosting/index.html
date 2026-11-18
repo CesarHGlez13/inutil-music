@@ -225,6 +225,7 @@
       <div class="tabs">
         <button class="tab active" data-tab="users">Usuarios y Licencias</button>
         <button class="tab" data-tab="ota">Actualizaciones OTA</button>
+        <button class="tab" data-tab="promo">Pop-ups y Anuncios</button>
       </div>
 
       <!-- USERS TAB -->
@@ -282,6 +283,69 @@
           </div>
           <div>
             <button id="saveOtaBtn" class="btn btn-primary" style="max-width:260px;margin-top:4px">Publicar manifiesto OTA</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROMO / ADS POPUP TAB -->
+      <section id="tab-promo" class="hidden">
+        <div class="card ota-grid">
+          <div>
+            <h2 style="font-size:18px;font-weight:800">Pop-ups de Apoyo y Anuncios (app_config/promo_popup)</h2>
+            <p class="subtitle">Cuando está desactivado, la app rota automáticamente sus 8 mensajes creativos del creador. Actívalo para lanzar un anuncio o campaña personalizada al instante.</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <input id="promoEnabled" type="checkbox" style="width:auto" />
+            <label for="promoEnabled" style="margin:0;color:var(--text)">Activar campaña / anuncio remoto</label>
+          </div>
+          <div class="row-2">
+            <div>
+              <label for="promoKind">Tipo de pop-up</label>
+              <select id="promoKind">
+                <option value="support">Apoyo al creador</option>
+                <option value="announcement">Aviso / Novedad</option>
+                <option value="ad">Anuncio patrocinado</option>
+              </select>
+            </div>
+            <div>
+              <label for="promoCampaignId">ID de campaña (cámbialo para re-mostrar)</label>
+              <input id="promoCampaignId" placeholder="promo-nov-2026-01" />
+            </div>
+          </div>
+          <div class="row-2">
+            <div>
+              <label for="promoBadge">Etiqueta superior (badge)</label>
+              <input id="promoBadge" placeholder="MENSAJE DEL CREADOR" />
+            </div>
+            <div>
+              <label for="promoEmoji">Emoji o icono central</label>
+              <input id="promoEmoji" placeholder="🌮" />
+            </div>
+          </div>
+          <div>
+            <label for="promoHeadline">Título principal</label>
+            <input id="promoHeadline" placeholder="El creador lleva 3 meses viviendo de café y código" />
+          </div>
+          <div>
+            <label for="promoBody">Mensaje</label>
+            <textarea id="promoBody" rows="3" placeholder="Texto cercano, gracioso o descriptivo del anuncio…"></textarea>
+          </div>
+          <div class="row-2">
+            <div>
+              <label for="promoPrimaryCta">Texto del botón principal</label>
+              <input id="promoPrimaryCta" placeholder="Invitar unos tacos 🌮" />
+            </div>
+            <div>
+              <label for="promoSecondaryCta">Texto del botón cerrar</label>
+              <input id="promoSecondaryCta" placeholder="Hoy no, que aguante 😅" />
+            </div>
+          </div>
+          <div>
+            <label for="promoActionUrl">URL de destino (donación, enlace o mailto:)</label>
+            <input id="promoActionUrl" placeholder="https://... o mailto:cesarmaster133@gmail.com" />
+          </div>
+          <div>
+            <button id="savePromoBtn" class="btn btn-primary" style="max-width:280px;margin-top:4px">Guardar campaña en Firestore</button>
           </div>
         </div>
       </section>
@@ -593,12 +657,50 @@
       renderUsers();
     });
 
+    async function loadPromo() {
+      const snap = await getDoc(doc(db, "app_config", "promo_popup"));
+      if (!snap.exists()) return;
+      const d = snap.data();
+      $("promoEnabled").checked = Boolean(d.enabled);
+      $("promoKind").value = d.kind || "support";
+      $("promoCampaignId").value = d.campaignId || "";
+      $("promoBadge").value = d.badge || "";
+      $("promoEmoji").value = d.emoji || "";
+      $("promoHeadline").value = d.headline || "";
+      $("promoBody").value = d.body || "";
+      $("promoPrimaryCta").value = d.primaryCta || "";
+      $("promoSecondaryCta").value = d.secondaryCta || "";
+      $("promoActionUrl").value = d.actionUrl || "";
+    }
+
+    $("savePromoBtn").addEventListener("click", async () => {
+      try {
+        await setDoc(doc(db, "app_config", "promo_popup"), {
+          enabled: $("promoEnabled").checked,
+          kind: $("promoKind").value,
+          campaignId: $("promoCampaignId").value.trim() || ("promo-" + Date.now()),
+          badge: $("promoBadge").value.trim(),
+          emoji: $("promoEmoji").value.trim() || "✨",
+          headline: $("promoHeadline").value.trim(),
+          body: $("promoBody").value.trim(),
+          primaryCta: $("promoPrimaryCta").value.trim(),
+          secondaryCta: $("promoSecondaryCta").value.trim(),
+          actionUrl: $("promoActionUrl").value.trim(),
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+        toast("Campaña de pop-up publicada en Firestore");
+      } catch (e) {
+        toast("Error campaña: " + e.message);
+      }
+    });
+
     document.querySelectorAll(".tab").forEach(t => {
       t.addEventListener("click", () => {
         document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
         t.classList.add("active");
         $("tab-users").classList.toggle("hidden", t.dataset.tab !== "users");
         $("tab-ota").classList.toggle("hidden", t.dataset.tab !== "ota");
+        $("tab-promo").classList.toggle("hidden", t.dataset.tab !== "promo");
       });
     });
 
@@ -704,7 +806,7 @@
       }
     });
 
-    $("refreshBtn").addEventListener("click", async () => { await loadUsers(); await loadOta(); toast("Datos actualizados"); });
+    $("refreshBtn").addEventListener("click", async () => { await Promise.all([loadUsers(), loadOta(), loadPromo()]); toast("Datos actualizados"); });
     $("logoutBtn").addEventListener("click", () => signOut(auth));
 
     onAuthStateChanged(auth, async (user) => {
@@ -723,7 +825,7 @@
         $("adminIdentity").textContent = `${user.email} · Proyecto inutil-music-app`;
         $("loginView").classList.add("hidden");
         $("dashView").classList.remove("hidden");
-        await Promise.all([loadUsers(), loadOta()]);
+        await Promise.all([loadUsers(), loadOta(), loadPromo()]);
       } catch (err) {
         showLoginAlert("Error cargando panel: " + err.message);
       }
