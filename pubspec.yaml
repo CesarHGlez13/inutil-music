@@ -121,6 +121,8 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
+    - LICENSE
+    - THIRD_PARTY_NOTICES.md
     - assets/icons/inutil_icon.png
     - assets/fonts/Roboto-LICENSE.txt
     - assets/fonts/Nunito-OFL.txt

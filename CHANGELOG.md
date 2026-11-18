@@ -6,6 +6,7 @@
 
 - Eliminadas todas las referencias internas heredadas restantes (colección de Favoritos unificada a `inutil:favorites`, carpeta `Inutil-Music`, identificador Apple `com.inutilmusic.app`, esquema `inutilmusic://`, cabecera CSV `InutilCsvVersion`, claves de sesión y pie de Ajustes/instalador/CI).
 - Migración automática segura al abrir la base de datos y restaurar respaldos en la nube para conservar las colecciones de Favoritos existentes bajo `inutil:favorites`.
+- Empaquetados `LICENSE` y `THIRD_PARTY_NOTICES.md` dentro de los assets en todas las plataformas (incluido APK Android) con visor integrado de *Licencias de código abierto* en Ajustes para cumplimiento total BSD-2/MIT/Apache-2.0.
 
 ## 2.5.5+255 — 2026-11-18
 

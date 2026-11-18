@@ -1847,6 +1847,14 @@ class _AboutApplicationSettings extends StatelessWidget {
           subtitle: strings.githubRepositoryBody,
           onTap: onGitHub,
         ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-licenses'),
+          glyph: InutilGlyph.info,
+          title: strings.openSourceLicensesTitle,
+          subtitle: strings.openSourceLicensesBody,
+          onTap: () => _showOpenSourceLicenses(context),
+        ),
         const SizedBox(height: 24),
         Center(
           child: Text(
@@ -1905,6 +1913,54 @@ class _AboutApplicationSettings extends StatelessWidget {
         actions: [
           TextButton(
             key: const ValueKey('settings-about-whats-new-close'),
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(strings.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showOpenSourceLicenses(BuildContext context) async {
+    String notices;
+    try {
+      notices = await rootBundle.loadString('THIRD_PARTY_NOTICES.md');
+    } catch (_) {
+      notices = await rootBundle.loadString('LICENSE');
+    }
+    if (!context.mounted) return;
+    await showAppDialog<void>(
+      context: context,
+      builder: (dialogContext) => AppAlertDialog(
+        key: const ValueKey('settings-about-licenses-dialog'),
+        title: Text(strings.openSourceLicensesTitle),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560, maxHeight: 420),
+          child: SingleChildScrollView(
+            child: SelectableText(
+              notices,
+              style: Theme.of(dialogContext).textTheme.bodySmall?.copyWith(
+                fontFamily: 'Space Mono',
+                height: 1.45,
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            key: const ValueKey('settings-about-licenses-packages'),
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              showLicensePage(
+                context: context,
+                applicationName: AppConstants.appName,
+                applicationVersion: AppConstants.appVersion,
+              );
+            },
+            child: Text(strings.openSourcePackagesAction),
+          ),
+          TextButton(
+            key: const ValueKey('settings-about-licenses-close'),
             onPressed: () => Navigator.of(dialogContext).pop(),
             child: Text(strings.close),
           ),

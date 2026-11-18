@@ -1,8 +1,8 @@
 # Inutil Android customization
 
-This directory vendors `just_audio` 0.10.6 under its original BSD-3-Clause
-license. Inutil keeps the public Dart API and all non-Android implementations
-unchanged.
+This directory vendors `just_audio` 0.10.6 under its original MIT License
+(y ExoPlayer/Media3 bajo Apache-2.0; ver `LICENSE`). Inutil keeps the public
+Dart API and all non-Android implementations unchanged.
 
 The small `InutilAudioOutput` native facade shares a media-output preference
 across the active and standby/crossfade players using weak references. It calls

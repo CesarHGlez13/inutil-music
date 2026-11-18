@@ -1695,6 +1695,14 @@ class AppStrings {
     'No se pudo abrir el repositorio de GitHub.',
     'The GitHub repository could not be opened.',
   );
+  String get openSourceLicensesTitle =>
+      choose('Licencias de código abierto', 'Open-source licenses');
+  String get openSourceLicensesBody => choose(
+    'Avisos legales y licencias de terceros',
+    'Legal notices and third-party licenses',
+  );
+  String get openSourcePackagesAction =>
+      choose('Ver paquetes', 'View packages');
 
   String songCount(int count) {
     if (appLanguage != AppLanguage.spanish && !isEnglish) {

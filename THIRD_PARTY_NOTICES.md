@@ -78,6 +78,12 @@ Source: <https://github.com/Kyant0/AndroidLiquidGlass/tree/2.0.0>
 Licensed under the Apache License, Version 2.0. A copy of the license is
 included at `third_party/kyant_android_liquid_glass/LICENSE`.
 
+## just_audio 0.10.6 (fork local)
+
+Inútil Music includes a local fork of `just_audio` 0.10.6 under `third_party/just_audio`
+(MIT License, `Copyright (c) 2019-2020 Ryan Heise and the project contributors`) junto con
+ExoPlayer/Media3 bajo Apache License 2.0; copia íntegra en `third_party/just_audio/LICENSE`.
+
 ## csv 8.0.0
 
 Inútil Music uses the `csv` Dart package to parse and encode interoperable

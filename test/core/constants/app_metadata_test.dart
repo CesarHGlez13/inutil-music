@@ -142,6 +142,22 @@ void main() {
         }
       }
       expect(unexpected, isEmpty, reason: 'referencias residuales: $unexpected');
+
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final license = File('LICENSE').readAsStringSync();
+      final notices = File('THIRD_PARTY_NOTICES.md').readAsStringSync();
+      final settingsPanel = File(
+        'lib/features/music/presentation/widgets/settings_panel.dart',
+      ).readAsStringSync();
+      expect(pubspec, contains('- LICENSE'));
+      expect(pubspec, contains('- THIRD_PARTY_NOTICES.md'));
+      expect(license, contains('Copyright (c) 2026, Bryam Contreras'));
+      expect(notices, contains('Copyright (c) 2026, Bryam Contreras'));
+      expect(license.toLowerCase(), isNot(contains('bstream')));
+      expect(notices.toLowerCase(), isNot(contains('bstream')));
+      expect(settingsPanel, contains("ValueKey('settings-about-licenses')"));
+      expect(settingsPanel, contains("rootBundle.loadString('THIRD_PARTY_NOTICES.md')"));
+      expect(settingsPanel, contains('showLicensePage('));
     },
   );
 
