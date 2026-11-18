@@ -146,6 +146,10 @@ static gboolean nudge_viewport_cb(gpointer user_data) {
 }
 
 static void nudge_viewport_after_first_frame(GtkWidget* toplevel) {
+  const char* sw = g_getenv("LIBGL_ALWAYS_SOFTWARE");
+  if (sw && g_strcmp0(sw, "1") == 0) {
+    return;
+  }
 #ifdef GDK_WINDOWING_X11
   if (!GDK_IS_X11_DISPLAY(gtk_widget_get_display(toplevel))) {
     return;

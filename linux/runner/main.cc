@@ -1,12 +1,24 @@
 #include <stdlib.h>
+#include <unistd.h>
 #include "my_application.h"
 
 int main(int argc, char** argv) {
-  // Prefer native Wayland when WAYLAND_DISPLAY is active so GNOME/Mutter with
-  // xwayland-native-scaling does not render Flutter GTK into a bottom-left
-  // quarter viewport over XWayland. Pure X11 sessions (no WAYLAND_DISPLAY)
-  // still use X11 automatically unless overridden via GDK_BACKEND.
-  if (!getenv("GDK_BACKEND")) {
+  // Flutter 3.50's Linux OpenGL compositor falls back to a broken offset path
+  // whenever NVIDIA proprietary EGL is active (rendering into the bottom-left
+  // 1/4 of the window). Route EGL through Mesa's software vendor when NVIDIA
+  // GLVND is present (unless the caller already pinned EGL/GL vendors).
+  if (!getenv("__EGL_VENDOR_LIBRARY_FILENAMES") &&
+      access("/usr/share/glvnd/egl_vendor.d/10_nvidia.json", F_OK) == 0 &&
+      access("/usr/share/glvnd/egl_vendor.d/50_mesa.json", F_OK) == 0) {
+    setenv("__EGL_VENDOR_LIBRARY_FILENAMES",
+           "/usr/share/glvnd/egl_vendor.d/50_mesa.json", 1);
+    if (!getenv("LIBGL_ALWAYS_SOFTWARE")) {
+      setenv("LIBGL_ALWAYS_SOFTWARE", "1", 1);
+    }
+    if (!getenv("GDK_BACKEND")) {
+      setenv("GDK_BACKEND", "x11", 1);
+    }
+  } else if (!getenv("GDK_BACKEND")) {
     const char* wayland_display = getenv("WAYLAND_DISPLAY");
     if (wayland_display && wayland_display[0] != '\0') {
       setenv("GDK_BACKEND", "wayland", 1);

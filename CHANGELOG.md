@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.5.4+254 — 2026-11-18
+
+### Fixed
+
+- Corrección definitiva de ventana en Linux con GPU NVIDIA (`Flutter 3.50`): en sistemas donde GLVND carga `10_nvidia.json`, el lanzador nativo enruta automáticamente EGL por `50_mesa.json` evitando el defecto del compositor OpenGL (`#195885`) que recortaba la app al cuarto inferior izquierdo tanto en XWayland como en Wayland nativo.
+- Eliminados los iconos heredados en `macos/`, `ios/`, `windows/runner/resources/app_icon.ico`, `assets/icons/source/ico.png` y el paquete Linux (`data/com.inutilmusic.app.png`); todas las plataformas usan ahora exclusivamente el icono oficial **iM** de Inútil Music.
+
 ## 2.5.3+253 — 2026-11-18
 
 ### Fixed
