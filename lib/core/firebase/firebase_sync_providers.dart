@@ -9,6 +9,7 @@ import '../../services/player/player_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_playback_sync_service.dart';
 import 'inutil_cloud_backup_service.dart';
+import 'inutil_wrapped_service.dart';
 
 final inutilAuthProvider = ChangeNotifierProvider<InutilAuthService>((ref) {
   final service = InutilAuthService.instance;
@@ -89,6 +90,14 @@ final inutilPlaybackSyncProvider =
     if (snapshot == null) return;
 
     final isPlaying = snapshot.status == PlayerStatus.playing;
+    InutilWrappedService.instance.recordPlaybackTick(
+      trackId: snapshot.trackId,
+      title: snapshot.title,
+      artist: snapshot.artist,
+      thumbnailUrl: snapshot.thumbnailUrl,
+      positionMs: snapshot.position.inMilliseconds,
+      isPlaying: isPlaying,
+    );
     final forcePush = prev?.value?.status != snapshot.status ||
         prev?.value?.trackId != snapshot.trackId;
 

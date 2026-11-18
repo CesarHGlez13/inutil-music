@@ -174,9 +174,22 @@ class _LocalArtworkMaintenanceState
       if (mounted) {
         final backup = ref.read(inutilCloudBackupProvider);
         backup.startAutoSync();
-        unawaited(backup.pullAndRestoreIfEmpty());
+        unawaited(_restoreCloudBackupAndRefresh());
       }
     });
+  }
+
+  Future<void> _restoreCloudBackupAndRefresh() async {
+    final backup = ref.read(inutilCloudBackupProvider);
+    await backup.pullAndRestoreIfEmpty();
+    if (!mounted) return;
+    if (backup.lastRestoreHadChanges) {
+      ref
+        ..invalidate(libraryTracksProvider)
+        ..invalidate(playlistsControllerProvider)
+        ..invalidate(catalogPlaylistsProvider)
+        ..invalidate(catalogPlaylistProvider);
+    }
   }
 
   @override
@@ -191,7 +204,7 @@ class _LocalArtworkMaintenanceState
       // Revalida la licencia (vigencia, teléfono único) al volver a primer
       // plano e intenta restaurar un respaldo recién publicado en la nube.
       unawaited(InutilAuthService.instance.onAppResumed());
-      unawaited(ref.read(inutilCloudBackupProvider).pullAndRestoreIfEmpty());
+      unawaited(_restoreCloudBackupAndRefresh());
       // A legacy download may have started while offline or before artwork
       // persistence existed. Resuming gives the cache/network repair another
       // chance without touching its already downloaded audio.

@@ -10,6 +10,7 @@ import '../../features/music/domain/entities/playlist.dart';
 import '../../services/storage/local_database_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
+import 'inutil_wrapped_service.dart';
 
 /// Respaldo en la nube del usuario (perfil, playlists, biblioteca y ajustes).
 ///
@@ -38,11 +39,13 @@ class InutilCloudBackupService {
   Timer? _interval;
   bool _pushing = false;
   bool _pulling = false;
+  bool _lastRestoreHadChanges = false;
   DateTime? _lastPushAt;
   String _lastError = '';
 
   DateTime? get lastPushAt => _lastPushAt;
   String get lastError => _lastError;
+  bool get lastRestoreHadChanges => _lastRestoreHadChanges;
 
   /// Claves de prefs que NUNCA se respaldan: identidad de sesión/dispositivo
   /// (cada instalación genera la suya) y cachés que se reconstruyen solos.
@@ -154,6 +157,9 @@ class InutilCloudBackupService {
             .deleteDocument('users/$uid/data/backup_tracks_$i');
       }
 
+      await InutilWrappedService.instance.persistNow();
+      await InutilWrappedService.instance.syncCurrentYearToCloud();
+
       _lastPushAt = DateTime.now();
       _lastError = metaOk && tracksOk
           ? ''
@@ -208,9 +214,12 @@ class InutilCloudBackupService {
     if (_pulling) return 'Respaldo en curso…';
     if (!canSync) return 'Inicia sesión para restaurar tu respaldo.';
     _pulling = true;
+    _lastRestoreHadChanges = false;
     try {
       final uid = _auth.currentUser!.uid;
       final prefs = await SharedPreferences.getInstance();
+
+      await InutilWrappedService.instance.pullYearFromCloud();
 
       final meta = await InutilFirestoreService.instance
           .getDocument('users/$uid/data/backup_meta');
@@ -220,12 +229,22 @@ class InutilCloudBackupService {
         final localPlaylists = await _db.getPlaylists();
         final remote = meta['playlists'];
         if (remote is List) {
-          final localIds = localPlaylists.map((p) => p.id).toSet();
+          final localById = <String, Playlist>{
+            for (final p in localPlaylists) p.id: p,
+          };
           for (final raw in remote) {
             if (raw is! Map) continue;
             final playlist = _playlistFromMap(raw.cast<String, dynamic>());
             if (playlist == null) continue;
-            if (localIds.contains(playlist.id)) continue;
+            final existingLocal = localById[playlist.id];
+            // Si la playlist local no existe, O existe pero está vacía (caso
+            // típico de la playlist Favoritos recién creada tras reinstalar)
+            // y en la nube sí tiene canciones, se restaura.
+            if (existingLocal != null &&
+                (existingLocal.trackIds.isNotEmpty ||
+                    playlist.trackIds.isEmpty)) {
+              continue;
+            }
             await _db.savePlaylist(playlist);
             restoredPlaylists += 1;
           }
@@ -268,6 +287,7 @@ class InutilCloudBackupService {
         }
       }
 
+      _lastRestoreHadChanges = restoredPlaylists > 0 || restoredTracks > 0;
       _lastError = '';
       if (restoredPlaylists == 0 && restoredTracks == 0 && meta == null) {
         return 'Aún no hay respaldo en la nube para esta cuenta.';

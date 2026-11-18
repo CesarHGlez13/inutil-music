@@ -11,7 +11,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/firebase/firebase_auth_service.dart';
 import '../../../../core/firebase/inutil_promo_popup_service.dart';
+import '../../../../core/firebase/inutil_wrapped_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
 import '../../../../core/theme/inutil_icons.dart';
@@ -39,6 +41,7 @@ import '../providers/track_selection_controller.dart';
 import '../widgets/inutil_account_dialog.dart';
 import '../widgets/inutil_connect_sheet.dart';
 import '../widgets/inutil_support_popup.dart';
+import '../widgets/inutil_wrapped_dialog.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
 import '../widgets/inutil_logo.dart';
@@ -1141,6 +1144,31 @@ class _HomePageState extends ConsumerState<HomePage>
     _promoPopupTimer?.cancel();
     _promoPopupTimer = Timer(const Duration(seconds: 22), () async {
       if (!mounted || !_appForeground || !_rootRouteVisible) return;
+      // 1. En temporada de fin de año (1 dic – 15 ene o campaña remota),
+      //    prioriza la experiencia animada «Inútil Wrapped».
+      final wrappedYear =
+          await InutilWrappedService.instance.evaluateAutoWrappedYear();
+      if (!mounted || !_appForeground || !_rootRouteVisible) return;
+      if (wrappedYear != null) {
+        final history = ref.read(historyProvider).value ?? const <LocalTrack>[];
+        final playlists = ref.read(playlistsControllerProvider).value ?? const [];
+        final summary = await InutilWrappedService.instance.buildSummary(
+          year: wrappedYear,
+          fallbackHistory: history,
+        );
+        if (!mounted || !_appForeground || !_rootRouteVisible) return;
+        if (summary.hasListeningData) {
+          final user = InutilAuthService.instance.currentUser;
+          await InutilWrappedDialog.show(
+            context,
+            summary: summary,
+            userName: user?.displayName ?? '',
+            playlistCount: playlists.length,
+          );
+          return;
+        }
+      }
+      // 2. El resto del año, evalúa los pop-ups creativos del creador / anuncios.
       final campaign =
           await InutilPromoPopupService.instance.evaluateScheduledPopup();
       if (!mounted || !_appForeground || !_rootRouteVisible || campaign == null) {

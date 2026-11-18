@@ -37,9 +37,11 @@ import 'inutil_account_dialog.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_spotify_import_dialog.dart';
 import 'inutil_support_popup.dart';
+import 'inutil_wrapped_dialog.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/firebase/inutil_promo_popup_service.dart';
 import '../../../../core/firebase/inutil_update_service.dart';
+import '../../../../core/firebase/inutil_wrapped_service.dart';
 
 typedef DownloadDirectoryPicker =
     Future<String?> Function({String? dialogTitle, String? initialDirectory});
@@ -1818,6 +1820,8 @@ class _AboutApplicationSettings extends StatelessWidget {
           subtitle: strings.supportDevelopmentBody,
           onTap: onSupport,
         ),
+        const SizedBox(height: appCardGap),
+        const _WrappedPreviewEntryCard(),
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
           key: const ValueKey('settings-about-creator-popup'),
@@ -5771,6 +5775,38 @@ class _SpotifyImportSettingsHeroCard extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _WrappedPreviewEntryCard extends ConsumerWidget {
+  const _WrappedPreviewEntryCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final year = DateTime.now().year;
+    return _SettingsEntryCard(
+      key: const ValueKey('settings-about-wrapped'),
+      glyph: InutilGlyph.player,
+      title: 'Tu Resumen del Año ($year)',
+      subtitle: 'Inútil Wrapped: horas, artista #1, canción favorita y más',
+      onTap: () async {
+        final history = ref.read(historyProvider).value ?? const [];
+        final playlists =
+            ref.read(playlistsControllerProvider).value ?? const [];
+        final user = ref.read(inutilAuthProvider).currentUser;
+        final summary = await InutilWrappedService.instance.buildSummary(
+          year: year,
+          fallbackHistory: history,
+        );
+        if (!context.mounted) return;
+        await InutilWrappedDialog.show(
+          context,
+          summary: summary,
+          userName: user?.displayName ?? '',
+          playlistCount: playlists.length,
+        );
+      },
     );
   }
 }

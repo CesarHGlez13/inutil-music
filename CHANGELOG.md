@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.0+230 — 2026-11-18
+
+### Added
+
+- Nuevo «Inútil Wrapped» (Resumen del Año animado tipo Stories estilo Spotify): horas escuchadas, artista #1, canción favorita, Top 5, personalidad musical, tarjeta compartible y agradecimiento de fin de año con respaldo en la nube.
+- Acceso directo en Ajustes → Acerca de → «Tu Resumen del Año» para revivirlo cuando quieras, además de lanzamiento automático en temporada de fin de año.
+
+### Fixed
+
+- Restauración completa de la playlist Favoritos y actualización inmediata de la Biblioteca tras reinstalar la app o borrar datos e iniciar sesión nuevamente.
+
 ## 2.2.1+221 — 2026-11-17
 
 ### Added
