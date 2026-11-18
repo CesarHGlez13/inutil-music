@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.1+211 — 2026-11-17
+
+### Added
+
+- Video Previews estilo Spotify en canciones, perfiles de artistas y álbumes, con visor vertical a pantalla completa.
+- Optimización de audio para conexiones lentas: buffer ampliado, reconexión automática y ajuste inteligente de calidad para evitar cortes.
+
+### Changed
+
+- Pantalla de Inicio más limpia y profesional; «Importar desde Spotify» organizado dentro de Ajustes → Almacenamiento y datos.
+- Diálogos de cuenta, dispositivos, importación y actualizaciones unificados con el tema nativo de la app.
+- Al cerrar sesión, la reproducción se detiene inmediatamente y limpia la cola activa.
+
 ## 2.1.0+210 — 2026-11-17
 
 ### Added

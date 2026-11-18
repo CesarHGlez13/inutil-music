@@ -12,7 +12,7 @@ It is based on the open-source project BStream Music by Bryam Contreras
 (BSD-2-Clause); see `LICENSE`. Published artifacts and the update channel live
 in <https://github.com/CesarHGlez13/inutil-music>.
 
-Current version: **2.1.0+210**.
+Current version: **2.1.1+211**.
 
 > The repository does not store media content. YouTube search, playback, and
 > downloads use Inútil Music's self-contained Dart InnerTube pipeline. Supported
