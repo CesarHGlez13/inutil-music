@@ -7,9 +7,11 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:video_player/video_player.dart';
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 import '../../../../services/player/visual_load_diagnostics.dart';
 import 'artwork_inset_detector.dart';
+import 'inutil_canvas_engine.dart';
 
 const animatedArtworkIntroOffset = Duration(seconds: 8);
 
@@ -94,6 +96,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   static final LinkedHashMap<String, double> _insetZoomCache = LinkedHashMap();
 
   VideoPlayerController? _controller;
+  InutilCanvasController? _canvasController;
   final GlobalKey _videoFrameBoundaryKey = GlobalKey();
   ui.Image? _loopFrame;
   bool _loopFrameFadingOut = false;
@@ -180,7 +183,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
       track: widget.identity ?? widget.url.toString(),
     );
     final previous = _controller;
+    final previousCanvas = _canvasController;
     _controller = null;
+    _canvasController = null;
     _ready = false;
     _clearLoopFrame();
     _effectiveStartOffset = Duration.zero;
@@ -195,6 +200,19 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     _resetInsetFit();
     if (mounted) setState(() {});
     if (previous != null) unawaited(previous.dispose());
+    if (previousCanvas != null) {
+      // Libera primero el decodificador hardware saliente para evitar competir
+      // por ranuras MediaCodec al abrir el siguiente vídeo.
+      await previousCanvas.dispose();
+      if (!mounted || generation != _generation) return;
+    }
+
+    if (InutilCanvasEngine.shouldUseNativeAndroidEngine(
+      VideoPlayerPlatform.instance,
+    )) {
+      await _openNativeAndroidCanvas(generation);
+      return;
+    }
 
     VideoPlayerController? controller;
     try {
@@ -285,6 +303,53 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         if (mounted) setState(() => _ready = false);
       }
       if (controller != null) unawaited(controller.dispose());
+    }
+  }
+
+  Future<void> _openNativeAndroidCanvas(int generation) async {
+    InutilCanvasController? canvas;
+    try {
+      canvas = await InutilCanvasEngine.create(
+        uri: widget.url,
+        startOffset: widget.startOffset,
+        durationHint: widget.durationHint,
+        playing: _active && _tickerEnabled && widget.isPlaying,
+      );
+      if (!mounted || generation != _generation) {
+        await canvas.dispose();
+        return;
+      }
+      _canvasController = canvas;
+      canvas.onReady = () {
+        if (!mounted || generation != _generation) return;
+        logVisualLoad(
+          'native video-only canvas ready',
+          track: widget.identity ?? widget.url.toString(),
+          elapsedMs: _startupTimer.elapsedMilliseconds,
+        );
+        setState(() {
+          _ready = true;
+          _insetFitResolved = true;
+        });
+        _synchronizePlayback();
+      };
+      canvas.onSizeChanged = () {
+        if (!mounted || generation != _generation) return;
+        setState(() {});
+      };
+      canvas.onError = () {
+        if (!mounted || generation != _generation) return;
+        final failed = _canvasController;
+        _canvasController = null;
+        setState(() => _ready = false);
+        if (failed != null) unawaited(failed.dispose());
+      };
+    } catch (_) {
+      if (generation == _generation) {
+        _canvasController = null;
+        if (mounted) setState(() => _ready = false);
+      }
+      if (canvas != null) unawaited(canvas.dispose());
     }
   }
 
@@ -765,6 +830,11 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   }
 
   void _synchronizePlayback() {
+    final canvas = _canvasController;
+    if (canvas != null) {
+      unawaited(canvas.setPlaying(_active && _tickerEnabled && widget.isPlaying));
+      return;
+    }
     final controller = _controller;
     if (controller == null || !controller.value.isInitialized) {
       return;
@@ -784,6 +854,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     _loopFrame?.dispose();
     _loopFrame = null;
     WidgetsBinding.instance.removeObserver(this);
+    final canvas = _canvasController;
+    _canvasController = null;
+    if (canvas != null) unawaited(canvas.dispose());
     final controller = _controller;
     _controller = null;
     if (controller != null) unawaited(controller.dispose());
@@ -792,8 +865,10 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
 
   @override
   Widget build(BuildContext context) {
+    final canvas = _canvasController;
     final controller = _controller;
-    final size = controller?.value.size ?? Size.zero;
+    final size = canvas != null ? canvas.size : (controller?.value.size ?? Size.zero);
+    final hasSurface = canvas != null || controller != null;
     final zoom = effectivePortraitArtworkZoom(size, _insetZoom);
     final frames = Stack(
       fit: StackFit.expand,
@@ -812,7 +887,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           opacity: _ready && size.width > 0 && size.height > 0
               ? (_insetFitResolved ? 1 : 0.02)
               : 0,
-          child: controller == null || size.isEmpty
+          child: !hasSurface || size.isEmpty
               ? const SizedBox.shrink()
               : RepaintBoundary(
                   key: _videoFrameBoundaryKey,
@@ -823,7 +898,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
                         child: SizedBox(
                           width: size.width,
                           height: size.height,
-                          child: VideoPlayer(controller),
+                          child: canvas != null
+                              ? InutilCanvasTextureView(controller: canvas)
+                              : VideoPlayer(controller!),
                         ),
                       ),
                     ),

@@ -24,7 +24,7 @@ class PlaybackVisualCache extends ChangeNotifier {
 
   static const maxRetainedTracks = 3;
   static const _maxCoverBytes = 4 * 1024 * 1024;
-  static const _maxVideoBytes = 16 * 1024 * 1024;
+  static const _maxVideoBytes = 24 * 1024 * 1024;
   static const _failureRetryDelay = Duration(minutes: 2);
 
   final Future<Directory> Function() _directory;

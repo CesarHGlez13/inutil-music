@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1+241 — 2026-11-18
+
+### Fixed
+
+- Nuevo motor nativo dedicado exclusivamente al vídeo de fondo en Android (`InutilCanvasEngine`, cero renderers de audio, cero `AudioTrack`/`AudioFocus`, hilo propio de baja prioridad y bucle en hardware sin lecturas GPU), más caché local previa de Video Previews, eliminando los micro-tirones al cargar y al reiniciar el bucle sobre la pista musical.
+
 ## 2.4.0+240 — 2026-11-18
 
 ### Added

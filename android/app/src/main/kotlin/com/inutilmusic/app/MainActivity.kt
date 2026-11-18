@@ -86,6 +86,9 @@ class MainActivity : AudioServiceActivity() {
         if (!flutterEngine.plugins.has(InutilCastEnginePlugin::class.java)) {
             flutterEngine.plugins.add(InutilCastEnginePlugin())
         }
+        if (!flutterEngine.plugins.has(InutilCanvasEnginePlugin::class.java)) {
+            flutterEngine.plugins.add(InutilCanvasEnginePlugin())
+        }
 
         homeWidgetChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,

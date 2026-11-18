@@ -443,19 +443,19 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
       artist: snapshot.artist,
       thumbnailUrl: artworkSource,
     );
+    final effectiveVideoSourceUrl = resolvedCanvasUrl ?? fallbackVideoPreviewUrl;
     if (visualActive) {
       visualCache.activate(
         trackKey: visualIdentity,
         coverSource: artworkSource,
         coverFallbackSource: artworkFallbackSource,
-        videoUrl: resolvedCanvasUrl,
+        videoUrl: effectiveVideoSourceUrl,
       );
     } else {
       visualCache.deactivate();
     }
     final canvasUrl = visualActive
-        ? (visualCache.videoFileFor(visualIdentity, resolvedCanvasUrl) ??
-              fallbackVideoPreviewUrl)
+        ? visualCache.videoFileFor(visualIdentity, effectiveVideoSourceUrl)
         : null;
     final hasTrack =
         snapshot.title != null ||
