@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 private let groupId = "group.com.bstream.bstreamMusic"
-private let widgetKind = "BStreamNowPlaying"
+private let widgetKind = "InutilNowPlaying"
 
 struct NowPlayingEntry: TimelineEntry {
   let date: Date
@@ -208,7 +208,7 @@ private struct NowPlayingWidgetView: View {
       HStack(spacing: 12) {
         artwork.frame(width: 92, height: 92)
         VStack(alignment: .leading, spacing: 4) {
-          Text("BStream Music")
+          Text("Inútil Music")
             .font(.system(size: 13)).lineLimit(1)
             .foregroundColor(.white.opacity(0.7))
           Text(entry.title)
@@ -281,12 +281,12 @@ private struct NowPlayingWidgetView: View {
 }
 
 @main
-struct BStreamNowPlayingWidget: Widget {
+struct InutilNowPlayingWidget: Widget {
   var body: some WidgetConfiguration {
     StaticConfiguration(kind: widgetKind, provider: NowPlayingProvider()) { entry in
       NowPlayingWidgetView(entry: entry)
     }
-    .configurationDisplayName("BStream Music")
+    .configurationDisplayName("Inútil Music")
     .description("Tu canción actual con portada y controles.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }

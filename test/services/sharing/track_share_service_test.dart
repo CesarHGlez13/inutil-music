@@ -47,7 +47,7 @@ void main() {
         await service.shareTrack(
           track(),
           message: message,
-          title: 'BStream Music',
+          title: 'Inútil Music',
         );
 
         expect(gateway.callCount, 1);

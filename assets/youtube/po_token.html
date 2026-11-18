@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta data-bstream-runtime-csp="true"
+  <meta data-inutil-runtime-csp="true"
         http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; connect-src 'none'; img-src 'none'; media-src 'none'; font-src 'none'; style-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; object-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'; navigate-to 'none'">
   <title>BotGuard</title>
@@ -67,7 +67,7 @@
           loggerFunctions);
       // Retain the return value so engines that defer setup cannot collect it
       // before the asynchronous snapshot callback is installed.
-      window.__bstreamSynchronousSnapshot = synchronousSnapshot &&
+      window.__inutilSynchronousSnapshot = synchronousSnapshot &&
           synchronousSnapshot[0];
       return new Promise(function(resolve, reject) {
         var attempts = 0;

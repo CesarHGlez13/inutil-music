@@ -135,7 +135,7 @@ class PlaylistSyncEngine {
     if (explicitResolution == PlaylistSyncConflictResolution.keepLocal &&
         remote == null &&
         !work.localDeleted) {
-      // The user explicitly chose the surviving BStream copy after YouTube
+      // The user explicitly chose the surviving Inutil copy after YouTube
       // deleted its counterpart. Clear the stale remote identity before the
       // one-shot create so a crash or an ambiguous response cannot make the
       // old deleted ID look reusable on the next pass.

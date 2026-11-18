@@ -18,7 +18,7 @@ void main() {
     final restored = await store.read();
 
     expect(keyValueStore.values.keys, <String>[
-      'bstream.youtube_music.session.v1',
+      'inutil.youtube_music.session.v1',
     ]);
     expect(restored?.profile.channelId, credential.profile.channelId);
     expect(restored?.cookieHeader, credential.cookieHeader);
@@ -27,7 +27,7 @@ void main() {
   test('corrupt and future values are deleted instead of being used', () async {
     for (final value in <String>['{not-json', '{"version":999}']) {
       final keyValueStore = _MemorySecureStore(
-        values: <String, String>{'bstream.youtube_music.session.v1': value},
+        values: <String, String>{'inutil.youtube_music.session.v1': value},
       );
       final store = SecureYouTubeMusicSessionStore(
         secureStore: keyValueStore,
@@ -91,7 +91,7 @@ void main() {
       final credential = _credential();
       final keyValueStore = _MemorySecureStore(
         values: <String, String>{
-          'bstream.youtube_music.session.v1': credential.encode(),
+          'inutil.youtube_music.session.v1': credential.encode(),
         },
         deleteFailuresRemaining: 2,
       );
@@ -126,7 +126,7 @@ void main() {
   test('a revocation marker read failure never reads the credential', () async {
     final keyValueStore = _MemorySecureStore(
       values: <String, String>{
-        'bstream.youtube_music.session.v1': _credential().encode(),
+        'inutil.youtube_music.session.v1': _credential().encode(),
       },
     );
     final store = SecureYouTubeMusicSessionStore(

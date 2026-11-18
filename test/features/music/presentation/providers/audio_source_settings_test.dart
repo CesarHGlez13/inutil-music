@@ -26,7 +26,7 @@ void main() {
   }
 
   setUp(() async {
-    sandbox = await Directory.systemTemp.createTemp('bstream-audio-settings-');
+    sandbox = await Directory.systemTemp.createTemp('inutil-audio-settings-');
     SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {

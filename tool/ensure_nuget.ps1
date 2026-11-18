@@ -28,9 +28,9 @@ $downloadUri = "https://dist.nuget.org/win-x86-commandline/v$nugetVersion/nuget.
 
 if ([string]::IsNullOrWhiteSpace($InstallDirectory)) {
     if (-not [string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) {
-        $InstallDirectory = Join-Path $env:RUNNER_TEMP 'bstream-tools'
+        $InstallDirectory = Join-Path $env:RUNNER_TEMP 'inutil-tools'
     } else {
-        $InstallDirectory = Join-Path $env:LOCALAPPDATA 'BStream Music\tools'
+        $InstallDirectory = Join-Path $env:LOCALAPPDATA 'Inútil Music\tools'
     }
 }
 

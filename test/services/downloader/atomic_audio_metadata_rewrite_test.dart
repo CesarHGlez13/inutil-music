@@ -10,7 +10,7 @@ void main() {
   late File source;
   const original = [1, 2, 3, 4, 5];
   setUp(() {
-    directory = Directory.systemTemp.createTempSync('bstream-tag-transaction-');
+    directory = Directory.systemTemp.createTempSync('inutil-tag-transaction-');
     source = File(p.join(directory.path, 'audio.bin'))
       ..writeAsBytesSync(original);
   });

@@ -9,8 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const channel = MethodChannel('bstream_music/home_widget_test');
-  const artworkChannel = MethodChannel('bstream_music/local_audio');
+  const channel = MethodChannel('inutil_music/home_widget_test');
+  const artworkChannel = MethodChannel('inutil_music/local_audio');
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
 

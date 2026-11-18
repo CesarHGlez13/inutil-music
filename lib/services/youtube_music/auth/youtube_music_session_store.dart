@@ -39,7 +39,7 @@ abstract interface class YouTubeMusicSessionRevocationStore {
 class SharedPreferencesYouTubeMusicSessionRevocationStore
     implements YouTubeMusicSessionRevocationStore {
   const SharedPreferencesYouTubeMusicSessionRevocationStore({
-    this.storageKey = 'bstream.youtube_music.session.revoked.v1',
+    this.storageKey = 'inutil.youtube_music.session.revoked.v1',
   });
 
   final String storageKey;
@@ -47,7 +47,16 @@ class SharedPreferencesYouTubeMusicSessionRevocationStore
   @override
   Future<bool> isRevoked() async {
     final preferences = await SharedPreferences.getInstance();
-    return preferences.getBool(storageKey) ?? false;
+    if (preferences.getBool(storageKey) ?? false) return true;
+    // Marcador escrito por las versiones 2.0.x, que usaban el nombre del
+    // proyecto original como clave. Se adopta una sola vez.
+    final legacyKey = storageKey.replaceFirst('inutil.', 'bstream.');
+    if (legacyKey != storageKey && (preferences.getBool(legacyKey) ?? false)) {
+      await preferences.setBool(storageKey, true);
+      await preferences.remove(legacyKey);
+      return true;
+    }
+    return false;
   }
 
   @override
@@ -103,7 +112,7 @@ class SecureYouTubeMusicSessionStore implements YouTubeMusicSessionStore {
         const FlutterYouTubeMusicSecureKeyValueStore(),
     YouTubeMusicSessionRevocationStore revocationStore =
         const SharedPreferencesYouTubeMusicSessionRevocationStore(),
-    String storageKey = 'bstream.youtube_music.session.v1',
+    String storageKey = 'inutil.youtube_music.session.v1',
   }) : this._(secureStore, revocationStore, storageKey);
 
   SecureYouTubeMusicSessionStore._(
@@ -125,7 +134,24 @@ class SecureYouTubeMusicSessionStore implements YouTubeMusicSessionStore {
       await _retryRevokedCredentialCleanup();
       return null;
     }
-    final encoded = await _secureStore.read(storageKey);
+    var encoded = await _secureStore.read(storageKey);
+    if (encoded == null || encoded.isEmpty) {
+      // Las versiones 2.0.x guardaron la sesión bajo el nombre del proyecto
+      // original. Se adopta una sola vez para no exigir otro inicio de sesión.
+      final legacyKey = storageKey.replaceFirst('inutil.', 'bstream.');
+      if (legacyKey != storageKey) {
+        final legacy = await _secureStore.read(legacyKey);
+        if (legacy != null && legacy.isNotEmpty) {
+          encoded = legacy;
+          try {
+            await _secureStore.write(storageKey, legacy);
+            await _secureStore.delete(legacyKey);
+          } on Object {
+            // Sin migración durable: la sesión legacy sigue siendo válida.
+          }
+        }
+      }
+    }
     if (encoded == null || encoded.isEmpty) return null;
     try {
       return YouTubeMusicSessionCredential.decode(encoded);

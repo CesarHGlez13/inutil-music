@@ -22,7 +22,7 @@ void main() {
       final document = LyricsDocument(
         provider: 'test',
         trackName: 'Scripts',
-        artistName: 'BStream',
+        artistName: 'Inutil',
         lines: [
           for (var index = 0; index < sourceTexts.length; index++)
             LyricLine(
@@ -76,7 +76,7 @@ void main() {
     () async {
       final service = LyricsRomanizationService();
       addTearDown(service.dispose);
-      const source = <String>['안녕하세요', 'BStream'];
+      const source = <String>['안녕하세요', 'Inutil'];
       const languages = <LyricsRomanizationLanguage>{
         LyricsRomanizationLanguage.korean,
       };
@@ -98,7 +98,7 @@ void main() {
       const document = LyricsDocument(
         provider: 'test',
         trackName: 'Japanese context',
-        artistName: 'BStream',
+        artistName: 'Inutil',
         lines: [LyricLine(timestamp: Duration.zero, text: '君 は好き')],
       );
       final service = LyricsRomanizationService();

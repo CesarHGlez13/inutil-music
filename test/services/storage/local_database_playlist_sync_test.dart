@@ -20,7 +20,7 @@ void main() {
     'fresh database contains catalog, sync, ordering, and artwork schema',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-v10-fresh-',
+        'inutil-v10-fresh-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -73,7 +73,7 @@ void main() {
     'downloaded song order persists and new tracks remain at the end',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-library-order-',
+        'inutil-library-order-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -124,7 +124,7 @@ void main() {
     'playlist updates preserve creation time and revision semantics',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-playlist-portable-upsert-',
+        'inutil-playlist-portable-upsert-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -176,7 +176,7 @@ void main() {
   test(
     'v7 migration preserves order, duplicates and missing memberships',
     () async {
-      final sandbox = await Directory.systemTemp.createTemp('bstream-v7-sync-');
+      final sandbox = await Directory.systemTemp.createTemp('inutil-v7-sync-');
       final path = p.join(sandbox.path, 'library.db');
       final legacy = await databaseFactoryFfi.openDatabase(
         path,
@@ -242,7 +242,7 @@ void main() {
     'linkCatalogDownload makes all matching occurrences local-first',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-link-sync-',
+        'inutil-link-sync-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -313,7 +313,7 @@ void main() {
     'Favorites commit remaps a mismatched download to its source video',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-favorites-download-identity-',
+        'inutil-favorites-download-identity-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -440,7 +440,7 @@ void main() {
     'Favorites commit preserves 1156 downloaded sources and their remote order',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-favorites-large-downloads-',
+        'inutil-favorites-large-downloads-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -557,7 +557,7 @@ void main() {
     'local-only playlist deletion keeps its binding and requires opt-in remote delete',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-local-only-delete-',
+        'inutil-local-only-delete-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -643,7 +643,7 @@ void main() {
     'local changes keep an ambiguous mutation frozen until read-back',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-ambiguous-sync-',
+        'inutil-ambiguous-sync-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -775,7 +775,7 @@ void main() {
     'local edits keep a conflict frozen until an explicit resolution',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-conflict-freeze-',
+        'inutil-conflict-freeze-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -928,7 +928,7 @@ void main() {
 
   test('binding and deferred intent updates preserve creation state', () async {
     final sandbox = await Directory.systemTemp.createTemp(
-      'bstream-portable-sync-upsert-',
+      'inutil-portable-sync-upsert-',
     );
     final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {
@@ -998,7 +998,7 @@ void main() {
 
   test('directed privacy update preserves every other binding field', () async {
     final sandbox = await Directory.systemTemp.createTemp(
-      'bstream-binding-privacy-atomic-',
+      'inutil-binding-privacy-atomic-',
     );
     final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {
@@ -1074,7 +1074,7 @@ void main() {
     'directed privacy update fences remote id, account and deleting bindings',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-binding-privacy-fences-',
+        'inutil-binding-privacy-fences-',
       );
       final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -1156,7 +1156,7 @@ void main() {
 
   test('directed privacy update rolls back when commit fence closes', () async {
     final sandbox = await Directory.systemTemp.createTemp(
-      'bstream-binding-privacy-rollback-',
+      'inutil-binding-privacy-rollback-',
     );
     final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {
@@ -1207,7 +1207,7 @@ void main() {
 
   test('SQLite sync store commits base and rejects stale revisions', () async {
     final sandbox = await Directory.systemTemp.createTemp(
-      'bstream-store-sync-',
+      'inutil-store-sync-',
     );
     final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {

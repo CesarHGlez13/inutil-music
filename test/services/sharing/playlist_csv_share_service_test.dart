@@ -20,7 +20,7 @@ void main() {
 
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp(
-      'bstream_playlist_csv_test_',
+      'inutil_playlist_csv_test_',
     );
     gateway = _RecordingGateway();
     service = SharePlusPlaylistCsvShareService(
@@ -93,7 +93,7 @@ void main() {
         final document = await const LibraryCsvService().importFile(
           gateway.files.single.path,
         );
-        expect(document.detectedFormat, LibraryCsvDetectedFormat.bstream);
+        expect(document.detectedFormat, LibraryCsvDetectedFormat.inutil);
         expect(document.tracks.map((track) => track.title), [
           'stream',
           'Downloaded song',
@@ -239,7 +239,7 @@ void main() {
         );
 
         final content = await gateway.files.single.readAsString();
-        expect(content, startsWith('BStreamCsvVersion,'));
+        expect(content, startsWith('InutilCsvVersion,'));
         expect(content, isNot(contains('Deleted')));
         expect(content.trim().split('\r\n'), hasLength(1));
       },
@@ -303,14 +303,14 @@ void main() {
         expect(gateway.files.map((file) => file.path).toSet(), hasLength(2));
         for (final file in gateway.files) {
           expect(await File(file.path).exists(), isTrue);
-          expect(await file.readAsString(), contains('BStreamCsvVersion'));
+          expect(await file.readAsString(), contains('InutilCsvVersion'));
         }
       },
     );
 
     test('prunes only marked exports older than seven days', () async {
       final root = await Directory(
-        p.join(temporaryDirectory.path, 'bstream-playlist-csv'),
+        p.join(temporaryDirectory.path, 'inutil-playlist-csv'),
       ).create();
       final expired = await Directory(
         p.join(root.path, 'share_expired'),
@@ -326,8 +326,8 @@ void main() {
       ).create();
       for (final directory in [expired, recent, unrelated]) {
         final marker = await File(
-          p.join(directory.path, '.bstream-playlist-csv-share'),
-        ).writeAsString('BStream playlist CSV share');
+          p.join(directory.path, '.inutil-playlist-csv-share'),
+        ).writeAsString('Inutil playlist CSV share');
         if (directory != recent) {
           await marker.setLastModified(
             DateTime.now().subtract(const Duration(days: 8)),

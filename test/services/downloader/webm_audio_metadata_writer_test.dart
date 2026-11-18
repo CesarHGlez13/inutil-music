@@ -11,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   late Directory directory;
   setUp(
-    () => directory = Directory.systemTemp.createTempSync('bstream-webm-tags-'),
+    () => directory = Directory.systemTemp.createTempSync('inutil-webm-tags-'),
   );
   tearDown(() => directory.deleteSync(recursive: true));
 
@@ -247,7 +247,7 @@ void main() {
         await const DownloadAudioMetadataService().embed(
           filePath: file.path,
           title: 'Texto portátil 日本語',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           album: 'Álbum',
           artworkPath: '${directory.path}/missing.png',
         ),
@@ -255,7 +255,7 @@ void main() {
       );
       final metadata = readMetadata(file, getImage: true);
       expect(metadata.title, 'Texto portátil 日本語');
-      expect(metadata.artist, 'BStream Music');
+      expect(metadata.artist, 'Inútil Music');
       expect(metadata.album, 'Álbum');
       expect(metadata.pictures, isEmpty);
       final after = file.readAsBytesSync();

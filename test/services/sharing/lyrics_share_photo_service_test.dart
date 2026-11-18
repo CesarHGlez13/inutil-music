@@ -13,7 +13,7 @@ void main() {
   setUp(() async {
     SharedPreferences.setMockInitialValues({});
     temporaryDirectory = await Directory.systemTemp.createTemp(
-      'bstream_lyrics_photo_test_',
+      'inutil_lyrics_photo_test_',
     );
   });
 

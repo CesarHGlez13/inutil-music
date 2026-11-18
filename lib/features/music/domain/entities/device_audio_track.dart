@@ -1,6 +1,6 @@
 import 'local_track.dart';
 
-/// A playable audio file discovered on the device, outside BStream's library.
+/// A playable audio file discovered on the device, outside Inútil Music's library.
 ///
 /// Device tracks are intentionally not database entities. They are converted
 /// to transient [LocalTrack] values only at the playback boundary.

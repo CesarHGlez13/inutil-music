@@ -7,7 +7,7 @@ import '../services/local_media/device_audio_catalog.dart';
 class AndroidLocalMediaChannel {
   const AndroidLocalMediaChannel({MethodChannel? methodChannel})
     : _methodChannel =
-          methodChannel ?? const MethodChannel('bstream_music/local_audio');
+          methodChannel ?? const MethodChannel('inutil_music/local_audio');
 
   final MethodChannel _methodChannel;
 

@@ -12,7 +12,7 @@ void main() {
   const service = PlaylistArtworkService();
 
   setUp(() async {
-    root = await Directory.systemTemp.createTemp('bstream-playlist-artwork-');
+    root = await Directory.systemTemp.createTemp('inutil-playlist-artwork-');
   });
   tearDown(() async => root.delete(recursive: true));
 

@@ -538,7 +538,7 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       } on ArgumentError catch (error) {
         // A download root persisted by an older or hand-edited installation is
         // untrusted input. In particular, never pass a filesystem root into
-        // migration: falling back must only create BStream's default folders.
+        // migration: falling back must only create Inútil Music's default folders.
         debugPrint(
           'Discarding an invalid persisted download directory: $error',
         );

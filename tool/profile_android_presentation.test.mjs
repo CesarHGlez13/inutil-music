@@ -17,20 +17,20 @@ async function runCase(extra = [], cfg = {}) {
     const times = tabs ? (cfg.oneTap ? [1, 1.02] : [1, 1.02, 1.52, 1.54]) : [1, 1.5, 1.6, 2.1];
     if (cfg.reverse) times[2] = 1.01;
     if (cfg.missing) times.pop();
-    return times.map((t) => `BSTREAM_CLOCK ${Math.round((100 + t) * 1e9)} ${Math.round(t * 1e9)}`).join('\n');
+    return times.map((t) => `INUTIL_CLOCK ${Math.round((100 + t) * 1e9)} ${Math.round(t * 1e9)}`).join('\n');
   };
   const run = async (_exe, argv) => {
     const cmd = argv[3]; calls.push(cmd);
     if (cmd === 'pidof process-tracker | wc -w') return { stdout: cfg.trackers ?? '0\n' };
     if (cmd.startsWith('uiautomator dump')) {
       dumps++;
-      return { stdout: (cfg.failUiBefore && dumps === 1) || (cfg.failUiAfter && dumps === 2) ? 'ERROR: could not get idle state' : 'UI hierchary dumped to: /sdcard/bstream_presentation_ui.xml\n' };
+      return { stdout: (cfg.failUiBefore && dumps === 1) || (cfg.failUiAfter && dumps === 2) ? 'ERROR: could not get idle state' : 'UI hierchary dumped to: /sdcard/inutil_presentation_ui.xml\n' };
     }
-    if (cmd === 'cat /sdcard/bstream_presentation_ui.xml') return { stdout: cfg.xml ?? `<hierarchy><node content-desc="${cfg.splitLabels && dumps === 1 ? 'Inicio' : 'B&#250;squeda'}"/></hierarchy>` };
-    if (cmd === '/data/local/tmp/bstream_profile_clock') return { stdout: cfg.badClock ? 'BSTREAM_CLOCK 9223372036854775807 1\n' : 'BSTREAM_CLOCK 100900000000 900000000\n' };
+    if (cmd === 'cat /sdcard/inutil_presentation_ui.xml') return { stdout: cfg.xml ?? `<hierarchy><node content-desc="${cfg.splitLabels && dumps === 1 ? 'Inicio' : 'B&#250;squeda'}"/></hierarchy>` };
+    if (cmd === '/data/local/tmp/inutil_profile_clock') return { stdout: cfg.badClock ? 'INUTIL_CLOCK 9223372036854775807 1\n' : 'INUTIL_CLOCK 100900000000 900000000\n' };
     if (cmd.includes('180; sleep 0.2')) return { stdout: '' };
     if (cmd === 'dumpsys SurfaceFlinger --list') {
-      const p = '1693cac SurfaceView[com.bstream.bstream_music/com.bstream.bstream_music.MainActivity]@0(BLAST)#123';
+      const p = '1693cac SurfaceView[com.inutilmusic.app/com.inutilmusic.app.MainActivity]@0(BLAST)#123';
       return { stdout: cfg.noSurface ? 'global display' : cfg.ambiguous ? p + '\n' + p.replace('#123', '#456') : cfg.plain ? p : 'RequestedLayerState{' + p + '}' };
     }
     if (cmd.startsWith('dumpsys SurfaceFlinger --latency')) {
@@ -80,7 +80,7 @@ test('VM profiler discovers Android14 bare and Android16 wrapped app surfaces', 
   assert.ok(discovery, 'VM profiler discovery block must remain covered');
   const subject = new vm.Script(`(async () => { let surfaceName; ${discovery} return surfaceName; })()`);
   const discover = (stdout) => subject.runInNewContext({ run: async () => ({ stdout }), options: new Map([['--adb', 'fake'], ['--device', 'fake']]) });
-  const bare = 'SurfaceView[com.bstream.bstream_music/com.bstream.bstream_music.MainActivity]@0(BLAST)#28711';
+  const bare = 'SurfaceView[com.inutilmusic.app/com.inutilmusic.app.MainActivity]@0(BLAST)#28711';
   const modern = `1693cac ${bare}`;
   assert.equal(await discover(bare), bare);
   assert.equal(await discover(`RequestedLayerState{${modern}}`), modern);

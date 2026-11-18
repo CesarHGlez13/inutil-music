@@ -36,12 +36,12 @@ Future<void> main(List<String> arguments) async {
     port: loopback ? 0 : localLiveOverlayPort,
     htmlDocument: liveOverlayHtml.replaceFirst(
       '      connect();',
-      '      window.__bstreamPreviewRender = render;\n'
-          '      window.__bstreamPreviewState = ${jsonEncode(previewState)};\n'
-          '      render(window.__bstreamPreviewState);\n'
+      '      window.__inutilPreviewRender = render;\n'
+          '      window.__inutilPreviewState = ${jsonEncode(previewState)};\n'
+          '      render(window.__inutilPreviewState);\n'
           '      connect();',
     ),
-    brandIconBytes: await File('assets/icons/bstream_icon.png').readAsBytes(),
+    brandIconBytes: await File('assets/icons/inutil_icon.png').readAsBytes(),
   );
   StreamSubscription<ProcessSignal>? signalSubscription;
   StreamSubscription<String>? inputSubscription;

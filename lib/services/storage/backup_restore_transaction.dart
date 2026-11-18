@@ -24,7 +24,7 @@ class BackupRestoreTransaction {
   }) async {
     final token = '$pid-${DateTime.now().microsecondsSinceEpoch}';
     final transactionRoot = Directory(
-      p.join(mediaRoot.parent.path, '.bstream-restore-$token'),
+      p.join(mediaRoot.parent.path, '.inutil-restore-$token'),
     );
     final stagedAudio = Directory(p.join(transactionRoot.path, 'audio'));
     final stagedThumbnails = Directory(

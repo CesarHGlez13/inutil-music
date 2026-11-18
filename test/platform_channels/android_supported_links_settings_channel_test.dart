@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('opens the Android supported links settings', () async {
-    const methodChannel = MethodChannel('test/bstream_supported_links');
+    const methodChannel = MethodChannel('test/inutil_supported_links');
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
@@ -30,7 +30,7 @@ void main() {
 
   test('returns false when the Android integration is unavailable', () async {
     const methodChannel = MethodChannel(
-      'test/bstream_supported_links_unavailable',
+      'test/inutil_supported_links_unavailable',
     );
     const channel = AndroidSupportedLinksSettingsChannel(
       methodChannel: methodChannel,

@@ -8,7 +8,7 @@ void main() {
 
   test('hides system chrome only for Android side mode', () async {
     const androidMethodChannel = MethodChannel(
-      'test/bstream_presentation_android',
+      'test/inutil_presentation_android',
     );
     final androidCalls = <MethodCall>[];
     final messenger =

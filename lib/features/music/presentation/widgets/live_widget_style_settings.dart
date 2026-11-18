@@ -148,7 +148,7 @@ class LiveWidgetPreview extends StatelessWidget {
   Widget _artwork(double size) => ClipRRect(
     borderRadius: BorderRadius.circular(size > 120 ? 14 : 10),
     child: Image.asset(
-      'assets/icons/bstream_icon.png',
+      'assets/icons/inutil_icon.png',
       width: size,
       height: size,
       fit: BoxFit.cover,

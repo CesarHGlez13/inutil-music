@@ -47,7 +47,7 @@ typedef LyricsImageDesktopSave =
 ///
 /// Shared files live in a dedicated temporary folder. A receiver may open the
 /// file after its share sheet closes, so exports are retained for seven days.
-/// Only marked BStream exports are considered during later cache maintenance.
+/// Only marked Inutil exports are considered during later cache maintenance.
 class DefaultLyricsImageShareService implements LyricsImageShareService {
   const DefaultLyricsImageShareService({
     this.platform = _currentPlatform,
@@ -67,8 +67,8 @@ class DefaultLyricsImageShareService implements LyricsImageShareService {
   final Future<Directory> Function() temporaryDirectoryFactory;
   final DateTime Function() clock;
 
-  static const _directoryName = 'bstream-lyrics-images';
-  static const _markerName = '.bstream-lyrics-image';
+  static const _directoryName = 'inutil-lyrics-images';
+  static const _markerName = '.inutil-lyrics-image';
   static const _retention = Duration(days: 7);
   static const _maximumBytes = 32 * 1024 * 1024;
 
@@ -149,7 +149,7 @@ class DefaultLyricsImageShareService implements LyricsImageShareService {
     try {
       await File(
         p.join(directory.path, _markerName),
-      ).writeAsString('BStream lyrics image', flush: true);
+      ).writeAsString('Inutil lyrics image', flush: true);
       await file.writeAsBytes(bytes, flush: true);
       return file;
     } catch (_) {

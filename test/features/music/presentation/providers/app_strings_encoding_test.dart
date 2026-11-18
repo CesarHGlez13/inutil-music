@@ -157,9 +157,9 @@ void main() {
       contains('Windows PowerShell 5.1'),
     );
     expect(
-      strings.liveOverlayHostsConflictError('overlay.bstreammusic.test'),
+      strings.liveOverlayHostsConflictError('overlay.inutilmusic.test'),
       'La configuración de la overlay tiene un conflicto en el archivo hosts. '
-      'Corrige la entrada de overlay.bstreammusic.test y vuelve a intentarlo.',
+      'Corrige la entrada de overlay.inutilmusic.test y vuelve a intentarlo.',
     );
     expect(
       strings.liveOverlayPortUnavailableError,
@@ -280,7 +280,7 @@ void main() {
     expect(spanish.surfaceBackgroundLiquidGlass, 'Liquid Glass Style');
     expect(spanish.player, 'Reproductor');
     expect(spanish.playerStyle, 'Estilo');
-    expect(spanish.playerStyleBStreamMusic, 'Inútil Music');
+    expect(spanish.playerStyleInutilMusic, 'Inútil Music');
     expect(spanish.playerStyleAppleMusic, 'Apple Music Style');
     expect(spanish.playerStyleClassicVinyl, 'Vinilo Clásico');
     expect(spanish.animatedArtwork, 'Portadas en Movimiento');
@@ -310,7 +310,7 @@ void main() {
     expect(english.surfaceBackgroundLiquidGlass, 'Liquid Glass Style');
     expect(english.player, 'Player');
     expect(english.playerStyle, 'Style');
-    expect(english.playerStyleBStreamMusic, 'Inútil Music');
+    expect(english.playerStyleInutilMusic, 'Inútil Music');
     expect(english.playerStyleAppleMusic, 'Apple Music Style');
     expect(english.playerStyleClassicVinyl, 'Classic Vinyl');
     expect(english.animatedArtwork, 'Artwork motion');
@@ -351,7 +351,7 @@ void main() {
       ),
       'Liquid Glass Style',
     );
-    expect(spanish.playerStyleLabel(PlayerStyle.bstreamMusic), 'Inútil Music');
+    expect(spanish.playerStyleLabel(PlayerStyle.inutilMusic), 'Inútil Music');
     expect(
       english.playerStyleLabel(PlayerStyle.appleMusic),
       'Apple Music Style',

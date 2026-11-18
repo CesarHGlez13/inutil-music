@@ -22,14 +22,14 @@ void main() {
     const channel = IosFileExportChannel(methodChannel: methodChannel);
     final destination = await channel.saveFile(
       sourcePath: '/private/tmp/library.zip',
-      fileName: 'bstream-backup.zip',
+      fileName: 'inutil-backup.zip',
     );
 
     expect(destination, '/private/exported/library.zip');
     expect(received?.method, 'saveFile');
     expect(received?.arguments, <String, Object>{
       'sourcePath': '/private/tmp/library.zip',
-      'fileName': 'bstream-backup.zip',
+      'fileName': 'inutil-backup.zip',
       'mimeType': 'application/zip',
     });
   });

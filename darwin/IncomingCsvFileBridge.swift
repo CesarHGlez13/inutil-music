@@ -9,7 +9,7 @@ import FlutterMacOS
 /// All IO, coordination and size checks run on one utility worker.
 final class IncomingCsvFileBridge {
   static let shared = IncomingCsvFileBridge()
-  private let worker = DispatchQueue(label: "com.bstream.incomingCsv", qos: .utility)
+  private let worker = DispatchQueue(label: "com.inutilmusic.incomingCsv", qos: .utility)
   private var channel: FlutterMethodChannel?
   private var pending: [String: [String: Any]] = [:]
   private var order: [String] = []
@@ -21,7 +21,7 @@ final class IncomingCsvFileBridge {
 
   func attach(messenger: FlutterBinaryMessenger) {
     ready = false
-    let bridge = FlutterMethodChannel(name: "bstream_music/incoming_csv", binaryMessenger: messenger)
+    let bridge = FlutterMethodChannel(name: "inutil_music/incoming_csv", binaryMessenger: messenger)
     bridge.setMethodCallHandler { [weak self] call, result in
       guard let self else { result(FlutterMethodNotImplemented); return }
       switch call.method {

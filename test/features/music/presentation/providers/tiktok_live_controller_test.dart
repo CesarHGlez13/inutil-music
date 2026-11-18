@@ -1941,7 +1941,7 @@ class _RealLiveHarness {
                 id: track.id,
                 title: track.title,
                 artist: track.artist,
-                filePath: 'C:/bstream-live-test/${track.id}.m4a',
+                filePath: 'C:/inutil-live-test/${track.id}.m4a',
                 addedAt: DateTime(2026),
                 sourceUrl: track.url,
                 duration: track.duration,
@@ -2342,7 +2342,7 @@ class _LiveAppendSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async {
     return const SettingsState(
-      downloadDirectory: '/tmp/bstream-live-append-test',
+      downloadDirectory: '/tmp/inutil-live-append-test',
       language: AppLanguage.spanish,
       recommendationHistoryEnabled: false,
     );

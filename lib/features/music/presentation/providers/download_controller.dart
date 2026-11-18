@@ -16,7 +16,7 @@ final cancellableDownloadVideoIdsProvider = Provider<Set<String>>((ref) {
       }),
     ),
   );
-  const codec = BStreamTrackLinkCodec();
+  const codec = InutilTrackLinkCodec();
   return Set<String>.unmodifiable({
     for (final url in cancellable.urls)
       ?codec
@@ -241,7 +241,7 @@ class DownloadController extends Notifier<Map<String, DownloadTaskState>> {
 
   Future<int> downloadTracks(Iterable<TrackInfo> tracks) async {
     final requested = tracks.toList(growable: false);
-    const codec = BStreamTrackLinkCodec();
+    const codec = InutilTrackLinkCodec();
     final generations = _cancellationSnapshot(requested);
     final library = await ref.read(libraryTracksProvider.future);
     final localsByVideoId = <String, LocalTrack>{};
@@ -289,7 +289,7 @@ class DownloadController extends Notifier<Map<String, DownloadTaskState>> {
     bool Function()? isCancelled,
     Map<String, int>? generationsAtRequest,
   }) async {
-    const codec = BStreamTrackLinkCodec();
+    const codec = InutilTrackLinkCodec();
     final generations =
         generationsAtRequest ??
         _cancellationSnapshot(
@@ -341,7 +341,7 @@ class DownloadController extends Notifier<Map<String, DownloadTaskState>> {
   }
 
   Map<String, int> _cancellationSnapshot(Iterable<TrackInfo> tracks) {
-    const codec = BStreamTrackLinkCodec();
+    const codec = InutilTrackLinkCodec();
     final generations = <String, int>{};
     for (final track in tracks) {
       final id = codec.tryFromTrack(track)?.videoId;
@@ -587,7 +587,7 @@ Set<String> playlistDownloadVideoIds(
   CatalogPlaylist? catalog,
   Iterable<LocalTrack> library,
 ) {
-  const codec = BStreamTrackLinkCodec();
+  const codec = InutilTrackLinkCodec();
   return {
     for (final item in playlistDownloadItems(playlist, catalog, library))
       if (item.remoteTrack case final remote?)
@@ -601,7 +601,7 @@ Set<String> pendingPlaylistDownloadUrls(
   Iterable<LocalTrack> library,
   Map<String, DownloadTaskState> tasks,
 ) {
-  const codec = BStreamTrackLinkCodec();
+  const codec = InutilTrackLinkCodec();
   final ids = playlistDownloadVideoIds(playlist, catalog, library);
   return {
     for (final task in tasks.values)

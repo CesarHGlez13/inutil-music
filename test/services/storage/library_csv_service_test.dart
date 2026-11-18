@@ -325,7 +325,7 @@ void main() {
       );
       final restored = service.importBytes(
         LibraryCsvInput(
-          bytes: service.exportDocument(original, LibraryCsvProfile.bstream),
+          bytes: service.exportDocument(original, LibraryCsvProfile.inutil),
           fileName: 'metadata-only.csv',
         ),
       );
@@ -401,7 +401,7 @@ void main() {
         );
         final restored = service.importBytes(
           LibraryCsvInput(
-            bytes: service.exportDocument(document, LibraryCsvProfile.bstream),
+            bytes: service.exportDocument(document, LibraryCsvProfile.inutil),
             fileName: 'favorites.csv',
           ),
         );
@@ -474,7 +474,7 @@ void main() {
         );
         final restored = service.importBytes(
           LibraryCsvInput(
-            bytes: service.exportDocument(document, LibraryCsvProfile.bstream),
+            bytes: service.exportDocument(document, LibraryCsvProfile.inutil),
             fileName: 'local.csv',
           ),
         );
@@ -589,7 +589,7 @@ void main() {
       );
       final restored = service.importBytes(
         LibraryCsvInput(
-          bytes: service.exportDocument(original, LibraryCsvProfile.bstream),
+          bytes: service.exportDocument(original, LibraryCsvProfile.inutil),
           fileName: 'memberships.csv',
         ),
       );
@@ -608,8 +608,8 @@ void main() {
     test('writes the exact header for every supported profile', () {
       final document = _sampleDocument();
       const expectedHeaders = <LibraryCsvProfile, List<String>>{
-        LibraryCsvProfile.bstream: [
-          'BStreamCsvVersion',
+        LibraryCsvProfile.inutil: [
+          'InutilCsvVersion',
           'PlaylistName',
           'PlaylistId',
           'Position',
@@ -652,16 +652,16 @@ void main() {
       }
     });
 
-    test('round-trips every BStream field and playlist membership', () {
+    test('round-trips every Inutil field and playlist membership', () {
       final original = _sampleDocument();
       final imported = service.importBytes(
         LibraryCsvInput(
-          bytes: service.exportDocument(original, LibraryCsvProfile.bstream),
-          fileName: 'bstream-roundtrip.csv',
+          bytes: service.exportDocument(original, LibraryCsvProfile.inutil),
+          fileName: 'inutil-roundtrip.csv',
         ),
       );
 
-      expect(imported.detectedFormat, LibraryCsvDetectedFormat.bstream);
+      expect(imported.detectedFormat, LibraryCsvDetectedFormat.inutil);
       expect(imported.uniqueTrackCount, 1);
       expect(imported.duplicateRowCount, 1);
       final track = imported.tracks.single;
@@ -709,12 +709,12 @@ void main() {
               youtubeVideoId: 'aaaaaaaaaa$index',
             ),
         ],
-        detectedFormat: LibraryCsvDetectedFormat.bstream,
+        detectedFormat: LibraryCsvDetectedFormat.inutil,
         defaultPlaylistName: 'Formulas',
         hasPlaylistColumn: true,
       );
 
-      final bytes = service.exportDocument(document, LibraryCsvProfile.bstream);
+      final bytes = service.exportDocument(document, LibraryCsvProfile.inutil);
       final rows = _decodeExportRows(bytes);
       final titleIndex = rows.first.indexOf('Title');
       final artistIndex = rows.first.indexOf('Artists');
@@ -794,8 +794,8 @@ LibraryCsvDocument _sampleDocument() {
   );
   return const LibraryCsvDocument(
     tracks: [track],
-    detectedFormat: LibraryCsvDetectedFormat.bstream,
-    defaultPlaylistName: 'BStream Music',
+    detectedFormat: LibraryCsvDetectedFormat.inutil,
+    defaultPlaylistName: 'Inútil Music',
     hasPlaylistColumn: true,
   );
 }

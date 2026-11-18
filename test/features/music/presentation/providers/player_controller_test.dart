@@ -1272,7 +1272,7 @@ void main() {
       const localCatalog = TrackInfo(
         id: 'LocalVideo01',
         title: 'Downloaded recommendation',
-        artist: 'BStream',
+        artist: 'Inutil',
         url: 'https://www.youtube.com/watch?v=LocalVideo01',
       );
       final remote = _queuedRemoteTrack('NextSong001');
@@ -1956,7 +1956,7 @@ void main() {
       final player = _CrossfadePlayerService();
       final settings = _CrossfadeSettingsController(
         const SettingsState(
-          downloadDirectory: '/tmp/bstream-crossfade-test',
+          downloadDirectory: '/tmp/inutil-crossfade-test',
           language: AppLanguage.spanish,
           crossfadeEnabled: true,
           crossfadeDuration: Duration(seconds: 10),
@@ -2006,7 +2006,7 @@ void main() {
       final player = _CrossfadePlayerService();
       final settings = _CrossfadeSettingsController(
         const SettingsState(
-          downloadDirectory: '/tmp/bstream-skip-silence-test',
+          downloadDirectory: '/tmp/inutil-skip-silence-test',
           language: AppLanguage.spanish,
           skipSilenceEnabled: true,
         ),
@@ -2045,7 +2045,7 @@ void main() {
     final player = _CrossfadePlayerService(supportsSkipSilence: false);
     final settings = _CrossfadeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream-unsupported-skip-silence-test',
+        downloadDirectory: '/tmp/inutil-unsupported-skip-silence-test',
         language: AppLanguage.spanish,
         skipSilenceEnabled: true,
       ),
@@ -2064,7 +2064,7 @@ void main() {
     final player = _CrossfadePlayerService()..skipSilenceFailuresRemaining = 1;
     final settings = _CrossfadeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream-skip-silence-failure-test',
+        downloadDirectory: '/tmp/inutil-skip-silence-failure-test',
         language: AppLanguage.spanish,
         skipSilenceEnabled: true,
       ),
@@ -2086,7 +2086,7 @@ void main() {
     final player = _CrossfadePlayerService();
     final settings = _CrossfadeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream-crossfade-duration-test',
+        downloadDirectory: '/tmp/inutil-crossfade-duration-test',
         language: AppLanguage.spanish,
         crossfadeEnabled: true,
         crossfadeDuration: Duration(seconds: 5),
@@ -2149,7 +2149,7 @@ void main() {
     'remote crossfade reuses its cached source and handoff advances once',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-controller-crossfade-',
+        'inutil-controller-crossfade-',
       );
       addTearDown(() async {
         if (await directory.exists()) {
@@ -2240,7 +2240,7 @@ void main() {
     'a stale remote completion cannot advance past a crossfade handoff',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-controller-completion-race-',
+        'inutil-controller-completion-race-',
       );
       addTearDown(() async {
         if (await directory.exists()) {
@@ -2743,7 +2743,7 @@ void main() {
       const downloadedCatalog = TrackInfo(
         id: 'Downloaded2',
         title: 'Downloaded successor',
-        artist: 'BStream',
+        artist: 'Inutil',
         url: 'https://www.youtube.com/watch?v=Downloaded2',
       );
 
@@ -3981,7 +3981,7 @@ void main() {
     'a downloaded remote cache keeps the remote identity and can fall back to streaming',
     () async {
       final temporaryDirectory = await Directory.systemTemp.createTemp(
-        'bstream-player-cache-test-',
+        'inutil-player-cache-test-',
       );
       addTearDown(() => temporaryDirectory.delete(recursive: true));
       final cachedFile = File('${temporaryDirectory.path}/cached.m4a');
@@ -4043,7 +4043,7 @@ void main() {
     'a synchronous cached-file open error falls back to the network stream',
     () async {
       final temporaryDirectory = await Directory.systemTemp.createTemp(
-        'bstream-player-invalid-cache-test-',
+        'inutil-player-invalid-cache-test-',
       );
       addTearDown(() => temporaryDirectory.delete(recursive: true));
       final cachedFile = File('${temporaryDirectory.path}/invalid.m4a');
@@ -4072,7 +4072,7 @@ void main() {
     'a cache entry appearing after resolve still falls back when invalid',
     () async {
       final temporaryDirectory = await Directory.systemTemp.createTemp(
-        'bstream-player-late-cache-test-',
+        'inutil-player-late-cache-test-',
       );
       addTearDown(() => temporaryDirectory.delete(recursive: true));
       final cachedFile = File('${temporaryDirectory.path}/late-invalid.m4a');
@@ -4104,7 +4104,7 @@ void main() {
     'native cached source appearing after resolve falls back to its network source',
     () async {
       final temporaryDirectory = await Directory.systemTemp.createTemp(
-        'bstream-player-late-native-cache-test-',
+        'inutil-player-late-native-cache-test-',
       );
       addTearDown(() => temporaryDirectory.delete(recursive: true));
       final cachedFile = File('${temporaryDirectory.path}/late-invalid.m4a');
@@ -4143,7 +4143,7 @@ void main() {
   test('a cache file removed during lookup falls back to streaming', () async {
     final player = _FakePlayerService();
     final temporaryDirectory = await Directory.systemTemp.createTemp(
-      'bstream-missing-remote-cache-',
+      'inutil-missing-remote-cache-',
     );
     addTearDown(() => temporaryDirectory.delete(recursive: true));
     final missingFile = File('${temporaryDirectory.path}/removed.m4a');
@@ -5982,7 +5982,7 @@ void main() {
           status: PlayerStatus.playing,
           trackId: 'track-1',
           title: 'Track 1',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           position: Duration(seconds: 50),
           duration: Duration(minutes: 1),
         ),
@@ -6146,7 +6146,7 @@ ProviderContainer _container(
             settingsController ??
             _CrossfadeSettingsController(
               const SettingsState(
-                downloadDirectory: '/tmp/bstream-player-test',
+                downloadDirectory: '/tmp/inutil-player-test',
                 language: AppLanguage.spanish,
                 recommendationHistoryEnabled: true,
               ),
@@ -6183,7 +6183,7 @@ ProviderContainer _container(
 _CrossfadeSettingsController _enabledCrossfadeSettings() {
   return _CrossfadeSettingsController(
     const SettingsState(
-      downloadDirectory: '/tmp/bstream-crossfade-test',
+      downloadDirectory: '/tmp/inutil-crossfade-test',
       language: AppLanguage.spanish,
       crossfadeEnabled: true,
     ),
@@ -6194,7 +6194,7 @@ LocalTrack _track(int index) {
   return LocalTrack(
     id: 'track-$index',
     title: 'Track $index',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: 'track-$index.mp3',
     addedAt: DateTime(2026),
     duration: const Duration(milliseconds: 10),
@@ -6245,7 +6245,7 @@ TrackInfo _queuedRemoteTrack(String id) {
   return TrackInfo(
     id: id,
     title: 'Track $id',
-    artist: 'BStream',
+    artist: 'Inutil',
     url: 'https://www.youtube.com/watch?v=$id',
     thumbnailUrl: 'https://i.ytimg.com/vi/$id/hqdefault.jpg',
     streamUrl: 'https://media.example/$id.m4a',
@@ -6256,7 +6256,7 @@ TrackInfo _unresolvedRemoteTrack(String id) {
   return TrackInfo(
     id: id,
     title: 'Track $id',
-    artist: 'BStream',
+    artist: 'Inutil',
     url: 'https://www.youtube.com/watch?v=$id',
     thumbnailUrl: 'https://i.ytimg.com/vi/$id/hqdefault.jpg',
   );

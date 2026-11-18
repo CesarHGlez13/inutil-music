@@ -6,8 +6,8 @@
 // or [{startUnixMs,endUnixMs,label}]. QPC milliseconds must use Windows
 // Stopwatch.GetTimestamp()*1000/Stopwatch.Frequency, matching Node hrtime. These
 // must bracket continuous motion only: do not include idle pauses in FPS.
-// --tab-markers true additionally records Dart timeline markers from BStream.
-// Start interacting after BSTREAM_PROFILE_READY is printed. Node 22+ required.
+// --tab-markers true additionally records Dart timeline markers from Inutil.
+// Start interacting after INUTIL_PROFILE_READY is printed. Node 22+ required.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -77,8 +77,8 @@ export function tabLatencies(events) {
   const requests = new Map();
   const matches = [];
   for (const event of events.toSorted((a, b) => a.ts - b.ts)) {
-    if (event.name === 'BStream.tab.request') requests.set(event.args?.requestId, event);
-    if (event.name !== 'BStream.tab.firstBuildComplete') continue;
+    if (event.name === 'Inutil.tab.request') requests.set(event.args?.requestId, event);
+    if (event.name !== 'Inutil.tab.firstBuildComplete') continue;
     const request = requests.get(event.args?.requestId);
     if (!request || request.args?.to !== event.args?.to || event.ts < request.ts) continue;
     matches.push({
@@ -180,7 +180,7 @@ async function capture(options) {
         do {
           const result = await rpc('getVMTimeline');
           for (const event of result.traceEvents ?? []) {
-            if (event.name?.startsWith('BStream.tab.')) events.set(JSON.stringify(event), event);
+            if (event.name?.startsWith('Inutil.tab.')) events.set(JSON.stringify(event), event);
           }
           if (polling) await delay(250);
         } while (polling);
@@ -189,7 +189,7 @@ async function capture(options) {
     }
     await delay(250);
     const start = await clockAnchor();
-    console.log(`BSTREAM_PROFILE_READY ${JSON.stringify({ label: options.label, startUnixMs: start.unixMs, startQpcMs: start.qpcMs, seconds: options.seconds })}`);
+    console.log(`INUTIL_PROFILE_READY ${JSON.stringify({ label: options.label, startUnixMs: start.unixMs, startQpcMs: start.qpcMs, seconds: options.seconds })}`);
     await delay(options.seconds * 1000);
     const end = await clockAnchor();
     await delay(700); // FrameTiming arrives in batches after raster completion.

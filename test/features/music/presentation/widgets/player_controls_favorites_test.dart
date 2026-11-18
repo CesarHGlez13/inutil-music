@@ -36,21 +36,21 @@ void main() {
   final localTrack = LocalTrack(
     id: trackId,
     title: 'Cancion de prueba',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: '/tmp/player-controls-track.m4a',
     addedAt: DateTime(2026),
   );
   const snapshot = PlayerSnapshot(
     status: PlayerStatus.paused,
     title: 'Cancion de prueba',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     trackId: trackId,
     duration: Duration(minutes: 3),
     volume: 0.72,
   );
 
   for (final style in [
-    PlayerStyle.bstreamMusic,
+    PlayerStyle.inutilMusic,
     PlayerStyle.spotifyMusic,
     PlayerStyle.classicVinyl,
   ]) {
@@ -77,7 +77,7 @@ void main() {
             ),
           );
           await tester.pump(const Duration(milliseconds: 500));
-          final progress = style == PlayerStyle.bstreamMusic
+          final progress = style == PlayerStyle.inutilMusic
               ? find.byType(WavyPlaybackSeekBar)
               : find.byKey(
                   ValueKey(
@@ -177,7 +177,7 @@ void main() {
           final trackWithArtwork = LocalTrack(
             id: trackId,
             title: 'Cancion de prueba',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             filePath: '/tmp/player-controls-track.m4a',
             thumbnailPath: '/tmp/spotify-expanded-cover.jpg',
             addedAt: DateTime(2026),
@@ -324,7 +324,7 @@ void main() {
     final trackWithArtwork = LocalTrack(
       id: trackId,
       title: 'Cancion de prueba',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       filePath: '/tmp/player-controls-track.m4a',
       thumbnailPath: '/tmp/spotify-expanded-bounded-cover.jpg',
       addedAt: DateTime(2026),
@@ -514,14 +514,14 @@ void main() {
       );
       final position = find.byKey(
         ValueKey(
-          style == PlayerStyle.bstreamMusic
+          style == PlayerStyle.inutilMusic
               ? 'player-position'
               : 'apple-player-position',
         ),
       );
       final duration = find.byKey(
         ValueKey(
-          style == PlayerStyle.bstreamMusic
+          style == PlayerStyle.inutilMusic
               ? 'player-duration'
               : 'apple-player-duration',
         ),
@@ -549,7 +549,7 @@ void main() {
         findsNothing,
       );
       final progress = switch (style) {
-        PlayerStyle.bstreamMusic => find.byType(WavyPlaybackSeekBar),
+        PlayerStyle.inutilMusic => find.byType(WavyPlaybackSeekBar),
         PlayerStyle.appleMusic => find.byKey(
           const ValueKey('apple-player-linear-seek'),
         ),
@@ -560,7 +560,7 @@ void main() {
           const ValueKey('spotify-player-linear-seek'),
         ),
       };
-      if (style == PlayerStyle.bstreamMusic ||
+      if (style == PlayerStyle.inutilMusic ||
           style == PlayerStyle.classicVinyl) {
         expect(
           tester.getBottomLeft(timeRow).dy,
@@ -672,7 +672,7 @@ void main() {
           }
           final duration = find.byKey(
             ValueKey(
-              style == PlayerStyle.bstreamMusic
+              style == PlayerStyle.inutilMusic
                   ? 'player-duration'
                   : 'apple-player-duration',
             ),
@@ -730,7 +730,7 @@ void main() {
 
         for (final style in const [
           PlayerStyle.appleMusic,
-          PlayerStyle.bstreamMusic,
+          PlayerStyle.inutilMusic,
           PlayerStyle.classicVinyl,
         ]) {
           await tester.pumpWidget(
@@ -780,7 +780,7 @@ void main() {
             find.byKey(
               ValueKey(switch (style) {
                 PlayerStyle.appleMusic => 'apple-player-timeline',
-                PlayerStyle.bstreamMusic => 'player-timeline',
+                PlayerStyle.inutilMusic => 'player-timeline',
                 PlayerStyle.classicVinyl => 'classic-vinyl-player-timeline',
                 PlayerStyle.spotifyMusic => 'apple-player-timeline',
               }),
@@ -802,8 +802,8 @@ void main() {
             final inset = tester.getRect(
               find.byKey(
                 ValueKey(
-                  style == PlayerStyle.bstreamMusic
-                      ? 'bstream-player-controls-inset'
+                  style == PlayerStyle.inutilMusic
+                      ? 'inutil-player-controls-inset'
                       : 'classic-vinyl-player-controls-inset',
                 ),
               ),
@@ -1694,7 +1694,7 @@ void main() {
   // Classic Vinyl layout renders the cover as the record label and has its
   // own responsive/animation contract below.
   for (final style in const [
-    PlayerStyle.bstreamMusic,
+    PlayerStyle.inutilMusic,
     PlayerStyle.appleMusic,
   ]) {
     for (final viewport in const [Size(320, 568), Size(390, 820)]) {
@@ -1705,7 +1705,7 @@ void main() {
           final trackWithArtwork = LocalTrack(
             id: trackId,
             title: 'Cancion de prueba',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             filePath: '/tmp/player-controls-track.m4a',
             thumbnailPath: '/tmp/player-reflection-cover.jpg',
             addedAt: DateTime(2026),
@@ -1780,7 +1780,7 @@ void main() {
           final trackWithArtwork = LocalTrack(
             id: trackId,
             title: 'Cancion de prueba',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             filePath: '/tmp/player-controls-track.m4a',
             thumbnailPath: '/tmp/player-reflection-cover.jpg',
             addedAt: DateTime(2026),
@@ -1824,7 +1824,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-controls-cover.jpg',
           addedAt: DateTime(2026),
@@ -1929,7 +1929,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-expanded-cover.jpg',
           addedAt: DateTime(2026),
@@ -2062,7 +2062,7 @@ void main() {
         final expandedPrimaryControlRect = tester.getRect(
           find.byKey(const ValueKey('player-primary-control')),
         );
-        if (style == PlayerStyle.bstreamMusic) {
+        if (style == PlayerStyle.inutilMusic) {
           final artworkOffset = Offset(
             0,
             expandedArtworkRect.top - classicArtworkRect.top,
@@ -2149,7 +2149,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-expanded-compact-cover.jpg',
           addedAt: DateTime(2026),
@@ -2193,7 +2193,7 @@ void main() {
           find.byKey(const ValueKey('player-artwork-presentation-scale')),
           findsNothing,
         );
-        if (style == PlayerStyle.bstreamMusic) {
+        if (style == PlayerStyle.inutilMusic) {
           expect(
             tester
                 .widget<SingleChildScrollView>(
@@ -2220,7 +2220,7 @@ void main() {
       (tester) async {
         _configureView(tester, const Size(390, 820), topPadding: 44);
         final fixtures = (await tester.runAsync(
-          () => Directory.systemTemp.createTemp('bstream-artwork-edge-'),
+          () => Directory.systemTemp.createTemp('inutil-artwork-edge-'),
         ))!;
         addTearDown(() => fixtures.delete(recursive: true));
         final coverFile = File('${fixtures.path}/white-cover.png');
@@ -2228,7 +2228,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: coverFile.path,
           addedAt: DateTime(2026),
@@ -2392,7 +2392,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-expanded-landscape-cover.jpg',
           addedAt: DateTime(2026),
@@ -2418,13 +2418,13 @@ void main() {
             .transform
             .getMaxScaleOnAxis();
         expect(scale, lessThanOrEqualTo(1.181));
-        if (style == PlayerStyle.bstreamMusic) {
+        if (style == PlayerStyle.inutilMusic) {
           expect(
-            find.byKey(const ValueKey('bstream-player-adaptive-landscape')),
+            find.byKey(const ValueKey('inutil-player-adaptive-landscape')),
             findsOneWidget,
           );
           expect(
-            find.byKey(const ValueKey('bstream-player-landscape-artwork-pane')),
+            find.byKey(const ValueKey('inutil-player-landscape-artwork-pane')),
             findsOneWidget,
           );
           expect(
@@ -2449,7 +2449,7 @@ void main() {
         final landscapeTrack = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-landscape-cover.jpg',
           addedAt: DateTime(2026),
@@ -2479,8 +2479,8 @@ void main() {
 
             final landscapeLayout = find.byKey(
               ValueKey(
-                style == PlayerStyle.bstreamMusic
-                    ? 'bstream-player-adaptive-landscape'
+                style == PlayerStyle.inutilMusic
+                    ? 'inutil-player-adaptive-landscape'
                     : 'apple-player-adaptive-two-column',
               ),
             );
@@ -2491,7 +2491,7 @@ void main() {
             );
 
             final artwork = find.byKey(const ValueKey('player-large-artwork'));
-            final rightPaneBlocks = style == PlayerStyle.bstreamMusic
+            final rightPaneBlocks = style == PlayerStyle.inutilMusic
                 ? <Finder>[
                     find.byKey(const ValueKey('player-track-title')),
                     find.byKey(const ValueKey('player-timeline')),
@@ -2591,7 +2591,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-landscape-accessibility-cover.jpg',
           addedAt: DateTime(2026),
@@ -2612,12 +2612,12 @@ void main() {
         final artwork = find.byKey(const ValueKey('player-large-artwork'));
         final controlsScroll = find.byKey(
           ValueKey(
-            style == PlayerStyle.bstreamMusic
-                ? 'bstream-player-controls-scroll'
+            style == PlayerStyle.inutilMusic
+                ? 'inutil-player-controls-scroll'
                 : 'apple-player-controls-scroll',
           ),
         );
-        final lastControl = style == PlayerStyle.bstreamMusic
+        final lastControl = style == PlayerStyle.inutilMusic
             ? find.byKey(const ValueKey('player-volume-control'))
             : find.byKey(const ValueKey('apple-player-utility-row'));
         final artworkBeforeScroll = tester.getRect(artwork);
@@ -2626,7 +2626,7 @@ void main() {
         expect(
           find.byKey(
             ValueKey(
-              style == PlayerStyle.bstreamMusic
+              style == PlayerStyle.inutilMusic
                   ? 'player-content-scroll'
                   : 'apple-player-scroll',
             ),
@@ -2656,7 +2656,7 @@ void main() {
         final trackWithArtwork = LocalTrack(
           id: trackId,
           title: 'Cancion de prueba',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: '/tmp/player-controls-track.m4a',
           thumbnailPath: '/tmp/player-inset-landscape-cover.jpg',
           addedAt: DateTime(2026),
@@ -2676,13 +2676,13 @@ void main() {
 
         final landscapeLayout = find.byKey(
           ValueKey(
-            style == PlayerStyle.bstreamMusic
-                ? 'bstream-player-adaptive-landscape'
+            style == PlayerStyle.inutilMusic
+                ? 'inutil-player-adaptive-landscape'
                 : 'apple-player-adaptive-two-column',
           ),
         );
         final artwork = find.byKey(const ValueKey('player-large-artwork'));
-        final lastBlock = style == PlayerStyle.bstreamMusic
+        final lastBlock = style == PlayerStyle.inutilMusic
             ? find.byKey(const ValueKey('player-volume-control'))
             : find.byKey(const ValueKey('apple-player-utility-row'));
 
@@ -2695,7 +2695,7 @@ void main() {
           tester.getRect(lastBlock).bottom,
           lessThanOrEqualTo(viewport.height - bottomInset + 0.1),
         );
-        if (style == PlayerStyle.bstreamMusic) {
+        if (style == PlayerStyle.inutilMusic) {
           expect(
             tester.getSize(find.byType(WavyPlaybackSeekBar)).height,
             greaterThanOrEqualTo(48),
@@ -2743,13 +2743,13 @@ void main() {
         await tester.pump(const Duration(milliseconds: 500));
 
         final portraitLayoutKey = ValueKey(
-          style == PlayerStyle.bstreamMusic
+          style == PlayerStyle.inutilMusic
               ? 'player-content-scroll'
               : 'apple-player-adaptive-stack',
         );
         final landscapeLayoutKey = ValueKey(
-          style == PlayerStyle.bstreamMusic
-              ? 'bstream-player-adaptive-landscape'
+          style == PlayerStyle.inutilMusic
+              ? 'inutil-player-adaptive-landscape'
               : 'apple-player-adaptive-two-column',
         );
         expect(find.byKey(portraitLayoutKey), findsOneWidget);
@@ -2791,7 +2791,7 @@ void main() {
       final trackWithArtwork = LocalTrack(
         id: trackId,
         title: 'Cancion de prueba',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: '/tmp/player-controls-track.m4a',
         thumbnailPath: '/tmp/player-expanded-tablet-cover.jpg',
         addedAt: DateTime(2026),
@@ -2821,7 +2821,7 @@ void main() {
         find.byKey(const ValueKey('player-expanded-artwork-viewport')),
         findsNothing,
       );
-      if (style == PlayerStyle.bstreamMusic) {
+      if (style == PlayerStyle.inutilMusic) {
         expect(
           tester
               .widget<SingleChildScrollView>(
@@ -2851,7 +2851,7 @@ void main() {
       final trackWithArtwork = LocalTrack(
         id: trackId,
         title: 'Cancion de prueba',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: '/tmp/player-controls-track.m4a',
         thumbnailPath: '/tmp/classic-vinyl-cover.jpg',
         addedAt: DateTime(2026),
@@ -3417,14 +3417,14 @@ void main() {
     },
   );
 
-  testWidgets('BStream landscape keeps dark controls over a light app theme', (
+  testWidgets('Inutil landscape keeps dark controls over a light app theme', (
     tester,
   ) async {
     _configureView(tester, const Size(568, 320));
     final trackWithArtwork = LocalTrack(
       id: trackId,
       title: 'Cancion de prueba',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       filePath: '/tmp/player-controls-track.m4a',
       thumbnailPath: '/tmp/player-light-landscape-cover.jpg',
       addedAt: DateTime(2026),
@@ -3490,7 +3490,7 @@ void main() {
           await tester.pump();
 
           final playerContent = switch (style) {
-            PlayerStyle.bstreamMusic => find.byKey(
+            PlayerStyle.inutilMusic => find.byKey(
               const ValueKey('player-content-layout'),
             ),
             PlayerStyle.appleMusic => find.byKey(
@@ -3550,7 +3550,7 @@ void main() {
             final trackWithArtwork = LocalTrack(
               id: trackId,
               title: 'Cancion de prueba',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               filePath: '/tmp/player-controls-track.m4a',
               thumbnailPath: '/tmp/player-status-bar-cover.jpg',
               addedAt: DateTime(2026),
@@ -3580,7 +3580,7 @@ void main() {
 
             final grabber = find.byKey(
               ValueKey(switch (style) {
-                PlayerStyle.bstreamMusic => 'bstream-player-grabber',
+                PlayerStyle.inutilMusic => 'inutil-player-grabber',
                 PlayerStyle.appleMusic => 'apple-player-grabber',
                 PlayerStyle.classicVinyl => 'classic-vinyl-player-grabber',
                 PlayerStyle.spotifyMusic => 'spotify-player-grabber',
@@ -3637,7 +3637,7 @@ void main() {
               ValueKey(switch (style) {
                 PlayerStyle.appleMusic => 'apple-player-utility-row',
                 PlayerStyle.classicVinyl => 'classic-vinyl-player-utility-row',
-                PlayerStyle.bstreamMusic ||
+                PlayerStyle.inutilMusic ||
                 PlayerStyle.spotifyMusic => 'player-utility-controls',
               }),
             );
@@ -4153,7 +4153,7 @@ void main() {
     final sharpLocalTrack = LocalTrack(
       id: trackId,
       title: 'Cancion de prueba',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       filePath: '/tmp/player-controls-track.m4a',
       thumbnailPath: '/tmp/soft-player-cover.jpg',
       catalogThumbnailUrl:
@@ -4362,7 +4362,7 @@ void main() {
         // metadata and playback controls retain their spacing as a group.
         await tester.pumpWidget(
           _playerHarness(
-            key: ValueKey('bstream-bottom-anchor-${size.width}'),
+            key: ValueKey('inutil-bottom-anchor-${size.width}'),
             platform: TargetPlatform.android,
             snapshot: snapshot,
             localTrack: localTrack,
@@ -4490,7 +4490,7 @@ void main() {
   }
 
   testWidgets(
-    'BStream player keeps its wave progress and compact volume thumb',
+    'Inutil player keeps its wave progress and compact volume thumb',
     (tester) async {
       _configureView(tester, const Size(390, 820));
       await tester.pumpWidget(
@@ -4510,7 +4510,7 @@ void main() {
         find.byKey(const ValueKey('player-timeline')),
       );
       final controlsInset = tester.getRect(
-        find.byKey(const ValueKey('bstream-player-controls-inset')),
+        find.byKey(const ValueKey('inutil-player-controls-inset')),
       );
       expect(controlsInset.left, closeTo(14, 0.1));
       expect(controlsInset.right, closeTo(376, 0.1));
@@ -5345,7 +5345,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 350));
 
     expect(find.text('Cancion de prueba'), findsWidgets);
-    expect(find.text('BStream Music'), findsWidgets);
+    expect(find.text('Inútil Music'), findsWidgets);
     final queueTitle = find.byKey(const ValueKey('queue-title'));
     final queueDivider = find.byKey(const ValueKey('queue-list-divider'));
     expect(tester.widget<Text>(queueTitle).textAlign, TextAlign.center);
@@ -5741,7 +5741,7 @@ void main() {
   });
 
   testWidgets(
-    'BStream raises its classic cover and adds title spacing when phone portrait has spare room',
+    'Inutil raises its classic cover and adds title spacing when phone portrait has spare room',
     (tester) async {
       _configureView(
         tester,
@@ -5752,9 +5752,9 @@ void main() {
       final trackWithArtwork = LocalTrack(
         id: trackId,
         title: 'Cancion de prueba',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: '/tmp/player-controls-track.m4a',
-        thumbnailPath: '/tmp/bstream-balanced-classic-cover.jpg',
+        thumbnailPath: '/tmp/inutil-balanced-classic-cover.jpg',
         addedAt: DateTime(2026),
       );
 
@@ -5774,7 +5774,7 @@ void main() {
         for (final artworkStyle in PlayerArtworkStyle.values) {
           await tester.pumpWidget(
             _playerHarness(
-              key: ValueKey('bstream-balanced-$viewport-$artworkStyle'),
+              key: ValueKey('inutil-balanced-$viewport-$artworkStyle'),
               platform: TargetPlatform.android,
               snapshot: snapshot,
               localTrack: trackWithArtwork,
@@ -5806,7 +5806,7 @@ void main() {
             ),
           );
           final handleRect = tester.getRect(
-            find.byKey(const ValueKey('bstream-player-grabber')),
+            find.byKey(const ValueKey('inutil-player-grabber')),
           );
           expect(handleRect.top, greaterThanOrEqualTo(44));
           expect(artworkRect.top - handleRect.bottom, greaterThanOrEqualTo(12));
@@ -5865,7 +5865,7 @@ void main() {
   );
 
   testWidgets(
-    'BStream keeps its classic cover and controls safe on small frames',
+    'Inutil keeps its classic cover and controls safe on small frames',
     (tester) async {
       _configureView(
         tester,
@@ -5877,7 +5877,7 @@ void main() {
         tester.view.physicalSize = viewport;
         await tester.pumpWidget(
           _playerHarness(
-            key: ValueKey('bstream-classic-small-$viewport'),
+            key: ValueKey('inutil-classic-small-$viewport'),
             platform: TargetPlatform.android,
             snapshot: snapshot,
             localTrack: localTrack,
@@ -5893,7 +5893,7 @@ void main() {
           findsNothing,
         );
         final handleRect = tester.getRect(
-          find.byKey(const ValueKey('bstream-player-grabber')),
+          find.byKey(const ValueKey('inutil-player-grabber')),
         );
         final artworkRect = tester.getRect(
           find.byKey(const ValueKey('player-large-artwork')),
@@ -5913,7 +5913,7 @@ void main() {
           );
         } else {
           expect(
-            find.byKey(const ValueKey('bstream-player-adaptive-landscape')),
+            find.byKey(const ValueKey('inutil-player-adaptive-landscape')),
             findsOneWidget,
           );
         }
@@ -5933,7 +5933,7 @@ void main() {
     },
   );
 
-  testWidgets('BStream keeps a gap between its collapse handle and cover', (
+  testWidgets('Inutil keeps a gap between its collapse handle and cover', (
     tester,
   ) async {
     _configureView(tester, const Size(936, 680));
@@ -5947,7 +5947,7 @@ void main() {
       await tester.pumpWidget(
         _playerHarness(
           key: ValueKey(
-            'bstream-handle-gap-${testCase.platform}-${testCase.size}',
+            'inutil-handle-gap-${testCase.platform}-${testCase.size}',
           ),
           platform: testCase.platform,
           snapshot: snapshot,
@@ -5958,7 +5958,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
       await tester.pump();
       final handle = tester.getRect(
-        find.byKey(const ValueKey('bstream-player-grabber')),
+        find.byKey(const ValueKey('inutil-player-grabber')),
       );
       final artwork = tester.getRect(
         find.byKey(const ValueKey('player-large-artwork')),
@@ -6020,7 +6020,7 @@ void main() {
   });
 
   testWidgets(
-    'BStream adapts between wide and tall desktop windows without stretched controls',
+    'Inutil adapts between wide and tall desktop windows without stretched controls',
     (tester) async {
       _configureView(tester, const Size(1280, 820));
       await tester.pumpWidget(
@@ -6091,7 +6091,7 @@ void main() {
     },
   );
 
-  testWidgets('BStream and Apple use the same capsule icon and button sizes', (
+  testWidgets('Inutil and Apple use the same capsule icon and button sizes', (
     tester,
   ) async {
     for (final scenario in [
@@ -6102,7 +6102,7 @@ void main() {
     ]) {
       _configureView(tester, scenario.$2);
       final measurements = <PlayerStyle, ({double icon, double button})>{};
-      for (final style in [PlayerStyle.bstreamMusic, PlayerStyle.appleMusic]) {
+      for (final style in [PlayerStyle.inutilMusic, PlayerStyle.appleMusic]) {
         await tester.pumpWidget(
           _playerHarness(
             key: ValueKey('utility-sizes-$scenario-$style'),
@@ -6125,7 +6125,7 @@ void main() {
         expect(tester.takeException(), isNull);
       }
       expect(
-        measurements[PlayerStyle.bstreamMusic],
+        measurements[PlayerStyle.inutilMusic],
         measurements[PlayerStyle.appleMusic],
         reason: '$scenario',
       );

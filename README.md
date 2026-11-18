@@ -231,9 +231,9 @@ Available features:
 - Automatically skip requests that fail during download.
 - On Windows, expose the current LIVE song and the next four requests as a
   transparent browser overlay at
-  `http://overlay.bstreammusic.test/overlay`. Playback, queue, artwork,
+  `http://overlay.inutilmusic.test/overlay`. Playback, queue, artwork,
   progress, accent, and language changes are pushed immediately over the
-  integrated `ws://overlay.bstreammusic.test/ws` connection.
+  integrated `ws://overlay.inutilmusic.test/ws` connection.
 
 Recognized commands:
 
@@ -256,7 +256,7 @@ On first use, Windows asks for administrator confirmation once so Inútil Music 
 add its marked `hosts` entry:
 
 ```text
-127.0.0.1 overlay.bstreammusic.test
+127.0.0.1 overlay.inutilmusic.test
 ```
 
 Afterward, activating the overlay does not need elevation. The name uses the
@@ -279,7 +279,7 @@ emulation; this is not a guarantee for every Windows device or policy.
 
 In TikTok LIVE Studio, add a web/browser source with these settings:
 
-- URL: `http://overlay.bstreammusic.test/overlay`
+- URL: `http://overlay.inutilmusic.test/overlay`
 - Canvas: `1280 × 760`
 - Background: transparent; no chroma-key filter is necessary
 
@@ -530,7 +530,7 @@ provided by the Dart application and its headless WebView runtime.
 
 ## iOS support
 
-The iOS runner targets iOS 13 or newer. It registers the `bstreammusic` custom
+The iOS runner targets iOS 13 or newer. It registers the `inutilmusic` custom
 URL scheme, keeps account credentials in the system Keychain, and enables the
 audio background mode for lock-screen and Now Playing controls. Remote search,
 playback, downloads, embedded YouTube Music account login, TikTok LIVE, backup
@@ -556,7 +556,7 @@ tracks remain in its own library as on the other platforms.
 
 The app cannot claim public `youtube.com` links as Universal Links because
 those domains do not publish an association for Inútil Music; app-owned
-`bstreammusic://` links remain supported.
+`inutilmusic://` links are the current contract; `bstreammusic://` links shared by older versions remain supported.
 
 The repository's CI compiles both an unsigned simulator application and an
 unsigned Release application for physical devices. It packages the latter as
@@ -626,9 +626,9 @@ The remaining app-specific native Android integration is limited to platform
 features that Flutter cannot provide directly:
 
 ```text
-android/app/src/main/kotlin/com/bstream/bstream_music/MainActivity.kt
-android/app/src/main/kotlin/com/bstream/bstream_music/ExternalAudioIntentHandler.kt
-android/app/src/main/kotlin/com/bstream/bstream_music/LauncherActivity.kt
+android/app/src/main/kotlin/com/inutilmusic/app/MainActivity.kt
+android/app/src/main/kotlin/com/inutilmusic/app/ExternalAudioIntentHandler.kt
+android/app/src/main/kotlin/com/inutilmusic/app/LauncherActivity.kt
 ```
 
 Those classes handle audio-service activity integration, file export, supported
@@ -645,19 +645,19 @@ through the shared `minSdk 24` baseline.
 Copy `android/key.properties.example` to `android/key.properties` and configure a key outside the repository:
 
 ```properties
-storeFile=../release/bstream-upload-keystore.jks
+storeFile=../release/inutil-upload-keystore.jks
 storePassword=...
-keyAlias=bstream
+keyAlias=inutil
 keyPassword=...
 ```
 
 These environment variables are also supported:
 
 ```powershell
-$env:BSTREAM_ANDROID_STORE_FILE="D:\keys\bstream-upload-keystore.jks"
-$env:BSTREAM_ANDROID_STORE_PASSWORD="..."
-$env:BSTREAM_ANDROID_KEY_ALIAS="bstream"
-$env:BSTREAM_ANDROID_KEY_PASSWORD="..."
+$env:INUTIL_ANDROID_STORE_FILE="D:\keys\inutil-upload-keystore.jks"
+$env:INUTIL_ANDROID_STORE_PASSWORD="..."
+$env:INUTIL_ANDROID_KEY_ALIAS="inutil"
+$env:INUTIL_ANDROID_KEY_PASSWORD="..."
 ```
 
 `android/key.properties`, `*.jks`, and `*.keystore` are excluded from Git.
@@ -670,6 +670,10 @@ BSTREAM_ANDROID_STORE_PASSWORD
 BSTREAM_ANDROID_KEY_ALIAS
 BSTREAM_ANDROID_KEY_PASSWORD
 ```
+
+Los secretos conservan el prefijo histórico `BSTREAM_` porque viven en
+*Settings → Secrets* del repositorio, no en el árbol del código; el workflow los
+mapea a las variables `INUTIL_ANDROID_*` que lee Gradle.
 
 The workflow verifies all three APK signatures before uploading the artifacts.
 
@@ -729,12 +733,12 @@ a maintainer can instead create a signed archive locally with
 Typical artifacts:
 
 ```text
-build/windows/x64/runner/Release/bstream_music.exe
+build/windows/x64/runner/Release/inutil_music.exe
 build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 build/app/outputs/flutter-apk/app-x86_64-release.apk
-build/linux/x64/release/bundle/bstream_music
-build/macos/Build/Products/Release/bstream_music.app
+build/linux/x64/release/bundle/inutil_music
+build/macos/Build/Products/Release/inutil_music.app
 build/ios/iphonesimulator/Runner.app
 build/ios/iphoneos/Runner.app
 dist/Inútil Music-Music-<version>-iOS-unsigned.ipa

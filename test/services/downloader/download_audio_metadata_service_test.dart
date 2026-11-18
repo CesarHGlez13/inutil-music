@@ -13,7 +13,7 @@ void main() {
   late DownloadAudioMetadataService service;
 
   setUp(() async {
-    directory = await Directory.systemTemp.createTemp('bstream-audio-tags-');
+    directory = await Directory.systemTemp.createTemp('inutil-audio-tags-');
     service = DownloadAudioMetadataService();
   });
   tearDown(() => directory.delete(recursive: true));

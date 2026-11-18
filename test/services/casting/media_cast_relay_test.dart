@@ -13,7 +13,7 @@ void main() {
 
   setUp(() async {
     temporary = await Directory.systemTemp.createTemp(
-      'bstream_cast_relay_test_',
+      'inutil_cast_relay_test_',
     );
     media = File('${temporary.path}/audio.m4a');
     await media.writeAsBytes(List.generate(100, (i) => i));
@@ -184,7 +184,7 @@ void main() {
     target.listen((request) async {
       expect(request.headers.value('authorization'), isNull);
       expect(request.headers.value('cookie'), isNull);
-      expect(request.headers.value('user-agent'), 'BStream-test');
+      expect(request.headers.value('user-agent'), 'Inutil-test');
       request.response.add(utf8.encode('ok'));
       await request.response.close();
     });
@@ -201,7 +201,7 @@ void main() {
       headers: {
         'Authorization': 'secret',
         'Cookie': 'secret',
-        'User-Agent': 'BStream-test',
+        'User-Agent': 'Inutil-test',
       },
       contentType: 'audio/mp4',
     );

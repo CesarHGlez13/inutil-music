@@ -62,7 +62,7 @@ final class YouTubeMusicAccountPlaylistGateway
     // by the active account. Treat that absence as unknown; the detail header
     // mapped by fetchPlaylist is authoritative before any write is attempted.
     // LM and VLLM are two browse forms of the same system collection. Keep one
-    // canonical summary so the coordinator can bind it to BStream Favorites
+    // canonical summary so the coordinator can bind it to Inutil Favorites
     // instead of importing a duplicate ordinary playlist.
     final mapped = <String, RemotePlaylistSummary>{};
     for (final playlist in collection.playlists) {
@@ -86,7 +86,7 @@ final class YouTubeMusicAccountPlaylistGateway
     // YouTube occasionally omits its system Liked Music card from the saved
     // playlists shelf (notably for new/empty libraries and during staged UI
     // experiments). VLLM is nevertheless the stable browse endpoint for that
-    // account collection. Always expose the canonical LM summary so BStream's
+    // account collection. Always expose the canonical LM summary so Inútil Music's
     // reserved Favorites playlist can be bound and synchronized instead of
     // silently remaining local-only.
     mapped.putIfAbsent(

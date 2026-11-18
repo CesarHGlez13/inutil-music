@@ -11,10 +11,10 @@ import '../../features/music/domain/entities/local_track.dart';
 import '../../features/music/domain/entities/playlist.dart';
 import '../../features/music/domain/entities/playlist_entry.dart';
 
-enum LibraryCsvProfile { bstream, metroList, harmony, soundiiz }
+enum LibraryCsvProfile { inutil, metroList, harmony, soundiiz }
 
 enum LibraryCsvDetectedFormat {
-  bstream,
+  inutil,
   metroList,
   harmony,
   exportify,
@@ -250,7 +250,7 @@ class LibraryCsvDocument {
     }
     return LibraryCsvDocument(
       tracks: List.unmodifiable(exported.values),
-      detectedFormat: LibraryCsvDetectedFormat.bstream,
+      detectedFormat: LibraryCsvDetectedFormat.inutil,
       defaultPlaylistName: 'Inútil Music',
       hasPlaylistColumn: true,
     );
@@ -438,13 +438,13 @@ class LibraryCsvService {
   ) {
     final rows = <List<dynamic>>[_headersFor(profile)];
     switch (profile) {
-      case LibraryCsvProfile.bstream:
+      case LibraryCsvProfile.inutil:
         for (final track in document.tracks) {
           final memberships = track.memberships.isEmpty
               ? const <LibraryCsvMembership?>[null]
               : track.memberships.cast<LibraryCsvMembership?>();
           for (final membership in memberships) {
-            rows.add(_bstreamRow(track, membership));
+            rows.add(_inutilRow(track, membership));
           }
         }
       case LibraryCsvProfile.metroList:
@@ -616,7 +616,7 @@ const _playlistAliases = {
   'list',
   'listname',
 };
-const _playlistIdAliases = {'playlistid', 'bstreamplaylistid'};
+const _playlistIdAliases = {'playlistid', 'inutilplaylistid'};
 const _positionAliases = {
   'position',
   'index',
@@ -645,8 +645,10 @@ const _addedAtAliases = {'addedat', 'dateadded', 'addeddate', 'fechaagregada'};
 
 LibraryCsvDetectedFormat _detectFormat(List<String> headers) {
   final set = headers.toSet();
-  if (set.contains('bstreamcsvversion')) {
-    return LibraryCsvDetectedFormat.bstream;
+  // 'BStreamCsvVersion' es la cabecera que exportaban las versiones 2.0.x;
+  // sigue siendo válida para importar copias antiguas.
+  if (set.contains('bstreamcsvversion') || set.contains('inutilcsvversion')) {
+    return LibraryCsvDetectedFormat.inutil;
   }
   if (set.contains('youtubevideoid') && set.contains('title')) {
     return LibraryCsvDetectedFormat.metroList;
@@ -664,8 +666,8 @@ LibraryCsvDetectedFormat _detectFormat(List<String> headers) {
 }
 
 List<dynamic> _headersFor(LibraryCsvProfile profile) => switch (profile) {
-  LibraryCsvProfile.bstream => const [
-    'BStreamCsvVersion',
+  LibraryCsvProfile.inutil => const [
+    'InutilCsvVersion',
     'PlaylistName',
     'PlaylistId',
     'Position',
@@ -700,7 +702,7 @@ List<dynamic> _headersFor(LibraryCsvProfile profile) => switch (profile) {
   LibraryCsvProfile.soundiiz => const ['title', 'artist', 'album', 'isrc'],
 };
 
-List<dynamic> _bstreamRow(
+List<dynamic> _inutilRow(
   LibraryCsvTrack track,
   LibraryCsvMembership? membership,
 ) => [

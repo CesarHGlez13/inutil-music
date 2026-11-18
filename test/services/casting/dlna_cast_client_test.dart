@@ -8,7 +8,7 @@ import 'package:xml/xml.dart';
 
 const _description = '''<root xmlns="urn:schemas-upnp-org:device-1-0"><device>
 <deviceType>urn:schemas-upnp-org:device:MediaRenderer:1</deviceType>
-<friendlyName>Living room &amp; TV</friendlyName><UDN>uuid:bstream-test</UDN><serviceList>
+<friendlyName>Living room &amp; TV</friendlyName><UDN>uuid:inutil-test</UDN><serviceList>
 <service><serviceType>urn:schemas-upnp-org:service:AVTransport:1</serviceType><controlURL>/av/control</controlURL></service>
 <service><serviceType>urn:schemas-upnp-org:service:RenderingControl:1</serviceType><controlURL>/volume/control</controlURL></service>
 </serviceList></device></root>''';
@@ -20,7 +20,7 @@ void main() {
       _description,
     )!;
     expect(device.name, 'Living room & TV');
-    expect(device.id, 'uuid:bstream-test');
+    expect(device.id, 'uuid:inutil-test');
     expect(device.address, '192.168.1.8');
     expect(device.controlUrl.toString(), 'http://192.168.1.8:1400/av/control');
     expect(

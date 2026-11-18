@@ -27,6 +27,8 @@
 			<string>com.bstream.bstreamMusic.track</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>inutilmusic</string>
+				<!-- Enlaces compartidos por las versiones 2.0.x -->
 				<string>bstreammusic</string>
 			</array>
 		</dict>

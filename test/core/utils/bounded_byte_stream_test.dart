@@ -45,7 +45,7 @@ void main() {
 
   test('writes bounded streams incrementally to a file', () async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-bounded-stream-',
+      'inutil-bounded-stream-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final output = File('${directory.path}/response.bin');

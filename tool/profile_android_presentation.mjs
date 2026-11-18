@@ -41,7 +41,7 @@ const motionTailMs = numberOption('--motion-tail-ms', 150, 0, 500);
 const tapWaitMs = numberOption('--tap-wait-ms', 500, 100, 2000, true);
 const pattern = options.get('--pattern') ?? 'sweep';
 const resetScroll = options.get('--reset-scroll') === 'true';
-const clockHelper = options.get('--clock-helper') ?? '/data/local/tmp/bstream_profile_clock';
+const clockHelper = options.get('--clock-helper') ?? '/data/local/tmp/inutil_profile_clock';
 const beforeLabel = options.get('--expect-label-before') ?? options.get('--expect-label');
 const afterLabel = options.get('--expect-label-after') ?? options.get('--expect-label');
 if (!['scroll', 'tabs'].includes(mode)) throw new Error('--mode must be scroll or tabs');
@@ -65,7 +65,7 @@ const shell = (command, timeout = 15000) => run(options.get('--adb'), ['-s', opt
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const uncertaintyMs = 0.25;
 function markers(output) {
-  const result = [...output.matchAll(/^BSTREAM_CLOCK ([0-9]+) ([0-9]+)\s*$/gm)].map((m) => ({ bootNs: Number(m[1]), monotonicNs: Number(m[2]) }));
+  const result = [...output.matchAll(/^INUTIL_CLOCK ([0-9]+) ([0-9]+)\s*$/gm)].map((m) => ({ bootNs: Number(m[1]), monotonicNs: Number(m[2]) }));
   for (let i = 0; i < result.length; i++) {
     const m = result[i], previous = result[i - 1];
     if (![m.bootNs, m.monotonicNs].every((v) => Number.isSafeInteger(v) && v > 0) || (previous && (m.bootNs <= previous.bootNs || m.monotonicNs <= previous.monotonicNs))) {
@@ -79,11 +79,11 @@ function escapeXml(value) {
 }
 async function verifyScreen(label, stage) {
   if (label == null) return;
-  const path = '/sdcard/bstream_presentation_ui.xml';
+  const path = '/sdcard/inutil_presentation_ui.xml';
   try {
     const dump = await shell(`uiautomator dump ${path}`, 20000);
     const output = `${dump.stdout}\n${dump.stderr ?? ''}`;
-    if (/\bERROR\b/i.test(output) || !/UI hier(?:archy|chary) dumped to:\s*\/sdcard\/bstream_presentation_ui\.xml(?:\s|$)/.test(output)) throw new Error(`No fresh successful UI dump: ${output.trim()}`);
+    if (/\bERROR\b/i.test(output) || !/UI hier(?:archy|chary) dumped to:\s*\/sdcard\/inutil_presentation_ui\.xml(?:\s|$)/.test(output)) throw new Error(`No fresh successful UI dump: ${output.trim()}`);
     const { stdout } = await shell(`cat ${path}`);
     const decode = (v) => v.replace(/&(amp|lt|gt|quot|apos|#x[0-9a-fA-F]+|#[0-9]+);/g, (_, e) => e[0] === '#' ? String.fromCodePoint(Number.parseInt(e.slice(e[1] === 'x' ? 2 : 1), e[1] === 'x' ? 16 : 10)) : ({ amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" })[e]);
     if (!/<hierarchy(?:\s|>)/.test(stdout) || ![...stdout.matchAll(/(?:^|\s)content-desc="([^"]*)"/g)].some((m) => escapeXml(decode(m[1])) === escapeXml(label))) throw new Error(`Exact content-desc ${JSON.stringify(label)} absent`);
@@ -121,11 +121,11 @@ const tracker = Number((await shell('pidof process-tracker | wc -w')).stdout.tri
 if (!Number.isFinite(tracker) || tracker > 4) throw new Error(`Unreliable profiling conditions: ${tracker} process-tracker monitors; close Android Studio and duplicate monitors first.`);
 await verifyScreen(beforeLabel, 'before reset/recording');
 const preflight = markers((await shell(clockHelper)).stdout);
-if (preflight.length !== 1) throw new Error('Clock helper must return exactly one BSTREAM_CLOCK marker');
+if (preflight.length !== 1) throw new Error('Clock helper must return exactly one INUTIL_CLOCK marker');
 if (resetScroll) await shell(`set -e; for i in 1 2 3 4; do input swipe ${Math.round(width / 2)} ${Math.round(height * 800 / 3120)} ${Math.round(width / 2)} ${Math.round(height * 2400 / 3120)} 180; sleep 0.2; done; sleep 0.6`);
 const layerOutput = (await shell('dumpsys SurfaceFlinger --list')).stdout;
-const candidates = [...new Set([...layerOutput.matchAll(/([^\r\n{}]*SurfaceView\[com\.bstream\.bstream_music\/[^\r\n{}]*?\(BLAST\)#\d+)/g)].map((m) => m[1].trim()))];
-if (candidates.length !== 1) throw new Error(`Need one unambiguous BStream Flutter BLAST surface, found ${candidates.length}; never substitute global display FPS.`);
+const candidates = [...new Set([...layerOutput.matchAll(/([^\r\n{}]*SurfaceView\[com\.inutil\.inutil_music\/[^\r\n{}]*?\(BLAST\)#\d+)/g)].map((m) => m[1].trim()))];
+if (candidates.length !== 1) throw new Error(`Need one unambiguous Inutil Flutter BLAST surface, found ${candidates.length}; never substitute global display FPS.`);
 const surfaceName = candidates[0];
 const latencyCommand = `dumpsys SurfaceFlinger --latency '${surfaceName.replaceAll("'", "'\\''")}'`;
 const presented = new Map(), presentationErrors = [];

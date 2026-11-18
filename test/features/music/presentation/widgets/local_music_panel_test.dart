@@ -47,7 +47,7 @@ void main() {
   testWidgets(
     'shows all songs and distinct folders, then plays a transient full queue',
     (tester) async {
-      const artworkChannel = MethodChannel('bstream_music/local_audio');
+      const artworkChannel = MethodChannel('inutil_music/local_audio');
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(artworkChannel, (call) async {
             if (call.method != 'loadArtwork') return null;
@@ -104,7 +104,7 @@ void main() {
       expect(catalog.lastOptions?.excludeTelegramAudio, isTrue);
       expect(catalog.lastOptions?.excludeAudioRecordings, isTrue);
       expect(catalog.lastOptions?.excludeShortAudio, isTrue);
-      expect(catalog.lastBstreamRoot, '/tmp/BStream-Music');
+      expect(catalog.lastInutilRoot, '/tmp/BStream-Music');
 
       await tester.tap(find.byKey(const ValueKey('local-all-songs-entry')));
       await tester.pumpAndSettle();
@@ -162,7 +162,7 @@ void main() {
       );
       expect(
         artwork.source,
-        'bstream-local-artwork://audio?uri=content%3A%2F%2Fmedia%2Falpha',
+        'inutil-local-artwork://audio?uri=content%3A%2F%2Fmedia%2Falpha',
       );
 
       await tester.tap(
@@ -262,7 +262,7 @@ const _tracks = <DeviceAudioTrack>[
     artist: 'Artista A',
     duration: Duration(minutes: 2),
     artworkSource:
-        'bstream-local-artwork://audio?uri=content%3A%2F%2Fmedia%2Falpha',
+        'inutil-local-artwork://audio?uri=content%3A%2F%2Fmedia%2Falpha',
     folderId: 'folder:downloads',
     folderName: 'Descargas',
   ),
@@ -291,33 +291,33 @@ class _FakeDeviceAudioCatalog implements DeviceAudioCatalog {
   DeviceAudioCatalogResult result;
   DeviceAudioCatalogResult? permissionResult;
   DeviceAudioFilterOptions? lastOptions;
-  String? lastBstreamRoot;
+  String? lastInutilRoot;
   int permissionRequests = 0;
 
   @override
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
     lastOptions = options;
-    lastBstreamRoot = bstreamRoot;
+    lastInutilRoot = inutilRoot;
     return result;
   }
 
   @override
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
-  }) => load(options: options, bstreamRoot: bstreamRoot);
+    String? inutilRoot,
+  }) => load(options: options, inutilRoot: inutilRoot);
 
   @override
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
     permissionRequests += 1;
     result = permissionResult ?? result;
-    return load(options: options, bstreamRoot: bstreamRoot);
+    return load(options: options, inutilRoot: inutilRoot);
   }
 }
 

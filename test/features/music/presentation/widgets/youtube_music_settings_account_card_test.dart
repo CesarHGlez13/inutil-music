@@ -34,8 +34,8 @@ void main() {
   ) async {
     const profile = YouTubeMusicAccountProfile(
       channelId: 'channel-1',
-      displayName: 'BStream User',
-      handle: '@bstream',
+      displayName: 'Inutil User',
+      handle: '@inutil',
     );
     await tester.pumpWidget(
       _harness(
@@ -47,8 +47,8 @@ void main() {
       ),
     );
 
-    expect(find.text('BStream User'), findsOneWidget);
-    expect(find.text('@bstream'), findsOneWidget);
+    expect(find.text('Inutil User'), findsOneWidget);
+    expect(find.text('@inutil'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('settings-youtube-music-sign-out')),
       findsOneWidget,

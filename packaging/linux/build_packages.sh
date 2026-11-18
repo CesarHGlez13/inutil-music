@@ -13,10 +13,10 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # El bundle de Flutter trae el entry point que espera el tool (`inutil_music`,
 # hoy un script) y el binario real con nombre legible (`Inútil Music`, el que
-# muestra KDE/PipeWire). Se aceptan también los nombres heredados de BStream
+# muestra KDE/PipeWire). Se aceptan también los nombres heredados de Inutil
 # para poder empaquetar bundles de checks anteriores.
 launcher=""
-for candidate in inutil_music bstream_music; do
+for candidate in inutil_music inutil_music; do
   if [[ -e "$bundle/$candidate" ]]; then launcher="$candidate"; break; fi
 done
 if [[ -z "$launcher" ]]; then
@@ -25,7 +25,7 @@ if [[ -z "$launcher" ]]; then
 fi
 
 executable=""
-for candidate in "Inútil Music" "BStream Music"; do
+for candidate in "Inútil Music" "Inútil Music"; do
   if [[ -x "$bundle/$candidate" ]]; then executable="$candidate"; break; fi
 done
 if [[ -z "$executable" ]]; then
@@ -53,33 +53,33 @@ trap 'rm -rf "$work_dir"' EXIT
 
 stage="$work_dir/root"
 install -d \
-  "$stage/opt/bstream-music" \
+  "$stage/opt/inutil-music" \
   "$stage/usr/bin" \
   "$stage/usr/share/applications" \
   "$stage/usr/share/icons/hicolor/512x512/apps"
-cp -a "$bundle/." "$stage/opt/bstream-music/"
+cp -a "$bundle/." "$stage/opt/inutil-music/"
 # El entry point que escribe Flutter repite el `BINARY_NAME` del CMake, así que
 # al tener el binario real renombrado (`OUTPUT_NAME`) se exec a sí mismo en vez
 # de arrancar la app. Se reescribe aquí para que apunte al ejecutable legible.
-cat >"$stage/opt/bstream-music/$launcher" <<EOF
+cat >"$stage/opt/inutil-music/$launcher" <<EOF
 #!/bin/sh
 set -e
 exec "\$(dirname "\$0")/$executable" "\$@"
 EOF
-chmod 0755 "$stage/opt/bstream-music/$launcher"
-install -m 0755 "$repo_root/packaging/linux/bstream-music" \
-  "$stage/usr/bin/bstream-music"
-install -m 0644 "$repo_root/packaging/linux/com.bstream.bstream_music.desktop" \
-  "$stage/usr/share/applications/com.bstream.bstream_music.desktop"
+chmod 0755 "$stage/opt/inutil-music/$launcher"
+install -m 0755 "$repo_root/packaging/linux/inutil-music" \
+  "$stage/usr/bin/inutil-music"
+install -m 0644 "$repo_root/packaging/linux/com.inutilmusic.app.desktop" \
+  "$stage/usr/share/applications/com.inutilmusic.app.desktop"
 install -m 0644 \
   "$repo_root/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_512.png" \
-  "$stage/usr/share/icons/hicolor/512x512/apps/com.bstream.bstream_music.png"
+  "$stage/usr/share/icons/hicolor/512x512/apps/com.inutilmusic.app.png"
 
 deb_root="$work_dir/deb"
 cp -a "$stage" "$deb_root"
 install -d "$deb_root/DEBIAN"
 cat >"$deb_root/DEBIAN/control" <<EOF
-Package: bstream-music
+Package: inutil-music
 Version: $version
 Section: sound
 Priority: optional
@@ -115,7 +115,7 @@ exit 0
 EOF
 chmod 0755 "$deb_root/DEBIAN/postinst" "$deb_root/DEBIAN/postrm"
 
-deb_path="$output_dir/BStream-Music-$version-linux-amd64.deb"
+deb_path="$output_dir/InutilMusic-$version-linux-amd64.deb"
 dpkg-deb --root-owner-group --build "$deb_root" "$deb_path"
 dpkg-deb --info "$deb_path"
 dpkg-deb --contents "$deb_path" >/dev/null
@@ -126,7 +126,7 @@ rpmbuild -bb \
   --define "_topdir $rpm_top" \
   --define "app_version $version" \
   --define "staging_root $stage" \
-  "$repo_root/packaging/linux/bstream-music.spec"
+  "$repo_root/packaging/linux/inutil-music.spec"
 
 rpm_source="$(find "$rpm_top/RPMS" -type f -name '*.rpm' -print -quit)"
 if [[ -z "$rpm_source" ]]; then
@@ -134,7 +134,7 @@ if [[ -z "$rpm_source" ]]; then
   exit 1
 fi
 
-rpm_path="$output_dir/BStream-Music-$version-linux-x86_64.rpm"
+rpm_path="$output_dir/InutilMusic-$version-linux-x86_64.rpm"
 cp "$rpm_source" "$rpm_path"
 rpm -qip "$rpm_path"
 rpm -qlp "$rpm_path" >/dev/null

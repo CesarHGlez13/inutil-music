@@ -660,7 +660,7 @@ const liveOverlayHtml = r'''<!doctype html>
         titleRow.className = 'title-row';
         const titleLogo = document.createElement('img');
         titleLogo.className = 'title-logo';
-        titleLogo.src = '/bstream-icon.png';
+        titleLogo.src = '/inutil-icon.png';
         titleLogo.alt = '';
         titleLogo.draggable = false;
         titleLogo.setAttribute('aria-hidden', 'true');

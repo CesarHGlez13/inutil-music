@@ -233,7 +233,7 @@ void main() {
   test(
     'bulk download queues only missing unique active playlist songs',
     () async {
-      final directory = await Directory.systemTemp.createTemp('bstream-bulk-');
+      final directory = await Directory.systemTemp.createTemp('inutil-bulk-');
       addTearDown(() => directory.delete(recursive: true));
       final saved = File('${directory.path}/saved.m4a');
       await saved.writeAsBytes([1, 2, 3]);
@@ -317,7 +317,7 @@ void main() {
     'legacy playlists reuse saved audio and recover missing source files',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-legacy-bulk-',
+        'inutil-legacy-bulk-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final saved = File('${directory.path}/saved.m4a');

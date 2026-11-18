@@ -1375,7 +1375,7 @@ InnerTubeClientProfile _profile({
   clientId: clientId,
   host: 'www.youtube.com',
   origin: 'https://www.youtube.com',
-  userAgent: 'BStream test',
+  userAgent: 'Inutil test',
   capabilities: const InnerTubeClientCapabilities(
     playerJavaScript: InnerTubePlayerJavaScriptRequirement.notRequired,
     playerPoToken: InnerTubePoTokenRequirement.notRequired,
@@ -1411,7 +1411,7 @@ Map<String, dynamic> _playerResponse({
   'videoDetails': <String, dynamic>{
     'videoId': videoId,
     'title': 'Test',
-    'author': 'BStream',
+    'author': 'Inutil',
     'lengthSeconds': '120',
   },
   'streamingData': <String, dynamic>{

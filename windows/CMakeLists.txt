@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(bstream_music LANGUAGES CXX)
+project(inutil_music LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "bstream_music")
+set(BINARY_NAME "inutil_music")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -40,29 +40,29 @@ add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 # `flutter run -d windows` behaves the same as CI.  The script is idempotent;
 # it only downloads on the first build and leaves newer smtc versions alone.
 if(WIN32)
-  set(BSTREAM_NUGET_DIR "$ENV{LOCALAPPDATA}/BStream Music/tools")
-  set(BSTREAM_WINDOWS_BOOTSTRAP
+  set(INUTIL_NUGET_DIR "$ENV{LOCALAPPDATA}/Inútil Music/tools")
+  set(INUTIL_WINDOWS_BOOTSTRAP
       "${CMAKE_CURRENT_SOURCE_DIR}/../tool/ensure_windows_build_dependencies.ps1")
-  if(EXISTS "${BSTREAM_WINDOWS_BOOTSTRAP}")
+  if(EXISTS "${INUTIL_WINDOWS_BOOTSTRAP}")
     execute_process(
       COMMAND powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass
-              -File "${BSTREAM_WINDOWS_BOOTSTRAP}"
+              -File "${INUTIL_WINDOWS_BOOTSTRAP}"
               -RepositoryRoot "${CMAKE_CURRENT_SOURCE_DIR}/.."
-              -InstallDirectory "${BSTREAM_NUGET_DIR}"
-      RESULT_VARIABLE BSTREAM_BOOTSTRAP_RESULT
-      OUTPUT_VARIABLE BSTREAM_BOOTSTRAP_OUTPUT
-      ERROR_VARIABLE BSTREAM_BOOTSTRAP_ERROR
+              -InstallDirectory "${INUTIL_NUGET_DIR}"
+      RESULT_VARIABLE INUTIL_BOOTSTRAP_RESULT
+      OUTPUT_VARIABLE INUTIL_BOOTSTRAP_OUTPUT
+      ERROR_VARIABLE INUTIL_BOOTSTRAP_ERROR
       OUTPUT_STRIP_TRAILING_WHITESPACE
       ERROR_STRIP_TRAILING_WHITESPACE)
-    if(NOT BSTREAM_BOOTSTRAP_RESULT EQUAL 0)
+    if(NOT INUTIL_BOOTSTRAP_RESULT EQUAL 0)
       message(FATAL_ERROR
-        "Windows build dependency bootstrap failed: ${BSTREAM_BOOTSTRAP_ERROR}")
+        "Windows build dependency bootstrap failed: ${INUTIL_BOOTSTRAP_ERROR}")
     endif()
     # find_program() in flutter_inappwebview_windows searches this CMake path.
-    list(PREPEND CMAKE_PROGRAM_PATH "${BSTREAM_NUGET_DIR}")
-    set(ENV{PATH} "${BSTREAM_NUGET_DIR};$ENV{PATH}")
-    set(ENV{NUGET_EXE} "${BSTREAM_NUGET_DIR}/nuget.exe")
-    set(ENV{NUGET_EXECUTABLE} "${BSTREAM_NUGET_DIR}/nuget.exe")
+    list(PREPEND CMAKE_PROGRAM_PATH "${INUTIL_NUGET_DIR}")
+    set(ENV{PATH} "${INUTIL_NUGET_DIR};$ENV{PATH}")
+    set(ENV{NUGET_EXE} "${INUTIL_NUGET_DIR}/nuget.exe")
+    set(ENV{NUGET_EXECUTABLE} "${INUTIL_NUGET_DIR}/nuget.exe")
     unset(NUGET CACHE)
   endif()
 endif()

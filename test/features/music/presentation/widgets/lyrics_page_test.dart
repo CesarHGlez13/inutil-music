@@ -3066,17 +3066,17 @@ void main() {
 
       await container
           .read(settingsControllerProvider.notifier)
-          .setPlayerStyle(PlayerStyle.bstreamMusic);
+          .setPlayerStyle(PlayerStyle.inutilMusic);
       await tester.pump();
 
       expect(linearTimeline, findsOneWidget);
       expect(linearSlider, findsOneWidget);
       expect(find.byType(WavyPlaybackSeekBar), findsNothing);
-      final bstreamTheme = tester.widget<SliderTheme>(sliderThemeFinder).data;
-      expect(bstreamTheme.trackHeight, 8);
-      expect(bstreamTheme.trackShape, isA<UniformPlaybackSliderTrackShape>());
-      expect(bstreamTheme.thumbShape, same(SliderComponentShape.noThumb));
-      expect(bstreamTheme.overlayShape, same(SliderComponentShape.noOverlay));
+      final inutilTheme = tester.widget<SliderTheme>(sliderThemeFinder).data;
+      expect(inutilTheme.trackHeight, 8);
+      expect(inutilTheme.trackShape, isA<UniformPlaybackSliderTrackShape>());
+      expect(inutilTheme.thumbShape, same(SliderComponentShape.noThumb));
+      expect(inutilTheme.overlayShape, same(SliderComponentShape.noOverlay));
       expect(
         tester.widget<UniformPlaybackSeekBar>(timeline).position,
         lookupSnapshot.position,
@@ -5165,7 +5165,7 @@ class _FakeLyricsSettingsController extends SettingsController {
 
   @override
   Future<SettingsState> build() async => SettingsState(
-    downloadDirectory: '/tmp/bstream-lyrics-test',
+    downloadDirectory: '/tmp/inutil-lyrics-test',
     language: initialLanguage,
     playerStyle: initialPlayerStyle,
     lyricsTextAlignment: initialLyricsTextAlignment,
@@ -5250,7 +5250,7 @@ class _FakeLyricsSettingsController extends SettingsController {
 class _PersistingLyricsSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/bstream-lyrics-test',
+    downloadDirectory: '/tmp/inutil-lyrics-test',
     language: AppLanguage.english,
   );
 }

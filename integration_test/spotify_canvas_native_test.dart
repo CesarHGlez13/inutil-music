@@ -20,14 +20,14 @@ import 'package:video_player/video_player.dart';
 
 /// Run with a local Canvas fixture, never the user's music database:
 /// flutter test integration_test/spotify_canvas_native_test.dart -d windows
-/// --dart-define=BSTREAM_CANVAS_TEST_FILE=absolute-path-to-mp4
-/// Add BSTREAM_CANVAS_TEST_LOOKUP=true to exercise the online player pipeline,
-/// and BSTREAM_CANVAS_TEST_UNKNOWN_DURATION=true for missing native metadata.
-/// BSTREAM_CANVAS_TEST_APPLE=true exercises Animated Artwork instead of Canvas.
+/// --dart-define=INUTIL_CANVAS_TEST_FILE=absolute-path-to-mp4
+/// Add INUTIL_CANVAS_TEST_LOOKUP=true to exercise the online player pipeline,
+/// and INUTIL_CANVAS_TEST_UNKNOWN_DURATION=true for missing native metadata.
+/// INUTIL_CANVAS_TEST_APPLE=true exercises Animated Artwork instead of Canvas.
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   configureArtworkVideoRendering();
-  const path = String.fromEnvironment('BSTREAM_CANVAS_TEST_FILE');
+  const path = String.fromEnvironment('INUTIL_CANVAS_TEST_FILE');
 
   testWidgets('cached artwork advances and becomes visible on Windows', (
     tester,
@@ -35,7 +35,7 @@ void main() {
     final original = File(path);
     expect(await original.exists(), isTrue);
     final fixtureDirectory = await Directory.systemTemp.createTemp(
-      'bstream_native_artwork_',
+      'inutil_native_artwork_',
     );
     addTearDown(() => fixtureDirectory.delete(recursive: true));
     final file = await original.copy('${fixtureDirectory.path}/fixture.mp4');
@@ -190,9 +190,9 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 200));
-    if (const bool.fromEnvironment('BSTREAM_CANVAS_TEST_LOOKUP')) {
+    if (const bool.fromEnvironment('INUTIL_CANVAS_TEST_LOOKUP')) {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream_canvas_native_',
+        'inutil_canvas_native_',
       );
       final cache = PlaybackVisualCache(directory: () async => directory);
       final container = ProviderContainer(
@@ -319,7 +319,7 @@ const _baseSnapshot = PlayerSnapshot(
   title: 'vampire',
   artist: 'Olivia Rodrigo',
   album: 'GUTS',
-  duration: bool.fromEnvironment('BSTREAM_CANVAS_TEST_UNKNOWN_DURATION')
+  duration: bool.fromEnvironment('INUTIL_CANVAS_TEST_UNKNOWN_DURATION')
       ? null
       : Duration(seconds: 220),
   trackId: 'native-canvas-fixture',
@@ -330,7 +330,7 @@ PlayerSnapshot get _snapshot => _fixtureCoverPath == null
     ? _baseSnapshot
     : _baseSnapshot.copyWith(thumbnailUrl: _fixtureCoverPath);
 
-const _appleArtwork = bool.fromEnvironment('BSTREAM_CANVAS_TEST_APPLE');
+const _appleArtwork = bool.fromEnvironment('INUTIL_CANVAS_TEST_APPLE');
 
 class _CanvasPlayer extends PlayerController {
   @override

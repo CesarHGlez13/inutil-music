@@ -71,7 +71,7 @@ class AudioOutputState {
 /// the system's multimedia volume, never the player's independent gain.
 class AudioOutputService {
   AudioOutputService({MethodChannel? channel})
-    : _channel = channel ?? const MethodChannel('bstream_music/audio_output');
+    : _channel = channel ?? const MethodChannel('inutil_music/audio_output');
 
   final MethodChannel _channel;
   final _changes = StreamController<AudioOutputState>.broadcast();

@@ -18,7 +18,7 @@ void main() {
 
   setUp(() async {
     temporaryDirectory = await Directory.systemTemp.createTemp(
-      'bstream_lyrics_export_test_',
+      'inutil_lyrics_export_test_',
     );
   });
 
@@ -227,7 +227,7 @@ void main() {
   test('only expires marked owned exports after seven days', () async {
     final now = DateTime.now();
     final root = await Directory(
-      p.join(temporaryDirectory.path, 'bstream-lyrics-images'),
+      p.join(temporaryDirectory.path, 'inutil-lyrics-images'),
     ).create();
     final expired = await Directory(
       p.join(root.path, 'image_expired'),
@@ -239,8 +239,8 @@ void main() {
     final unrelated = await Directory(p.join(root.path, 'unrelated')).create();
     for (final directory in [expired, recent, unrelated]) {
       final marker = await File(
-        p.join(directory.path, '.bstream-lyrics-image'),
-      ).writeAsString('BStream lyrics image');
+        p.join(directory.path, '.inutil-lyrics-image'),
+      ).writeAsString('Inutil lyrics image');
       if (directory != recent) {
         await marker.setLastModified(now.subtract(const Duration(days: 8)));
       }

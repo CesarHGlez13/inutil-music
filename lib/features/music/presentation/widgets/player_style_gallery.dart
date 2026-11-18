@@ -14,7 +14,7 @@ import '../providers/player_style.dart';
 import 'player_controls_capsule.dart';
 import 'player_lyrics_icon.dart';
 
-const _previewCoverAsset = 'assets/icons/4.0x/bstream_icon.png';
+const _previewCoverAsset = 'assets/icons/inutil_icon.png';
 const _styleCaptionHorizontalPadding = 10.0;
 
 /// Full settings page with complete, lightweight layout illustrations.
@@ -193,7 +193,7 @@ class _PlayerStyleGalleryPageState extends State<PlayerStyleGalleryPage> {
 }
 
 String _optionCode(PlayerStyle style) => switch (style) {
-  PlayerStyle.bstreamMusic => 'bstream-music',
+  PlayerStyle.inutilMusic => 'inutil-music',
   PlayerStyle.appleMusic => 'apple-music',
   PlayerStyle.classicVinyl => 'classic-vinyl',
   PlayerStyle.spotifyMusic => 'spotify-music',

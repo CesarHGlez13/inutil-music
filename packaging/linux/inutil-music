@@ -1,0 +1,13 @@
+#!/bin/sh
+# Lanzador empaquetado en /usr/bin. El bundle vive en /opt/inutil-music y su
+# ejecutable tiene el nombre legible que muestran los controles de volumen de
+# KDE/PipeWire («Inútil Music»); se conservan también los nombres heredados de
+# Inutil por si el bundle instalado todavía los usa.
+base=/opt/inutil-music
+for candidate in "Inútil Music" "Inútil Music" "inutil_music" "inutil_music"; do
+  if [ -x "$base/$candidate" ]; then
+    exec "$base/$candidate" "$@"
+  fi
+done
+echo "No se encontró el ejecutable de Inútil Music en $base" >&2
+exit 1

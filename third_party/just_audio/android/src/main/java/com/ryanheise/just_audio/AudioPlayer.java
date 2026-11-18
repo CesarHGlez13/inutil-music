@@ -86,27 +86,27 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private static Random random = new Random();
 
-    // BStream's music/crossfade engines share an explicit media-device preference.
+    // Inútil Music's music/crossfade engines share an explicit media-device preference.
     // Weak keys never keep released Flutter players alive. No communication-mode,
     // SCO, speakerphone or global Bluetooth state is changed here.
-    private static final WeakHashMap<AudioPlayer, Boolean> bstreamPlayers = new WeakHashMap<>();
-    private static Integer bstreamPreferredDeviceId;
+    private static final WeakHashMap<AudioPlayer, Boolean> inutilPlayers = new WeakHashMap<>();
+    private static Integer inutilPreferredDeviceId;
 
-    public static Integer getBStreamPreferredAudioDeviceId() {
-        return bstreamPreferredDeviceId;
+    public static Integer getInutilPreferredAudioDeviceId() {
+        return inutilPreferredDeviceId;
     }
 
-    public static boolean setBStreamPreferredAudioDevice(Context context, Integer deviceId) {
-        AudioDeviceInfo device = findBStreamAudioDevice(context, deviceId);
+    public static boolean setInutilPreferredAudioDevice(Context context, Integer deviceId) {
+        AudioDeviceInfo device = findInutilAudioDevice(context, deviceId);
         if (deviceId != null && device == null) return false;
-        bstreamPreferredDeviceId = deviceId;
-        for (AudioPlayer instance : new ArrayList<>(bstreamPlayers.keySet())) {
+        inutilPreferredDeviceId = deviceId;
+        for (AudioPlayer instance : new ArrayList<>(inutilPlayers.keySet())) {
             if (instance.player != null) instance.player.setPreferredAudioDevice(device);
         }
         return true;
     }
 
-    private static AudioDeviceInfo findBStreamAudioDevice(Context context, Integer deviceId) {
+    private static AudioDeviceInfo findInutilAudioDevice(Context context, Integer deviceId) {
         if (deviceId == null || Build.VERSION.SDK_INT < 23) return null;
         AudioManager manager = (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
         for (AudioDeviceInfo device : manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)) {
@@ -208,7 +208,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         boolean useLazyPreparation
     ) {
         this.context = applicationContext;
-        bstreamPlayers.put(this, Boolean.TRUE);
+        inutilPlayers.put(this, Boolean.TRUE);
         this.rawAudioEffects = rawAudioEffects;
         this.offloadSchedulingEnabled = offloadSchedulingEnabled != null ? offloadSchedulingEnabled : false;
         this.useLazyPreparation = useLazyPreparation;
@@ -880,7 +880,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                             boolean enableFloatOutput,
                             boolean enableAudioTrackPlaybackParams) {
                         return new DefaultAudioSink.Builder(context)
-                            .setAudioProcessorChain(new BStreamAudioProcessorChain())
+                            .setAudioProcessorChain(new InutilAudioProcessorChain())
                             .setEnableFloatOutput(enableFloatOutput)
                             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                             .build();
@@ -901,7 +901,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
                 builder.setLivePlaybackSpeedControl(livePlaybackSpeedControl);
             }
             player = builder.build();
-            player.setPreferredAudioDevice(findBStreamAudioDevice(context, bstreamPreferredDeviceId));
+            player.setPreferredAudioDevice(findInutilAudioDevice(context, inutilPreferredDeviceId));
             player.setTrackSelectionParameters(
                 player.getTrackSelectionParameters()
                     .buildUpon()
@@ -1166,7 +1166,7 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     public void dispose() {
-        bstreamPlayers.remove(this);
+        inutilPlayers.remove(this);
         if (processingState == ProcessingState.loading) {
             abortExistingConnection(true);
         }

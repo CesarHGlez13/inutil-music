@@ -94,7 +94,7 @@ BEGIN
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "Inútil Music" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 Inútil Music · basado en BStream Music (BSD-2-Clause)" "\0"
-            VALUE "OriginalFilename", "bstream_music.exe" "\0"
+            VALUE "OriginalFilename", "inutil_music.exe" "\0"
             VALUE "ProductName", "Inútil Music" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

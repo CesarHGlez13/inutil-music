@@ -1,4 +1,4 @@
-storeFile=../release/bstream-upload-keystore.jks
+storeFile=../release/inutil-upload-keystore.jks
 storePassword=change-me
-keyAlias=bstream
+keyAlias=inutil
 keyPassword=change-me

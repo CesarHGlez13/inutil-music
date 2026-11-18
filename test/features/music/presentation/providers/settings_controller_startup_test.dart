@@ -28,26 +28,26 @@ void main() {
       downloadDirectoryForPlatform(
         platform: AppPlatformType.ios,
         candidateDirectory:
-            '/var/mobile/Containers/Data/Application/OLD/Documents/BStream Music',
+            '/var/mobile/Containers/Data/Application/OLD/Documents/Inútil Music',
         defaultDirectory:
-            '/var/mobile/Containers/Data/Application/NEW/Documents/BStream Music',
+            '/var/mobile/Containers/Data/Application/NEW/Documents/Inútil Music',
       ),
-      '/var/mobile/Containers/Data/Application/NEW/Documents/BStream Music',
+      '/var/mobile/Containers/Data/Application/NEW/Documents/Inútil Music',
     );
     expect(
       downloadDirectoryForPlatform(
         platform: AppPlatformType.android,
-        candidateDirectory: '/data/user/0/com.bstream/files/BStream Music',
-        defaultDirectory: '/data/user/0/com.bstream/files/default',
+        candidateDirectory: '/data/user/0/com.inutil/files/Inútil Music',
+        defaultDirectory: '/data/user/0/com.inutil/files/default',
       ),
-      '/data/user/0/com.bstream/files/BStream Music',
+      '/data/user/0/com.inutil/files/Inútil Music',
     );
   });
 
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
     sandbox = await Directory.systemTemp.createTemp(
-      'bstream-settings-startup-',
+      'inutil-settings-startup-',
     );
     documentsPath = p.join(sandbox.path, 'documents');
     await Directory(documentsPath).create(recursive: true);
@@ -336,13 +336,13 @@ void main() {
 
     await container
         .read(settingsControllerProvider.notifier)
-        .setPlayerStyle(PlayerStyle.bstreamMusic);
+        .setPlayerStyle(PlayerStyle.inutilMusic);
 
     final preferences = await SharedPreferences.getInstance();
-    expect(preferences.getString('settings.playerStyle'), 'bstreamMusic');
+    expect(preferences.getString('settings.playerStyle'), 'inutilMusic');
     expect(
       container.read(settingsControllerProvider).value?.playerStyle,
-      PlayerStyle.bstreamMusic,
+      PlayerStyle.inutilMusic,
     );
   });
 
@@ -547,7 +547,7 @@ void main() {
     final preferences = await SharedPreferences.getInstance();
 
     expect(settings.surfaceBackgroundMode, SurfaceBackgroundMode.accent);
-    expect(settings.playerStyle, PlayerStyle.bstreamMusic);
+    expect(settings.playerStyle, PlayerStyle.inutilMusic);
     expect(settings.playerArtworkStyle, PlayerArtworkStyle.classic);
     expect(settings.animatedArtworkEnabled, isTrue);
     expect(settings.miniPlayerMode, MiniPlayerMode.capsule);

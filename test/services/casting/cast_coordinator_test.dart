@@ -83,14 +83,14 @@ void main() {
 
   test('load relays exact source and forwards logical occurrence ID', () async {
     await harness.coordinator.connect(_speaker);
-    await harness.load('bstream-1');
+    await harness.load('inutil-1');
     expect(
       harness.relay.sources.single,
       Uri.parse('https://media.example/audio.m4a'),
     );
-    expect(harness.native.loads.single.contentId, 'bstream-1');
+    expect(harness.native.loads.single.contentId, 'inutil-1');
     expect(harness.native.loads.single.url.host, '192.168.1.5');
-    expect(harness.coordinator.state.contentId, 'bstream-1');
+    expect(harness.coordinator.state.contentId, 'inutil-1');
     expect(harness.coordinator.state.status, CastPlaybackStatus.playing);
   });
 
@@ -159,18 +159,18 @@ void main() {
     'previous occurrence native status cannot complete the new song',
     () async {
       await harness.coordinator.connect(_speaker);
-      await harness.load('bstream-1');
-      await harness.load('bstream-2');
+      await harness.load('inutil-1');
+      await harness.load('inutil-2');
       harness.native.emitStatus(
-        'bstream-1',
+        'inutil-1',
         NativeCastStatus.completed,
         position: const Duration(seconds: 199),
       );
-      expect(harness.coordinator.state.contentId, 'bstream-2');
+      expect(harness.coordinator.state.contentId, 'inutil-2');
       expect(harness.coordinator.state.status, CastPlaybackStatus.playing);
       expect(harness.coordinator.state.position, Duration.zero);
       harness.native.emitStatus(
-        'bstream-2',
+        'inutil-2',
         NativeCastStatus.paused,
         position: const Duration(seconds: 7),
       );
@@ -249,9 +249,9 @@ void main() {
 
   test('late receiver completion after stop is ignored', () async {
     await harness.coordinator.connect(_speaker);
-    await harness.load('bstream-1');
+    await harness.load('inutil-1');
     await harness.coordinator.stop();
-    harness.native.emitStatus('bstream-1', NativeCastStatus.completed);
+    harness.native.emitStatus('inutil-1', NativeCastStatus.completed);
     expect(harness.coordinator.state.status, CastPlaybackStatus.idle);
     expect(harness.coordinator.state.contentId, isNull);
   });
@@ -259,21 +259,21 @@ void main() {
     'temporary session suspension preserves receiver and relay until resume',
     () async {
       await harness.coordinator.connect(_speaker);
-      await harness.load('bstream-1');
+      await harness.load('inutil-1');
       final stops = harness.relay.stops;
       harness.native.publish(
         const NativeCastState(
           supported: true,
           connected: false,
           suspended: true,
-          contentId: 'bstream-1',
+          contentId: 'inutil-1',
         ),
       );
       expect(harness.coordinator.state.connected, true);
       expect(harness.coordinator.state.status, CastPlaybackStatus.loading);
       expect(harness.relay.stops, stops);
       harness.native.emitStatus(
-        'bstream-1',
+        'inutil-1',
         NativeCastStatus.playing,
         position: const Duration(seconds: 43),
       );
@@ -284,7 +284,7 @@ void main() {
 
   test('receiver loss clears selection and stops relay', () async {
     await harness.coordinator.connect(_speaker);
-    await harness.load('bstream-1');
+    await harness.load('inutil-1');
     final stopsBefore = harness.relay.stops;
     harness.native.publish(const NativeCastState(supported: true));
     expect(harness.coordinator.state.connected, isFalse);

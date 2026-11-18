@@ -40,12 +40,12 @@ class PlaybackVisualCache extends ChangeNotifier {
   static Future<Directory> _defaultDirectory() async {
     final root = await getTemporaryDirectory();
     return Directory(
-      '${root.path}${Platform.pathSeparator}bstream_visual_cache_v1',
+      '${root.path}${Platform.pathSeparator}inutil_visual_cache_v1',
     );
   }
 
   static Future<File?> _defaultSharedArtworkLookup(String source) async =>
-      (await BStreamArtworkCacheManager().getFileFromCache(source))?.file;
+      (await InutilArtworkCacheManager().getFileFromCache(source))?.file;
 
   void activate({
     required String trackKey,
@@ -243,7 +243,7 @@ class PlaybackVisualCache extends ChangeNotifier {
           );
           assert(() {
             debugPrint(
-              'BStream visual cover ${entry.key}: ${file!.lengthSync()} bytes',
+              'Inutil visual cover ${entry.key}: ${file!.lengthSync()} bytes',
             );
             return true;
           }());
@@ -309,7 +309,7 @@ class PlaybackVisualCache extends ChangeNotifier {
           );
           assert(() {
             debugPrint(
-              'BStream visual video ${entry.key}: ${file!.lengthSync()} bytes',
+              'Inutil visual video ${entry.key}: ${file!.lengthSync()} bytes',
             );
             return true;
           }());

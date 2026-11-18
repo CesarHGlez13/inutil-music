@@ -13,7 +13,7 @@ void main() {
   late Directory directory;
   late AudioMetadataTags tags;
   setUp(() {
-    directory = Directory.systemTemp.createTempSync('bstream-standard-tags-');
+    directory = Directory.systemTemp.createTempSync('inutil-standard-tags-');
     tags = AudioMetadataTags(
       title: 'Canción 日本語 🎵',
       artist: 'Björk, 坂本龍一',

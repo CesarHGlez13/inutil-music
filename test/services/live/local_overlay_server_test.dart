@@ -50,7 +50,7 @@ void main() {
       );
       expect(overlay.contentSecurityPolicy, contains("img-src 'self' data:"));
 
-      final icon = await _request(boundServer.port, '/bstream-icon.png');
+      final icon = await _request(boundServer.port, '/inutil-icon.png');
       expect(icon.statusCode, HttpStatus.ok);
       expect(icon.contentType?.mimeType, 'image/png');
       expect(icon.bytes, <int>[137, 80, 78, 71]);

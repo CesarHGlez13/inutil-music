@@ -17,10 +17,10 @@ void main() {
   ) async {
     if (!Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) return;
 
-    const headless = bool.fromEnvironment('BSTREAM_HEADLESS_AUDIO');
+    const headless = bool.fromEnvironment('INUTIL_HEADLESS_AUDIO');
     const trackDuration = Duration(milliseconds: 2600);
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_desktop_output_',
+      'inutil_desktop_output_',
     );
     final files = <File>[];
     final service = MediaKitPlayerService();
@@ -58,7 +58,7 @@ void main() {
       await output.selectAudioOutput(selectedId);
       expect(output.audioOutputState.selectedDeviceId, selectedId);
       await expectLater(
-        output.selectAudioOutput('bstream-nonexistent-output-device'),
+        output.selectAudioOutput('inutil-nonexistent-output-device'),
         throwsA(isA<ArgumentError>()),
       );
       expect(output.audioOutputState.selectedDeviceId, selectedId);
@@ -74,7 +74,7 @@ void main() {
           LocalTrack(
             id: 'desktop-output-$index',
             title: 'Silent desktop output fixture $index',
-            artist: 'BStream integration test',
+            artist: 'Inutil integration test',
             filePath: file.path,
             duration: trackDuration,
             addedAt: DateTime(2026),

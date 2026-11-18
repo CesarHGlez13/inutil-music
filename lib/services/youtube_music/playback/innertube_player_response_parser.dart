@@ -2,7 +2,7 @@ import 'innertube_stream_models.dart';
 
 /// Parses the public shape of an InnerTube player JSON response.
 ///
-/// Original BStream parser kept independent from external extractor code.
+/// Original Inutil parser kept independent from external extractor code.
 final class InnerTubePlayerResponseParser {
   const InnerTubePlayerResponseParser();
 

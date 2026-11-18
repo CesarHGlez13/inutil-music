@@ -36,7 +36,7 @@ class NativeIncomingCsvFileService implements IncomingCsvFileService {
     Stream<Uri>? links,
     MethodChannel? channel,
     TargetPlatform? platform,
-  }) : _channel = channel ?? const MethodChannel('bstream_music/incoming_csv') {
+  }) : _channel = channel ?? const MethodChannel('inutil_music/incoming_csv') {
     _platform = platform ?? defaultTargetPlatform;
     _controller = StreamController<IncomingCsvFile>(
       onListen: () {

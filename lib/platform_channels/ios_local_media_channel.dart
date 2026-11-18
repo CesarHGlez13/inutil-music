@@ -11,7 +11,7 @@ import 'android_local_media_channel.dart' show DeviceAudioTrackPlatformModel;
 class IosLocalMediaChannel {
   const IosLocalMediaChannel({MethodChannel? methodChannel})
     : _methodChannel =
-          methodChannel ?? const MethodChannel('bstream_music/local_audio');
+          methodChannel ?? const MethodChannel('inutil_music/local_audio');
 
   final MethodChannel _methodChannel;
 

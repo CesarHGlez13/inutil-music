@@ -27,27 +27,27 @@
         android:networkSecurityConfig="@xml/network_security_config">
         <meta-data
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
-            android:value="com.bstream.bstream_music.BStreamCastOptionsProvider" />
+            android:value="com.inutilmusic.app.InutilCastOptionsProvider" />
         <!-- Keep the runtime-configured media notification icon in release APKs. -->
         <meta-data
-            android:name="bstream_music.notification_icon"
-            android:resource="@drawable/ic_stat_bstream_music" />
+            android:name="inutil_music.notification_icon"
+            android:resource="@drawable/ic_stat_inutil_music" />
         <receiver
-            android:name=".BStreamMusicWidget"
+            android:name=".InutilMusicWidget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/bstream_music_widget" />
+                android:resource="@xml/inutil_music_widget" />
         </receiver>
         <service
-            android:name=".BStreamMusicQueueWidgetService"
+            android:name=".InutilMusicQueueWidgetService"
             android:exported="true"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
         <receiver
-            android:name=".BStreamWidgetPlaybackReceiver"
+            android:name=".InutilWidgetPlaybackReceiver"
             android:exported="false" />
         <activity
             android:name=".MainActivity"
@@ -75,11 +75,23 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
+                    android:scheme="inutilmusic"
+                    android:host="track" />
+            </intent-filter>
+            <!--
+                 Enlaces compartidos por las versiones 2.0.x
+                 (bstreammusic://track/<id>): siguen abriendo la app.
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
                     android:scheme="bstreammusic"
                     android:host="track" />
             </intent-filter>
             <!--
-                 Offer BStream as an option for public YouTube links. This is
+                 Offer Inutil as an option for public YouTube links. This is
                  intentionally not autoVerify: without a domain-owned
                  assetlinks.json Android must keep the normal chooser instead
                  of claiming the link as the system default.

@@ -24,7 +24,7 @@ import '../../../../services/animated_artwork/apple_animated_artwork_resolver.da
 import '../../../../services/player/player_service.dart';
 import '../../../../services/player/local_audio_quality_service.dart';
 import '../../../../services/spotify_canvas/spotify_canvas_resolver.dart';
-import '../../../../services/sharing/bstream_track_link.dart';
+import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../domain/entities/local_track.dart';
 import '../../domain/entities/track_info.dart';
@@ -1017,7 +1017,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                             final controlsPane = scrollControls
                                                 ? SingleChildScrollView(
                                                     key: const ValueKey(
-                                                      'bstream-player-controls-scroll',
+                                                      'inutil-player-controls-scroll',
                                                     ),
                                                     clipBehavior: Clip.hardEdge,
                                                     child: ConstrainedBox(
@@ -1041,8 +1041,8 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                             final row = Row(
                                               key: ValueKey(
                                                 desktopTwoColumn
-                                                    ? 'bstream-player-adaptive-two-column'
-                                                    : 'bstream-player-adaptive-landscape',
+                                                    ? 'inutil-player-adaptive-two-column'
+                                                    : 'inutil-player-adaptive-landscape',
                                               ),
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.stretch,
@@ -1052,7 +1052,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                                       landscapeArtworkPaneWidth,
                                                   child: ClipRect(
                                                     key: const ValueKey(
-                                                      'bstream-player-landscape-artwork-pane',
+                                                      'inutil-player-landscape-artwork-pane',
                                                     ),
                                                     child: Stack(
                                                       fit: StackFit.expand,
@@ -1063,7 +1063,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                                 SizedBox(width: landscapeGap),
                                                 Expanded(
                                                   key: const ValueKey(
-                                                    'bstream-player-landscape-controls-pane',
+                                                    'inutil-player-landscape-controls-pane',
                                                   ),
                                                   child: controlsPane,
                                                 ),
@@ -1189,7 +1189,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                   alignment: Alignment.topCenter,
                                   child: PlayerCollapseHandle(
                                     key: const ValueKey(
-                                      'bstream-player-grabber',
+                                      'inutil-player-grabber',
                                     ),
                                     onCollapse: widget.onCollapse,
                                     label: strings.minimizePlayer,
@@ -4206,7 +4206,7 @@ class _PlayerControls extends ConsumerWidget {
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth),
       child: Padding(
-        key: const ValueKey('bstream-player-controls-inset'),
+        key: const ValueKey('inutil-player-controls-inset'),
         padding: EdgeInsets.symmetric(
           horizontal: _playerControlsHorizontalInset(landscape),
         ),
@@ -4446,7 +4446,7 @@ Future<_ArtistNavigationTarget?> _resolveArtistNavigationTarget(
   var browseId = track.artistBrowseIds.isEmpty
       ? null
       : track.artistBrowseIds.first?.trim();
-  final link = const BStreamTrackLinkCodec().tryFromTrack(track);
+  final link = const InutilTrackLinkCodec().tryFromTrack(track);
   final seedVideoId = link?.videoId;
   final service = ref.read(youtubeMusicSearchProvider);
 
@@ -4618,7 +4618,7 @@ Future<_AlbumNavigationTarget?> _resolveAlbumNavigationTarget({
   }
 
   var resolvedAlbumTitle = directTitle;
-  final videoId = const BStreamTrackLinkCodec().tryFromTrack(track)?.videoId;
+  final videoId = const InutilTrackLinkCodec().tryFromTrack(track)?.videoId;
   if (videoId != null && service is YouTubeMusicRelated) {
     final page = await (service as YouTubeMusicRelated).getNext(
       videoId,

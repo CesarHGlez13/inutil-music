@@ -56,7 +56,7 @@ class RemotePlaybackCachePolicy {
     maximumFiles: 24,
     maximumBytes: 256 * 1024 * 1024,
     maximumEntryBytes: 128 * 1024 * 1024,
-    // Another BStream process may own a recent partial file on desktop.
+    // Another Inutil process may own a recent partial file on desktop.
     partialMaximumAge: Duration(hours: 1),
   );
 
@@ -120,7 +120,7 @@ class RemotePlaybackCache {
   static const _downloadIdleTimeout = Duration(seconds: 20);
   static const _downloadTotalTimeout = Duration(minutes: 30);
   static const _userAgent =
-      'BStreamMusic/${AppConstants.appVersion} AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36';
+      'InutilMusic/${AppConstants.appVersion} AppleWebKit/537.36 Chrome/125.0.0.0 Safari/537.36';
   static const _audioExtensions = {
     '.aiff',
     '.alac',

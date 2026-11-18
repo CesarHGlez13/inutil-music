@@ -13,7 +13,7 @@ typedef LocalTrackLegacyArtworkCleanup =
     Future<bool> Function(String directory);
 
 final artworkCacheFileLookupProvider = Provider<ArtworkCacheFileLookup>((ref) {
-  final cache = BStreamArtworkCacheManager();
+  final cache = InutilArtworkCacheManager();
   return (source) async => (await cache.getFileFromCache(source))?.file;
 });
 

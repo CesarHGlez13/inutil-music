@@ -16,7 +16,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-v10-audio-format-',
+        'inutil-v10-audio-format-',
       );
       final path = p.join(directory.path, 'library.db');
       final service = _TestLocalDatabaseService(path);
@@ -65,7 +65,7 @@ void main() {
   test('migrates v4 metadata and backfills canonical source IDs', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-metadata-migration-',
+      'inutil-metadata-migration-',
     );
     final databasePath = p.join(directory.path, 'library.db');
     final legacyDatabase = await databaseFactoryFfi.openDatabase(
@@ -222,7 +222,7 @@ void main() {
   test('migrates a v1 database before creating v5 indexes', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-v1-metadata-migration-',
+      'inutil-v1-metadata-migration-',
     );
     final databasePath = p.join(directory.path, 'library.db');
     final legacyDatabase = await databaseFactoryFfi.openDatabase(
@@ -291,7 +291,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-external-persistence-guard-',
+        'inutil-external-persistence-guard-',
       );
       final databasePath = p.join(directory.path, 'library.db');
       final service = _TestLocalDatabaseService(databasePath);
@@ -333,7 +333,7 @@ void main() {
   test('rewrites and restores only the exact media rows affected', () async {
     sqfliteFfiInit();
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-media-root-rewrite-',
+      'inutil-media-root-rewrite-',
     );
     final databasePath = p.join(directory.path, 'library.db');
     final oldRoot = p.join(directory.path, 'OldRootAlias');

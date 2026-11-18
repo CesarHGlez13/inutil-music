@@ -1,6 +1,6 @@
 /// A validated YouTube video identifier.
 ///
-/// This is an original BStream implementation. It deliberately accepts only
+/// This is an original Inutil implementation. It deliberately accepts only
 /// known YouTube URL shapes so that arbitrary URLs cannot be mistaken for
 /// playable videos.
 final class InnerTubeVideoId {

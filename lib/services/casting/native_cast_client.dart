@@ -77,7 +77,7 @@ class NativeCastState {
 /// Cast SDK bridge. Construction does not initialize the SDK or scan Wi-Fi.
 class NativeCastClient {
   NativeCastClient({MethodChannel? channel})
-    : _channel = channel ?? const MethodChannel('bstream_music/cast');
+    : _channel = channel ?? const MethodChannel('inutil_music/cast');
 
   final MethodChannel _channel;
   final _changes = StreamController<NativeCastState>.broadcast();

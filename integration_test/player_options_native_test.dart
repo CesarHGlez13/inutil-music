@@ -20,14 +20,14 @@ import 'package:path_provider/path_provider.dart';
 /// network. Use --keep-app-running with flutter drive to preserve app data.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  const capture = bool.fromEnvironment('BSTREAM_NATIVE_SCREENSHOTS');
+  const capture = bool.fromEnvironment('INUTIL_NATIVE_SCREENSHOTS');
   testWidgets('artwork-colored menus and queue heart in all player styles', (
     tester,
   ) async {
     var screenshotSurfaceReady = false;
     final directory = await getTemporaryDirectory();
-    final cover = File('${directory.path}/bstream-menu-native-fixture.png');
-    final coverData = await rootBundle.load('assets/icons/bstream_icon.png');
+    final cover = File('${directory.path}/inutil-menu-native-fixture.png');
+    final coverData = await rootBundle.load('assets/icons/inutil_icon.png');
     await cover.writeAsBytes(
       coverData.buffer.asUint8List(
         coverData.offsetInBytes,
@@ -237,7 +237,7 @@ void main() {
 final _track = LocalTrack(
   id: 'player-menu-fixture',
   title: 'Tu canción favorita',
-  artist: 'BStream Music',
+  artist: 'Inútil Music',
   filePath: '/test/player-menu-fixture.m4a',
   addedAt: DateTime(2026),
 );

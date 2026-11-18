@@ -564,7 +564,7 @@ void main() {
         expect(html, contains('function obtainPoToken'));
         expect(html, contains('var loggerFunctions = ['));
         expect(html, contains('vmTelemetryCallback'));
-        expect(html, contains('window.__bstreamSynchronousSnapshot'));
+        expect(html, contains('window.__inutilSynchronousSnapshot'));
       },
     );
   });

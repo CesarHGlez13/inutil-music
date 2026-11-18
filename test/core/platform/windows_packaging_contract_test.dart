@@ -7,7 +7,7 @@ void main() {
     'Windows package declares its OS, architecture, and elevation contract',
     () {
       final installer = File(
-        'packaging/windows/BStreamMusic.iss',
+        'packaging/windows/InutilMusic.iss',
       ).readAsStringSync();
       final manifest = File(
         'windows/runner/runner.exe.manifest',

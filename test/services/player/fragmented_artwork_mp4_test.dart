@@ -7,7 +7,7 @@ import 'package:inutil_music/services/player/fragmented_artwork_mp4.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const fixtureDirectory = String.fromEnvironment('BSTREAM_APPLE_MP4_FIXTURES');
+  const fixtureDirectory = String.fromEnvironment('INUTIL_APPLE_MP4_FIXTURES');
   for (final fixture in [
     ('apple-artwork-windows-square.mp4', 480),
     ('apple-artwork-windows-coldplay.mp4', 450),

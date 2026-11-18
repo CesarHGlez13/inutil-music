@@ -45,12 +45,12 @@ void main() {
       find.text('The last YouTube Music write was uncertain.'),
       findsOneWidget,
     );
-    expect(find.text(strings.keepBStreamPlaylist), findsNWidgets(2));
+    expect(find.text(strings.keepInutilPlaylist), findsNWidgets(2));
     expect(find.text(strings.keepYouTubeMusicPlaylist), findsNWidgets(2));
   });
 
   testWidgets(
-    'resolves with BStream or YouTube Music and closes after the last row',
+    'resolves with Inutil or YouTube Music and closes after the last row',
     (tester) async {
       final calls = <_ResolutionCall>[];
       final roadTrip = _conflict(playlistId: 'road-trip', title: 'Road trip');

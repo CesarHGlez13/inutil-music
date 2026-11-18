@@ -12,7 +12,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-history-context-',
+        'inutil-history-context-',
       );
       final databasePath = p.join(directory.path, 'library.db');
       final legacyDatabase = await databaseFactoryFfi.openDatabase(
@@ -49,7 +49,7 @@ void main() {
       await legacyDatabase.insert('local_tracks', {
         'id': 'legacy-track',
         'title': 'Legacy track',
-        'artist': 'BStream Music',
+        'artist': 'Inútil Music',
         'file_path': p.join(directory.path, 'legacy.m4a'),
         'added_at': DateTime.utc(2026).toIso8601String(),
         'last_played_at': DateTime.utc(2026, 8, 3).toIso8601String(),

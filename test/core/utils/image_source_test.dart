@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('converts file uri image sources to local files', () {
-    final uri = Uri.file('/tmp/bstream-cover.jpg');
+    final uri = Uri.file('/tmp/inutil-cover.jpg');
 
     expect(imageFileFromSource(uri.toString())?.path, File.fromUri(uri).path);
   });
@@ -153,8 +153,8 @@ void main() {
       'https://example.com/cover.jpg',
     );
     expect(
-      canonicalYouTubeThumbnailSource('/tmp/bstream-cover.jpg'),
-      '/tmp/bstream-cover.jpg',
+      canonicalYouTubeThumbnailSource('/tmp/inutil-cover.jpg'),
+      '/tmp/inutil-cover.jpg',
     );
     expect(artworkSourceCandidates('https://example.com/cover.jpg'), [
       'https://example.com/cover.jpg',

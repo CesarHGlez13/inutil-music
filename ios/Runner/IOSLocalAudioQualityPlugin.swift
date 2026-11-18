@@ -10,7 +10,7 @@ final class IOSLocalAudioQualityPlugin {
   private let reader = IOSLocalAudioQualityReader()
 
   init(messenger: FlutterBinaryMessenger) {
-    channel = FlutterMethodChannel(name: "bstream/local_audio_quality", binaryMessenger: messenger)
+    channel = FlutterMethodChannel(name: "inutil/local_audio_quality", binaryMessenger: messenger)
     channel.setMethodCallHandler { [weak self] call, result in
       guard call.method == "read" else { result(FlutterMethodNotImplemented); return }
       guard let self,

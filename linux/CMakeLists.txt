@@ -58,7 +58,7 @@ pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 add_subdirectory("runner")
 
 # PipeWire uses the basename of /proc/self/exe as the native client name on
-# Linux. Keep Flutter's expected `bstream_music` entry point as a tiny exec
+# Linux. Keep Flutter's expected `inutil_music` entry point as a tiny exec
 # launcher, while the actual runner binary has the human-readable name that
 # KDE's volume controls display.
 set_target_properties(${BINARY_NAME}

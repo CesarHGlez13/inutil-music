@@ -22,7 +22,7 @@ void main() {
   late _ImportHarness harness;
 
   setUp(() async {
-    sandbox = await Directory.systemTemp.createTemp('bstream-csv-import-');
+    sandbox = await Directory.systemTemp.createTemp('inutil-csv-import-');
     harness = _ImportHarness(_TestDatabase(p.join(sandbox.path, 'library.db')));
   });
 
@@ -367,7 +367,7 @@ void main() {
         );
         final restored = csv.importBytes(
           LibraryCsvInput(
-            bytes: csv.exportDocument(exported, LibraryCsvProfile.bstream),
+            bytes: csv.exportDocument(exported, LibraryCsvProfile.inutil),
             fileName: 'favorites-roundtrip.csv',
           ),
         );

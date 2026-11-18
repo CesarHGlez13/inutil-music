@@ -133,11 +133,11 @@ void main() {
     expect(buttonRect.top, greaterThan(fieldRect.bottom));
     expect(buttonRect.width, closeTo(fieldRect.width, 0.1));
 
-    await tester.enterText(userField, '@bstream_test');
+    await tester.enterText(userField, '@inutil_test');
     await tester.tap(connectButton);
     await tester.pump();
     expect(liveController.connectCalls, 1);
-    expect(liveController.lastCreatorInput, '@bstream_test');
+    expect(liveController.lastCreatorInput, '@inutil_test');
 
     final audienceSections = [
       for (final audience in TikTokCommandAudience.values)

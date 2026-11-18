@@ -490,7 +490,7 @@ String _plainText(String value) => value
 
 bool _isNotesHeading(String text) => RegExp(
   r'^(?:v?\d+(?:\.\d+){1,3}(?:[-+][\w.-]+)?|'
-  r'(?:bstream(?: music)?\s*)?(?:release notes|what.?s (?:new|changed)|'
+  r'(?:inutil(?: music)?\s*)?(?:release notes|what.?s (?:new|changed)|'
   r'changelog|novedades|notas de (?:la versi[oó]n|lanzamiento)|'
   r'novidades|nouveaut[eé]s)\s*[:\-–]?\s*v?\d*(?:\.\d+)*)$',
   caseSensitive: false,

@@ -14,7 +14,7 @@ void main() {
   setUp(() async {
     sqfliteFfiInit();
     sandbox = await Directory.systemTemp.createTemp(
-      'bstream-backup-validation-',
+      'inutil-backup-validation-',
     );
     databasePath = p.join(sandbox.path, AppConstants.databaseName);
     service = _TestLocalDatabaseService(databasePath);
@@ -27,7 +27,7 @@ void main() {
     }
   });
 
-  test('accepts an intact supported BStream database', () async {
+  test('accepts an intact supported Inutil database', () async {
     await service.initialize();
     await service.close();
 

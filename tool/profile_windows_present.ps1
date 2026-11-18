@@ -1,7 +1,7 @@
 # Read a scoped per-frame query through an ALREADY RUNNING PresentMon service.
 # No elevation, ETW-session creation, service/ACL changes or UI input.
 # ApiPath must be the matching installed PresentMonAPI2.dll (or an exact copy).
-# Start motion only after BSTREAM_NATIVE_READY; preserve idle gaps in raw output.
+# Start motion only after INUTIL_NATIVE_READY; preserve idle gaps in raw output.
 # API definitions: https://github.com/GameTechDev/PresentMon/blob/main/IntelPresentMon/PresentMonAPI2/PresentMonAPI.h
 param(
   [Parameter(Mandatory = $true)][int]$ProcessId,
@@ -12,7 +12,7 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $target = Get-Process -Id $ProcessId -ErrorAction Stop
-if ($target.ProcessName -ne 'bstream_music') { throw 'Capture is restricted to a bstream_music process' }
+if ($target.ProcessName -ne 'inutil_music') { throw 'Capture is restricted to a inutil_music process' }
 $apiFullPath = (Resolve-Path -LiteralPath $ApiPath).Path
 if ([IO.Path]::GetFileName($apiFullPath) -ne 'PresentMonAPI2.dll') { throw 'Expected the installed PresentMonAPI2.dll' }
 
@@ -23,7 +23,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading;
 
-public sealed class BStreamPresentCapture : IDisposable {
+public sealed class InutilPresentCapture : IDisposable {
   [StructLayout(LayoutKind.Sequential)] public struct Element {
     public int metric, stat;
     public uint deviceId, arrayIndex;
@@ -62,7 +62,7 @@ public sealed class BStreamPresentCapture : IDisposable {
   static void Check(int code, string operation) {
     if (code != 0) throw new InvalidOperationException(operation + " failed with PM_STATUS=" + code);
   }
-  public BStreamPresentCapture(string path, string pipe, uint id) {
+  public InutilPresentCapture(string path, string pipe, uint id) {
     processId = id;
     library = LoadLibrary(path);
     if (library == IntPtr.Zero) throw new InvalidOperationException("Cannot load matching PresentMon API; Win32 error " + Marshal.GetLastWin32Error());
@@ -154,11 +154,11 @@ public sealed class BStreamPresentCapture : IDisposable {
 '@
 $capture = $null
 try {
-  $capture = New-Object BStreamPresentCapture($apiFullPath, $ControlPipe, $ProcessId)
+  $capture = New-Object InutilPresentCapture($apiFullPath, $ControlPipe, $ProcessId)
   # Drain initial data before publishing the actual capture interval.
   $capture.Poll()
   $startQpcMs = [Diagnostics.Stopwatch]::GetTimestamp() * 1000.0 / [Diagnostics.Stopwatch]::Frequency
-  Write-Output "BSTREAM_NATIVE_READY $startQpcMs"
+  Write-Output "INUTIL_NATIVE_READY $startQpcMs"
   $timer = [Diagnostics.Stopwatch]::StartNew()
   while ($timer.Elapsed.TotalSeconds -lt $Seconds) { $capture.Poll(); Start-Sleep -Milliseconds 50 }
   $endQpcMs = [Diagnostics.Stopwatch]::GetTimestamp() * 1000.0 / [Diagnostics.Stopwatch]::Frequency
@@ -179,5 +179,5 @@ try {
   $outputPath = [IO.Path]::GetFullPath($Out)
   New-Item -ItemType Directory -Path ([IO.Path]::GetDirectoryName($outputPath)) -Force | Out-Null
   $result | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $outputPath -Encoding UTF8
-  Write-Output "BSTREAM_NATIVE_DONE frames=$($capture.Frames.Count) fullBatches=$($capture.FullBatches) output=$outputPath"
+  Write-Output "INUTIL_NATIVE_DONE frames=$($capture.Frames.Count) fullBatches=$($capture.FullBatches) output=$outputPath"
 } finally { if ($null -ne $capture) { $capture.Dispose() } }

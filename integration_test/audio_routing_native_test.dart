@@ -23,15 +23,15 @@ void main() {
     tester,
   ) async {
     final temporary = await getTemporaryDirectory();
-    final cover = File('${temporary.path}/bstream-routing-fixture.png');
-    final data = await rootBundle.load('assets/icons/bstream_icon.png');
+    final cover = File('${temporary.path}/inutil-routing-fixture.png');
+    final data = await rootBundle.load('assets/icons/inutil_icon.png');
     await cover.writeAsBytes(
       data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
     );
     final track = LocalTrack(
       id: 'routing-fixture',
       title: 'Tu canción favorita',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       filePath: '/fixture.mp3',
       thumbnailPath: cover.path,
       addedAt: DateTime(2026),
@@ -123,7 +123,7 @@ void main() {
       await nativeCast.initialize();
       if (nativeCast.state.supported) {
         await expectLater(
-          nativeCast.connect('nonexistent-bstream-test-receiver'),
+          nativeCast.connect('nonexistent-inutil-test-receiver'),
           throwsA(isA<PlatformException>()),
         );
       }
@@ -146,6 +146,6 @@ class _FixturePlayer extends PlayerController {
     status: PlayerStatus.paused,
     trackId: 'routing-fixture',
     title: 'Tu canción favorita',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
   );
 }

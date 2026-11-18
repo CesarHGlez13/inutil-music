@@ -15,7 +15,7 @@ const liveOverlayArtworkByteCount =
 
 typedef LiveOverlayArtworkLoader = Future<String?> Function(String source);
 
-/// Resolves artwork through BStream's persistent cache and creates a compact
+/// Resolves artwork through Inútil Music's persistent cache and creates a compact
 /// PNG data URI that a localhost browser source can render without receiving a
 /// private file path or depending on the remote thumbnail staying online.
 class LiveOverlayArtworkService {
@@ -27,7 +27,7 @@ class LiveOverlayArtworkService {
   static const _maximumEncodedBytes = 20 * 1024 * 1024;
   static const _maximumDecodeDimension = 768;
 
-  BStreamArtworkCacheManager? _cacheManager;
+  InutilArtworkCacheManager? _cacheManager;
   final Duration timeout;
   final int maximumCachedItems;
   final LinkedHashMap<String, String?> _memoryCache =
@@ -59,7 +59,7 @@ class LiveOverlayArtworkService {
     for (final candidate in _sourceCandidates(source)) {
       try {
         final file = isNetworkImageSource(candidate)
-            ? await (_cacheManager ??= BStreamArtworkCacheManager())
+            ? await (_cacheManager ??= InutilArtworkCacheManager())
                   .getSingleFile(candidate)
                   .timeout(timeout)
             : imageFileFromSource(candidate);

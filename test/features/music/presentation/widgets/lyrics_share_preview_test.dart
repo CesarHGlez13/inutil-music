@@ -81,7 +81,7 @@ void main() {
       } finally {
         codec.dispose();
       }
-      final artifact = Platform.environment['BSTREAM_LYRICS_PREVIEW_ARTIFACT'];
+      final artifact = Platform.environment['INUTIL_LYRICS_PREVIEW_ARTIFACT'];
       if (artifact != null) await File(artifact).writeAsBytes(png);
     });
     expect(tester.takeException(), isNull);

@@ -21,7 +21,7 @@ void main() {
       }
 
       final directory = await Directory.systemTemp.createTemp(
-        'bstream_native_skip_silence_',
+        'inutil_native_skip_silence_',
       );
       try {
         final warmUp = await _writeTrack(directory, 'warm-up', const [
@@ -170,7 +170,7 @@ void main() {
       }
 
       final directory = await Directory.systemTemp.createTemp(
-        'bstream_native_skip_silence_crossfade_',
+        'inutil_native_skip_silence_crossfade_',
       );
       try {
         final outgoing =
@@ -300,7 +300,7 @@ void main() {
       final track = TrackInfo(
         id: 'clock-sync-long-gap',
         title: 'clock-sync-long-gap',
-        artist: 'BStream clock integration test',
+        artist: 'Inutil clock integration test',
         url: server.uriFor('/clock-sync-long-gap.wav').toString(),
         streamUrl: server.uriFor('/clock-sync-long-gap.wav').toString(),
         streamExtension: 'wav',
@@ -528,7 +528,7 @@ Future<Duration> _measureRemotePlayback(
   final track = TrackInfo(
     id: id,
     title: id,
-    artist: 'BStream slow CDN integration test',
+    artist: 'Inutil slow CDN integration test',
     url: uri.toString(),
     streamUrl: uri.toString(),
     streamExtension: 'wav',
@@ -681,7 +681,7 @@ Future<LocalTrack> _writeTrack(
   return LocalTrack(
     id: id,
     title: id,
-    artist: 'BStream integration test',
+    artist: 'Inutil integration test',
     filePath: file.path,
     duration: duration,
     addedAt: DateTime(2026),

@@ -27,7 +27,7 @@ void main() {
   });
 
   test('delivers a pending cold-start activation', () async {
-    const methodChannel = MethodChannel('test/bstream_android_app_activation');
+    const methodChannel = MethodChannel('test/inutil_android_app_activation');
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(methodChannel, (call) async {

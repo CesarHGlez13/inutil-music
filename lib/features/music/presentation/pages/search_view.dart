@@ -10,7 +10,7 @@ import '../../../../core/theme/app_ui.dart';
 import '../../../../core/widgets/app_shared_widgets.dart';
 import '../../../../core/widgets/horizontal_shelf_scroll_behavior.dart';
 import '../../../../core/widgets/marquee_text.dart';
-import '../../../../services/sharing/bstream_track_link.dart';
+import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../domain/entities/search_result.dart';
 import '../../domain/entities/track_info.dart';
@@ -1768,7 +1768,7 @@ class _SearchCategoryResultsBody extends ConsumerWidget {
   Future<void> _playSearchResult(WidgetRef ref, TrackInfo track) {
     final player = ref.read(playerControllerProvider.notifier);
     final service = ref.read(youtubeMusicSearchProvider);
-    final link = const BStreamTrackLinkCodec().tryFromTrack(track);
+    final link = const InutilTrackLinkCodec().tryFromTrack(track);
     if (service is! YouTubeMusicRelated || link == null) {
       // A provider without watch-next support must never fall back to the
       // unrelated list of search hits.

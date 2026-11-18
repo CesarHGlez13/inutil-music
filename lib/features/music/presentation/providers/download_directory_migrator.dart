@@ -104,7 +104,7 @@ class DownloadDirectoryMigrationException implements Exception {
   }
 }
 
-/// Copies only BStream-owned media through a verified, same-volume staging tree.
+/// Copies only Inutil-owned media through a verified, same-volume staging tree.
 ///
 /// Existing destination files are never overwritten. Activation is idempotent:
 /// a process interruption can leave verified duplicate files in the destination,
@@ -115,8 +115,8 @@ class DownloadDirectoryMigrator {
   }) : assert(hashVerificationThresholdBytes >= 0);
 
   static const _managedDirectories = <String>['audio', 'thumbnails'];
-  static const _stagingPrefix = '.bstream-migration-stage-';
-  static const _stagingMarkerName = '.bstream-owned-migration.json';
+  static const _stagingPrefix = '.inutil-migration-stage-';
+  static const _stagingMarkerName = '.inutil-owned-migration.json';
 
   // Kept for source compatibility. Every file is now hashed regardless of
   // this legacy threshold.
@@ -371,7 +371,7 @@ class DownloadDirectoryMigrator {
     await File(p.join(staging.path, _stagingMarkerName)).writeAsString(
       jsonEncode(<String, Object?>{
         'version': 1,
-        'kind': 'bstream.download-directory-migration',
+        'kind': 'inutil.download-directory-migration',
         'token': token,
         'sourceRoot': paths.sourceRoot,
         'targetRoot': paths.targetRoot,
@@ -397,7 +397,7 @@ class DownloadDirectoryMigrator {
       final decoded = jsonDecode(await marker.readAsString());
       if (decoded is! Map ||
           decoded['version'] != 1 ||
-          decoded['kind'] != 'bstream.download-directory-migration') {
+          decoded['kind'] != 'inutil.download-directory-migration') {
         return false;
       }
       final token = decoded['token'];

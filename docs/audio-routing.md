@@ -5,7 +5,7 @@ En el menú de los tres puntos del reproductor:
 - En Android/iOS, **Salida Multimedia** abre el selector nativo de salidas
   multimedia del sistema.
 - En Windows, Linux y macOS, **Salida de audio** permite elegir el dispositivo
-  para el reproductor de BStream y ajustar su volumen independiente.
+  para el reproductor de Inutil y ajustar su volumen independiente.
 - **Transmitir a** busca receptores solo mientras está abierto. No busca equipos
   periódicamente en Inicio ni descarga la canción completa para transmitirla.
 
@@ -14,7 +14,7 @@ En el menú de los tres puntos del reproductor:
 En escritorio se enumeran los dispositivos disponibles mediante media_kit.
 **Predeterminada del sistema** sigue la salida predeterminada del equipo;
 elegir otro dispositivo cambia la preferencia de las instancias del reproductor
-de BStream, sin modificar la salida ni el volumen global del sistema.
+de Inutil, sin modificar la salida ni el volumen global del sistema.
 La preferencia se mantiene durante la sesión, incluidos los cambios de canción,
 los fundidos entre canciones y la recuperación del motor de reproducción.
 Al reiniciar la app se vuelve al dispositivo predeterminado del sistema.
@@ -62,7 +62,7 @@ Se revisaron las integraciones públicas de
 [EchoMusic](https://github.com/EchoMusicApp/Echo-Music/blob/main/app/src/gms/kotlin/com/music/echo/playback/CastConnectionHandler.kt)
 y [Metrolist](https://github.com/MetrolistGroup/Metrolist/blob/main/app/src/gms/kotlin/com/metrolist/music/playback/CastConnectionHandler.kt).
 El código de esta integración es original. No se incorporó su reproductor ni se
-cambió la versión Media3 fijada por BStream.
+cambió la versión Media3 fijada por Inutil.
 
 Documentación primaria:
 [media_kit, selección de dispositivo](https://pub.dev/documentation/media_kit/latest/media_kit/Player/setAudioDevice.html),
@@ -82,7 +82,7 @@ flutter test integration_test/desktop_audio_output_native_test.dart -d windows
 ```
 
 En CI sin dispositivo de audio se puede añadir
-`--dart-define=BSTREAM_HEADLESS_AUDIO=true`. La audibilidad y la recuperación tras
+`--dart-define=INUTIL_HEADLESS_AUDIO=true`. La audibilidad y la recuperación tras
 desconectar físicamente un dispositivo requieren una comprobación con hardware.
 
 Pruebas automatizadas de transporte, rangos/cancelación HTTP, SOAP DLNA,

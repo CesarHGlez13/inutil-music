@@ -24,7 +24,7 @@ void main() {
       return;
     }
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_native_eof_',
+      'inutil_native_eof_',
     );
     final PlayerService service = Platform.isAndroid || Platform.isIOS
         ? JustAudioPlayerService()
@@ -74,13 +74,13 @@ void main() {
       return;
     }
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_native_quality_upgrade_',
+      'inutil_native_quality_upgrade_',
     );
     const duration = Duration(seconds: 45);
     const catalogTrack = TrackInfo(
       id: 'native-quality-upgrade',
       title: 'Native quality upgrade',
-      artist: 'BStream integration test',
+      artist: 'Inutil integration test',
       url: 'https://www.youtube.com/watch?v=native-quality-upgrade',
       duration: duration,
       streamExtension: 'wav',
@@ -198,7 +198,7 @@ void main() {
     }
 
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_native_crossfade_',
+      'inutil_native_crossfade_',
     );
     const trackDuration = Duration(milliseconds: 2600);
     const crossfadeDuration = Duration(milliseconds: 700);
@@ -342,7 +342,7 @@ LocalTrack _track(String id, String path, {required Duration duration}) =>
     LocalTrack(
       id: id,
       title: id,
-      artist: 'BStream integration test',
+      artist: 'Inutil integration test',
       filePath: path,
       duration: duration,
       addedAt: DateTime(2026),

@@ -158,11 +158,11 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
           return handler;
         },
         config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.bstream.bstream_music.audio',
+          androidNotificationChannelId: 'com.inutilmusic.app.audio',
           androidNotificationChannelName: 'Inútil Music',
           androidNotificationChannelDescription: 'Inútil Music playback',
           notificationColor: AppColors.brandGreen,
-          androidNotificationIcon: 'drawable/ic_stat_bstream_music',
+          androidNotificationIcon: 'drawable/ic_stat_inutil_music',
           androidShowNotificationBadge: true,
           androidNotificationOngoing: true,
           // Playback intent keeps automatic loads/retries active. A genuine

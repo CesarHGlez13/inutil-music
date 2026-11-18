@@ -6,8 +6,8 @@ import 'package:integration_test/integration_test.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  const enabled = bool.fromEnvironment('BSTREAM_LIVE_WEB_PO');
-  const strict = bool.fromEnvironment('BSTREAM_LIVE_WEB_PO_STRICT');
+  const enabled = bool.fromEnvironment('INUTIL_LIVE_WEB_PO');
+  const strict = bool.fromEnvironment('INUTIL_LIVE_WEB_PO_STRICT');
 
   testWidgets(
     'live homepage exposes a coherent WebPO bootstrap and interpreter',

@@ -43,9 +43,9 @@ class DeviceAudioFilterOptions {
 List<DeviceAudioTrack> filterDeviceAudioTracks(
   Iterable<DeviceAudioTrack> tracks, {
   DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-  String? bstreamRoot,
+  String? inutilRoot,
 }) {
-  final excludedRoot = _normalizedPath(bstreamRoot);
+  final excludedRoot = _normalizedPath(inutilRoot);
   final excludedRelativeRoot = _sharedStorageRelativePath(excludedRoot);
   return List<DeviceAudioTrack>.unmodifiable(
     tracks.where((track) {

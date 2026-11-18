@@ -281,7 +281,7 @@ ProviderContainer _container(
 class _LifecycleSettingsController extends SettingsController {
   @override
   Future<SettingsState> build() async => const SettingsState(
-    downloadDirectory: '/tmp/bstream-lifecycle-test',
+    downloadDirectory: '/tmp/inutil-lifecycle-test',
     language: AppLanguage.spanish,
     recommendationHistoryEnabled: true,
   );
@@ -310,7 +310,7 @@ LocalTrack _track(int index, {Duration duration = const Duration(minutes: 6)}) {
   return LocalTrack(
     id: 'track-$index',
     title: 'Track $index',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: 'track-$index.m4a',
     addedAt: DateTime(2026),
     duration: duration,
@@ -321,7 +321,7 @@ TrackInfo _remoteTrack(int index) {
   return TrackInfo(
     id: 'remote-$index',
     title: 'Remote $index',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     url: 'https://www.youtube.com/watch?v=remote-$index',
     thumbnailUrl: 'https://i.ytimg.com/vi/remote-$index/hqdefault.jpg',
     streamUrl: 'https://media.example/remote-$index-original.m4a',

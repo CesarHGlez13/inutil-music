@@ -305,7 +305,7 @@ class _LyricsRomanizationWorker {
         onError: errorPort.sendPort,
         onExit: exitPort.sendPort,
         errorsAreFatal: true,
-        debugName: 'BStream lyrics romanization',
+        debugName: 'Inutil lyrics romanization',
       );
       if (_disposed || generation != _generation) {
         spawnedIsolate.kill(priority: Isolate.immediate);

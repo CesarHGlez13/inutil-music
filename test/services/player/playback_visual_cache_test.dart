@@ -21,7 +21,7 @@ void main() {
   final requestCounts = <String, int>{};
 
   setUp(() async {
-    directory = await Directory.systemTemp.createTemp('bstream-visual-test-');
+    directory = await Directory.systemTemp.createTemp('inutil-visual-test-');
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     requestCounts.clear();
     cache = PlaybackVisualCache(

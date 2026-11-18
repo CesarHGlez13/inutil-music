@@ -839,7 +839,7 @@ class BotGuardPoTokenProvider {
 
   static const _runBotGuardFunction = r'''
     const result = await runBotGuard(challengeData);
-    globalThis.__bstreamWebPoSignalOutput = result.webPoSignalOutput;
+    globalThis.__inutilWebPoSignalOutput = result.webPoSignalOutput;
     return typeof result.botguardResponse === 'string'
       ? result.botguardResponse
       : JSON.stringify(result.botguardResponse);
@@ -851,11 +851,11 @@ class BotGuardPoTokenProvider {
   ''';
 
   static const _createMinterFunction = r'''
-    if (!globalThis.__bstreamWebPoSignalOutput) {
+    if (!globalThis.__inutilWebPoSignalOutput) {
       throw new Error('BotGuard signal output is unavailable');
     }
     await createPoTokenMinter(
-      globalThis.__bstreamWebPoSignalOutput,
+      globalThis.__inutilWebPoSignalOutput,
       new Uint8Array(integrityTokenBytes)
     );
     return true;

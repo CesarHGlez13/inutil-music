@@ -18,7 +18,7 @@ void main() {
     'removes missing rows, history, playlist and favorite references atomically',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-library-reconciliation-',
+        'inutil-library-reconciliation-',
       );
       final databaseService = _TestLocalDatabaseService(
         p.join(directory.path, 'library.db'),
@@ -157,7 +157,7 @@ LocalTrack _track(String id, String filePath, {bool played = false}) {
   return LocalTrack(
     id: id,
     title: id,
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: filePath,
     addedAt: DateTime.utc(2026),
     lastPlayedAt: played ? DateTime.utc(2026, 8, 4) : null,

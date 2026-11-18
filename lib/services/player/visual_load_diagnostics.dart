@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 
 /// Opt-in timings for separating artwork lookup, transfer and local decoder
-/// startup. Enable with --dart-define=BSTREAM_VISUAL_TIMINGS=true.
+/// startup. Enable with --dart-define=INUTIL_VISUAL_TIMINGS=true.
 const bool visualLoadTimingsEnabled = bool.fromEnvironment(
-  'BSTREAM_VISUAL_TIMINGS',
+  'INUTIL_VISUAL_TIMINGS',
 );
 
 void logVisualLoad(
@@ -20,5 +20,5 @@ void logVisualLoad(
     if (elapsedMs != null) 'elapsed=${elapsedMs}ms',
     if (bytes != null) 'bytes=$bytes',
   ];
-  debugPrint('BStream visual: ${details.join(' ')}');
+  debugPrint('Inutil visual: ${details.join(' ')}');
 }

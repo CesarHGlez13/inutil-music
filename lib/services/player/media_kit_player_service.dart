@@ -55,7 +55,7 @@ class _MediaKitPlayerBackend
   }
 
   static const _useHeadlessAudio = bool.fromEnvironment(
-    'BSTREAM_HEADLESS_AUDIO',
+    'INUTIL_HEADLESS_AUDIO',
   );
 
   late Player _player;
@@ -479,7 +479,7 @@ class MediaKitPlayerService
         ) {
           developer.log(
             'Could not restore the automatic audio output',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: error,
             stackTrace: stackTrace,
           );
@@ -668,7 +668,7 @@ class MediaKitPlayerService
       if (!_disposed) {
         developer.log(
           'media_kit source upgrade kept the original source',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -890,7 +890,7 @@ class MediaKitPlayerService
       if (_isCrossfadeCurrent(generation)) {
         developer.log(
           'media_kit crossfade preload failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -984,7 +984,7 @@ class MediaKitPlayerService
           }
           developer.log(
             'media_kit standby error: ${_sanitizePlaybackError(message)}',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
           );
           unawaited(_abortCrossfadeGeneration(generation));
         }),
@@ -1132,7 +1132,7 @@ class MediaKitPlayerService
       if (_isCrossfadeCurrent(generation)) {
         developer.log(
           'media_kit crossfade failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1505,7 +1505,7 @@ class MediaKitPlayerService
         final detail = _sanitizePlaybackError(message);
         developer.log(
           'media_kit backend error: $detail',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: detail,
         );
         _emit(
@@ -1549,7 +1549,7 @@ class MediaKitPlayerService
       'playRemote start, host=${_diagnosticHost(source)}, '
       'format=${track.streamExtension ?? track.streamMimeType ?? 'unknown'}, '
       'headerKeys=${_diagnosticHeaderKeys(track.httpHeaders)}',
-      name: 'BStreamPlayback',
+      name: 'InutilPlayback',
     );
     await _openForGeneration(_remoteMedia(track), generation, play: true);
   }
@@ -2009,7 +2009,7 @@ class MediaKitPlayerService
           final detail = _sanitizePlaybackError(error.toString());
           developer.log(
             'media_kit open failed for ${_diagnosticHost(media.uri)}',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: detail,
             stackTrace: stackTrace,
           );

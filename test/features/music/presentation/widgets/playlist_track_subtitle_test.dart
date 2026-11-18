@@ -97,7 +97,7 @@ void main() {
     'audio availability ignores artwork and rejects empty audio files',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-playlist-cloud-',
+        'inutil-playlist-cloud-',
       );
       addTearDown(() async {
         if (await directory.exists()) await directory.delete(recursive: true);

@@ -19,7 +19,7 @@ void main() {
       final hardened = hardenYoutubeJavaScriptDocument(source);
 
       expect(
-        hardened.indexOf('data-bstream-runtime-csp'),
+        hardened.indexOf('data-inutil-runtime-csp'),
         lessThan(hardened.indexOf('<script>')),
       );
       expect(hardened, contains("default-src 'none'"));
@@ -28,7 +28,7 @@ void main() {
       expect(hardened, contains("worker-src 'none'"));
       expect(hardened, contains("frame-src 'none'"));
       expect(hardened, contains("navigate-to 'none'"));
-      expect('data-bstream-runtime-csp'.allMatches(hardened), hasLength(1));
+      expect('data-inutil-runtime-csp'.allMatches(hardened), hasLength(1));
       expect(hardenYoutubeJavaScriptDocument(hardened), hardened);
     });
 
@@ -45,7 +45,7 @@ void main() {
     test('rejects a marker that does not carry the exact runtime policy', () {
       expect(
         () => hardenYoutubeJavaScriptDocument(
-          '<html><head><meta data-bstream-runtime-csp="true" '
+          '<html><head><meta data-inutil-runtime-csp="true" '
           'http-equiv="Content-Security-Policy" content="default-src *">'
           '</head></html>',
         ),
@@ -61,7 +61,7 @@ void main() {
         );
 
         expect(
-          html.indexOf('data-bstream-runtime-csp'),
+          html.indexOf('data-inutil-runtime-csp'),
           inInclusiveRange(0, html.indexOf('<script>') - 1),
         );
         expect(html, contains(youtubeJavaScriptRuntimeCsp));
@@ -136,7 +136,7 @@ void main() {
         expect(backends.last.html, backends.first.html);
         expect(backends.last.baseUrl, origin);
         expect(
-          backends.last.html.indexOf('data-bstream-runtime-csp'),
+          backends.last.html.indexOf('data-inutil-runtime-csp'),
           lessThan(backends.last.html.indexOf('<script>')),
         );
 

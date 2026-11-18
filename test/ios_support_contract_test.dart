@@ -89,7 +89,7 @@ void main() {
       expect(infoPlist, contains('<key>UIBackgroundModes</key>'));
       expect(infoPlist, contains('<string>audio</string>'));
       expect(infoPlist, contains('<key>NSAllowsLocalNetworking</key>'));
-      expect(infoPlist, contains('<string>bstreammusic</string>'));
+      expect(infoPlist, contains('<string>inutilmusic</string>'));
       expect(infoPlist, isNot(contains('NSAllowsArbitraryLoads')));
 
       final appDelegate = File(
@@ -97,7 +97,7 @@ void main() {
       ).readAsStringSync();
       expect(appDelegate, contains('IOSLocalMediaPlugin'));
       expect(appDelegate, contains('IOSFileExportPlugin'));
-      expect(appDelegate, contains('bstream_music/screen'));
+      expect(appDelegate, contains('inutil_music/screen'));
       expect(appDelegate, contains('isIdleTimerDisabled'));
     });
 
@@ -171,7 +171,7 @@ void main() {
       expect(workflow, contains(r'test ! -e "$app/embedded.mobileprovision"'));
       expect(
         workflow,
-        contains(r'BStream-Music-$APP_VERSION-iOS-unsigned.ipa'),
+        contains(r'InutilMusic-$APP_VERSION-iOS-unsigned.ipa'),
       );
       expect(workflow, contains('- name: Upload unsigned iOS IPA'));
     });

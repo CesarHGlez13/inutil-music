@@ -49,11 +49,11 @@ void main() {
     final body = jsonEncode({'padding': 'x' * backgroundParsingThreshold});
     expect(
       await parseJsonInBackground(body, _isolateName),
-      'BStream background work',
+      'Inutil background work',
     );
     expect(
       await transformInBackground(body, _isolateName, inputSize: body.length),
-      'BStream background work',
+      'Inutil background work',
     );
   });
 

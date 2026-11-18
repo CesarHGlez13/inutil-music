@@ -14,7 +14,7 @@ const capture = process.argv.includes('--capture');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const windows = process.platform === 'win32';
 const browsers = [
-  process.env.BSTREAM_BROWSER,
+  process.env.INUTIL_BROWSER,
   'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Microsoft/Edge/Application/msedge.exe',
   'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -22,7 +22,7 @@ const browsers = [
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
 ];
 const browserPath = browsers.find(candidate => candidate && existsSync(candidate));
-assert.ok(browserPath, 'Install Chrome/Edge or set BSTREAM_BROWSER.');
+assert.ok(browserPath, 'Install Chrome/Edge or set INUTIL_BROWSER.');
 
 let dartPath = 'dart';
 if (windows) {
@@ -97,7 +97,7 @@ class CDP {
   }
 }
 
-const profilePrefix = path.join(tmpdir(), 'bstream-overlay-browser-');
+const profilePrefix = path.join(tmpdir(), 'inutil-overlay-browser-');
 const profile = await mkdtemp(profilePrefix);
 let browser;
 let server;
@@ -123,13 +123,13 @@ try {
   await viewport(1280);
   await cdp.send('Page.navigate', { url: overlayUrl });
   for (let attempt = 0; attempt < 100; attempt++) {
-    if (await cdp.evaluate('Boolean(window.__bstreamPreviewRender && document.querySelectorAll(".track").length === 5)')) break;
+    if (await cdp.evaluate('Boolean(window.__inutilPreviewRender && document.querySelectorAll(".track").length === 5)')) break;
     await delay(100);
   }
-  await cdp.evaluate('window.__base = structuredClone(window.__bstreamPreviewState); Boolean(window.__base)');
+  await cdp.evaluate('window.__base = structuredClone(window.__inutilPreviewState); Boolean(window.__base)');
   await delay(500);
 
-  const render = patch => cdp.evaluate(`window.__bstreamPreviewRender({...window.__base, ...${JSON.stringify(patch)}}); true`);
+  const render = patch => cdp.evaluate(`window.__inutilPreviewRender({...window.__base, ...${JSON.stringify(patch)}}); true`);
   const settle = () => cdp.evaluate('Promise.allSettled(document.getAnimations().filter(animation => !animation.effect?.target?.classList?.contains("wave-bar")).map(animation => animation.finished)).then(() => true)');
   const measure = () => cdp.evaluate(`(() => {
     const card = document.querySelector('.current:not(.leaving)');
@@ -245,7 +245,7 @@ try {
   // overflow:hidden can otherwise conceal vertical clipping in compact cards.
   const longItems = await cdp.evaluate(`window.__base.items.map(item => ({...item,
     title: '16bitガール (Full Size) — Tu canción favorita con un título muy largo',
-    artist: 'Kurumi Tokisaki (CV: Asami Sanada), BStream Music y otros artistas'
+    artist: 'Kurumi Tokisaki (CV: Asami Sanada), Inútil Music y otros artistas'
   }))`);
   for (const style of ['classic', 'wave']) {
     for (const width of [1280, 900, 560, 400, 320]) {

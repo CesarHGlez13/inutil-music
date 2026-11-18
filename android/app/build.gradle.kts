@@ -14,10 +14,10 @@ fun releaseSigningValue(propertyName: String, environmentName: String): String? 
         ?: System.getenv(environmentName)?.trim()?.takeIf { it.isNotEmpty() }
 }
 
-val releaseStoreFilePath = releaseSigningValue("storeFile", "BSTREAM_ANDROID_STORE_FILE")
-val releaseStorePassword = releaseSigningValue("storePassword", "BSTREAM_ANDROID_STORE_PASSWORD")
-val releaseKeyAlias = releaseSigningValue("keyAlias", "BSTREAM_ANDROID_KEY_ALIAS")
-val releaseKeyPassword = releaseSigningValue("keyPassword", "BSTREAM_ANDROID_KEY_PASSWORD")
+val releaseStoreFilePath = releaseSigningValue("storeFile", "INUTIL_ANDROID_STORE_FILE")
+val releaseStorePassword = releaseSigningValue("storePassword", "INUTIL_ANDROID_STORE_PASSWORD")
+val releaseKeyAlias = releaseSigningValue("keyAlias", "INUTIL_ANDROID_KEY_ALIAS")
+val releaseKeyPassword = releaseSigningValue("keyPassword", "INUTIL_ANDROID_KEY_PASSWORD")
 val hasReleaseSigning = listOf(
     releaseStoreFilePath,
     releaseStorePassword,
@@ -34,7 +34,7 @@ plugins {
 }
 
 android {
-    namespace = "com.bstream.bstream_music"
+    namespace = "com.inutilmusic.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -49,7 +49,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        testInstrumentationRunner = "com.bstream.bstream_music.WidgetLayoutInstrumentation"
+        testInstrumentationRunner = "com.inutilmusic.app.WidgetLayoutInstrumentation"
         if (!splitPerAbi) {
             ndk {
                 abiFilters += setOf("armeabi-v7a", "arm64-v8a", "x86_64")

@@ -17,7 +17,7 @@ int _active = 0;
 /// service, HTTP client, platform channel, widget or database connection.
 Future<T> runBackgroundWork<T>(
   FutureOr<T> Function() work, {
-  String debugName = 'BStream background work',
+  String debugName = 'Inutil background work',
 }) async {
   if (_active >= _maximumWorkers) {
     final ready = Completer<void>();

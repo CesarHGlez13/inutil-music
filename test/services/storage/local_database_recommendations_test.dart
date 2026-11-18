@@ -17,7 +17,7 @@ void main() {
     setUp(() async {
       sqfliteFfiInit();
       sandbox = await Directory.systemTemp.createTemp(
-        'bstream-recommendation-storage-',
+        'inutil-recommendation-storage-',
       );
       service = _TestLocalDatabaseService(
         p.join(sandbox.path, AppConstants.databaseName),
@@ -707,7 +707,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-recommendation-migration-',
+        'inutil-recommendation-migration-',
       );
       final databasePath = p.join(sandbox.path, 'library.db');
       final legacyDatabase = await databaseFactoryFfi.openDatabase(
@@ -811,7 +811,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-v6-recommendation-migration-',
+        'inutil-v6-recommendation-migration-',
       );
       final databasePath = p.join(sandbox.path, 'library.db');
       final creator = _TestLocalDatabaseService(databasePath);
@@ -879,7 +879,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-v7-schema-repair-',
+        'inutil-v7-schema-repair-',
       );
       final databasePath = p.join(sandbox.path, 'library.db');
       final creator = _TestLocalDatabaseService(databasePath);

@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('sets and clears the Android keep-screen-on flag', () async {
-    const methodChannel = MethodChannel('test/bstream_screen');
+    const methodChannel = MethodChannel('test/inutil_screen');
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
@@ -31,7 +31,7 @@ void main() {
   });
 
   test('hides and restores the Android status bar', () async {
-    const methodChannel = MethodChannel('test/bstream_status_bar');
+    const methodChannel = MethodChannel('test/inutil_status_bar');
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(methodChannel, (call) async {
@@ -56,8 +56,8 @@ void main() {
   });
 
   test('status-bar failures do not escape the Android channel', () async {
-    const missingChannel = MethodChannel('test/bstream_status_bar_missing');
-    const failingChannel = MethodChannel('test/bstream_status_bar_failure');
+    const missingChannel = MethodChannel('test/inutil_status_bar_missing');
+    const failingChannel = MethodChannel('test/inutil_status_bar_failure');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
           failingChannel,

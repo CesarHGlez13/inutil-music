@@ -42,7 +42,7 @@ void main() {
   late String targetMedia;
 
   setUp(() async {
-    sandbox = await Directory.systemTemp.createTemp('bstream-restore-sync-');
+    sandbox = await Directory.systemTemp.createTemp('inutil-restore-sync-');
     source = _TestDatabase(
       p.join(sandbox.path, 'source', AppConstants.databaseName),
     );

@@ -27,7 +27,7 @@ void main() {
     final validator = IoInnerTubeStreamValidator();
     final probe = await validator.validate(
       Uri.parse('http://127.0.0.1:${server.port}/audio'),
-      headers: const {'User-Agent': 'BStream test'},
+      headers: const {'User-Agent': 'Inutil test'},
       contentLength: 5 * 1024 * 1024,
     );
 

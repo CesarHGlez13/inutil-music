@@ -33,7 +33,7 @@ void main() {
       }) {
         final instance = better
             ? BetterLyricsService(
-                userAgent: 'BStream lyrics test',
+                userAgent: 'Inutil lyrics test',
                 transport: transport,
                 apiBaseUri: Uri.parse('https://test.invalid/'),
                 cacheTtl: cacheTtl,
@@ -42,7 +42,7 @@ void main() {
                 clock: () => now,
               )
             : YouLyPlusLyricsService(
-                userAgent: 'BStream lyrics test',
+                userAgent: 'Inutil lyrics test',
                 transport: transport,
                 apiBaseUri: Uri.parse('https://test.invalid/'),
                 cacheTtl: cacheTtl,
@@ -83,7 +83,7 @@ void main() {
                     'duration': '180.0',
                   },
           );
-          expect(transport.headers.single['User-Agent'], 'BStream lyrics test');
+          expect(transport.headers.single['User-Agent'], 'Inutil lyrics test');
           expect(transport.headers.single['X-API-Key'], isNull);
           expect(
             transport.timeouts.single,

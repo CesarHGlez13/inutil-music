@@ -1,6 +1,6 @@
 import 'dart:io';
 
-const deviceAudioArtworkScheme = 'bstream-local-artwork';
+const deviceAudioArtworkScheme = 'inutil-local-artwork';
 
 /// Creates a lightweight artwork reference for one device audio URI.
 ///

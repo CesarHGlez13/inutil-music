@@ -1418,7 +1418,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       controller.reset();
       final document = await controller.prepareExport();
       final temporaryRoot = await getTemporaryDirectory();
-      transferDirectory = await temporaryRoot.createTemp('bstream-csv-');
+      transferDirectory = await temporaryRoot.createTemp('inutil-csv-');
       final fileName = _csvFileName(profile);
       final source = await ref
           .read(libraryCsvServiceProvider)
@@ -1486,7 +1486,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         .toIso8601String()
         .replaceAll(':', '-')
         .replaceAll('.', '-');
-    return 'bstream-music-backup-$stamp.zip';
+    return 'inutil-music-backup-$stamp.zip';
   }
 
   String _csvFileName(LibraryCsvProfile profile) {
@@ -1494,7 +1494,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         .toIso8601String()
         .replaceAll(':', '-')
         .replaceAll('.', '-');
-    return 'bstream-music-${profile.name}-$stamp.csv';
+    return 'inutil-music-${profile.name}-$stamp.csv';
   }
 
   void _showSnackBar(String message) {
@@ -1518,7 +1518,7 @@ class _CsvProfileDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = <(LibraryCsvProfile, String)>[
-      (LibraryCsvProfile.bstream, strings.csvProfileBStream),
+      (LibraryCsvProfile.inutil, strings.csvProfileInutil),
       (LibraryCsvProfile.metroList, strings.csvProfileMetroList),
       (LibraryCsvProfile.harmony, strings.csvProfileHarmony),
       (LibraryCsvProfile.soundiiz, strings.csvProfileSoundiiz),
@@ -2771,7 +2771,7 @@ class _AppearanceSettings extends StatelessWidget {
               _SettingsEntryCard(
                 key: const ValueKey('player-style-selector'),
                 icon: switch (playerStyle) {
-                  PlayerStyle.bstreamMusic => Icons.graphic_eq_rounded,
+                  PlayerStyle.inutilMusic => Icons.graphic_eq_rounded,
                   PlayerStyle.appleMusic => Icons.music_note_rounded,
                   PlayerStyle.classicVinyl => Icons.album_rounded,
                   PlayerStyle.spotifyMusic => Icons.play_circle_rounded,

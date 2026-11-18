@@ -1,6 +1,6 @@
 import 'youtube_music_account_models.dart';
 
-/// Defensive parser for the small authenticated surface used by BStream.
+/// Defensive parser for the small authenticated surface used by Inutil.
 ///
 /// YouTube frequently wraps the same renderer in different containers. The
 /// parser therefore keys off renderer names and semantic endpoint fields, not

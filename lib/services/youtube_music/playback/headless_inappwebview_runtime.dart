@@ -29,7 +29,7 @@ const youtubeJavaScriptRuntimeCsp =
     "navigate-to 'none'";
 
 const youtubeJavaScriptRuntimeCspMeta =
-    '<meta data-bstream-runtime-csp="true" '
+    '<meta data-inutil-runtime-csp="true" '
     'http-equiv="Content-Security-Policy" '
     'content="$youtubeJavaScriptRuntimeCsp">';
 
@@ -44,7 +44,7 @@ String hardenYoutubeJavaScriptDocument(String html) {
     r'<script\b',
     caseSensitive: false,
   ).firstMatch(html)?.start;
-  final existingPolicy = html.indexOf('data-bstream-runtime-csp="true"');
+  final existingPolicy = html.indexOf('data-inutil-runtime-csp="true"');
   if (existingPolicy >= 0) {
     if (firstScript != null && existingPolicy > firstScript) {
       throw const YoutubeJavaScriptRuntimeException(

@@ -13,7 +13,7 @@
 namespace {
 
 // Keep this value in sync with the AppUserModelID assigned by the installer.
-constexpr wchar_t kAppUserModelId[] = L"BStreamMusic.Desktop";
+constexpr wchar_t kAppUserModelId[] = L"InutilMusic.Desktop";
 // Nombre visible del acceso directo (Menú Inicio / Escritorio).
 constexpr wchar_t kShortcutName[] = L"In\u00FAtil Music.lnk";
 

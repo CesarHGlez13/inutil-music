@@ -38,11 +38,11 @@ test('window validation rejects overlap, invalid clocks, and capture-edge leakag
 
 test('latencies require matching request and selection and remain framework-only', () => {
   const result = tabLatencies([
-    { name: 'BStream.tab.request', ts: 1000, args: { requestId: 1, from: 0, to: 1 } },
-    { name: 'BStream.tab.firstBuildComplete', ts: 6000, args: { requestId: 1, to: 1, stillSelected: true } },
-    { name: 'BStream.tab.request', ts: 9000, args: { requestId: 2, from: 1, to: 2 } },
-    { name: 'BStream.tab.firstBuildComplete', ts: 12000, args: { requestId: 2, to: 2, stillSelected: false } },
-    { name: 'BStream.tab.request', ts: 15000, args: { requestId: 3, from: 2, to: 0 } },
+    { name: 'Inutil.tab.request', ts: 1000, args: { requestId: 1, from: 0, to: 1 } },
+    { name: 'Inutil.tab.firstBuildComplete', ts: 6000, args: { requestId: 1, to: 1, stillSelected: true } },
+    { name: 'Inutil.tab.request', ts: 9000, args: { requestId: 2, from: 1, to: 2 } },
+    { name: 'Inutil.tab.firstBuildComplete', ts: 12000, args: { requestId: 2, to: 2, stillSelected: false } },
+    { name: 'Inutil.tab.request', ts: 15000, args: { requestId: 3, from: 2, to: 0 } },
   ]);
   assert.equal(result.handlerToFirstBuildMs.mean, 5);
   assert.equal(result.matches.length, 2);

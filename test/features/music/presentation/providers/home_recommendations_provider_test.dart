@@ -925,7 +925,7 @@ void main() {
             summary: const ytm_account.RemotePlaylistSummary(
               playlistId: 'PL_private',
               title: 'Playlist privada',
-              owner: 'Cuenta BStream',
+              owner: 'Cuenta Inutil',
               thumbnailUrl: 'https://img.test/private-playlist.jpg',
             ),
             entries: <ytm_account.RemotePlaylistEntry>[
@@ -956,7 +956,7 @@ void main() {
       expect(source.collectionCalls, 1);
       expect(requestedPlaylistIds, const <String>['PL_private']);
       expect(detail.title, 'Playlist privada');
-      expect(detail.subtitle, 'Cuenta BStream');
+      expect(detail.subtitle, 'Cuenta Inutil');
       expect(detail.artworkSource, 'https://img.test/private-playlist.jpg');
       expect(detail.tracks, hasLength(1));
       expect(detail.tracks.single.id, 'Private0001');

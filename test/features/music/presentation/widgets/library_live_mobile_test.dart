@@ -20,7 +20,7 @@ void main() {
       final track = LocalTrack(
         id: 'sharp-library-artwork',
         title: 'Bonsai',
-        artist: 'BStream Artist',
+        artist: 'Inutil Artist',
         filePath: r'C:\Music\bonsai.m4a',
         thumbnailPath: r'C:\Music\soft-bonsai.jpg',
         thumbnailUrl: 'https://i.ytimg.com/vi/bonsai00001/hqdefault.jpg',
@@ -119,7 +119,7 @@ void main() {
         final track = LocalTrack(
           id: 'artwork-track',
           title: 'A deliberately long downloaded song title',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: r'C:\Music\artwork-track.mp3',
           thumbnailPath: r'C:\Music\missing-artwork.jpg',
           addedAt: DateTime(2026),

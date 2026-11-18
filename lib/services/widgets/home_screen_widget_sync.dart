@@ -16,7 +16,7 @@ class HomeScreenWidgetSync {
     MethodChannel? channel,
     this.onAction,
     this.supportsQueue = false,
-  }) : _channel = channel ?? const MethodChannel('bstream_music/home_widget') {
+  }) : _channel = channel ?? const MethodChannel('inutil_music/home_widget') {
     _channel.setMethodCallHandler(_handleCall);
     unawaited(_registerAndConsumePendingAction());
   }
@@ -220,7 +220,7 @@ class HomeScreenWidgetSync {
       ownsArtworkRequest = true;
       final deviceAudioUri = deviceAudioUriFromArtworkSource(artworkUrl);
       if (deviceAudioUri != null) {
-        final bytes = await const MethodChannel('bstream_music/local_audio')
+        final bytes = await const MethodChannel('inutil_music/local_audio')
             .invokeMethod<Uint8List>('loadArtwork', <String, Object>{
               'audioUri': deviceAudioUri,
               'targetWidth': 320,
@@ -242,7 +242,7 @@ class HomeScreenWidgetSync {
       if (uri?.scheme == 'file') {
         path = uri!.toFilePath();
       } else if (uri?.scheme == 'http' || uri?.scheme == 'https') {
-        final cached = await BStreamArtworkCacheManager().getSingleFile(
+        final cached = await InutilArtworkCacheManager().getSingleFile(
           artworkUrl,
         );
         path = cached.path;
@@ -379,7 +379,7 @@ class HomeScreenWidgetSync {
       final uri = Uri.tryParse(source);
       final deviceAudioUri = deviceAudioUriFromArtworkSource(source);
       if (deviceAudioUri != null) {
-        final bytes = await const MethodChannel('bstream_music/local_audio')
+        final bytes = await const MethodChannel('inutil_music/local_audio')
             .invokeMethod<Uint8List>('loadArtwork', <String, Object>{
               'audioUri': deviceAudioUri,
               'targetWidth': 128,
@@ -387,7 +387,7 @@ class HomeScreenWidgetSync {
         if (bytes != null && bytes.isNotEmpty) {
           final directory = Directory.systemTemp;
           await directory.create(recursive: true);
-          final filename = 'bstream_queue_${_stablePathHash(source)}.img';
+          final filename = 'inutil_queue_${_stablePathHash(source)}.img';
           final file = File(
             '${directory.path}${Platform.pathSeparator}$filename',
           );
@@ -409,7 +409,7 @@ class HomeScreenWidgetSync {
           sizedGoogleArtworkSource(source, 128) ?? source,
           ...previewCandidates,
         };
-        final cache = BStreamArtworkCacheManager();
+        final cache = InutilArtworkCacheManager();
         for (final candidate in candidates) {
           final cached = await cache.getFileFromCache(candidate);
           if (cached != null && await cached.file.exists()) {

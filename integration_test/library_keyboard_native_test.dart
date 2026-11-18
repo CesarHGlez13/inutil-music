@@ -47,7 +47,7 @@ void main() {
     'native keyboard cycles retain shell, playlist mosaic and navigation',
     (tester) async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream_library_keyboard_',
+        'inutil_library_keyboard_',
       );
       final fixture = await _Fixture.create(directory);
       final container = _container(fixture);

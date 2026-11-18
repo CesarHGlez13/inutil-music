@@ -21,7 +21,7 @@ const int _backupMinimumExpansionAllowance = 64 * 1024 * 1024;
 
 /// Validates declared ZIP sizes before any backup entry is expanded to disk.
 ///
-/// Media files in BStream backups are stored without compression, while the
+/// Media files in Inutil backups are stored without compression, while the
 /// database and manifest are compressed. The generous ratio allowance keeps
 /// legitimate libraries compatible but rejects tiny ZIP bombs before they can
 /// consume storage or inodes on a phone.
@@ -122,7 +122,7 @@ class BackupService {
       outputPath ??
           p.join(
             (await getTemporaryDirectory()).path,
-            'bstream_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
+            'inutil_backup_${DateTime.now().millisecondsSinceEpoch}.zip',
           ),
     );
     await destination.parent.create(recursive: true);
@@ -133,7 +133,7 @@ class BackupService {
     final snapshotRoot = Directory(
       p.join(
         (await getTemporaryDirectory()).path,
-        'bstream_backup_snapshot_${DateTime.now().millisecondsSinceEpoch}',
+        'inutil_backup_snapshot_${DateTime.now().millisecondsSinceEpoch}',
       ),
     );
     try {
@@ -218,7 +218,7 @@ class BackupService {
     final temporaryRoot = Directory(
       p.join(
         (await getTemporaryDirectory()).path,
-        'bstream_import_${DateTime.now().millisecondsSinceEpoch}',
+        'inutil_import_${DateTime.now().millisecondsSinceEpoch}',
       ),
     );
     await temporaryRoot.create(recursive: true);
@@ -443,7 +443,7 @@ Future<void> _preflightBackupArchive(String backupPath) async {
     validateBackupArchiveBudget(
       archiveBytes: await File(backupPath).length(),
       // Count directories and ignored entries too. They still consume parser
-      // memory even though BStream never writes them to the extraction root.
+      // memory even though Inutil never writes them to the extraction root.
       entrySizes: headers.map((header) => header.uncompressedSize),
     );
 

@@ -24,7 +24,7 @@ void main() {
 
   setUp(() async {
     root = await Directory.systemTemp.createTemp(
-      'bstream-playlist-cover-change-',
+      'inutil-playlist-cover-change-',
     );
     database = _MemoryArtworkDatabase();
     settings = _ArtworkSettings(root.path);

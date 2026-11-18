@@ -16,7 +16,7 @@ void main() {
       'uses the shared fallback for null, empty, and invalid sources',
       () async {
         final directory = await Directory.systemTemp.createTemp(
-          'bstream-artwork-progress-',
+          'inutil-artwork-progress-',
         );
         addTearDown(() => directory.delete(recursive: true));
         final service = ArtworkProgressColorService();
@@ -38,7 +38,7 @@ void main() {
       'deduplicates concurrent requests for the same normalized source',
       () async {
         final directory = await Directory.systemTemp.createTemp(
-          'bstream-artwork-progress-',
+          'inutil-artwork-progress-',
         );
         addTearDown(() => directory.delete(recursive: true));
         final service = ArtworkProgressColorService();
@@ -59,7 +59,7 @@ void main() {
 
     test('serves extracted colors from cache until it is cleared', () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-artwork-progress-',
+        'inutil-artwork-progress-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final artwork = await _writeSolidPng(
@@ -86,7 +86,7 @@ void main() {
       'menu sampling preserves grayscale without changing progress sampling',
       () async {
         final directory = await Directory.systemTemp.createTemp(
-          'bstream-menu-gray-',
+          'inutil-menu-gray-',
         );
         addTearDown(() => directory.delete(recursive: true));
         final artwork = await _writeSolidPng(
@@ -114,7 +114,7 @@ void main() {
 
     test('decodes local artwork through the bounded 32 px cache key', () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-artwork-progress-',
+        'inutil-artwork-progress-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final artwork = await _writeSolidPng(

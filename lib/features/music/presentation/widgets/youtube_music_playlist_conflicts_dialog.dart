@@ -94,7 +94,7 @@ class _YouTubeMusicPlaylistConflictsDialogState
                                     conflict,
                                     PlaylistSyncConflictResolution.keepLocal,
                                   ),
-                            child: Text(widget.strings.keepBStreamPlaylist),
+                            child: Text(widget.strings.keepInutilPlaylist),
                           ),
                           if (conflict.kind !=
                               PlaylistSyncConflictKind.remoteDeleted)

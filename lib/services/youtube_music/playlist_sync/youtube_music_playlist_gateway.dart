@@ -17,7 +17,7 @@ class RemotePlaylistSummary {
   final String? privacy;
 
   /// True for YouTube Music's system "Liked Music" collection (LM/VLLM).
-  /// It is represented locally by BStream's reserved Favorites playlist,
+  /// It is represented locally by Inútil Music's reserved Favorites playlist,
   /// rather than imported as a second ordinary playlist.
   final bool isLikedMusic;
 }

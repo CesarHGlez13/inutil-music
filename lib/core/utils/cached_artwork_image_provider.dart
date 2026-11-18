@@ -5,15 +5,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 
-/// Persistent cache dedicated to artwork shown throughout BStream.
+/// Persistent cache dedicated to artwork shown throughout Inutil.
 ///
 /// Flutter's [ImageCache] only retains decoded pixels in memory. This cache
 /// keeps the compressed response on disk as well, so an evicted album cover or
 /// artist portrait does not need another network round trip while scrolling.
-class BStreamArtworkCacheManager extends CacheManager {
-  factory BStreamArtworkCacheManager() => _instance;
+class InutilArtworkCacheManager extends CacheManager {
+  factory InutilArtworkCacheManager() => _instance;
 
-  BStreamArtworkCacheManager._()
+  InutilArtworkCacheManager._()
     : super(
         Config(
           _cacheKey,
@@ -22,12 +22,12 @@ class BStreamArtworkCacheManager extends CacheManager {
         ),
       );
 
-  static const _cacheKey = 'bstreamArtworkCacheV1';
-  static final BStreamArtworkCacheManager _instance =
-      BStreamArtworkCacheManager._();
+  static const _cacheKey = 'inutilArtworkCacheV1';
+  static final InutilArtworkCacheManager _instance =
+      InutilArtworkCacheManager._();
 }
 
-/// An [ImageProvider] backed by BStream's persistent artwork cache.
+/// An [ImageProvider] backed by Inútil Music's persistent artwork cache.
 @immutable
 class CachedArtworkImageProvider
     extends ImageProvider<CachedArtworkImageProvider> {
@@ -35,7 +35,7 @@ class CachedArtworkImageProvider
     this.url, {
     this.scale = 1,
     BaseCacheManager? cacheManager,
-  }) : cacheManager = cacheManager ?? BStreamArtworkCacheManager();
+  }) : cacheManager = cacheManager ?? InutilArtworkCacheManager();
 
   final String url;
   final double scale;

@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 
-/// Puente con el `MethodChannel` nativo `bstream_music/app_update`.
+/// Puente con el `MethodChannel` nativo `inutil_music/app_update`.
 ///
 /// La instalación real la hace Android: `MainActivity.installDownloadedPackage`
 /// expone el APK con `androidx.core.content.FileProvider` (URI `content://`) y
@@ -17,7 +17,7 @@ class AndroidPackageInstaller {
   const AndroidPackageInstaller._();
 
   static const MethodChannel channel = MethodChannel(
-    'bstream_music/app_update',
+    'inutil_music/app_update',
   );
 
   static bool get isSupported => Platform.isAndroid;

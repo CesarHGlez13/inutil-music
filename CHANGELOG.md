@@ -174,7 +174,7 @@
 - Improved animated artwork with smaller and more varied particles, mixed
   focus, smoother trajectories, and more natural wind-like movement.
 - Refined the Local LIVE overlay with compact cards, elapsed and duration
-  counters, artwork-aware accent colors, an inline BStream logo beside the
+  counters, artwork-aware accent colors, an inline Inútil Music logo beside the
   current song title, and keyed queue transitions without flicker when requests
   are added, removed, or updated.
 - Hardened Local LIVE overlay startup on Windows with strict loopback DNS and
@@ -199,7 +199,7 @@
   now rebuilds sandbox-relative media paths after container changes, uses the
   bounded mobile stream cache, and is validated in CI with focused tests plus
   unsigned simulator and Release device builds. CI packages the device build
-  as `BStream-Music-<version>-iOS-unsigned.ipa` for use as input to external
+  as `InutilMusic-<version>-iOS-unsigned.ipa` for use as input to external
   signing or sideloading tools; the artifact is not directly installable until
   such a tool signs or re-signs it. Existing Android, Windows, Linux, and macOS
   platform paths remain unchanged.
@@ -226,7 +226,7 @@
   player instead of reaching the browsing content underneath.
 - The compact Liquid Glass Home control is now icon-only, matching the detached
   Search control while retaining its full accessible label and tap target.
-- Appearance settings now offer BStream Music and Apple Music Style full-player
+- Appearance settings now offer Inútil Music and Apple Music Style full-player
   layouts. The Apple layout uses the artwork-blurred background, compact square
   cover, inline favorite/menu actions, remaining-time seek bar, Apple-like
   transport and volume rows, and the supported Lyrics, shuffle, repeat, and
@@ -234,11 +234,11 @@
   mobile landscape keep the complete player in one non-scrolling viewport;
   only extreme reduced-height or 300-percent accessibility layouts retain a
   scroll fallback. The Apple layout uses uniform 7 px progress and volume
-  tracks without circular indicators, while BStream Music retains its animated
+  tracks without circular indicators, while Inútil Music retains its animated
   wave seek bar and compact volume thumb. Metadata actions align with the
   artist row, transport controls use the reference proportions, and time
   labels follow the track insets. Share now lives inside the overflow menu in
-  both layouts, while BStream Music also retains its direct shortcut beside
+  both layouts, while Inútil Music also retains its direct shortcut beside
   Favorites. The Apple trigger keeps a 48 px touch target without applying that
   constraint to the popup route. Mobile Apple spacing now places the cover
   closer to the grabber and grows it responsively while preserving safe-area
@@ -293,7 +293,7 @@
 - Optional YouTube Music account sign-in with an isolated browser, encrypted
   on-device session storage, account/channel selection, a Home avatar, and an
   explicit warning that the integration is unofficial and unaffiliated with
-  Google. BStream never receives or stores the account password.
+  Google. Inútil Music never receives or stores the account password.
 - Bidirectional local/YouTube Music playlist synchronization with stable IDs,
   occurrence-safe duplicates, private-by-default remote creation, three-way
   merging, bounded automatic retries, and explicit conflict review.
@@ -301,7 +301,7 @@
   until the user explicitly chooses **Keep and sync**; choosing **Not now**
   performs no remote reads or writes and can be revisited from the account menu.
 - Account-free Home personalization backed by qualified local listening
-  history. BStream combines YouTube Music `/next`, related shelves, generated
+  history. Inútil Music combines YouTube Music `/next`, related shelves, generated
   mixes, and exact artist pages into **Because you listened**, **Your mixes**,
   **New for you**, and **Discovery for you** sections.
 - Persistent anonymous InnerTube visitor data, related-result caches, and an
@@ -401,7 +401,7 @@
 - Search title changes and expandable Crossfade settings use bounded accessible
   transitions, including reduced-motion behavior without layout jumps.
 - Android hides the desktop-only download-folder control. CSV export profiles
-  present only their compatibility names: BStream Music, MetroList,
+  present only their compatibility names: Inútil Music, MetroList,
   Harmony/RiMusic, and Soundiiz.
 
 #### Fixed
@@ -430,7 +430,7 @@
   the remote queue.
 - Refreshable YouTube Music Home shelves with lazy collection lookups and
   bounded continuations of up to 100 detail tracks.
-- CSV library import and export with BStream, MetroList, Harmony/RiMusic,
+- CSV library import and export with Inútil Music, MetroList, Harmony/RiMusic,
   Soundiiz, Exportify, and common title/artist/album/ISRC layouts. Imports are
   previewed, deduplicated, confirmed, and downloaded sequentially.
 - Native Dart TikTok LIVE support on Android, Windows, Linux, and macOS. LIVE

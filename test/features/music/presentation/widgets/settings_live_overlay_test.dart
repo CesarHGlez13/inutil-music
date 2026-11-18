@@ -395,7 +395,7 @@ class _FakeTikTokLiveController extends TikTokLiveController {
 
   @override
   Future<TikTokLiveState> build() async => TikTokLiveState(
-    creatorInput: '@bstream_test',
+    creatorInput: '@inutil_test',
     status: connected ? TikTokLiveStatus.connected : TikTokLiveStatus.idle,
     message: connected ? 'Conectado' : 'Listo para conectar.',
     roomId: connected ? '741852963' : null,

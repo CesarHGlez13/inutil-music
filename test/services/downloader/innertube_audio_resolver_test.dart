@@ -34,7 +34,7 @@ void main() {
       const TrackInfo(
         id: 'dQw4w9WgXcQ',
         title: 'Test',
-        artist: 'BStream',
+        artist: 'Inutil',
         url: 'https://youtu.be/dQw4w9WgXcQ',
       ),
     );
@@ -75,7 +75,7 @@ void main() {
       const TrackInfo(
         id: 'dQw4w9WgXcQ',
         title: 'Test',
-        artist: 'BStream',
+        artist: 'Inutil',
         url: 'dQw4w9WgXcQ',
       ),
       mode: AudioResolutionMode.fallbackOnly,
@@ -112,7 +112,7 @@ void main() {
         const TrackInfo(
           id: 'dQw4w9WgXcQ',
           title: 'Test',
-          artist: 'BStream',
+          artist: 'Inutil',
           url: 'not-a-youtube-url',
           streamClientProfileKey: 'visionOS',
         ),
@@ -149,7 +149,7 @@ void main() {
         const TrackInfo(
           id: 'dQw4w9WgXcQ',
           title: 'Test',
-          artist: 'BStream',
+          artist: 'Inutil',
           url: 'dQw4w9WgXcQ',
         ),
         mode: AudioResolutionMode.fallbackOnly,
@@ -170,7 +170,7 @@ const _secondaryProfile = InnerTubeClientProfile(
   clientId: 7,
   host: 'www.youtube.com',
   origin: 'https://www.youtube.com',
-  userAgent: 'BStream test',
+  userAgent: 'Inutil test',
   capabilities: InnerTubeClientCapabilities(
     playerJavaScript: InnerTubePlayerJavaScriptRequirement.notRequired,
     playerPoToken: InnerTubePoTokenRequirement.notRequired,

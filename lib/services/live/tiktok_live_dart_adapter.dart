@@ -35,7 +35,7 @@ class TikTokLiveDartRawEvent {
   final String roomId;
 }
 
-/// Direct Dart implementation of BStream's TikTok LIVE command transport.
+/// Direct Dart implementation of Inútil Music's TikTok LIVE command transport.
 ///
 /// The audited transport reports its `connected` event after the WebSocket
 /// handshake. The adapter also accepts the first decoded traffic event as a
@@ -544,7 +544,7 @@ class PirateTokLiveDartClient implements TikTokLiveDartClient {
 /// Cheap pre-filter used before PirateTok decodes a chat user's full profile.
 ///
 /// Exact command validation remains in [parseTikTokLiveCommand]. This only
-/// rejects ordinary chat lines that cannot possibly be a BStream command.
+/// rejects ordinary chat lines that cannot possibly be a Inutil command.
 bool isPotentialTikTokLiveCommandText(String text) {
   final message = text.trim();
   return message.startsWith('!') || message.toLowerCase() == 'revoke!';

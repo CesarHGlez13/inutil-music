@@ -3,7 +3,7 @@ import 'dart:ui';
 import 'package:share_plus/share_plus.dart';
 
 import '../../features/music/domain/entities/track_info.dart';
-import 'bstream_track_link.dart';
+import 'inutil_track_link.dart';
 
 abstract interface class TrackShareService {
   bool canShare(TrackInfo track);
@@ -49,11 +49,11 @@ class SharePlusTrackShareGateway implements TrackShareGateway {
 
 class SharePlusTrackShareService implements TrackShareService {
   const SharePlusTrackShareService({
-    this.codec = const BStreamTrackLinkCodec(),
+    this.codec = const InutilTrackLinkCodec(),
     this.gateway = const SharePlusTrackShareGateway(),
   });
 
-  final BStreamTrackLinkCodec codec;
+  final InutilTrackLinkCodec codec;
   final TrackShareGateway gateway;
 
   @override

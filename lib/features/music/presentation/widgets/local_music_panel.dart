@@ -66,7 +66,7 @@ class LocalMusicNavigationController extends ChangeNotifier {
   }
 }
 
-/// Browses device audio without adding it to BStream's Library.
+/// Browses device audio without adding it to Inútil Music's Library.
 class LocalMusicPanel extends ConsumerStatefulWidget {
   const LocalMusicPanel({
     required this.onOpenPlayer,
@@ -196,7 +196,7 @@ class _LocalMusicPanelState extends ConsumerState<LocalMusicPanel>
 
     final filters = settingsState.localMusicFilters;
     final query = DeviceAudioQuery(
-      bstreamRoot: settingsState.downloadDirectory,
+      inutilRoot: settingsState.downloadDirectory,
       options: DeviceAudioFilterOptions(
         excludeWhatsAppAudio: filters.contains(
           LocalMusicFilter.hideWhatsAppAudio,
@@ -322,7 +322,7 @@ class _LocalMusicPanelState extends ConsumerState<LocalMusicPanel>
           .read(deviceAudioCatalogProvider)
           .requestPermissionAndLoad(
             options: query.options,
-            bstreamRoot: query.bstreamRoot,
+            inutilRoot: query.inutilRoot,
           );
       ref.invalidate(deviceAudioCatalogResultProvider(query));
     } catch (_) {
@@ -338,7 +338,7 @@ class _LocalMusicPanelState extends ConsumerState<LocalMusicPanel>
     try {
       await ref
           .read(deviceAudioCatalogProvider)
-          .refresh(options: query.options, bstreamRoot: query.bstreamRoot);
+          .refresh(options: query.options, inutilRoot: query.inutilRoot);
       ref.invalidate(deviceAudioCatalogResultProvider(query));
     } catch (_) {
       if (mounted) _showCatalogError();

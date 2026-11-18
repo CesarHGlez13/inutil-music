@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-const localLiveOverlayHost = 'overlay.bstreammusic.test';
+const localLiveOverlayHost = 'overlay.inutilmusic.test';
 const localLiveOverlayIpv4 = '127.0.0.1';
 const localLiveOverlayPort = 80;
 const localLiveOverlayPath = '/overlay';
-const localLiveOverlayUrl = 'http://overlay.bstreammusic.test/overlay';
+const localLiveOverlayUrl = 'http://overlay.inutilmusic.test/overlay';
 const localOverlayHostsCommandTimeout = Duration(seconds: 30);
 
 const _localOverlayHostsProcessCleanupTimeout = Duration(seconds: 2);
@@ -16,8 +16,8 @@ const _windowsCommandLineSafetyMargin = 512;
 const _windowsOperationCancelledExitCode = 1223;
 const _powerShellPolicyBlockedExitCode = 125;
 
-const _ownedBlockBegin = '# BEGIN BStream Music LIVE Overlay';
-const _ownedBlockEnd = '# END BStream Music LIVE Overlay';
+const _ownedBlockBegin = '# BEGIN Inútil Music LIVE Overlay';
+const _ownedBlockEnd = '# END Inútil Music LIVE Overlay';
 
 /// Ensures that the stable LIVE overlay hostname resolves to IPv4 loopback.
 abstract interface class LocalOverlayHostProvisioner {
@@ -467,7 +467,7 @@ final class WindowsLocalOverlayHostProvisioner
     );
     if (powerShellExecutable == null && !await File(executable).exists()) {
       throw const LocalOverlayHostsPowerShellUnavailableException(
-        'Windows PowerShell 5.1 is unavailable, so BStream cannot request the '
+        'Windows PowerShell 5.1 is unavailable, so Inutil cannot request the '
         'narrow administrative permission required for the LIVE overlay hostname.',
       );
     }
@@ -550,12 +550,12 @@ final class WindowsLocalOverlayHostProvisioner
     if (value.status == LocalOverlayHostStatus.conflicting) {
       throw LocalOverlayHostsConflictException(
         '$localLiveOverlayHost already points to '
-        '${value.mappedAddresses.join(', ')}. BStream will not overwrite it.',
+        '${value.mappedAddresses.join(', ')}. Inutil will not overwrite it.',
       );
     }
     if (value.status == LocalOverlayHostStatus.malformed) {
       throw const LocalOverlayHostsConflictException(
-        'The BStream marker block in the Windows hosts file is incomplete or malformed.',
+        'The Inutil marker block in the Windows hosts file is incomplete or malformed.',
       );
     }
   }
@@ -744,10 +744,10 @@ $endMarker = {{END_MARKER}}
 if ($ExecutionContext.SessionState.LanguageMode -ne 'FullLanguage') {
   exit 125
 }
-$mutex = New-Object System.Threading.Mutex($false, 'Local\BStreamMusic.LiveOverlay.Hosts.v1')
+$mutex = New-Object System.Threading.Mutex($false, 'Local\InutilMusic.LiveOverlay.Hosts.v1')
 $lockTaken = $false
 
-function Get-BStreamEncoding([byte[]]$bytes) {
+function Get-InutilEncoding([byte[]]$bytes) {
   if ($bytes.Length -ge 4 -and
       (($bytes[0] -eq 0xFF -and $bytes[1] -eq 0xFE -and
         $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) -or
@@ -778,7 +778,7 @@ function Get-BStreamEncoding([byte[]]$bytes) {
   }
 }
 
-function Get-BStreamMappings([string]$content) {
+function Get-InutilMappings([string]$content) {
   $result = @()
   foreach ($line in [System.Text.RegularExpressions.Regex]::Split($content, "`r`n|`n|`r")) {
     $active = ($line -split '#', 2)[0].Trim()
@@ -795,7 +795,7 @@ function Get-BStreamMappings([string]$content) {
   return @($result)
 }
 
-function Invoke-BStreamFlushDns {
+function Invoke-InutilFlushDns {
   # The hosts entry is the durable postcondition. Some managed PCs block the
   # cache flush even though name resolution observes hosts changes correctly,
   # so flushing is an optimization and must not roll back a valid mapping.
@@ -814,7 +814,7 @@ try {
   }
 
   [byte[]]$originalBytes = [System.IO.File]::ReadAllBytes($hostsPath)
-  $encodingInfo = Get-BStreamEncoding $originalBytes
+  $encodingInfo = Get-InutilEncoding $originalBytes
   $encoding = $encodingInfo[0]
   [int]$preambleLength = $encodingInfo[1]
   $content = $encoding.GetString(
@@ -822,7 +822,7 @@ try {
     $preambleLength,
     $originalBytes.Length - $preambleLength
   )
-  $mappings = @(Get-BStreamMappings $content)
+  $mappings = @(Get-InutilMappings $content)
   $conflicts = @($mappings | Where-Object { $_ -ne $loopback })
   if ($conflicts.Count -gt 0) {
     throw "$hostName already maps to $($conflicts -join ', ')."
@@ -832,7 +832,7 @@ try {
     $markerLines = @([System.Text.RegularExpressions.Regex]::Split(
       $content, "`r`n|`n|`r") | ForEach-Object { $_.Trim() })
     if ($markerLines -contains $beginMarker -or $markerLines -contains $endMarker) {
-      throw 'The existing BStream hosts marker block is malformed.'
+      throw 'The existing Inutil hosts marker block is malformed.'
     }
 
     $newLine = if ($content.Contains("`r`n")) {
@@ -856,8 +856,8 @@ try {
 
     $directory = [System.IO.Path]::GetDirectoryName($hostsPath)
     $nonce = [Guid]::NewGuid().ToString('N')
-    $temporary = [System.IO.Path]::Combine($directory, "hosts.bstream.$nonce.tmp")
-    $backup = [System.IO.Path]::Combine($directory, "hosts.bstream.$nonce.bak")
+    $temporary = [System.IO.Path]::Combine($directory, "hosts.inutil.$nonce.tmp")
+    $backup = [System.IO.Path]::Combine($directory, "hosts.inutil.$nonce.bak")
     try {
       [System.IO.File]::WriteAllBytes($temporary, $updatedBytes)
       $acl = Get-Acl -LiteralPath $hostsPath
@@ -871,13 +871,13 @@ try {
       $currentHash = [Convert]::ToBase64String(
         [System.Security.Cryptography.SHA256]::Create().ComputeHash($currentBytes))
       if ($currentHash -ne $expectedHash) {
-        throw 'The Windows hosts file changed while BStream was preparing it.'
+        throw 'The Windows hosts file changed while Inutil was preparing it.'
       }
 
       [System.IO.File]::Replace($temporary, $hostsPath, $backup, $true)
       $temporary = $null
       [byte[]]$verifiedBytes = [System.IO.File]::ReadAllBytes($hostsPath)
-      $verifiedEncodingInfo = Get-BStreamEncoding $verifiedBytes
+      $verifiedEncodingInfo = Get-InutilEncoding $verifiedBytes
       $verifiedEncoding = $verifiedEncodingInfo[0]
       [int]$verifiedPreambleLength = $verifiedEncodingInfo[1]
       $verifiedContent = $verifiedEncoding.GetString(
@@ -885,12 +885,12 @@ try {
         $verifiedPreambleLength,
         $verifiedBytes.Length - $verifiedPreambleLength
       )
-      $verified = @(Get-BStreamMappings $verifiedContent)
+      $verified = @(Get-InutilMappings $verifiedContent)
       if ($verified -notcontains $loopback -or
           @($verified | Where-Object { $_ -ne $loopback }).Count -gt 0) {
         throw 'The LIVE overlay hostname could not be verified after writing.'
       }
-      Invoke-BStreamFlushDns
+      Invoke-InutilFlushDns
     }
     catch {
       $operationError = $_
@@ -902,7 +902,7 @@ try {
           Copy-Item -LiteralPath $backup -Destination $hostsPath -Force
         }
       }
-      Invoke-BStreamFlushDns
+      Invoke-InutilFlushDns
       throw $operationError
     }
     finally {
@@ -913,7 +913,7 @@ try {
     }
   }
   else {
-    Invoke-BStreamFlushDns
+    Invoke-InutilFlushDns
   }
 }
 finally {

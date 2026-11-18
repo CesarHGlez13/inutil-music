@@ -89,7 +89,7 @@ class CachedPersonalizedRecommendationFeed {
 
 /// Builds a local, deterministic ranking from YouTube candidate pools.
 ///
-/// YouTube decides which candidates are related, while BStream decides which
+/// YouTube decides which candidates are related, while Inutil decides which
 /// ones are useful for the current listener: recent/ever exclusions, global
 /// deduplication, artist diversity, section quotas and cache policy all live
 /// here. An empty result is intentional during cold start; the application can

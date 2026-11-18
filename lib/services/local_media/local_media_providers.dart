@@ -10,22 +10,22 @@ import 'ios_device_audio_catalog.dart';
 class DeviceAudioQuery {
   const DeviceAudioQuery({
     this.options = const DeviceAudioFilterOptions(),
-    this.bstreamRoot,
+    this.inutilRoot,
   });
 
   final DeviceAudioFilterOptions options;
-  final String? bstreamRoot;
+  final String? inutilRoot;
 
   @override
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is DeviceAudioQuery &&
             options == other.options &&
-            bstreamRoot == other.bstreamRoot;
+            inutilRoot == other.inutilRoot;
   }
 
   @override
-  int get hashCode => Object.hash(options, bstreamRoot);
+  int get hashCode => Object.hash(options, inutilRoot);
 }
 
 final deviceAudioCatalogProvider = Provider<DeviceAudioCatalog>((ref) {
@@ -43,5 +43,5 @@ final deviceAudioCatalogResultProvider = FutureProvider.autoDispose
     .family<DeviceAudioCatalogResult, DeviceAudioQuery>((ref, query) {
       return ref
           .watch(deviceAudioCatalogProvider)
-          .load(options: query.options, bstreamRoot: query.bstreamRoot);
+          .load(options: query.options, inutilRoot: query.inutilRoot);
     });

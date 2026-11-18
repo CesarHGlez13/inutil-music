@@ -35,7 +35,7 @@ void main() {
         PlaybackQueueEntry(
           id: 'updated-queue-track',
           title: 'Cola actualizada',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           isRemote: false,
         ),
       ], 0);
@@ -55,7 +55,7 @@ void main() {
         PlaybackQueueEntry(
           id: 'visible-queue-track',
           title: 'Cola visible actualizada',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           isRemote: false,
         ),
       ], 0);
@@ -418,7 +418,7 @@ class _TestPlayerController extends PlayerController {
       PlayerSnapshot(
         status: PlayerStatus.paused,
         title: title,
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         trackId: 'queue-transition-track',
         duration: const Duration(minutes: 3),
       ),
@@ -429,7 +429,7 @@ class _TestPlayerController extends PlayerController {
   Future<PlayerSnapshot> build() async => const PlayerSnapshot(
     status: PlayerStatus.paused,
     title: 'Cancion de prueba',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     trackId: 'queue-transition-track',
     duration: Duration(minutes: 3),
   );
@@ -442,13 +442,13 @@ class _TestQueueNotifier extends PlaybackQueueNotifier {
       PlaybackQueueEntry(
         id: 'queue-transition-track',
         title: 'Cancion de prueba',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         isRemote: false,
       ),
       PlaybackQueueEntry(
         id: 'queue-transition-next',
         title: 'Siguiente cancion',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         isRemote: false,
       ),
     ],

@@ -14,7 +14,7 @@ void main() {
     'custom artwork painting reuses decoded cover and fallback pixels',
     (tester) async {
       final directory = Directory.systemTemp.createTempSync(
-        'bstream-reflection-',
+        'inutil-reflection-',
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -118,7 +118,7 @@ void main() {
   ) async {
     const remote = 'https://example.invalid/current-cover.jpg';
     final directory = Directory.systemTemp.createTempSync(
-      'bstream-cover-scope-',
+      'inutil-cover-scope-',
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -199,7 +199,7 @@ void main() {
       const remote =
           'https://lh3.googleusercontent.com/current-cover=w120-h120-l90-rj';
       final directory = Directory.systemTemp.createTempSync(
-        'bstream-cover-upgrade-',
+        'inutil-cover-upgrade-',
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -289,7 +289,7 @@ void main() {
     tester,
   ) async {
     final directory = Directory.systemTemp.createTempSync(
-      'bstream-cover-next-track-',
+      'inutil-cover-next-track-',
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -348,7 +348,7 @@ void main() {
   ) async {
     const remote = 'https://example.invalid/reopened-cover.jpg';
     final directory = Directory.systemTemp.createTempSync(
-      'bstream-cover-reopen-',
+      'inutil-cover-reopen-',
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -399,7 +399,7 @@ void main() {
     tester,
   ) async {
     final directory = Directory.systemTemp.createTempSync(
-      'bstream-local-cover-',
+      'inutil-local-cover-',
     );
     addTearDown(() async {
       await tester.pumpWidget(const SizedBox.shrink());
@@ -478,7 +478,7 @@ void main() {
     'SourceImage keeps downloaded artwork when its remote fallback is offline',
     (tester) async {
       final directory = Directory.systemTemp.createTempSync(
-        'bstream-source-image-',
+        'inutil-source-image-',
       );
       addTearDown(() async {
         await tester.pumpWidget(const SizedBox.shrink());
@@ -629,7 +629,7 @@ void main() {
   testWidgets('SourceImage loads embedded device artwork only when rendered', (
     tester,
   ) async {
-    const channel = MethodChannel('bstream_music/local_audio');
+    const channel = MethodChannel('inutil_music/local_audio');
     final calls = <MethodCall>[];
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {

@@ -22,7 +22,7 @@ void main() {
 
     final result = service.original(
       _release('''
-# BStream Music
+# Inútil Music
 ## v1.3.0
 **What's New**
 

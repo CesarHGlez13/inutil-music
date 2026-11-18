@@ -2243,7 +2243,7 @@ void main() {
     );
     final controller = _RecordingSearchController(
       SearchState(
-        query: 'bstream',
+        query: 'inutil',
         selectedCategory: SearchCategory.videos,
         pages: <SearchCategory, SearchPage>{
           SearchCategory.videos: fallbackPage,

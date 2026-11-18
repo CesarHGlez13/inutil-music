@@ -1,4 +1,4 @@
-/// A validated public YouTube/YouTube Music link that BStream can open.
+/// A validated public YouTube/YouTube Music link that Inutil can open.
 ///
 /// This parser intentionally accepts only HTTPS links from the canonical
 /// YouTube hosts. It never keeps cookies, query parameters unrelated to the

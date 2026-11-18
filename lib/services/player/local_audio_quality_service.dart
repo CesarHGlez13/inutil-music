@@ -37,7 +37,7 @@ class LocalAudioQualityService {
   }) : _fingerprintLoader = fingerprintLoader ?? _fileFingerprint,
        _now = now ?? DateTime.now,
        _channel =
-           methodChannel ?? const MethodChannel('bstream/local_audio_quality') {
+           methodChannel ?? const MethodChannel('inutil/local_audio_quality') {
     if (maxEntries < 1 || maxEntries > 256) {
       throw ArgumentError.value(maxEntries, 'maxEntries');
     }

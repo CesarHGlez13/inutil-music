@@ -11,7 +11,7 @@ app_bundle="$1"
 expected_arch="$2"
 expected_version="$3"
 info_plist="$app_bundle/Contents/Info.plist"
-executable="$app_bundle/Contents/MacOS/bstream_music"
+executable="$app_bundle/Contents/MacOS/inutil_music"
 frameworks_dir="$app_bundle/Contents/Frameworks"
 failures=0
 macho_count=0
@@ -30,7 +30,7 @@ read_plist() {
 }
 
 test "$(read_plist CFBundleIdentifier)" = "com.bstream.bstreamMusic"
-test "$(read_plist CFBundleExecutable)" = "bstream_music"
+test "$(read_plist CFBundleExecutable)" = "inutil_music"
 test "$(read_plist CFBundlePackageType)" = "APPL"
 test "$(read_plist CFBundleShortVersionString)" = "$expected_version"
 

@@ -365,7 +365,7 @@ void main() {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetDevicePixelRatio);
       final directory = await tester.runAsync(
-        () => Directory.systemTemp.createTemp('bstream_mosaic_layout_'),
+        () => Directory.systemTemp.createTemp('inutil_mosaic_layout_'),
       );
       final folder = directory!;
       addTearDown(() {

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 /// window bounds/maximized state, rather than just hiding Flutter's chrome.
 class DesktopWindowChannel {
   const DesktopWindowChannel({
-    this.methodChannel = const MethodChannel('bstream/desktop_window'),
+    this.methodChannel = const MethodChannel('inutil/desktop_window'),
   });
 
   final MethodChannel methodChannel;

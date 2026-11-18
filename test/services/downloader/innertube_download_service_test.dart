@@ -193,7 +193,7 @@ void main() {
         await playback.dispose();
       });
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-innertube-download-',
+        'inutil-innertube-download-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final progress = <double?>[];
@@ -259,7 +259,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-bitrate-download-',
+      'inutil-innertube-bitrate-download-',
     );
     addTearDown(() => directory.delete(recursive: true));
 
@@ -308,7 +308,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-muxed-download-',
+      'inutil-innertube-muxed-download-',
     );
     addTearDown(() => directory.delete(recursive: true));
 
@@ -346,7 +346,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-ios-format-download-',
+      'inutil-innertube-ios-format-download-',
     );
     addTearDown(() => directory.delete(recursive: true));
 
@@ -390,7 +390,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-unplayable-download-',
+      'inutil-innertube-unplayable-download-',
     );
     addTearDown(() => directory.delete(recursive: true));
 
@@ -459,7 +459,7 @@ void main() {
         await playback.dispose();
       });
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-innertube-profile-refresh-',
+        'inutil-innertube-profile-refresh-',
       );
       addTearDown(() => directory.delete(recursive: true));
 
@@ -531,7 +531,7 @@ void main() {
         await playback.dispose();
       });
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-innertube-ranged-download-',
+        'inutil-innertube-ranged-download-',
       );
       addTearDown(() => directory.delete(recursive: true));
 
@@ -575,7 +575,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-android-range-',
+      'inutil-innertube-android-range-',
     );
     addTearDown(() => directory.delete(recursive: true));
 
@@ -611,7 +611,7 @@ void main() {
       await playback.dispose();
     });
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-innertube-cancel-',
+      'inutil-innertube-cancel-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final statuses = <DownloadProgressStatus>[];
@@ -695,7 +695,7 @@ _upgradeFixture(
   DownloadAudioUpgrade callback,
 ) async {
   final directory = await Directory.systemTemp.createTemp(
-    'bstream-provider-download-',
+    'inutil-provider-download-',
   );
   final playback = InnerTubePlaybackService(
     transport: _PlayerTransport('https://yt.example/audio.m4a'),

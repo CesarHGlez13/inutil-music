@@ -28,7 +28,7 @@ class PlaylistAccountSyncResult {
 /// It never matches names and never treats absence during the initial import as
 /// a deletion. Local unbound playlists become private remote playlists, while
 /// unbound remote playlists receive a new local UUID. YouTube Music's system
-/// Liked Music collection is bound to BStream's reserved Favorites playlist
+/// Liked Music collection is bound to Inútil Music's reserved Favorites playlist
 /// and is never imported as a second local playlist.
 class PlaylistAccountSyncCoordinator {
   const PlaylistAccountSyncCoordinator({

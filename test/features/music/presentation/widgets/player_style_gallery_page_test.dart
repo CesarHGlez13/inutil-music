@@ -134,7 +134,7 @@ void main() {
 
       final cards = [
         for (final code in [
-          'bstream-music',
+          'inutil-music',
           'apple-music',
           'classic-vinyl',
           'spotify-music',
@@ -249,15 +249,15 @@ void main() {
         final preview = find.byKey(
           const ValueKey('player-style-preview-classicVinyl'),
         );
-        final bstream = find.byKey(
-          const ValueKey('settings-player-style-option-bstream-music'),
+        final inutil = find.byKey(
+          const ValueKey('settings-player-style-option-inutil-music'),
         );
         final apple = find.byKey(
           const ValueKey('settings-player-style-option-apple-music'),
         );
         expect(
           tester.getRect(apple).top,
-          greaterThan(tester.getRect(bstream).bottom),
+          greaterThan(tester.getRect(inutil).bottom),
         );
         await Scrollable.ensureVisible(tester.element(preview), alignment: .5);
         await tester.pumpAndSettle();
@@ -316,7 +316,7 @@ Widget _harness({
             MaterialPageRoute<void>(
               builder: (pageContext) => Scaffold(
                 body: PlayerStyleGalleryPage(
-                  style: PlayerStyle.bstreamMusic,
+                  style: PlayerStyle.inutilMusic,
                   strings: const AppStrings(AppLanguage.spanish),
                   bottomContentPadding: 0,
                   header: Row(

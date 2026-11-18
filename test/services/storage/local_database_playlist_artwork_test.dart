@@ -17,7 +17,7 @@ void main() {
   const fileName = 'playlist_e57b8304-a49c-4f51-a55f-45f776a0c062.png';
 
   setUp(() async {
-    sandbox = await Directory.systemTemp.createTemp('bstream-playlist-cover-');
+    sandbox = await Directory.systemTemp.createTemp('inutil-playlist-cover-');
     service = _TestDatabase(p.join(sandbox.path, 'library.db'));
   });
 

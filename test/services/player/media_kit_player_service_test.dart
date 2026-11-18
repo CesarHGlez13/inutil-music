@@ -351,7 +351,7 @@ void main() {
           'hinted',
           streamExtension: 'm4a',
           httpHeaders: const {
-            'User-Agent': 'BStream test',
+            'User-Agent': 'Inutil test',
             'Cookie': 'CONSENT=YES',
             'Range': 'bytes=0-1',
             'Host': 'invalid.example',
@@ -363,7 +363,7 @@ void main() {
       final media = backend.openCalls.single.media;
       expect(media.uri, endsWith('#.m4a'));
       expect(media.httpHeaders, const {
-        'User-Agent': 'BStream test',
+        'User-Agent': 'Inutil test',
         'Cookie': 'CONSENT=YES',
       });
 

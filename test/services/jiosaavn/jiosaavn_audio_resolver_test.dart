@@ -18,8 +18,8 @@ const _encodedUrl =
 const _target = TrackInfo(
   id: 'youtube-id',
   title: 'Coraz\u00f3n',
-  artist: 'BStream Music',
-  artists: ['BStream Music'],
+  artist: 'Inútil Music',
+  artists: ['Inútil Music'],
   album: 'Original Album',
   duration: Duration(seconds: 180),
   url: 'https://music.youtube.com/watch?v=youtube-id',
@@ -120,8 +120,8 @@ void main() {
       const matcher = JioSaavnRecordingMatcher();
       final target = _target.copyWith(
         title: 'Coraz\u00f3n (Official Audio)',
-        artist: 'BStream Music, Guest',
-        artists: ['BStream Music', 'Guest'],
+        artist: 'Inútil Music, Guest',
+        artists: ['Inútil Music', 'Guest'],
       );
       final song = _song(title: 'Corazon (feat. Guest)');
       expect(matcher.rankedMatches(target, [song]), [song]);
@@ -130,7 +130,7 @@ void main() {
         'A & B "C" \u{1f3b5}',
       );
       expect(matcher.searchQueries(target), [
-        'corazon bstream music',
+        'corazon inutil music',
         'corazon',
       ]);
     },
@@ -455,7 +455,7 @@ void main() {
       const unknown = TrackInfo(
         id: 'x',
         title: 'Corazon',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         url: 'https://music.youtube.com/watch?v=x',
       );
       expect(await resolver.findUpgrade(unknown), isNull);
@@ -530,7 +530,7 @@ void main() {
 JioSaavnSong _song({
   String id = 'song',
   String title = 'Corazon',
-  List<String> artists = const ['BStream Music'],
+  List<String> artists = const ['Inútil Music'],
   Duration duration = const Duration(seconds: 180),
   String album = 'Original Album',
   bool explicit = false,
@@ -555,7 +555,7 @@ Map<String, Object?> _row({bool supports320 = true}) => {
     'encrypted_media_url': _encodedUrl,
     'artistMap': {
       'primary_artists': [
-        {'name': 'BStream Music'},
+        {'name': 'Inútil Music'},
       ],
     },
   },

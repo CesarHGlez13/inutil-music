@@ -78,11 +78,11 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel, (call) async {
           return switch (call.method) {
-            'getApplicationDocumentsDirectory' => 'C:\\bstream_music_test',
-            'getTemporaryDirectory' => 'C:\\bstream_music_test\\temp',
+            'getApplicationDocumentsDirectory' => 'C:\\inutil_music_test',
+            'getTemporaryDirectory' => 'C:\\inutil_music_test\\temp',
             'getApplicationSupportDirectory' =>
-              'C:\\bstream_music_test\\support',
-            'getApplicationCacheDirectory' => 'C:\\bstream_music_test\\cache',
+              'C:\\inutil_music_test\\support',
+            'getApplicationCacheDirectory' => 'C:\\inutil_music_test\\cache',
             _ => null,
           };
         });
@@ -92,7 +92,7 @@ void main() {
     });
   });
 
-  testWidgets('renders BStream Music shell', (tester) async {
+  testWidgets('renders Inútil Music shell', (tester) async {
     await tester.pumpWidget(_testApp());
 
     await tester.pump(const Duration(milliseconds: 400));
@@ -128,17 +128,17 @@ void main() {
           _testApp(
             settingsController: _FakeSettingsController(
               const SettingsState(
-                downloadDirectory: '/tmp/bstream',
+                downloadDirectory: '/tmp/inutil',
                 language: AppLanguage.spanish,
                 themeMode: AppThemeMode.light,
-                playerStyle: PlayerStyle.bstreamMusic,
+                playerStyle: PlayerStyle.inutilMusic,
               ),
             ),
             playerService: _FakePlayerService(
               snapshot: const PlayerSnapshot(
                 status: PlayerStatus.paused,
                 title: 'Barra transparente',
-                artist: 'BStream Music',
+                artist: 'Inútil Music',
                 trackId: 'status-bar-track',
                 duration: Duration(minutes: 3),
               ),
@@ -182,7 +182,7 @@ void main() {
         expect(MediaQuery.paddingOf(tester.element(player)).top, 44);
         expect(
           tester
-              .getRect(find.byKey(const ValueKey('bstream-player-grabber')))
+              .getRect(find.byKey(const ValueKey('inutil-player-grabber')))
               .top,
           greaterThanOrEqualTo(44),
         );
@@ -225,7 +225,7 @@ void main() {
             _testApp(
               settingsController: _FakeSettingsController(
                 SettingsState(
-                  downloadDirectory: '/tmp/bstream',
+                  downloadDirectory: '/tmp/inutil',
                   language: AppLanguage.spanish,
                   themeMode: themeMode,
                   appBackgroundPath: photoPath,
@@ -275,7 +275,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
         playerFont: PlayerFont.fredoka,
       ),
@@ -315,7 +315,7 @@ void main() {
     var checkCount = 0;
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -353,7 +353,7 @@ void main() {
     var checkCount = 0;
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -424,7 +424,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Portada activa',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'browsing-background-track',
             thumbnailUrl: 'https://example.com/cover.jpg',
             duration: Duration(minutes: 3),
@@ -481,7 +481,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Cancion de escritorio',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'desktop-mini-player-track',
               duration: Duration(minutes: 3),
             ),
@@ -691,7 +691,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Ruta de letras',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'desktop-lyrics-route',
               position: Duration(seconds: 12),
               duration: Duration(minutes: 3),
@@ -701,7 +701,7 @@ void main() {
             const LyricsDocument(
               provider: 'Test',
               trackName: 'Ruta de letras',
-              artistName: 'BStream Music',
+              artistName: 'Inútil Music',
               lines: [
                 LyricLine(timestamp: Duration.zero, text: 'Primera linea'),
                 LyricLine(
@@ -947,7 +947,7 @@ void main() {
         const SettingsState(
           downloadDirectory: '/tmp/BStream-Music',
           language: AppLanguage.spanish,
-          playerStyle: PlayerStyle.bstreamMusic,
+          playerStyle: PlayerStyle.inutilMusic,
         ),
       );
       final playerService = _FakePlayerService(
@@ -983,7 +983,7 @@ void main() {
 
       expect(
         tester.widget<PlayerPanel>(playerPanel).style,
-        PlayerStyle.bstreamMusic,
+        PlayerStyle.inutilMusic,
       );
       expect(
         tester.widget<PlayerPanel>(playerPanel).animatedArtworkEnabled,
@@ -1103,13 +1103,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 110));
       await tester.pump(const Duration(milliseconds: 330));
 
-      await settingsController.setPlayerStyle(PlayerStyle.bstreamMusic);
+      await settingsController.setPlayerStyle(PlayerStyle.inutilMusic);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
 
       expect(
         tester.widget<PlayerPanel>(playerPanel).style,
-        PlayerStyle.bstreamMusic,
+        PlayerStyle.inutilMusic,
       );
       expect(
         find.byKey(const ValueKey('player-content-layout')),
@@ -1158,7 +1158,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Cancion movil',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'android-mini-player-track',
             duration: Duration(minutes: 3),
           ),
@@ -1223,7 +1223,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Cancion movil',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'android-bottom-navigation-track',
             duration: Duration(minutes: 3),
           ),
@@ -1320,7 +1320,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Glass real',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'glass-layout-track',
               duration: Duration(minutes: 3),
             ),
@@ -1368,7 +1368,7 @@ void main() {
       final glassTrack = LocalTrack(
         id: 'glass-surface-track',
         title: 'Cancion de cristal',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: r'C:\Music\glass-surface-track.mp3',
         duration: const Duration(minutes: 3),
         addedAt: DateTime(2026),
@@ -2534,7 +2534,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Mini player Liquid compacto',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'liquid-collapsed-mini-player',
               duration: Duration(minutes: 3),
             ),
@@ -2869,7 +2869,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Artwork mini player',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'artwork-mini-with-liquid-navigation',
               duration: Duration(minutes: 3),
             ),
@@ -2999,7 +2999,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Mini player Liquid interactivo',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'liquid-compact-hit-target',
               duration: Duration(minutes: 3),
             ),
@@ -3120,7 +3120,7 @@ void main() {
           id: 'liquid-local-$index',
           uri: 'file:///music/liquid-local-$index.m4a',
           title: 'Cancion local $index',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           duration: const Duration(minutes: 3),
           folderId: 'liquid-local-folder',
           folderName: 'Musica',
@@ -3145,7 +3145,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Mini player conserva Local',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'liquid-local-selection-mini-player',
               duration: Duration(minutes: 3),
             ),
@@ -3366,7 +3366,7 @@ void main() {
               snapshot: const PlayerSnapshot(
                 status: PlayerStatus.playing,
                 title: 'Mini player desplazable',
-                artist: 'BStream Music',
+                artist: 'Inútil Music',
                 trackId: 'scroll-following-mini-player',
                 duration: Duration(minutes: 3),
               ),
@@ -3468,7 +3468,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Mini player robusto',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'robust-navigation-scroll',
             duration: Duration(minutes: 3),
           ),
@@ -3590,7 +3590,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Mini player sin animacion',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'reduced-motion-scroll-chrome',
               duration: Duration(minutes: 3),
             ),
@@ -3900,7 +3900,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Cancion durante busqueda',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'keyboard-retained-player',
               duration: Duration(minutes: 3),
             ),
@@ -4059,7 +4059,7 @@ void main() {
     }
   }
 
-  testWidgets('android BStream player reuses the Lyrics page transition', (
+  testWidgets('android Inutil player reuses the Lyrics page transition', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -4081,14 +4081,14 @@ void main() {
             language: AppLanguage.spanish,
             miniPlayerMode: MiniPlayerMode.capsule,
             miniPlayerBackgroundMode: MiniPlayerBackgroundMode.transparent,
-            playerStyle: PlayerStyle.bstreamMusic,
+            playerStyle: PlayerStyle.inutilMusic,
           ),
         ),
         playerService: _FakePlayerService(
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Cancion para transicion coordinada',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'coordinated-shell-track',
             duration: Duration(minutes: 3),
           ),
@@ -4159,7 +4159,7 @@ void main() {
       const ValueKey('shell-player-background-slide-transition'),
     );
     expect(
-      find.byKey(const ValueKey('bstream-player-controls-slide-transition')),
+      find.byKey(const ValueKey('inutil-player-controls-slide-transition')),
       findsNothing,
     );
     final controlsSlide = tester.widget<SlideTransition>(
@@ -4385,7 +4385,7 @@ void main() {
             SettingsState(
               downloadDirectory: '/tmp/BStream-Music',
               language: AppLanguage.spanish,
-              playerStyle: PlayerStyle.bstreamMusic,
+              playerStyle: PlayerStyle.inutilMusic,
               playerArtworkStyle: artworkStyle,
             ),
           ),
@@ -4393,7 +4393,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Portada durante la salida',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'retained-exit-artwork',
               thumbnailUrl: 'https://example.com/retained-exit-artwork.jpg',
               duration: Duration(minutes: 3),
@@ -4480,7 +4480,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Transicion Apple coordinada',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'apple-coordinated-shell-track',
             duration: Duration(minutes: 3),
           ),
@@ -4520,7 +4520,7 @@ void main() {
 
     expect(controlsSlideFinder, findsOneWidget);
     expect(
-      find.byKey(const ValueKey('bstream-player-controls-slide-transition')),
+      find.byKey(const ValueKey('inutil-player-controls-slide-transition')),
       findsNothing,
     );
     expect(
@@ -4628,7 +4628,7 @@ void main() {
               snapshot: PlayerSnapshot(
                 status: PlayerStatus.playing,
                 title: 'Primera entrada ${playerStyle.code}',
-                artist: 'BStream Music',
+                artist: 'Inútil Music',
                 trackId: 'desktop-first-entry-${playerStyle.code}',
                 duration: const Duration(minutes: 3),
               ),
@@ -4674,7 +4674,7 @@ void main() {
             ValueKey(
               playerStyle == PlayerStyle.appleMusic
                   ? 'apple-player-controls-slide-transition'
-                  : 'bstream-player-controls-slide-transition',
+                  : 'inutil-player-controls-slide-transition',
             ),
           ),
           findsNothing,
@@ -4743,7 +4743,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Reentrada desde notificacion',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'notification-reentry-track',
               duration: Duration(minutes: 3),
             ),
@@ -4830,7 +4830,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Reentrada con cola',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'notification-queue-track',
               duration: Duration(minutes: 3),
             ),
@@ -5022,7 +5022,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.failed,
             title: 'Pista con error',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'navigation-inset-error-track',
             duration: Duration(minutes: 3),
             errorMessage: 'No se pudo abrir la pista.',
@@ -5146,7 +5146,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Movimiento reducido',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'reduced-motion-shell-track',
             duration: Duration(minutes: 3),
           ),
@@ -5210,7 +5210,7 @@ void main() {
     await tester.pump();
     await tester.pump();
     expect(
-      find.byKey(const ValueKey('bstream-player-controls-slide-transition')),
+      find.byKey(const ValueKey('inutil-player-controls-slide-transition')),
       findsNothing,
     );
     expect(
@@ -6298,7 +6298,7 @@ void main() {
     (tester) async {
       _configureMobileHomeViewport(tester);
       final directory = io.Directory.systemTemp.createTempSync(
-        'bstream-home-offline-artwork-',
+        'inutil-home-offline-artwork-',
       );
       final artwork = io.File(p.join(directory.path, 'downloaded-cover.png'));
       artwork.writeAsBytesSync(
@@ -6556,7 +6556,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     final uri = Uri.parse(
-      'https://music.youtube.com/watch?v=dQw4w9WgXcQ&si=bstream-test',
+      'https://music.youtube.com/watch?v=dQw4w9WgXcQ&si=inutil-test',
     );
     incomingLinks.add(uri);
     await tester.pump();
@@ -7183,7 +7183,7 @@ void main() {
   ) async {
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
         themeMode: AppThemeMode.dark,
         accent: AppAccent.blue,
@@ -7241,7 +7241,7 @@ void main() {
         libraryRepository: _homeCardsRepository(),
         settingsController: _FakeSettingsController(
           const SettingsState(
-            downloadDirectory: '/tmp/bstream',
+            downloadDirectory: '/tmp/inutil',
             language: AppLanguage.spanish,
           ),
         ),
@@ -7361,7 +7361,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -7460,7 +7460,7 @@ void main() {
     ) async {
       final settingsController = _FakeSettingsController(
         SettingsState(
-          downloadDirectory: '/tmp/bstream',
+          downloadDirectory: '/tmp/inutil',
           language: AppLanguage.spanish,
           themeMode: popupCase.themeMode,
           accent: AppAccent.blue,
@@ -7688,7 +7688,7 @@ void main() {
   testWidgets('cancelling custom sleep timer closes safely', (tester) async {
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -7743,7 +7743,7 @@ void main() {
     addTearDown(active.dispose);
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -7814,7 +7814,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -7968,7 +7968,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -8020,7 +8020,7 @@ void main() {
     final launchedUrls = <Uri>[];
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -8111,7 +8111,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -8162,7 +8162,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -8221,7 +8221,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
       ),
     );
@@ -8379,7 +8379,7 @@ void main() {
               track: const TrackInfo(
                 id: 'track-result',
                 title: 'Resultado',
-                artist: 'BStream Music',
+                artist: 'Inútil Music',
                 url: 'https://example.com/result',
               ),
               onOpenPlayer: () {},
@@ -8486,7 +8486,7 @@ void main() {
     const track = TrackInfo(
       id: 'playing-result',
       title: 'Resultado activo',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       url: 'https://example.com/playing-result',
       thumbnailUrl: '',
     );
@@ -8558,7 +8558,7 @@ void main() {
       (index) => TrackInfo(
         id: 'search-$index',
         title: 'Resultado $index',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         url: 'https://example.com/search-$index',
         thumbnailUrl: '',
       ),
@@ -8614,7 +8614,7 @@ void main() {
     const track = TrackInfo(
       id: 'progress-track',
       title: 'Progreso visible',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       url: 'https://example.com/watch?v=progress-track',
       thumbnailUrl: '',
       duration: Duration(minutes: 3),
@@ -8737,7 +8737,7 @@ void main() {
 
   test('downloadAudioForLibrary returns the saved local track', () async {
     final tempDirectory = await io.Directory.systemTemp.createTemp(
-      'bstream-library-download-test-',
+      'inutil-library-download-test-',
     );
     final libraryRepository = _FakeLibraryRepository();
     final container = ProviderContainer(
@@ -8773,7 +8773,7 @@ void main() {
           const TrackInfo(
             id: 'remote-track',
             title: 'Cancion remota',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             url: 'https://example.com/remote-track',
             thumbnailUrl: '',
             duration: Duration(minutes: 3),
@@ -8795,14 +8795,14 @@ void main() {
         status: PlayerStatus.playing,
         trackId: 'active-library-track',
         title: 'Cancion que esta sonando',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
       ),
     );
     libraryRepository.localTracks.add(
       LocalTrack(
         id: 'active-library-track',
         title: 'Cancion que esta sonando',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: r'C:\Music\active.mp3',
         addedAt: DateTime(2026),
         duration: const Duration(minutes: 3, seconds: 24),
@@ -8881,7 +8881,7 @@ void main() {
     final track = LocalTrack(
       id: 'playlist-route-track',
       title: 'Cancion de playlist',
-      artist: 'BStream Music',
+      artist: 'Inútil Music',
       filePath: r'C:\Music\playlist.mp3',
       addedAt: DateTime(2026),
     );
@@ -9200,7 +9200,7 @@ void main() {
     tester.view.physicalSize = const Size(360, 900);
     tester.view.devicePixelRatio = 1;
     final directory = io.Directory.systemTemp.createTempSync(
-      'bstream-library-selection-',
+      'inutil-library-selection-',
     );
     addTearDown(() async {
       debugDefaultTargetPlatformOverride = null;
@@ -9349,7 +9349,7 @@ void main() {
     const selectedAccent = Color(0xFF3D8BFF);
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
         themeMode: AppThemeMode.light,
         accent: AppAccent.blue,
@@ -9372,7 +9372,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Cancion larga para probar controles',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'test-track',
             thumbnailUrl: 'test-artwork.invalid',
             position: Duration(minutes: 1),
@@ -9709,7 +9709,7 @@ void main() {
     });
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
         themeMode: AppThemeMode.light,
         accent: AppAccent.blue,
@@ -9724,7 +9724,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Cancion con volumen transparente',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'transparent-volume-track',
             duration: Duration(minutes: 3),
             volume: 0.64,
@@ -9784,7 +9784,7 @@ void main() {
   ) async {
     final settingsController = _FakeSettingsController(
       const SettingsState(
-        downloadDirectory: '/tmp/bstream',
+        downloadDirectory: '/tmp/inutil',
         language: AppLanguage.spanish,
         themeMode: AppThemeMode.light,
         accent: AppAccent.blue,
@@ -9919,7 +9919,7 @@ void main() {
       LocalTrack(
         id: 'favorite-player-track',
         title: 'Cancion favorita',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         filePath: r'C:\Music\favorite-player-track.m4a',
         addedAt: DateTime(2026),
       ),
@@ -9934,7 +9934,7 @@ void main() {
               snapshot: const PlayerSnapshot(
                 status: PlayerStatus.playing,
                 title: 'Cancion favorita',
-                artist: 'BStream Music',
+                artist: 'Inútil Music',
                 trackId: 'favorite-player-track',
                 duration: Duration(minutes: 3),
               ),
@@ -10027,7 +10027,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: title,
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'desktop-track',
               duration: Duration(minutes: 4, seconds: 11),
               volume: 0.72,
@@ -10155,7 +10155,7 @@ void main() {
         snapshot: const PlayerSnapshot(
           status: PlayerStatus.playing,
           title: 'Primera cancion',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           trackId: 'desktop-queue-1',
           duration: Duration(minutes: 3),
         ),
@@ -10177,14 +10177,14 @@ void main() {
         LocalTrack(
           id: 'desktop-queue-1',
           title: 'Primera cancion',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: r'C:\Music\desktop-queue-1.m4a',
           addedAt: DateTime(2026),
         ),
         LocalTrack(
           id: 'desktop-queue-2',
           title: 'Segunda cancion',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           filePath: r'C:\Music\desktop-queue-2.m4a',
           addedAt: DateTime(2026),
         ),
@@ -10247,7 +10247,7 @@ void main() {
             snapshot: const PlayerSnapshot(
               status: PlayerStatus.playing,
               title: 'Cancion para redimensionar controles',
-              artist: 'BStream Music',
+              artist: 'Inútil Music',
               trackId: 'resize-track',
               duration: Duration(minutes: 3, seconds: 47),
               volume: 0.8,
@@ -10278,7 +10278,7 @@ void main() {
       final artworkAt839 = tester.getSize(artwork);
 
       expect(
-        find.byKey(const ValueKey('bstream-player-adaptive-landscape')),
+        find.byKey(const ValueKey('inutil-player-adaptive-landscape')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('player-content-scroll')), findsNothing);
@@ -10308,7 +10308,7 @@ void main() {
         lessThanOrEqualTo(1),
       );
       expect(
-        find.byKey(const ValueKey('bstream-player-adaptive-landscape')),
+        find.byKey(const ValueKey('inutil-player-adaptive-landscape')),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('player-content-scroll')), findsNothing);
@@ -10369,7 +10369,7 @@ void main() {
         snapshot: const PlayerSnapshot(
           status: PlayerStatus.playing,
           title: 'Atajo de escritorio',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           trackId: 'desktop-space-shortcut',
           duration: Duration(minutes: 3),
         ),
@@ -10572,7 +10572,7 @@ LocalTrack _librarySelectionTrack(
   return LocalTrack(
     id: id,
     title: title,
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: filePath ?? p.join(io.Directory.systemTemp.path, '$id.m4a'),
     thumbnailPath: thumbnailPath,
     addedAt: DateTime(2026),
@@ -10680,7 +10680,7 @@ _FakeLibraryRepository _homeCardsRepository({String? thumbnailUrl}) {
   final track = LocalTrack(
     id: 'home-card-track',
     title: 'Cancion reciente',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     filePath: r'C:\Music\home-card-track.mp3',
     thumbnailUrl: thumbnailUrl,
     addedAt: DateTime(2026),
@@ -10896,7 +10896,7 @@ Widget _testApp({
       libraryRepositoryProvider.overrideWithValue(resolvedLibraryRepository),
     ],
     child: testHome == null
-        ? const BStreamMusicApp(enforceLicenseGates: false)
+        ? const InutilMusicApp(enforceLicenseGates: false)
         : MaterialApp(
             theme: ThemeData(
               useMaterial3: true,
@@ -11938,19 +11938,19 @@ class _StaticDeviceAudioCatalog implements DeviceAudioCatalog {
   @override
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async => result;
 
   @override
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async => result;
 
   @override
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async => result;
 }
 

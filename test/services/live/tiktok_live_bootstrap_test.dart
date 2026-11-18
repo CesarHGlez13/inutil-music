@@ -35,7 +35,7 @@ void main() {
       try {
         final value = await fetchTtwid(
           timeout: const Duration(seconds: 3),
-          userAgent: 'BStream-Test-UA',
+          userAgent: 'Inutil-Test-UA',
           language: 'es',
           region: 'NI',
           registrationUri: _serverUri(server, '/ttwid/register/'),
@@ -44,7 +44,7 @@ void main() {
 
         expect(value, '1%7Cregistered-device-token-123456789');
         expect(method, 'POST');
-        expect(userAgent, 'BStream-Test-UA');
+        expect(userAgent, 'Inutil-Test-UA');
         expect(language, 'es-NI,es;q=0.9');
         expect(origin, 'https://www.tiktok.com');
         expect(jsonDecode(body!)['aid'], 1988);

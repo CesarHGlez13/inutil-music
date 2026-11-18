@@ -270,7 +270,7 @@ class AppStrings {
     'Inútil Music paused these playlists to avoid repeating or overwriting '
         'uncertain changes. Choose which version to keep for each one.',
   );
-  String get keepBStreamPlaylist => choose('Conservar Inútil Music', 'Keep Inútil Music');
+  String get keepInutilPlaylist => choose('Conservar Inútil Music', 'Keep Inútil Music');
   String get keepYouTubeMusicPlaylist =>
       choose('Conservar YouTube Music', 'Keep YouTube Music');
   String get noPlaylistSyncConflicts => choose(
@@ -884,7 +884,7 @@ class AppStrings {
       choose('Playlist renombrada.', 'Playlist renamed.');
   String get playlistDeleted =>
       choose('Playlist eliminada.', 'Playlist deleted.');
-  String get removePlaylistFromBStream =>
+  String get removePlaylistFromInutil =>
       choose('Quitar sólo de Inútil Music', 'Remove only from Inútil Music');
   String get deletePlaylistFromYouTubeMusic => choose(
     'Eliminar también de YouTube Music',
@@ -1058,7 +1058,7 @@ class AppStrings {
   );
   String get chooseCsvProfile =>
       choose('Formato del archivo CSV', 'CSV file format');
-  String get csvProfileBStream => 'Inútil Music';
+  String get csvProfileInutil => 'Inútil Music';
   String get csvProfileMetroList => 'MetroList';
   String get csvProfileHarmony => 'Harmony / RiMusic';
   String get csvProfileSoundiiz => 'Soundiiz';
@@ -1147,7 +1147,7 @@ class AppStrings {
   String get audioQualityMono => 'Mono';
   String audioQualityChannels(int channels) =>
       choose('$channels canales', '$channels channels');
-  String get playerStyleBStreamMusic => 'Inútil Music';
+  String get playerStyleInutilMusic => 'Inútil Music';
   String get playerStyleAppleMusic => 'Apple Music Style';
   String get playerStyleSpotifyMusic => 'Spotify Style';
   String get playerStyleClassicVinyl =>
@@ -1531,7 +1531,7 @@ class AppStrings {
     MiniPlayerMode.capsule => miniPlayerCapsule,
   };
   String playerStyleLabel(PlayerStyle style) => switch (style) {
-    PlayerStyle.bstreamMusic => playerStyleBStreamMusic,
+    PlayerStyle.inutilMusic => playerStyleInutilMusic,
     PlayerStyle.appleMusic => playerStyleAppleMusic,
     PlayerStyle.classicVinyl => playerStyleClassicVinyl,
     PlayerStyle.spotifyMusic => playerStyleSpotifyMusic,

@@ -1,6 +1,6 @@
 # InnerTube playback and downloads
 
-BStream resolves YouTube media through a self-contained Dart pipeline, without
+Inutil resolves YouTube media through a self-contained Dart pipeline, without
 a vendored extractor library, native extractor, or companion executable.
 Catalog requests remain in
 `innertube_search_service.dart`; playback is isolated under
@@ -35,7 +35,7 @@ not imply that a PO token is required, and WebPO is never attached to Android
 or iOS profiles that require a platform attestation.
 
 The implementation follows behavior, not source code, from Zemer Cipher.
-Zemer is GPL-3.0 while BStream is BSD-2-Clause, so no Zemer implementation was
+Zemer is GPL-3.0 while Inutil is BSD-2-Clause, so no Zemer implementation was
 copied or translated. EJS is an independent upstream Unlicense solver. The
 exact 0.8.0 release modules are bundled as Base64 assets and their
 decoded bytes are verified by SHA-256 before execution; a verified download
@@ -49,7 +49,7 @@ those projects.
 
 Metrolist/InnerTubeX, OpenTune, Echo Music, and SimpMusic were also reviewed as
 behavioral references for client fallback, bootstrap separation, and failure
-handling. BStream's implementation remains a clean-room Dart design; no Kotlin
+handling. Inútil Music's implementation remains a clean-room Dart design; no Kotlin
 or GPL application source was copied or mechanically translated.
 
 ## WebPO bootstrap
@@ -69,10 +69,10 @@ The primary bootstrap is one atomic `https://www.youtube.com/` snapshot:
    route is unavailable or returns only degraded output, try YouTube's
    compatible `/api/jnn/v1/GenerateIT` route.
 
-GenerateIT must return a full integrity token before BStream initializes the
+GenerateIT must return a full integrity token before Inutil initializes the
 per-binding minter. A `websafeFallbackToken` is not content-bound and is never
 accepted as a player or GVS token. If both routes withhold full integrity for
-the homepage challenge, BStream creates one fresh, coherent `att/get` session
+the homepage challenge, Inutil creates one fresh, coherent `att/get` session
 and tries both GenerateIT routes again. If that independent session also
 withholds integrity, the provider fails closed; a shared WebPO circuit breaker
 skips the remaining WebPO profiles for two minutes and immediately continues
@@ -161,14 +161,14 @@ The complete Flutter matrix forces each selected profile independently through
 bootstrap, EJS/PO when applicable, player parsing, and the deep CDN probe:
 
 ```text
-flutter test -d windows --dart-define=BSTREAM_LIVE_INNERTUBE_MATRIX=true --dart-define=BSTREAM_INNERTUBE_MATRIX_ROUNDS=1 --dart-define=BSTREAM_INNERTUBE_MATRIX_PROFILES=visionOS,androidSdkless,visionOS01,webEmbedded integration_test/innertube_profile_matrix_live_test.dart
+flutter test -d windows --dart-define=INUTIL_LIVE_INNERTUBE_MATRIX=true --dart-define=INUTIL_INNERTUBE_MATRIX_ROUNDS=1 --dart-define=INUTIL_INNERTUBE_MATRIX_PROFILES=visionOS,androidSdkless,visionOS01,webEmbedded integration_test/innertube_profile_matrix_live_test.dart
 ```
 
 Each profile receives isolated visitor/EJS/PO state, and samples label cold
 versus warm latency. Strict mode rejects capability skips and requires every
 stable or explicitly selected profile to meet the per-profile success floor
 (80% by default, configurable with
-`BSTREAM_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT`), so one healthy profile cannot
+`INUTIL_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT`), so one healthy profile cannot
 hide another profile's regression.
 
 On the same date, the hardened strict Windows matrix passed 19/20 overall:
@@ -179,24 +179,24 @@ why the production path must retain several independently validated fallbacks.
 The opt-in WebPO integration checks the live bootstrap/interpreter and performs
 one live GenerateIT mint without printing visitor, challenge, or token values.
 It accepts either full integrity-backed tokens or the explicitly classified
-fail-closed state; add `BSTREAM_LIVE_WEB_PO_STRICT=true` when a release gate
+fail-closed state; add `INUTIL_LIVE_WEB_PO_STRICT=true` when a release gate
 must require full integrity in that environment:
 
 ```text
-flutter test --dart-define=BSTREAM_LIVE_WEB_PO=true integration_test/web_po_bootstrap_live_test.dart
+flutter test --dart-define=INUTIL_LIVE_WEB_PO=true integration_test/web_po_bootstrap_live_test.dart
 ```
 
 The production-ladder integration additionally requires a deep CDN probe:
 
 ```text
-flutter test -d windows --dart-define=BSTREAM_LIVE_INNERTUBE=true integration_test/innertube_playback_live_test.dart
+flutter test -d windows --dart-define=INUTIL_LIVE_INNERTUBE=true integration_test/innertube_playback_live_test.dart
 ```
 
 ## Platform behavior
 
 BotGuard and EJS are orchestrated in Dart. Their JavaScript executes in a
 headless `flutter_inappwebview` runtime on Android, Windows, and macOS. Linux
-has no backend in the pinned stable plugin, so BStream cleanly limits Linux to
+has no backend in the pinned stable plugin, so Inutil cleanly limits Linux to
 the three JS-less tokenless profiles (`visionOS`, `androidSdkless`, and
 `visionOS01`) instead of invoking a companion JavaScript or native extraction
 runtime. The runtime boundary remains injectable so Linux EJS/WebPO can be enabled after a stable

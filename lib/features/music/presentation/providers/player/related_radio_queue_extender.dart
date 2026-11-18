@@ -1,11 +1,11 @@
-import '../../../../../services/sharing/bstream_track_link.dart';
+import '../../../../../services/sharing/inutil_track_link.dart';
 import '../../../../../services/youtube_music/innertube_search_service.dart';
 import '../../../data/datasources/remote_music_datasource.dart';
 import 'recommendation_playback_item.dart';
 
 /// Uses the library identity when an older history row lacks catalog metadata.
 String? relatedRadioVideoId(RecommendationPlaybackItem item) {
-  const codec = BStreamTrackLinkCodec();
+  const codec = InutilTrackLinkCodec();
   return codec.tryFromTrack(item.track)?.videoId ??
       codec.extractVideoId(item.localTrack?.sourceUrl ?? '') ??
       codec.extractVideoId(item.localTrack?.sourceId ?? '');
@@ -33,7 +33,7 @@ RecommendationQueueExtender buildMetadataRelatedRadioQueueExtender({
       artist.isEmpty ? title : '$title $artist',
       limit: 5,
     );
-    const codec = BStreamTrackLinkCodec();
+    const codec = InutilTrackLinkCodec();
     for (final result in results) {
       final seed = codec.extractVideoId(result.videoId);
       if (seed == null) continue;

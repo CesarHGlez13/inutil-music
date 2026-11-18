@@ -49,7 +49,7 @@ import '../../../../services/player/just_audio_player_service.dart';
 import '../../../../services/player/media_kit_player_service.dart';
 import '../../../../services/player/player_service.dart';
 import '../../../../services/recommendations/recommendations.dart';
-import '../../../../services/sharing/bstream_track_link.dart';
+import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/sharing/incoming_csv_file_service.dart';
 import '../../../../services/sharing/incoming_track_link_service.dart';
 import '../../../../services/sharing/lyrics_share_photo_service.dart';
@@ -413,16 +413,16 @@ final incomingCsvFileProvider = StreamProvider<IncomingCsvFile>((ref) {
   return ref.watch(incomingCsvFileServiceProvider).files;
 });
 
-final bstreamTrackLinkCodecProvider = Provider<BStreamTrackLinkCodec>((ref) {
-  return const BStreamTrackLinkCodec();
+final inutilTrackLinkCodecProvider = Provider<InutilTrackLinkCodec>((ref) {
+  return const InutilTrackLinkCodec();
 });
 
-/// Valid BStream activations, with the occasional cold/warm duplicate removed.
-final incomingTrackLinkProvider = StreamProvider<BStreamTrackLink>((
+/// Valid Inutil activations, with the occasional cold/warm duplicate removed.
+final incomingTrackLinkProvider = StreamProvider<InutilTrackLink>((
   ref,
 ) async* {
   final source = ref.watch(incomingTrackLinkServiceProvider);
-  final codec = ref.watch(bstreamTrackLinkCodecProvider);
+  final codec = ref.watch(inutilTrackLinkCodecProvider);
   String? previousIdentity;
   DateTime? previousAt;
 
@@ -448,7 +448,7 @@ final incomingTrackLinkProvider = StreamProvider<BStreamTrackLink>((
 ///
 /// This is deliberately separate from [incomingTrackLinkProvider] so older
 /// `bstreammusic://` links keep their exact compatibility contract while
-/// regular YouTube links can also be offered to BStream by the operating
+/// regular YouTube links can also be offered to Inutil by the operating
 /// system.
 final incomingYouTubeMusicLinkProvider = StreamProvider<YouTubeMusicLink>((
   ref,
@@ -1953,7 +1953,7 @@ final homeRecommendationsProvider =
       List<HomeRecommendationSection>
     >(HomeRecommendationsController.new, retry: (_, _) => null);
 
-/// Cache-first controller for BStream's personalized feed plus the generic
+/// Cache-first controller for Inútil Music's personalized feed plus the generic
 /// YouTube Music home. Both inputs refresh independently and the last usable
 /// combined value remains visible through loading and failures.
 class HomeRecommendationsController
@@ -2515,7 +2515,7 @@ List<HomeRecommendationSection> _combineHomeRecommendationSections(
   final orderedSections = personalized.toList(growable: true);
   // The artist shelf replaces the removed personalized mixes shelf. Keep it
   // near the top (after Continue listening when present), while the ordinary
-  // YouTube Music feed remains below all of BStream's existing sections.
+  // YouTube Music feed remains below all of Inútil Music's existing sections.
   final continueIndex = orderedSections.indexWhere(
     (section) => section.isContinueListening,
   );
@@ -2595,7 +2595,7 @@ typedef YouTubeMusicAuthenticatedPlaylistLoader =
 /// Public collection pages continue to use anonymous InnerTube first. This
 /// loader is only consulted by incoming playlist links when that public read
 /// cannot expose any tracks (for example, a private playlist created by the
-/// active BStream account).
+/// active Inutil account).
 final youtubeMusicAuthenticatedPlaylistLoaderProvider =
     Provider<YouTubeMusicAuthenticatedPlaylistLoader?>((ref) {
       final gateway = ref.watch(
@@ -2763,7 +2763,7 @@ final homeCollectionTracksProvider = FutureProvider.autoDispose
         final rawSeed = normalizedBrowseId.substring(
           automixBrowsePrefix.length,
         );
-        final seedVideoId = const BStreamTrackLinkCodec().extractVideoId(
+        final seedVideoId = const InutilTrackLinkCodec().extractVideoId(
           rawSeed,
         );
         if (seedVideoId != null) {

@@ -626,7 +626,7 @@ void main() {
       final title = tester.widget<MarqueeText>(
         find.byKey(const ValueKey('mini-player-track-title-marquee')),
       );
-      final artist = tester.widget<Text>(find.text('BStream Music'));
+      final artist = tester.widget<Text>(find.text('Inútil Music'));
       final position = tester.widget<Text>(find.text('0:00'));
 
       expect(title.style?.color, Colors.black);
@@ -683,7 +683,7 @@ void main() {
           snapshot: const PlayerSnapshot(
             status: PlayerStatus.playing,
             title: 'Progreso circular',
-            artist: 'BStream Music',
+            artist: 'Inútil Music',
             trackId: 'capsule-progress-track',
             thumbnailUrl:
                 'https://example.invalid/capsule-progress-artwork.jpg',
@@ -778,7 +778,7 @@ void main() {
       const initial = PlayerSnapshot(
         status: PlayerStatus.playing,
         title: 'Progreso circular',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         trackId: 'capsule-progress-track',
         thumbnailUrl: 'https://example.invalid/capsule-progress-artwork.jpg',
         position: Duration(seconds: 45),
@@ -821,7 +821,7 @@ void main() {
       const initial = PlayerSnapshot(
         status: PlayerStatus.playing,
         title: 'Progreso retenido',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         trackId: 'hidden-mini-progress',
         position: Duration(seconds: 45),
         duration: Duration(minutes: 3),
@@ -1570,7 +1570,7 @@ class _TestPlayerController extends PlayerController {
       PlayerSnapshot(
         status: initialStatus,
         title: 'Canción de prueba',
-        artist: 'BStream Music',
+        artist: 'Inútil Music',
         trackId: withTrack ? 'mini-player-test-track' : null,
         thumbnailUrl: withTrack
             ? 'https://example.invalid/mini-player-artwork.jpg'

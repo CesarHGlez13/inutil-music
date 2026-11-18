@@ -467,7 +467,7 @@ Future<File> _createArtwork(
   WidgetTester tester, {
   Size size = const Size(384, 384),
 }) async {
-  final directory = Directory.systemTemp.createTempSync('bstream-artist-hero-');
+  final directory = Directory.systemTemp.createTempSync('inutil-artist-hero-');
   addTearDown(() async {
     await tester.pumpWidget(const SizedBox.shrink());
     PaintingBinding.instance.imageCache

@@ -122,7 +122,7 @@ final class IOSFileExportPlugin: NSObject, UIDocumentPickerDelegate,
 
   private func stage(sourceURL: URL, fileName: String) throws -> URL {
     let directory = FileManager.default.temporaryDirectory
-      .appendingPathComponent("BStreamExports", isDirectory: true)
+      .appendingPathComponent("InutilExports", isDirectory: true)
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
     try FileManager.default.createDirectory(
       at: directory,

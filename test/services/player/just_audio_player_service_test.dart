@@ -799,7 +799,7 @@ void main() {
     'local replacement cannot overlap or overwrite a newer remote source',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream_just_audio_race_',
+        'inutil_just_audio_race_',
       );
       final artwork = NotificationArtworkService(
         cacheDirectoryProvider: () async => directory,
@@ -2474,7 +2474,7 @@ class _Fixture {
     JustAudioOperationDeadline? operationDeadline,
   }) async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_just_audio_deadline_',
+      'inutil_just_audio_deadline_',
     );
     final artwork = NotificationArtworkService(
       cacheDirectoryProvider: () async => directory,
@@ -2521,7 +2521,7 @@ class _CrossfadeFixture {
     JustAudioRemoteDiagnosticProbe? remoteDiagnosticProbe,
   }) async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream_just_audio_crossfade_',
+      'inutil_just_audio_crossfade_',
     );
     final artwork = NotificationArtworkService(
       cacheDirectoryProvider: () async => directory,

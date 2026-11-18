@@ -251,7 +251,7 @@ void main() {
         bootstrapUri: Uri.parse('https://example.test/bootstrap'),
         language: 'es',
         region: 'ni',
-        userAgent: 'BStreamMusic/RelatedTest',
+        userAgent: 'InutilMusic/RelatedTest',
         retryDelay: _immediateRetryDelay,
         retryClock: _fixedRetryClock,
       );

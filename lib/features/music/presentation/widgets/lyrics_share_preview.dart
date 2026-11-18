@@ -70,7 +70,7 @@ enum _TextTone { automatic, light, dark }
 enum _ExportAction { share, save }
 
 class _LyricsSharePreviewState extends ConsumerState<LyricsSharePreview> {
-  static const _logo = AssetImage('assets/icons/bstream_icon.png');
+  static const _logo = AssetImage('assets/icons/inutil_icon.png');
   static const _presets = <(Color, Color)>[
     (Color(0xFF9DAAFF), Color(0xFFCCB1EB)),
     (Color(0xFF69D7A1), Color(0xFF93D8DE)),
@@ -1241,7 +1241,7 @@ class _LyricsCard extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(7),
                           child: Image.asset(
-                            'assets/icons/bstream_icon.png',
+                            'assets/icons/inutil_icon.png',
                             width: 28,
                             height: 28,
                             filterQuality: FilterQuality.medium,

@@ -41,17 +41,17 @@ class DeviceAudioCatalogResult {
 abstract interface class DeviceAudioCatalog {
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   });
 
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   });
 
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   });
 }
 
@@ -61,7 +61,7 @@ class UnsupportedDeviceAudioCatalog implements DeviceAudioCatalog {
   @override
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async => const DeviceAudioCatalogResult(
     status: DeviceAudioPermissionStatus.unsupported,
   );
@@ -69,12 +69,12 @@ class UnsupportedDeviceAudioCatalog implements DeviceAudioCatalog {
   @override
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
-  }) => load(options: options, bstreamRoot: bstreamRoot);
+    String? inutilRoot,
+  }) => load(options: options, inutilRoot: inutilRoot);
 
   @override
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
-  }) => load(options: options, bstreamRoot: bstreamRoot);
+    String? inutilRoot,
+  }) => load(options: options, inutilRoot: inutilRoot);
 }

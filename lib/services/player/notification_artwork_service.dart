@@ -558,14 +558,14 @@ class NotificationArtworkService {
   }
 
   static Future<File?> _defaultSourceFileLookup(String source) async =>
-      (await BStreamArtworkCacheManager().getFileFromCache(source))?.file;
+      (await InutilArtworkCacheManager().getFileFromCache(source))?.file;
 
   static Future<Uint8List?> _loadDeviceAudioArtwork(
     String audioUri,
     int targetWidth,
   ) {
     return const MethodChannel(
-      'bstream_music/local_audio',
+      'inutil_music/local_audio',
     ).invokeMethod<Uint8List>('loadArtwork', <String, Object>{
       'audioUri': audioUri,
       'targetWidth': targetWidth.clamp(32, 1280),

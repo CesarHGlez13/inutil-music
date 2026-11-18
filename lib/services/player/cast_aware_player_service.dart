@@ -201,7 +201,7 @@ class CastAwarePlayerService
     artist: source.snapshot.artist ?? '',
     duration: source.snapshot.duration,
     artworkUrl: _publicArtwork(source.snapshot.thumbnailUrl),
-    contentId: 'bstream-${++_contentSequence}',
+    contentId: 'inutil-${++_contentSequence}',
     position: position,
     autoplay: autoplay,
   );

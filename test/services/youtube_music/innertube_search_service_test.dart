@@ -39,7 +39,7 @@ void main() {
         bootstrapUri: Uri.parse('https://example.test/bootstrap'),
         language: 'es',
         region: 'ni',
-        userAgent: 'BStreamMusic/InnerTubeTest',
+        userAgent: 'InutilMusic/InnerTubeTest',
         requestTimeout: requestTimeout,
         retryDelay: retryDelay,
         retryClock: retryClock,
@@ -1386,7 +1386,7 @@ void main() {
         );
         expect(
           request.headers[HttpHeaders.userAgentHeader],
-          'BStreamMusic/InnerTubeTest',
+          'InutilMusic/InnerTubeTest',
         );
         expect(request.headers['X-YouTube-Client-Name'], '99');
         expect(
@@ -1924,7 +1924,7 @@ void main() {
           ], continuation: 'public-playlist-page-2');
           initialPayload['header'] = _publicPlaylistHeader(
             title: 'Playlist publica real',
-            owner: 'BStream Listener',
+            owner: 'Inutil Listener',
             thumbnails: const [
               ('https://img.test/playlist-160.jpg', 160),
               ('//img.test/playlist-1280.jpg', 1280),
@@ -1960,7 +1960,7 @@ void main() {
 
           expect(detail.browseId, 'VLPLpublic123');
           expect(detail.title, 'Playlist publica real');
-          expect(detail.subtitle, 'BStream Listener');
+          expect(detail.subtitle, 'Inutil Listener');
           expect(detail.thumbnailUrl, 'https://img.test/playlist-1280.jpg');
           expect(detail.songs.map((song) => song.videoId), [
             'public00001',

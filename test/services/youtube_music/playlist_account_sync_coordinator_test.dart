@@ -22,7 +22,7 @@ void main() {
     'syncAll imports by remote ID, creates private remotes, and skips favorites',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-sync-',
+        'inutil-account-sync-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -109,7 +109,7 @@ void main() {
     'a playlist created remotely accepts a later local addition without conflict',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-create-then-append-',
+        'inutil-account-create-then-append-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -234,7 +234,7 @@ void main() {
 
   test('binds YouTube Music Liked Music to local Favorites', () async {
     final sandbox = await Directory.systemTemp.createTemp(
-      'bstream-account-sync-favorites-',
+      'inutil-account-sync-favorites-',
     );
     final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {
@@ -286,7 +286,7 @@ void main() {
     'first sync materializes Favorites when the local library is empty',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-sync-empty-favorites-',
+        'inutil-account-sync-empty-favorites-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -337,7 +337,7 @@ void main() {
     'an incomplete shelf summary cannot downgrade known edit access',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-capability-',
+        'inutil-account-capability-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -401,7 +401,7 @@ void main() {
     'switching accounts never uploads a playlist imported by another account',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-isolation-',
+        'inutil-account-isolation-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -461,7 +461,7 @@ void main() {
     'remote import rolls back on a mid-transaction crash and retries once',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-atomic-import-',
+        'inutil-atomic-import-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {
@@ -527,7 +527,7 @@ void main() {
     'a stale remote listing cannot import or bind local playlists',
     () async {
       final sandbox = await Directory.systemTemp.createTemp(
-        'bstream-account-fence-',
+        'inutil-account-fence-',
       );
       final database = _TestDatabase(p.join(sandbox.path, 'library.db'));
       addTearDown(() async {

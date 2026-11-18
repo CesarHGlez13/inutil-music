@@ -29,7 +29,7 @@ void main() {
 
   setUp(() async {
     sandbox = await Directory.systemTemp.createTemp(
-      'bstream-lyrics-provider-settings-',
+      'inutil-lyrics-provider-settings-',
     );
     SharedPreferences.setMockInitialValues({});
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger

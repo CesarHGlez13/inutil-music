@@ -12,7 +12,7 @@ void main() {
 
   test('center-crops a local cover into a cached PNG data URI', () async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-live-overlay-artwork-',
+      'inutil-live-overlay-artwork-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final file = File('${directory.path}${Platform.pathSeparator}cover.png');

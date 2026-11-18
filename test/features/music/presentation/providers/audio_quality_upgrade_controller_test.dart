@@ -36,7 +36,7 @@ void main() {
           '$selection download $scenario (nativeQueue=$nativeQueue)',
           () async {
             final directory = await Directory.systemTemp.createTemp(
-              'bstream-owned-audio-',
+              'inutil-owned-audio-',
             );
             addTearDown(() => directory.delete(recursive: true));
             final file = await File(
@@ -118,7 +118,7 @@ void main() {
   for (final action in ['reorder', 'delete-file', 'delete-after-upgrade']) {
     test('a downloaded transport handles $action safely', () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-download-queue-',
+        'inutil-download-queue-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final file = await File(
@@ -494,7 +494,7 @@ void main() {
     'desktop cached audio retains remote identity and can upgrade without a native remote queue',
     () async {
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-desktop-quality-cache-',
+        'inutil-desktop-quality-cache-',
       );
       addTearDown(() => directory.delete(recursive: true));
       final file = await File(
@@ -798,7 +798,7 @@ SettingsState _settings({
   AudioQualityProfile wifiAudioQuality = AudioQualityProfile.high,
   AudioQualityProfile mobileAudioQuality = AudioQualityProfile.standard,
 }) => SettingsState(
-  downloadDirectory: '/tmp/bstream-quality-tests',
+  downloadDirectory: '/tmp/inutil-quality-tests',
   language: AppLanguage.spanish,
   recommendationHistoryEnabled: false,
   jioSaavnEnabled: jioSaavnEnabled,
@@ -809,8 +809,8 @@ SettingsState _settings({
 TrackInfo _track(String id) => TrackInfo(
   id: id,
   title: 'Catalog $id',
-  artist: 'BStream Music',
-  artists: const ['BStream Music'],
+  artist: 'Inútil Music',
+  artists: const ['Inútil Music'],
   artistBrowseIds: const ['catalog-artist'],
   album: 'Catalog album',
   url: 'https://music.youtube.com/watch?v=$id',

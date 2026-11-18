@@ -20,7 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 void main() {
-  for (final style in [PlayerStyle.bstreamMusic, PlayerStyle.appleMusic]) {
+  for (final style in [PlayerStyle.inutilMusic, PlayerStyle.appleMusic]) {
     for (final scenario in [
       (
         name: 'desktop',
@@ -127,7 +127,7 @@ void main() {
   }
 
   for (final style in [
-    PlayerStyle.bstreamMusic,
+    PlayerStyle.inutilMusic,
     PlayerStyle.appleMusic,
     PlayerStyle.spotifyMusic,
   ]) {
@@ -348,7 +348,7 @@ Future<List<List<int>>> _capturePixels(
 const _snapshot = PlayerSnapshot(
   status: PlayerStatus.paused,
   title: 'Canvas layout fixture',
-  artist: 'BStream Music',
+  artist: 'Inútil Music',
   trackId: 'canvas-layout-fixture',
   thumbnailUrl: '/fixture/cover.jpg',
   duration: Duration(minutes: 3),

@@ -214,7 +214,7 @@ typedef CdpProcessProbe =
     bool Function(int processId, DesktopOperatingSystem operatingSystem);
 typedef CdpProfileInUseProbe = Future<bool> Function(Directory profile);
 
-/// Removes credential profiles left by a previous crashed BStream process.
+/// Removes credential profiles left by a previous crashed Inutil process.
 ///
 /// A directory must have the exact prefix, marker and a non-active ownership
 /// lock. Unmarked directories are never touched. PID and loopback-port probes
@@ -230,9 +230,9 @@ class CdpOrphanedProfileCollector {
        _processProbe = processProbe ?? _defaultProcessProbe,
        _profileInUseProbe = profileInUseProbe ?? _defaultProfileInUseProbe;
 
-  static const profilePrefix = 'bstream_ytmusic_auth_';
-  static const profileMarker = '.bstream-temporary-auth-profile';
-  static const ownershipLock = '.bstream-auth-profile-owner.lock';
+  static const profilePrefix = 'inutil_ytmusic_auth_';
+  static const profileMarker = '.inutil-temporary-auth-profile';
+  static const ownershipLock = '.inutil-auth-profile-owner.lock';
 
   final Directory temporaryRoot;
   final CdpDebugPortProbe _debugPortProbe;

@@ -36,7 +36,7 @@ void main() {
     'serves a cached square center crop without processing during uriFor',
     () async {
       final root = await Directory.systemTemp.createTemp(
-        'bstream-notification-artwork-',
+        'inutil-notification-artwork-',
       );
       final cache = Directory(
         '${root.path}${Platform.pathSeparator}notification-cache',
@@ -84,7 +84,7 @@ void main() {
 
   test('rejects empty, missing, and unsupported artwork sources', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream-notification-artwork-',
+      'inutil-notification-artwork-',
     );
     final service = NotificationArtworkService(
       cacheDirectoryProvider: () async => root,
@@ -108,7 +108,7 @@ void main() {
 
   test('serves the original local artwork when decoding fails', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream-notification-artwork-',
+      'inutil-notification-artwork-',
     );
     final source = File('${root.path}${Platform.pathSeparator}unsupported.jpg');
     final original = Uint8List.fromList(<int>[1, 2, 3, 4, 5]);
@@ -133,7 +133,7 @@ void main() {
 
   test('proxies bounded iOS Media Library artwork for Now Playing', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream-notification-artwork-',
+      'inutil-notification-artwork-',
     );
     final fixture = image.Image(width: 480, height: 320)
       ..clear(image.ColorRgb8(12, 180, 90));
@@ -173,7 +173,7 @@ void main() {
 
   test('applies JPEG EXIF rotation before the square center crop', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream-notification-artwork-',
+      'inutil-notification-artwork-',
     );
     final fixture = image.Image(width: 80, height: 40);
     for (final pixel in fixture) {
@@ -206,7 +206,7 @@ void main() {
     'reuses a compressed display-cache cover without a CDN request',
     () async {
       final root = await Directory.systemTemp.createTemp(
-        'bstream-notification-artwork-',
+        'inutil-notification-artwork-',
       );
       final source = await _writeLandscapeFixture(root);
       final lookups = <String>[];
@@ -235,7 +235,7 @@ void main() {
 
   test('coalesces concurrent artwork loads before directory lookup', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream-notification-artwork-',
+      'inutil-notification-artwork-',
     );
     final fixture = await _writeLandscapeFixture(root);
     final bytes = await fixture.readAsBytes();
@@ -282,7 +282,7 @@ void main() {
       'retries the CDN when a shared compressed cover is $cachedSource',
       () async {
         final root = await Directory.systemTemp.createTemp(
-          'bstream-notification-artwork-',
+          'inutil-notification-artwork-',
         );
         final fixture = await _writeLandscapeFixture(root);
         final bytes = await fixture.readAsBytes();
@@ -331,7 +331,7 @@ void main() {
     'bounds registered queue artwork to the configured recent set',
     () async {
       final root = await Directory.systemTemp.createTemp(
-        'bstream-notification-artwork-',
+        'inutil-notification-artwork-',
       );
       final first = await _writeLandscapeFixture(root, name: 'first.png');
       final second = await _writeLandscapeFixture(root, name: 'second.png');

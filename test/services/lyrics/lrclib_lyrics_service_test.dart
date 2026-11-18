@@ -37,7 +37,7 @@ void main() {
             virtualElapsed += duration;
           };
     final service = LrclibLyricsService(
-      userAgent: 'BStreamMusic/1.2.1 (lyrics tests)',
+      userAgent: 'InutilMusic/1.2.1 (lyrics tests)',
       transport: transport,
       delay: virtualDelay,
       clock: clock,
@@ -65,7 +65,7 @@ void main() {
       final names = <String?>[];
       final subscription = events.listen((name) => names.add(name as String?));
       final service = LrclibLyricsService(
-        userAgent: 'BStream lyrics worker test',
+        userAgent: 'Inutil lyrics worker test',
         transport: transport,
         parser: _ObservedLrcParser(events.sendPort),
       );
@@ -93,7 +93,7 @@ void main() {
         );
         expect(
           names,
-          ['BStream background work'],
+          ['Inutil background work'],
           reason: 'Scoring and presenting a candidate must reuse its timeline.',
         );
       } finally {
@@ -214,7 +214,7 @@ void main() {
       'track_name': 'Me Duele Amarte',
       'artist_name': 'Reik',
     });
-    expect(request.headers['User-Agent'], contains('BStreamMusic'));
+    expect(request.headers['User-Agent'], contains('InutilMusic'));
     expect(request.headers['Accept'], 'application/json');
   });
 

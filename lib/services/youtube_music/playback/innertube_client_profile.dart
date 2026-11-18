@@ -242,7 +242,7 @@ abstract final class InnerTubeClientRegistry {
   );
 
   /// Older VisionOS identity kept separate from the unreleased 1.02 profile.
-  /// It passed BStream's full raw deep-range corpus, but remains fallback-only
+  /// It passed Inútil Music's full raw deep-range corpus, but remains fallback-only
   /// because its known content coverage is narrower than the primary profile.
   static const InnerTubeClientProfile visionOS01 = InnerTubeClientProfile(
     key: 'visionOS01',

@@ -4,7 +4,7 @@ import 'package:inutil_music/services/local_media/device_audio_grouping.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('filters messaging audio, recordings, short audio, and BStream paths', () {
+  test('filters messaging audio, recordings, short audio, and Inutil paths', () {
     final tracks = <DeviceAudioTrack>[
       _track(
         'song',
@@ -49,7 +49,7 @@ void main() {
 
     final filtered = filterDeviceAudioTracks(
       tracks,
-      bstreamRoot: r'c:\downloads\bstream-music',
+      inutilRoot: r'c:\downloads\inutil-music',
     );
 
     expect(filtered.map((track) => track.id), <String>[
@@ -116,7 +116,7 @@ void main() {
     ]);
   });
 
-  test('scoped-storage relative paths still exclude the BStream root', () {
+  test('scoped-storage relative paths still exclude the Inutil root', () {
     final tracks = <DeviceAudioTrack>[
       _track('managed-relative', relativePath: 'BStream-Music/audio/'),
       _track('similar-relative', relativePath: 'BStream-Music-Other/audio/'),
@@ -124,7 +124,7 @@ void main() {
 
     final filtered = filterDeviceAudioTracks(
       tracks,
-      bstreamRoot: '/storage/emulated/0/BStream-Music',
+      inutilRoot: '/storage/emulated/0/BStream-Music',
     );
 
     expect(filtered.map((track) => track.id), <String>['similar-relative']);

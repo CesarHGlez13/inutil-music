@@ -11,7 +11,7 @@ import 'package:path/path.dart' as p;
 void main() {
   test('shares the scan while its music roots are still loading', () async {
     final temporary = await Directory.systemTemp.createTemp(
-      'bstream-device-audio-concurrent-',
+      'inutil-device-audio-concurrent-',
     );
     addTearDown(() => temporary.delete(recursive: true));
     await File(p.join(temporary.path, 'Artist - Song.mp3')).writeAsBytes([1]);
@@ -39,7 +39,7 @@ void main() {
 
   test('shares the next scan when an exclusion root changes', () async {
     final temporary = await Directory.systemTemp.createTemp(
-      'bstream-device-audio-roots-',
+      'inutil-device-audio-roots-',
     );
     addTearDown(() => temporary.delete(recursive: true));
     final firstRoot = Directory(p.join(temporary.path, 'First'));
@@ -59,9 +59,9 @@ void main() {
       return nextRoots.future;
     });
 
-    final first = catalog.load(bstreamRoot: firstRoot.path);
-    final second = catalog.load(bstreamRoot: secondRoot.path);
-    final concurrentSecond = catalog.load(bstreamRoot: secondRoot.path);
+    final first = catalog.load(inutilRoot: firstRoot.path);
+    final second = catalog.load(inutilRoot: secondRoot.path);
+    final concurrentSecond = catalog.load(inutilRoot: secondRoot.path);
     expect(rootsCalls, 1);
     initialRoots.complete([temporary]);
     final initial = await first;
@@ -98,9 +98,9 @@ void main() {
     expect(rootsCalls, 2);
   });
 
-  test('scans Music recursively and prunes the managed BStream root', () async {
+  test('scans Music recursively and prunes the managed Inutil root', () async {
     final temporary = await Directory.systemTemp.createTemp(
-      'bstream-device-audio-',
+      'inutil-device-audio-',
     );
     addTearDown(() => temporary.delete(recursive: true));
     final music = Directory(p.join(temporary.path, 'Music'));
@@ -124,7 +124,7 @@ void main() {
       return <Directory>[music];
     });
     final result = await catalog.load(
-      bstreamRoot: p.join(music.path, 'Downloads', 'BStream-Music'),
+      inutilRoot: p.join(music.path, 'Downloads', 'BStream-Music'),
     );
 
     expect(result.status, DeviceAudioPermissionStatus.notRequired);
@@ -149,7 +149,7 @@ void main() {
     'reads desktop duration without loading audio into the catalog',
     () async {
       final temporary = await Directory.systemTemp.createTemp(
-        'bstream-device-audio-metadata-',
+        'inutil-device-audio-metadata-',
       );
       addTearDown(() => temporary.delete(recursive: true));
       final music = Directory(p.join(temporary.path, 'Music'));

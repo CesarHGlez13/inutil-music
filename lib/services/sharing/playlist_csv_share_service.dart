@@ -72,7 +72,7 @@ class SharePlusPlaylistCsvShareGateway implements PlaylistCsvShareGateway {
   }
 }
 
-/// Shares one playlist using the same BStream CSV schema as library exports.
+/// Shares one playlist using the same Inutil CSV schema as library exports.
 ///
 /// Files survive share-sheet completion: another application can read them
 /// later. Only marked exports older than seven days are reclaimed on a later
@@ -88,8 +88,8 @@ class SharePlusPlaylistCsvShareService implements PlaylistCsvShareService {
   final PlaylistCsvShareGateway gateway;
   final Future<Directory> Function() temporaryDirectoryFactory;
 
-  static const _directoryName = 'bstream-playlist-csv';
-  static const _markerName = '.bstream-playlist-csv-share';
+  static const _directoryName = 'inutil-playlist-csv';
+  static const _markerName = '.inutil-playlist-csv-share';
   static const _retention = Duration(days: 7);
 
   @override
@@ -118,7 +118,7 @@ class SharePlusPlaylistCsvShareService implements PlaylistCsvShareService {
     try {
       await File(
         p.join(exportDirectory.path, _markerName),
-      ).writeAsString('BStream playlist CSV share');
+      ).writeAsString('Inutil playlist CSV share');
       await file.writeAsBytes(bytes, flush: true);
     } catch (_) {
       // No share consumer has received this path yet.
@@ -233,11 +233,11 @@ Uint8List _encodePlaylistCsv(_PlaylistCsvExportRequest request) {
   return request.service.exportDocument(
     LibraryCsvDocument(
       tracks: rows,
-      detectedFormat: LibraryCsvDetectedFormat.bstream,
+      detectedFormat: LibraryCsvDetectedFormat.inutil,
       defaultPlaylistName: playlist.playlist.name,
       hasPlaylistColumn: true,
     ),
-    LibraryCsvProfile.bstream,
+    LibraryCsvProfile.inutil,
   );
 }
 

@@ -7,9 +7,9 @@ import 'package:integration_test/integration_test.dart';
 
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  const enabled = bool.fromEnvironment('BSTREAM_LIVE_INNERTUBE');
+  const enabled = bool.fromEnvironment('INUTIL_LIVE_INNERTUBE');
   const allowAttestationWithheld = bool.fromEnvironment(
-    'BSTREAM_ALLOW_ATTESTATION_WITHHELD',
+    'INUTIL_ALLOW_ATTESTATION_WITHHELD',
   );
 
   testWidgets('production fallback resolves media that passes the deep probe', (

@@ -37,7 +37,7 @@ void main() {
       var applicationMounted = false;
       VoidCallback? scheduledStartup;
 
-      final startup = app.launchBStreamMusicApp(
+      final startup = app.launchInutilMusicApp(
         initializeAndroidServices: true,
         initializeNotificationArtwork: () => pending.future,
         initializeAudioService: () => pending.future,

@@ -51,7 +51,7 @@ sign_macho_files() {
 
 # Sign every executable image before its containing bundle. This replaces
 # signatures inherited from third-party framework vendors with the same
-# identity used for BStream Music.
+# identity used for Inútil Music.
 sign_macho_files "$app_bundle/Contents/Frameworks"
 sign_macho_files "$app_bundle/Contents/PlugIns"
 sign_macho_files "$app_bundle/Contents/XPCServices"

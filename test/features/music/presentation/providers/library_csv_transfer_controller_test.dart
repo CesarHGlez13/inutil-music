@@ -20,7 +20,7 @@ void main() {
 
   test('preview parses off-thread and publishes the detected document', () async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-csv-preview-',
+      'inutil-csv-preview-',
     );
     addTearDown(() => directory.delete(recursive: true));
     final file = File('${directory.path}/songs.csv');
@@ -128,7 +128,7 @@ void main() {
             ],
           ),
         ],
-        detectedFormat: LibraryCsvDetectedFormat.bstream,
+        detectedFormat: LibraryCsvDetectedFormat.inutil,
         defaultPlaylistName: 'songs',
         hasPlaylistColumn: true,
       );
@@ -247,7 +247,7 @@ class _Harness {
     Future<List<TrackInfo>> Function(String)? search,
   }) async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-csv-controller-',
+      'inutil-csv-controller-',
     );
     final database = _TestDatabase('${directory.path}/library.db');
     final sync = _SyncSpy();

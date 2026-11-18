@@ -15,7 +15,7 @@ import 'package:integration_test/integration_test.dart';
 /// Uses original fixture text and in-memory settings, never the user's library.
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
-  const capture = bool.fromEnvironment('BSTREAM_NATIVE_SCREENSHOTS');
+  const capture = bool.fromEnvironment('INUTIL_NATIVE_SCREENSHOTS');
   testWidgets(
     'native lyrics menu, live translation, cache, language and romanization',
     (tester) async {
@@ -206,7 +206,7 @@ Future<void> _waitUntil(WidgetTester tester, bool Function() ready) async {
 const _english = LyricsDocument(
   provider: 'Fixture',
   trackName: 'Lyrics options test',
-  artistName: 'BStream Music',
+  artistName: 'Inútil Music',
   lines: [
     LyricLine(timestamp: Duration.zero, text: 'Music brings us together.'),
     LyricLine(
@@ -222,7 +222,7 @@ const _english = LyricsDocument(
 const _korean = LyricsDocument(
   provider: 'Fixture',
   trackName: 'Korean test',
-  artistName: 'BStream Music',
+  artistName: 'Inútil Music',
   lines: [
     LyricLine(timestamp: Duration.zero, text: '오늘은 좋은 날입니다'),
     LyricLine(timestamp: Duration(seconds: 2), text: '우리는 함께 음악을 들어요'),
@@ -234,7 +234,7 @@ class _FixturePlayerController extends PlayerController {
   Future<PlayerSnapshot> build() async => const PlayerSnapshot(
     status: PlayerStatus.paused,
     title: 'Lyrics options test',
-    artist: 'BStream Music',
+    artist: 'Inútil Music',
     trackId: 'english',
     duration: Duration(minutes: 3),
   );

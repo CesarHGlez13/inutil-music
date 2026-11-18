@@ -27,8 +27,8 @@ void main() {
             clientContext: _clientContext,
             parser: _ObservedAccountParser(events.sendPort),
           );
-          expect((await gateway.getProfile())?.displayName, 'BStream User');
-          expect(await parsed, 'BStream background work');
+          expect((await gateway.getProfile())?.displayName, 'Inutil User');
+          expect(await parsed, 'Inutil background work');
         } finally {
           events.close();
         }
@@ -41,9 +41,9 @@ void main() {
 
       final profile = await gateway.getProfile();
 
-      expect(profile?.displayName, 'BStream User');
+      expect(profile?.displayName, 'Inutil User');
       expect(profile?.email, 'listener@example.test');
-      expect(profile?.handle, '@bstream');
+      expect(profile?.handle, '@inutil');
       expect(profile?.avatarUrl, 'https://img.test/avatar-large.jpg');
       expect(profile?.channelId, 'UC-profile');
       expect(transport.requests.single.endpoint, 'account/account_menu');
@@ -509,7 +509,7 @@ void main() {
 
       final profile = await gateway.getProfile();
 
-      expect(profile?.displayName, 'BStream User');
+      expect(profile?.displayName, 'Inutil User');
       expect(transport.requests, hasLength(3));
       expect(delays, const <Duration>[
         Duration(milliseconds: 1),
@@ -864,9 +864,9 @@ Map<String, Object?> _profileFixture() => <String, Object?>{
           'multiPageMenuRenderer': <String, Object?>{
             'header': <String, Object?>{
               'activeAccountHeaderRenderer': <String, Object?>{
-                'accountName': _runs('BStream User'),
+                'accountName': _runs('Inutil User'),
                 'email': _runs('listener@example.test'),
-                'channelHandle': _runs('@bstream'),
+                'channelHandle': _runs('@inutil'),
                 'accountPhoto': <String, Object?>{
                   'thumbnails': <Object?>[
                     <String, Object?>{
@@ -1042,7 +1042,7 @@ Map<String, Object?> _savedPlaylistItem({
     'title': _runs(title),
     'subtitle': <String, Object?>{
       'runs': <Object?>[
-        <String, Object?>{'text': 'BStream User'},
+        <String, Object?>{'text': 'Inutil User'},
         <String, Object?>{'text': ' • '},
         <String, Object?>{'text': '3 canciones'},
       ],

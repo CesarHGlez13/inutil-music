@@ -13,24 +13,24 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 
-const _enabled = bool.fromEnvironment('BSTREAM_LIVE_INNERTUBE_MATRIX');
-const _strict = bool.fromEnvironment('BSTREAM_INNERTUBE_MATRIX_STRICT');
+const _enabled = bool.fromEnvironment('INUTIL_LIVE_INNERTUBE_MATRIX');
+const _strict = bool.fromEnvironment('INUTIL_INNERTUBE_MATRIX_STRICT');
 const _includeExperimental = bool.fromEnvironment(
-  'BSTREAM_INNERTUBE_MATRIX_INCLUDE_EXPERIMENTAL',
+  'INUTIL_INNERTUBE_MATRIX_INCLUDE_EXPERIMENTAL',
 );
 const _roundsDefine = String.fromEnvironment(
-  'BSTREAM_INNERTUBE_MATRIX_ROUNDS',
+  'INUTIL_INNERTUBE_MATRIX_ROUNDS',
   defaultValue: '2',
 );
 const _videosDefine = String.fromEnvironment(
-  'BSTREAM_INNERTUBE_MATRIX_VIDEOS',
+  'INUTIL_INNERTUBE_MATRIX_VIDEOS',
   defaultValue: 'dQw4w9WgXcQ,kJQP7kiw5Fk,9bZkp7q19f0,JGwWNGJdvx8,CevxZvSJLk8',
 );
 const _profilesDefine = String.fromEnvironment(
-  'BSTREAM_INNERTUBE_MATRIX_PROFILES',
+  'INUTIL_INNERTUBE_MATRIX_PROFILES',
 );
 const _minimumSuccessPercentDefine = String.fromEnvironment(
-  'BSTREAM_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT',
+  'INUTIL_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT',
   defaultValue: '80',
 );
 
@@ -44,14 +44,14 @@ void main() {
       expect(
         rounds,
         inInclusiveRange(1, 10),
-        reason: 'BSTREAM_INNERTUBE_MATRIX_ROUNDS must be between 1 and 10.',
+        reason: 'INUTIL_INNERTUBE_MATRIX_ROUNDS must be between 1 and 10.',
       );
       final minimumSuccessPercent = int.tryParse(_minimumSuccessPercentDefine);
       expect(
         minimumSuccessPercent,
         inInclusiveRange(1, 100),
         reason:
-            'BSTREAM_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT must be between '
+            'INUTIL_INNERTUBE_MATRIX_MIN_SUCCESS_PERCENT must be between '
             '1 and 100.',
       );
       final videoIds = _videosDefine
@@ -62,7 +62,7 @@ void main() {
       expect(
         videoIds,
         isNotEmpty,
-        reason: 'BSTREAM_INNERTUBE_MATRIX_VIDEOS has no valid video IDs.',
+        reason: 'INUTIL_INNERTUBE_MATRIX_VIDEOS has no valid video IDs.',
       );
 
       final requestedKeys = _profilesDefine
@@ -77,7 +77,7 @@ void main() {
       expect(
         unknownKeys,
         isEmpty,
-        reason: 'BSTREAM_INNERTUBE_MATRIX_PROFILES contains unknown keys.',
+        reason: 'INUTIL_INNERTUBE_MATRIX_PROFILES contains unknown keys.',
       );
       final profileCatalog = _includeExperimental || requestedKeys.isNotEmpty
           ? InnerTubeClientRegistry.benchmarkCandidates

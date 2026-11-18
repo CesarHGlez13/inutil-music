@@ -4,13 +4,13 @@ import WidgetKit
 import ImageIO
 import CryptoKit
 
-final class BStreamWidgetActionRelay {
-  static let shared = BStreamWidgetActionRelay()
+final class InutilWidgetActionRelay {
+  static let shared = InutilWidgetActionRelay()
   var channel: FlutterMethodChannel?
   private var pendingAction: String?
 
   func accept(_ url: URL) {
-    guard url.scheme == "bstreammusic", url.host == "widget" else { return }
+    guard url.scheme == "inutilmusic", url.host == "widget" else { return }
     let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     let action = components?.queryItems?.first(where: { $0.name == "action" })?.value
     guard let action, ["toggle", "next", "previous", "repeat", "favorite"].contains(action) else { return }
@@ -36,12 +36,12 @@ final class BStreamWidgetActionRelay {
   private let fileExportPlugin = IOSFileExportPlugin()
   private var screenChannel: FlutterMethodChannel?
   private var homeWidgetChannel: FlutterMethodChannel?
-  private var audioOutputPlugin: BStreamAudioOutputPlugin?
+  private var audioOutputPlugin: InutilAudioOutputPlugin?
   private var localAudioQualityPlugin: IOSLocalAudioQualityPlugin?
-  private var castPlugin: BStreamCastPlugin?
+  private var castPlugin: InutilCastPlugin?
   private let widgetGroup = "group.com.bstream.bstreamMusic"
-  private let widgetKind = "BStreamNowPlaying"
-  private let widgetArtworkQueue = DispatchQueue(label: "com.bstream.homeWidget.artwork", qos: .utility)
+  private let widgetKind = "InutilNowPlaying"
+  private let widgetArtworkQueue = DispatchQueue(label: "com.inutilmusic.homeWidget.artwork", qos: .utility)
 
   private func widgetCoverName(_ trackId: String) -> String {
     let digest = SHA256.hash(data: Data(trackId.utf8))
@@ -101,13 +101,13 @@ final class BStreamWidgetActionRelay {
 
     let audioMessenger = engineBridge.applicationRegistrar.messenger()
     IncomingCsvFileBridge.shared.attach(messenger: audioMessenger)
-    audioOutputPlugin = BStreamAudioOutputPlugin(messenger: audioMessenger)
+    audioOutputPlugin = InutilAudioOutputPlugin(messenger: audioMessenger)
     localAudioQualityPlugin?.dispose()
     localAudioQualityPlugin = IOSLocalAudioQualityPlugin(messenger: audioMessenger)
-    castPlugin = BStreamCastPlugin(messenger: audioMessenger)
+    castPlugin = InutilCastPlugin(messenger: audioMessenger)
 
     let channel = FlutterMethodChannel(
-      name: "bstream_music/local_audio",
+      name: "inutil_music/local_audio",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     channel.setMethodCallHandler { [weak self] call, result in
@@ -116,7 +116,7 @@ final class BStreamWidgetActionRelay {
     localMediaChannel = channel
 
     let exportChannel = FlutterMethodChannel(
-      name: "bstream_music/file_export",
+      name: "inutil_music/file_export",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     exportChannel.setMethodCallHandler { [weak self] call, result in
@@ -125,7 +125,7 @@ final class BStreamWidgetActionRelay {
     fileExportChannel = exportChannel
 
     let displayChannel = FlutterMethodChannel(
-      name: "bstream_music/screen",
+      name: "inutil_music/screen",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     displayChannel.setMethodCallHandler { call, result in
@@ -140,7 +140,7 @@ final class BStreamWidgetActionRelay {
     screenChannel = displayChannel
 
     let widgetChannel = FlutterMethodChannel(
-      name: "bstream_music/home_widget",
+      name: "inutil_music/home_widget",
       binaryMessenger: engineBridge.applicationRegistrar.messenger()
     )
     widgetChannel.setMethodCallHandler { [weak self] call, result in
@@ -214,7 +214,7 @@ final class BStreamWidgetActionRelay {
         }
         result(nil)
       case "consumePendingAction":
-        result(BStreamWidgetActionRelay.shared.consume())
+        result(InutilWidgetActionRelay.shared.consume())
       case "registerActionHandler":
         result(nil)
       default:
@@ -222,6 +222,6 @@ final class BStreamWidgetActionRelay {
       }
     }
     homeWidgetChannel = widgetChannel
-    BStreamWidgetActionRelay.shared.channel = widgetChannel
+    InutilWidgetActionRelay.shared.channel = widgetChannel
   }
 }

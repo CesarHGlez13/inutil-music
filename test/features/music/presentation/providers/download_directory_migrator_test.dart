@@ -14,7 +14,7 @@ void main() {
 
     setUp(() async {
       sandbox = await Directory.systemTemp.createTemp(
-        'bstream-directory-migrator-',
+        'inutil-directory-migrator-',
       );
     });
 
@@ -317,20 +317,20 @@ void main() {
       final target = Directory(p.join(sandbox.path, 'target'));
       await target.create();
       final unowned = Directory(
-        p.join(target.path, '.bstream-migration-stage-personal'),
+        p.join(target.path, '.inutil-migration-stage-personal'),
       );
       await unowned.create();
       await _write(p.join(unowned.path, 'keep.txt'), 'external');
       const token = 'owned-token';
       final owned = Directory(
-        p.join(target.path, '.bstream-migration-stage-$token'),
+        p.join(target.path, '.inutil-migration-stage-$token'),
       );
       await owned.create();
       await _write(
-        p.join(owned.path, '.bstream-owned-migration.json'),
+        p.join(owned.path, '.inutil-owned-migration.json'),
         jsonEncode(<String, Object?>{
           'version': 1,
-          'kind': 'bstream.download-directory-migration',
+          'kind': 'inutil.download-directory-migration',
           'token': token,
           'sourceRoot': p.join(sandbox.path, 'source'),
           'targetRoot': target.path,
@@ -400,6 +400,6 @@ Future<File> _write(String path, String contents) async {
 Future<List<String>> _migrationArtifacts(Directory parent) async {
   return <String>[
     await for (final entity in parent.list())
-      if (p.basename(entity.path).contains('.bstream-')) entity.path,
+      if (p.basename(entity.path).contains('.inutil-')) entity.path,
   ];
 }

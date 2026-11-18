@@ -372,7 +372,7 @@ class _Fixture {
 
   static Future<_Fixture> create() async {
     final directory = await Directory.systemTemp.createTemp(
-      'bstream-metadata-refresh-',
+      'inutil-metadata-refresh-',
     );
     final repository = _ReadOnlyRepository();
     final writer = _Writer();

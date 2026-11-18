@@ -59,7 +59,7 @@ void main() {
 
   test('orphan recovery deletes only marked inactive profiles', () async {
     final root = await Directory.systemTemp.createTemp(
-      'bstream_cdp_collector_test_',
+      'inutil_cdp_collector_test_',
     );
     Future<Directory> profile(String suffix, {bool marked = true}) async {
       final directory = Directory(

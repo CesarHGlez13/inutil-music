@@ -16,7 +16,7 @@ import '../../features/music/domain/entities/playlist.dart';
 import '../../features/music/domain/entities/playlist_entry.dart';
 import '../../features/music/domain/repositories/catalog_playlist_repository.dart';
 import '../recommendations/recommendation_storage_models.dart';
-import '../sharing/bstream_track_link.dart';
+import '../sharing/inutil_track_link.dart';
 import 'portable_sqlite_upsert.dart';
 
 class PlaybackEventRetentionPolicy {
@@ -2658,7 +2658,7 @@ class LocalDatabaseService {
       return;
     }
 
-    const codec = BStreamTrackLinkCodec();
+    const codec = InutilTrackLinkCodec();
     final batch = db.batch();
     var updates = 0;
     for (final row in rows) {

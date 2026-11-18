@@ -10,7 +10,7 @@ void main() {
     final readme = File('README.md').readAsStringSync();
     final changelog = File('CHANGELOG.md').readAsStringSync();
     final windowsInstaller = File(
-      'packaging/windows/BStreamMusic.iss',
+      'packaging/windows/InutilMusic.iss',
     ).readAsStringSync();
     final pubspecVersion = RegExp(
       r'^version:\s*([0-9]+\.[0-9]+\.[0-9]+\+[0-9]+)\s*$',
@@ -92,6 +92,71 @@ void main() {
     expect(widgetEs, isNot(contains('canciÃ³n')));
   });
 
+  test(
+    'el producto ya no menciona el proyecto original salvo compatibilidad',
+    () {
+      // Literales que siguen siendo válidos a propósito: identidad publicada
+      // en iOS, datos del usuario y el crédito legal de la licencia BSD-2.
+      const allowed = <String>[
+        'BStream-Music',                 // Music/BStream-Music (biblioteca descargada)
+        'bstream:favorites',             // id de playlist persistido en la BD
+        'BStreamCsvVersion',             // exportaciones CSV de las 2.0.x
+        'bstreamcsvversion',
+        'bstreamMusic',                  // estilo guardado en Preferencias
+        'bstreammusic',                  // esquema de enlaces de las 2.0.x
+        'com.bstream.bstreamMusic',      // bundle id y App Group de iOS/macOS
+        'BStream Music (BSD-2-Clause)',  // crédito legal
+        'open-source BStream Music',
+        'parte de BStream Music',
+        "'bstream.'",                    // claves legacy de Preferencias
+        "'BStream'",                     // carpeta descargada por las 1.x
+      ];
+      final roots = <String>[
+        'lib',
+        'android/app/src',
+        'ios/Runner',
+        'macos/Runner',
+        'windows/runner',
+        'linux/runner',
+        'packaging',
+      ];
+      final unexpected = <String>[];
+      for (final root in roots) {
+        for (final entry in Directory(root).listSync(recursive: true, followLinks: false)) {
+          if (entry is! File) continue;
+          final path = entry.path;
+          if (!path.endsWith(
+            '.dart',
+          ) &&
+              !path.endsWith('.kt') &&
+              !path.endsWith('.java') &&
+              !path.endsWith('.swift') &&
+              !path.endsWith('.cc') &&
+              !path.endsWith('.cpp') &&
+              !path.endsWith('.rc') &&
+              !path.endsWith('.xml') &&
+              !path.endsWith('.plist') &&
+              !path.endsWith('.entitlements') &&
+              !path.endsWith('.xcconfig') &&
+              !path.endsWith('.iss') &&
+              !path.endsWith('.spec') &&
+              !path.endsWith('.desktop') &&
+              !path.endsWith('.sh') &&
+              !path.endsWith('.txt')) {
+            continue;
+          }
+          final lines = entry.readAsLinesSync();
+          for (var i = 0; i < lines.length; i++) {
+            if (!lines[i].toLowerCase().contains('bstream')) continue;
+            if (allowed.any((token) => lines[i].contains(token))) continue;
+            unexpected.add('$path:${i + 1}  ${lines[i].trim()}');
+          }
+        }
+      }
+      expect(unexpected, isEmpty, reason: 'menciones huérfanas: $unexpected');
+    },
+  );
+
   test('uses only the in-process Dart YouTube resolver architecture', () {
     final pubspec = File('pubspec.yaml').readAsStringSync().toLowerCase();
     final lockfile = File('pubspec.lock').readAsStringSync().toLowerCase();
@@ -109,7 +174,7 @@ void main() {
     );
     expect(
       nightlyWorkflow,
-      contains('--dart-define=BSTREAM_LIVE_INNERTUBE=true'),
+      contains('--dart-define=INUTIL_LIVE_INNERTUBE=true'),
     );
     expect(
       nightlyWorkflow,
@@ -153,22 +218,22 @@ void main() {
       'packaging/linux/build_packages.sh',
     ).readAsStringSync();
     final rpmSpec = File(
-      'packaging/linux/bstream-music.spec',
+      'packaging/linux/inutil-music.spec',
     ).readAsStringSync();
     final attributes = File('.gitattributes').readAsStringSync();
 
     expect(workflow, contains('Dir::Etc::sourcelist=/etc/apt/sources.list'));
-    expect(workflow, contains('bstream-apt-sourceparts'));
+    expect(workflow, contains('inutil-apt-sourceparts'));
     expect(workflow, contains('Dir::Etc::sourceparts=\$apt_sourceparts'));
     expect(workflow, contains('Acquire::Retries=5'));
     expect(workflow, contains('libsecret-1-dev'));
     expect(workflow, contains('Verify Linux installer payloads'));
-    expect(workflow, contains('test -x "\$bundle/BStream Music"'));
+    expect(workflow, contains('test -x "\$bundle/Inútil Music"'));
     expect(workflow, contains('dpkg-deb --extract'));
     expect(workflow, contains('rpm2cpio'));
     expect(linuxPackages, contains('libsecret-1-0'));
     expect(rpmSpec, contains('Requires:       libsecret'));
-    expect(attributes, contains('packaging/linux/bstream-music text eol=lf'));
+    expect(attributes, contains('packaging/linux/inutil-music text eol=lf'));
 
     for (final legacyDirectory in <String>[
       'third_party/youtube_explode_dart',

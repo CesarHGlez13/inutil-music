@@ -20,7 +20,7 @@ void main() {
 
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    sandbox = await Directory.systemTemp.createTemp('bstream_backup_test_');
+    sandbox = await Directory.systemTemp.createTemp('inutil_backup_test_');
     mediaRoot = Directory(p.join(sandbox.path, 'media'));
     databaseFile = File(p.join(sandbox.path, AppConstants.databaseName));
     await databaseFile.writeAsString('database-v1');

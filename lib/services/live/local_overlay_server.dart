@@ -311,7 +311,7 @@ final class LocalLiveOverlayServer {
     }
 
     throw LocalLiveOverlayVerificationException(
-      'Windows configur\u00f3 el dominio local, pero BStream no pudo verificar '
+      'Windows configur\u00f3 el dominio local, pero Inutil no pudo verificar '
       'de forma segura http://$host/health.',
       lastError,
     );
@@ -359,7 +359,7 @@ final class LocalLiveOverlayServer {
           (client) => _closeSocket(
             client,
             WebSocketStatus.goingAway,
-            'BStream LIVE overlay startup failed',
+            'Inutil LIVE overlay startup failed',
           ),
         ),
       );
@@ -455,7 +455,7 @@ final class LocalLiveOverlayServer {
             }),
           );
           await request.response.close();
-        case '/bstream-icon.png':
+        case '/inutil-icon.png':
           if (request.method != 'GET') {
             await _methodNotAllowed(request.response, allow: 'GET');
             return;
@@ -495,7 +495,7 @@ final class LocalLiveOverlayServer {
             await _closeSocket(
               socket,
               WebSocketStatus.goingAway,
-              'BStream LIVE overlay is stopping',
+              'Inutil LIVE overlay is stopping',
             );
             return;
           }
@@ -708,7 +708,7 @@ final class LocalLiveOverlayServer {
             (client) => _closeSocket(
               client,
               WebSocketStatus.goingAway,
-              'BStream LIVE overlay stopped',
+              'Inutil LIVE overlay stopped',
             ),
           ),
         );

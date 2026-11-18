@@ -50,7 +50,7 @@ function Get-CenteredCropRect {
     )
 }
 
-function New-BStreamIcon {
+function New-InutilIcon {
     param(
         [System.Drawing.Image]$Source,
         [int]$Size,
@@ -105,7 +105,7 @@ function Save-PngIcon {
         New-Item -ItemType Directory -Force -Path $directory | Out-Null
     }
 
-    $bitmap = New-BStreamIcon $Source $Size $CropInsetFactor
+    $bitmap = New-InutilIcon $Source $Size $CropInsetFactor
     $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
 }
@@ -165,9 +165,9 @@ function Save-MonochromeNotificationIcon {
     }
 
     # Android status icons must be a white/alpha mask. Extract the green/blue
-    # BStream mark from the source instead of using the generic music-note
+    # Inutil mark from the source instead of using the generic music-note
     # glyph that Android would otherwise show in media notifications.
-    $base = New-BStreamIcon $Source $Size $CropInsetFactor
+    $base = New-InutilIcon $Source $Size $CropInsetFactor
     $bitmap = [System.Drawing.Bitmap]::new(
         $Size,
         $Size,
@@ -204,7 +204,7 @@ function Get-PngBytes {
         [float]$CropInsetFactor = 0.018
     )
 
-    $bitmap = New-BStreamIcon $Source $Size $CropInsetFactor
+    $bitmap = New-InutilIcon $Source $Size $CropInsetFactor
     $stream = [System.IO.MemoryStream]::new()
     $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
     $bitmap.Dispose()
@@ -265,10 +265,10 @@ function Write-Ico {
 $source = [System.Drawing.Image]::FromFile($SourcePath)
 
 try {
-    Save-PngIcon $source 48 (Join-Path $Root "assets\icons\bstream_icon.png")
-    Save-PngIcon $source 96 (Join-Path $Root "assets\icons\2.0x\bstream_icon.png")
-    Save-PngIcon $source 144 (Join-Path $Root "assets\icons\3.0x\bstream_icon.png")
-    Save-PngIcon $source 192 (Join-Path $Root "assets\icons\4.0x\bstream_icon.png")
+    Save-PngIcon $source 48 (Join-Path $Root "assets\icons\inutil_icon.png")
+    Save-PngIcon $source 96 (Join-Path $Root "assets\icons\2.0x\inutil_icon.png")
+    Save-PngIcon $source 144 (Join-Path $Root "assets\icons\3.0x\inutil_icon.png")
+    Save-PngIcon $source 192 (Join-Path $Root "assets\icons\4.0x\inutil_icon.png")
 
     $androidIcons = @{
         "mipmap-mdpi\ic_launcher.png" = 48
@@ -284,7 +284,7 @@ try {
     }
 
     Save-MonochromeNotificationIcon $source 96 `
-        (Join-Path $Root "android\app\src\main\res\drawable-nodpi\ic_stat_bstream_music.png") 0.075
+        (Join-Path $Root "android\app\src\main\res\drawable-nodpi\ic_stat_inutil_music.png") 0.075
 
     foreach ($size in @(16, 32, 64, 128, 256, 512, 1024)) {
         Save-PngIcon $source $size (Join-Path $Root "macos\Runner\Assets.xcassets\AppIcon.appiconset\app_icon_$size.png")

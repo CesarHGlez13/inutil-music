@@ -3671,7 +3671,7 @@ class _PlaylistMenu extends ConsumerWidget {
                 onPressed: () => Navigator.of(
                   dialogContext,
                 ).pop(PlaylistDeleteScope.localOnly),
-                child: Text(strings.removePlaylistFromBStream),
+                child: Text(strings.removePlaylistFromInutil),
               )
             else
               FilledButton.icon(

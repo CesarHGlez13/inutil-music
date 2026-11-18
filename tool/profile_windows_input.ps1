@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
-public static class BStreamDesktopInput {
+public static class InutilDesktopInput {
   [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left, Top, Right, Bottom; }
   [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
   [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
@@ -65,22 +65,22 @@ public static class BStreamDesktopInput {
 '@
 
 $appProcess = Get-Process -Id $TargetProcessId
-if ($appProcess.ProcessName -ne 'bstream_music') { throw 'Only the BStream desktop process may receive this tool input.' }
+if ($appProcess.ProcessName -ne 'inutil_music') { throw 'Only the Inutil desktop process may receive this tool input.' }
 $appProcess.Refresh()
 $windowHandle = $appProcess.MainWindowHandle
-if ($windowHandle -eq [IntPtr]::Zero) { throw 'BStream has no visible main window.' }
-if ($Maximize) { [void][BStreamDesktopInput]::ShowWindow($windowHandle, 3) }
-if ($Action -eq 'Resize') { [BStreamDesktopInput]::ResizeClient($windowHandle, $Width, $Height) }
+if ($windowHandle -eq [IntPtr]::Zero) { throw 'Inutil has no visible main window.' }
+if ($Maximize) { [void][InutilDesktopInput]::ShowWindow($windowHandle, 3) }
+if ($Action -eq 'Resize') { [InutilDesktopInput]::ResizeClient($windowHandle, $Width, $Height) }
 if ($Action -ne 'Inspect') {
-  [void][BStreamDesktopInput]::SetForegroundWindow($windowHandle)
+  [void][InutilDesktopInput]::SetForegroundWindow($windowHandle)
   Start-Sleep -Milliseconds 250
 }
-$clientRect = New-Object BStreamDesktopInput+RECT
-[void][BStreamDesktopInput]::GetClientRect($windowHandle, [ref]$clientRect)
-$clientOrigin = New-Object BStreamDesktopInput+POINT
-[void][BStreamDesktopInput]::ClientToScreen($windowHandle, [ref]$clientOrigin)
-$windowRect = New-Object BStreamDesktopInput+RECT
-[void][BStreamDesktopInput]::GetWindowRect($windowHandle, [ref]$windowRect)
+$clientRect = New-Object InutilDesktopInput+RECT
+[void][InutilDesktopInput]::GetClientRect($windowHandle, [ref]$clientRect)
+$clientOrigin = New-Object InutilDesktopInput+POINT
+[void][InutilDesktopInput]::ClientToScreen($windowHandle, [ref]$clientOrigin)
+$windowRect = New-Object InutilDesktopInput+RECT
+[void][InutilDesktopInput]::GetWindowRect($windowHandle, [ref]$windowRect)
 $windows = New-Object 'System.Collections.Generic.List[object]'
 function Get-Marker {
   return @{
@@ -90,15 +90,15 @@ function Get-Marker {
 }
 function Assert-Foreground {
   [uint32]$foregroundProcessId = 0
-  [void][BStreamDesktopInput]::GetWindowThreadProcessId([BStreamDesktopInput]::GetForegroundWindow(), [ref]$foregroundProcessId)
-  if ($foregroundProcessId -ne $TargetProcessId) { throw 'Input stopped: BStream is no longer foreground.' }
+  [void][InutilDesktopInput]::GetWindowThreadProcessId([InutilDesktopInput]::GetForegroundWindow(), [ref]$foregroundProcessId)
+  if ($foregroundProcessId -ne $TargetProcessId) { throw 'Input stopped: Inutil is no longer foreground.' }
 }
 function Move-WithinApp([int]$clientX, [int]$clientY) {
   Assert-Foreground
   if ($clientX -lt 0 -or $clientY -lt 0 -or $clientX -ge $clientRect.Right -or $clientY -ge $clientRect.Bottom) {
-    throw 'Input coordinate is outside the BStream client area.'
+    throw 'Input coordinate is outside the Inutil client area.'
   }
-  [void][BStreamDesktopInput]::SetCursorPos($clientOrigin.X + $clientX, $clientOrigin.Y + $clientY)
+  [void][InutilDesktopInput]::SetCursorPos($clientOrigin.X + $clientX, $clientOrigin.Y + $clientY)
 }
 function Add-Window($start, $end, [string]$label, $inputTimes = @()) {
   $windows.Add(@{
@@ -109,8 +109,8 @@ function Add-Window($start, $end, [string]$label, $inputTimes = @()) {
 }
 function Click-WithinApp([int]$clientX, [int]$clientY) {
   Move-WithinApp $clientX $clientY
-  [BStreamDesktopInput]::LeftDown()
-  try { Start-Sleep -Milliseconds 15 } finally { [BStreamDesktopInput]::LeftUp() }
+  [InutilDesktopInput]::LeftDown()
+  try { Start-Sleep -Milliseconds 15 } finally { [InutilDesktopInput]::LeftUp() }
 }
 
 switch ($Action) {
@@ -119,8 +119,8 @@ switch ($Action) {
     Move-WithinApp $X $Y
     for ($step = 0; $step -lt $Steps; $step++) {
       Assert-Foreground
-      [BStreamDesktopInput]::Wheel(120)
-      [BStreamDesktopInput]::PreciseSleep($StepMs)
+      [InutilDesktopInput]::Wheel(120)
+      [InutilDesktopInput]::PreciseSleep($StepMs)
     }
     Start-Sleep -Milliseconds 500
   }
@@ -133,8 +133,8 @@ switch ($Action) {
         for ($step = 0; $step -lt $Steps; $step++) {
           Assert-Foreground
           $inputTimes.Add((Get-Marker).qpcMs)
-          [BStreamDesktopInput]::Wheel($direction * $WheelDelta)
-          [BStreamDesktopInput]::PreciseSleep($StepMs)
+          [InutilDesktopInput]::Wheel($direction * $WheelDelta)
+          [InutilDesktopInput]::PreciseSleep($StepMs)
         }
         Add-Window $start (Get-Marker) "wheel-$cycle-$direction" $inputTimes.ToArray()
         Start-Sleep -Milliseconds 120
@@ -151,14 +151,14 @@ switch ($Action) {
         Move-WithinApp $fromX $Y
         $start = Get-Marker
         $inputTimes = New-Object 'System.Collections.Generic.List[double]'
-        [BStreamDesktopInput]::LeftDown()
+        [InutilDesktopInput]::LeftDown()
         try {
           for ($step = 1; $step -le $Steps; $step++) {
             Move-WithinApp ([int]($fromX + ($toX - $fromX) * $step / $Steps)) $Y
             $inputTimes.Add((Get-Marker).qpcMs)
-            [BStreamDesktopInput]::PreciseSleep($StepMs)
+            [InutilDesktopInput]::PreciseSleep($StepMs)
           }
-        } finally { [BStreamDesktopInput]::LeftUp() }
+        } finally { [InutilDesktopInput]::LeftUp() }
         Add-Window $start (Get-Marker) "drag-$cycle-$reverse" $inputTimes.ToArray()
         Start-Sleep -Milliseconds 120
         Start-Sleep -Milliseconds 180
@@ -172,10 +172,10 @@ switch ($Action) {
       foreach ($point in $points) {
         if ($point.Count -ne 2) { throw 'Each tab coordinate must be [x,y].' }
         Move-WithinApp $point[0] $point[1]
-        [BStreamDesktopInput]::LeftDown()
+        [InutilDesktopInput]::LeftDown()
         Start-Sleep -Milliseconds 15
         $start = Get-Marker
-        [BStreamDesktopInput]::LeftUp()
+        [InutilDesktopInput]::LeftUp()
         Start-Sleep -Milliseconds 360
         Add-Window $start (Get-Marker) "tab-$cycle-$($point[0])-$($point[1])"
         Start-Sleep -Milliseconds 290
@@ -195,7 +195,7 @@ if ($ScreenshotPath) {
 if ($ReportPath) {
   [IO.File]::WriteAllText([IO.Path]::GetFullPath($ReportPath), (ConvertTo-Json -InputObject @($windows.ToArray()) -Depth 5))
 }
-[BStreamDesktopInput]::DisposeTimer()
+[InutilDesktopInput]::DisposeTimer()
 @{
   processId = $TargetProcessId; action = $Action; clientWidth = $clientRect.Right; clientHeight = $clientRect.Bottom
   screenOriginX = $clientOrigin.X; screenOriginY = $clientOrigin.Y; motionWindows = @($windows.ToArray())

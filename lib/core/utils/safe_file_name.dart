@@ -5,7 +5,7 @@ String safeFileName(String value) {
       .trim();
 
   if (sanitized.isEmpty) {
-    return 'bstream_track';
+    return 'inutil_track';
   }
 
   return sanitized.length > 140

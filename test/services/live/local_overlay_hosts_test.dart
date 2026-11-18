@@ -8,19 +8,19 @@ import 'package:flutter_test/flutter_test.dart';
 const _hostsPath = r'C:\Windows\System32\drivers\etc\hosts';
 const _powerShell =
     r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe';
-const _managedBlock = '''# BEGIN BStream Music LIVE Overlay
-127.0.0.1\toverlay.bstreammusic.test
-# END BStream Music LIVE Overlay
+const _managedBlock = '''# BEGIN Inútil Music LIVE Overlay
+127.0.0.1\toverlay.inutilmusic.test
+# END Inútil Music LIVE Overlay
 ''';
 
 void main() {
   group('local LIVE overlay endpoint', () {
     test('uses the stable HTTP port-80 endpoint', () {
-      expect(localLiveOverlayHost, 'overlay.bstreammusic.test');
+      expect(localLiveOverlayHost, 'overlay.inutilmusic.test');
       expect(localLiveOverlayIpv4, '127.0.0.1');
       expect(localLiveOverlayPort, 80);
       expect(localLiveOverlayPath, '/overlay');
-      expect(localLiveOverlayUrl, 'http://overlay.bstreammusic.test/overlay');
+      expect(localLiveOverlayUrl, 'http://overlay.inutilmusic.test/overlay');
       expect(
         Uri(
           scheme: 'http',
@@ -49,7 +49,7 @@ void main() {
 
     test('accepts an external correct entry without claiming ownership', () {
       final result = inspectLocalOverlayHosts('''
-127.0.0.1 localhost Overlay.BStreamMusic.Test. another-alias # retained
+127.0.0.1 localhost Overlay.InutilMusic.Test. another-alias # retained
 ''');
 
       expect(result.status, LocalOverlayHostStatus.configured);
@@ -76,8 +76,8 @@ $_managedBlock# user entry after
 
     test('treats any other address as a conflict', () {
       final result = inspectLocalOverlayHosts('''
-127.0.0.1 overlay.bstreammusic.test
-192.0.2.8 overlay.bstreammusic.test
+127.0.0.1 overlay.inutilmusic.test
+192.0.2.8 overlay.inutilmusic.test
 ''');
 
       expect(result.status, LocalOverlayHostStatus.conflicting);
@@ -87,13 +87,13 @@ $_managedBlock# user entry after
 
     test('reports orphaned or duplicate ownership markers as malformed', () {
       final orphaned = inspectLocalOverlayHosts('''
-# BEGIN BStream Music LIVE Overlay
+# BEGIN Inútil Music LIVE Overlay
 127.0.0.1 localhost
 ''');
       final duplicate = inspectLocalOverlayHosts('''
-# BEGIN BStream Music LIVE Overlay
-# BEGIN BStream Music LIVE Overlay
-# END BStream Music LIVE Overlay
+# BEGIN Inútil Music LIVE Overlay
+# BEGIN Inútil Music LIVE Overlay
+# END Inútil Music LIVE Overlay
 ''');
 
       expect(orphaned.status, LocalOverlayHostStatus.malformed);
@@ -102,15 +102,15 @@ $_managedBlock# user entry after
 
     test('prioritizes malformed ownership over a correct external entry', () {
       final orphaned = inspectLocalOverlayHosts('''
-127.0.0.1 overlay.bstreammusic.test
-# BEGIN BStream Music LIVE Overlay
+127.0.0.1 overlay.inutilmusic.test
+# BEGIN Inútil Music LIVE Overlay
 127.0.0.1 localhost
 ''');
       final emptyBlock = inspectLocalOverlayHosts('''
-127.0.0.1 overlay.bstreammusic.test
-# BEGIN BStream Music LIVE Overlay
+127.0.0.1 overlay.inutilmusic.test
+# BEGIN Inútil Music LIVE Overlay
 127.0.0.1 localhost
-# END BStream Music LIVE Overlay
+# END Inútil Music LIVE Overlay
 ''');
 
       expect(orphaned.status, LocalOverlayHostStatus.malformed);
@@ -127,10 +127,10 @@ $_managedBlock# user entry after
       final executable =
           '$systemRoot\\System32\\WindowsPowerShell\\v1.0\\powershell.exe';
       const script = r'''
-function Write-BStreamProbe {
-  [Console]::Out.Write('bstream-command-ok')
+function Write-InutilProbe {
+  [Console]::Out.Write('inutil-command-ok')
 }
-Write-BStreamProbe
+Write-InutilProbe
 ''';
       final result = await const SystemLocalOverlayHostsCommandRunner().run(
         executable,
@@ -144,7 +144,7 @@ Write-BStreamProbe
       );
 
       expect(result.exitCode, 0);
-      expect(result.stdout, 'bstream-command-ok');
+      expect(result.stdout, 'inutil-command-ok');
       expect(result.stderr, isEmpty);
     });
 
@@ -321,7 +321,7 @@ exit $process.ExitCode
         hostsReader: (path) async {
           reads++;
           expect(path, _hostsPath);
-          return '127.0.0.1 overlay.bstreammusic.test\r\n';
+          return '127.0.0.1 overlay.inutilmusic.test\r\n';
         },
         hostsPathProvider: () => _hostsPath,
         powerShellExecutable: _powerShell,
@@ -340,7 +340,7 @@ exit $process.ExitCode
       });
       final provisioner = WindowsLocalOverlayHostProvisioner(
         commandRunner: runner,
-        hostsReader: (_) async => '203.0.113.7 overlay.bstreammusic.test\r\n',
+        hostsReader: (_) async => '203.0.113.7 overlay.inutilmusic.test\r\n',
         hostsPathProvider: () => _hostsPath,
         powerShellExecutable: _powerShell,
         isWindows: true,
@@ -449,8 +449,8 @@ exit $process.ExitCode
         expect(elevatedScript, contains(_hostsPath));
         expect(elevatedScript, contains(localLiveOverlayHost));
         expect(elevatedScript, contains(localLiveOverlayIpv4));
-        expect(elevatedScript, contains('# BEGIN BStream Music LIVE Overlay'));
-        expect(elevatedScript, contains('# END BStream Music LIVE Overlay'));
+        expect(elevatedScript, contains('# BEGIN Inútil Music LIVE Overlay'));
+        expect(elevatedScript, contains('# END Inútil Music LIVE Overlay'));
         expect(
           elevatedScript,
           contains(r'$encoding.GetBytes($separator + $block)'),

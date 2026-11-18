@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Apply BStream's small Fredoka font customizations.
+"""Apply Inútil Music's small Fredoka font customizations.
 
 Usage:
   py tool/build_fredoka_heart_font.py source.ttf assets/fonts/Fredoka-Variable.ttf

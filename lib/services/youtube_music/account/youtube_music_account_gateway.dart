@@ -681,7 +681,7 @@ class YouTubeMusicAccountGateway
         developer.log(
           'YouTube Music account read rejected: endpoint=$endpoint '
           'status=${response.statusCode} attempt=$attempt',
-          name: 'bstream.youtube_music.auth',
+          name: 'inutil.youtube_music.auth',
         );
         if (attempt < _readRetryPolicy.maxAttempts &&
             _readRetryPolicy.shouldRetryStatus(response.statusCode)) {
@@ -696,7 +696,7 @@ class YouTubeMusicAccountGateway
         developer.log(
           'YouTube Music account transport failed: endpoint=$endpoint '
           'delivery=${error.delivery} retryable=${error.retryableForRead}',
-          name: 'bstream.youtube_music.auth',
+          name: 'inutil.youtube_music.auth',
         );
         if (attempt < _readRetryPolicy.maxAttempts && error.retryableForRead) {
           await _retryDelay(_readRetryPolicy.delayForRetry(attempt));

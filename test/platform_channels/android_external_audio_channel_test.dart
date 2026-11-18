@@ -73,7 +73,7 @@ void main() {
     'delivers pending audio after the Android Activity is recreated',
     () async {
       const methodChannel = MethodChannel(
-        'test/bstream_android_external_audio',
+        'test/inutil_android_external_audio',
       );
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;

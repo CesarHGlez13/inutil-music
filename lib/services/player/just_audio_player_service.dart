@@ -134,7 +134,7 @@ class JustAudioPlayerService
           _loggedRemoteDuration = true;
           developer.log(
             'duration available after ${watch.elapsedMilliseconds}ms: $duration',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
           );
         }
         if (_usableDuration(duration) == null &&
@@ -180,7 +180,7 @@ class JustAudioPlayerService
         if (watch != null) {
           developer.log(
             'state ${state.processingState.name}, playing=${state.playing}, elapsed=${watch.elapsedMilliseconds}ms',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
           );
           if (state.processingState == ProcessingState.ready && state.playing) {
             _remoteStartupWatch = null;
@@ -254,7 +254,7 @@ class JustAudioPlayerService
         if (!belongsToCurrentItem) {
           developer.log(
             'ignored stale playback error for source index ${error.index}',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: error,
           );
           return;
@@ -531,7 +531,7 @@ class JustAudioPlayerService
     } catch (error, stackTrace) {
       developer.log(
         'Optional notification artwork initialization failed',
-        name: 'BStreamPlayback',
+        name: 'InutilPlayback',
         error: error,
         stackTrace: stackTrace,
       );
@@ -698,7 +698,7 @@ class JustAudioPlayerService
         _trackTimedOutSkipSilenceWrite(player, nativeWrite);
         developer.log(
           'skip silence configuration timed out',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -712,7 +712,7 @@ class JustAudioPlayerService
         if (logFailure) {
           developer.log(
             'skip silence configuration failed after retry',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: error,
             stackTrace: stackTrace,
           );
@@ -779,7 +779,7 @@ class JustAudioPlayerService
       if (!_disposed) {
         developer.log(
           'skip silence timeout recovery failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1005,7 +1005,7 @@ class JustAudioPlayerService
       if (!_disposed) {
         developer.log(
           'just_audio source upgrade kept the original source',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1140,7 +1140,7 @@ class JustAudioPlayerService
           identical(incoming, _crossfadePlayer)) {
         developer.log(
           'just_audio standby error',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
         );
         unawaited(_abortCrossfadeGeneration(generation));
@@ -1196,7 +1196,7 @@ class JustAudioPlayerService
       if (_isCrossfadeCurrent(generation)) {
         developer.log(
           'just_audio crossfade preload failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1516,7 +1516,7 @@ class JustAudioPlayerService
       if (_isCrossfadeCurrent(generation)) {
         developer.log(
           'just_audio crossfade failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1572,7 +1572,7 @@ class JustAudioPlayerService
             identical(incoming, _crossfadePlayer)) {
           developer.log(
             'just_audio standby play failed',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: error,
             stackTrace: stackTrace,
           );
@@ -1586,7 +1586,7 @@ class JustAudioPlayerService
           // failure merely because it is no longer named `_crossfadePlayer`.
           developer.log(
             'promoted crossfade deck failed to start',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: error,
             stackTrace: stackTrace,
           );
@@ -1607,7 +1607,7 @@ class JustAudioPlayerService
         if (!_disposed) {
           developer.log(
             'crossfade play failure recovery failed',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: recoveryError,
             stackTrace: recoveryStackTrace,
           );
@@ -1660,7 +1660,7 @@ class JustAudioPlayerService
       if (!_disposed) {
         developer.log(
           'immediate crossfade promotion failed',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -1680,7 +1680,7 @@ class JustAudioPlayerService
         if (!_disposed) {
           developer.log(
             'immediate crossfade recovery failed',
-            name: 'BStreamPlayback',
+            name: 'InutilPlayback',
             error: recoveryError,
             stackTrace: recoveryStackTrace,
           );
@@ -2007,7 +2007,7 @@ class JustAudioPlayerService
       'playRemote start, hasDuration=${track.duration != null}, '
       'hasHeaders=${track.httpHeaders?.isNotEmpty == true}, '
       'format=${track.streamExtension ?? 'unknown'}',
-      name: 'BStreamPlayback',
+      name: 'InutilPlayback',
     );
     await _enqueueQueueMutation(
       () async {
@@ -2050,7 +2050,7 @@ class JustAudioPlayerService
         }
         developer.log(
           'setAudioSources returned after ${_remoteStartupWatch?.elapsedMilliseconds ?? 0}ms',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
         );
         await _applyPlaybackOptions();
         if (generation != _playbackGeneration) {
@@ -2059,7 +2059,7 @@ class JustAudioPlayerService
         _startPlayback(generation);
         developer.log(
           'play requested after ${_remoteStartupWatch?.elapsedMilliseconds ?? 0}ms',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
         );
       },
       isSourceLoad: true,
@@ -2331,7 +2331,7 @@ class JustAudioPlayerService
       _player.stop().catchError((Object error, StackTrace stackTrace) {
         developer.log(
           'failed to interrupt timed-out source load',
-          name: 'BStreamPlayback',
+          name: 'InutilPlayback',
           error: error,
           stackTrace: stackTrace,
         );
@@ -3061,7 +3061,7 @@ class JustAudioPlayerService
       );
       developer.log(
         'play request failed',
-        name: 'BStreamPlayback',
+        name: 'InutilPlayback',
         error: error,
         stackTrace: stackTrace,
       );
@@ -3103,7 +3103,7 @@ class JustAudioPlayerService
     }
     developer.log(
       'playback failed: $message',
-      name: 'BStreamPlayback',
+      name: 'InutilPlayback',
       error: error,
     );
     _emit(

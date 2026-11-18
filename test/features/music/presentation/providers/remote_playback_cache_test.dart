@@ -26,7 +26,7 @@ void main() {
 
   setUp(() async {
     cacheDirectory = await Directory.systemTemp.createTemp(
-      'bstream-remote-playback-cache-',
+      'inutil-remote-playback-cache-',
     );
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     variantResponseBarrier = Completer<void>();
@@ -641,7 +641,7 @@ TrackInfo _track(HttpServer server, String id) {
   return TrackInfo(
     id: id,
     title: 'Track $id',
-    artist: 'BStream',
+    artist: 'Inutil',
     url: 'https://www.youtube.com/watch?v=$id',
     streamUrl: 'http://${server.address.host}:${server.port}/$id.m4a',
   );

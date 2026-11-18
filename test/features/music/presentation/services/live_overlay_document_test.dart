@@ -56,7 +56,7 @@ void main() {
     );
     expect(liveOverlayHtml, contains("titleRow.className = 'title-row'"));
     expect(liveOverlayHtml, contains("titleLogo.className = 'title-logo'"));
-    expect(liveOverlayHtml, contains("titleLogo.src = '/bstream-icon.png'"));
+    expect(liveOverlayHtml, contains("titleLogo.src = '/inutil-icon.png'"));
     expect(liveOverlayHtml, contains("titleLogo.alt = ''"));
     expect(liveOverlayHtml, contains('titleRow.append(titleLogo, title)'));
     expect(liveOverlayHtml, contains('details.append(titleRow, artist)'));

@@ -467,7 +467,7 @@ class _ArtworkMotionVariant {
   final double intensity;
 
   factory _ArtworkMotionVariant.fromIdentity(String? identity) {
-    final seed = _stableStringHash(identity ?? 'bstream-artwork');
+    final seed = _stableStringHash(identity ?? 'inutil-artwork');
     return _ArtworkMotionVariant(
       horizontalDirection: seed.isEven ? 1 : -1,
       verticalDirection: (seed & 2) == 0 ? 1 : -1,

@@ -81,7 +81,7 @@ bool ForwardCsvToInstance(const std::wstring& path) {
 
 IncomingCsvBridge::IncomingCsvBridge(flutter::BinaryMessenger* messenger) {
   channel_ = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      messenger, "bstream_music/incoming_csv",
+      messenger, "inutil_music/incoming_csv",
       &flutter::StandardMethodCodec::GetInstance());
   channel_->SetMethodCallHandler([this](const auto& call, auto result) {
     if (call.method_name() == "start") {
@@ -92,7 +92,7 @@ IncomingCsvBridge::IncomingCsvBridge(flutter::BinaryMessenger* messenger) {
       ready_ = false;
       result->Success();
     } else if (call.method_name() == "release") {
-      result->Success();  // Desktop originals are never owned by BStream.
+      result->Success();  // Desktop originals are never owned by Inutil.
     } else {
       result->NotImplemented();
     }

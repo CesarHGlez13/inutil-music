@@ -23,7 +23,7 @@ import 'core/firebase/inutil_auth_gate.dart';
 import 'core/firebase/inutil_update_gate.dart';
 
 void main() {
-  launchBStreamMusicApp();
+  launchInutilMusicApp();
 }
 
 typedef AppStartupScheduler = void Function(VoidCallback callback);
@@ -76,7 +76,7 @@ Future<void> _startLicenceServices() async {
 }
 
 @visibleForTesting
-AppStartupCoordinator launchBStreamMusicApp({
+AppStartupCoordinator launchInutilMusicApp({
   bool? initializeAndroidServices,
   OptionalStartupOperation? initializeNotificationArtwork,
   OptionalStartupOperation? initializeAudioService,
@@ -118,7 +118,7 @@ AppStartupCoordinator launchBStreamMusicApp({
   (runApplication ?? runApp)(
     const ProviderScope(
       child: _LocalArtworkMaintenance(
-        child: BStreamMusicApp(checkForUpdatesOnStartup: false),
+        child: InutilMusicApp(checkForUpdatesOnStartup: false),
       ),
     ),
   );
@@ -129,7 +129,7 @@ AppStartupCoordinator launchBStreamMusicApp({
 }
 
 /// Runs non-blocking library maintenance only for the production app shell.
-/// Widget tests that mount [BStreamMusicApp] directly remain deterministic.
+/// Widget tests that mount [InutilMusicApp] directly remain deterministic.
 class _LocalArtworkMaintenance extends ConsumerStatefulWidget {
   const _LocalArtworkMaintenance({required this.child});
 
@@ -246,12 +246,12 @@ class _LocalArtworkMaintenanceState
   Widget build(BuildContext context) => widget.child;
 }
 
-class BStreamMusicApp extends ConsumerWidget {
+class InutilMusicApp extends ConsumerWidget {
   /// [enforceLicenseGates] aplica la barrera de licencia y el kill switch de
   /// OTA sobre la pantalla de inicio. Las pruebas de widget lo desactivan
   /// porque nunca inicializan Firebase y montan el shell directamente; en
-  /// producción ([launchBStreamMusicApp]) siempre se aplica.
-  const BStreamMusicApp({
+  /// producción ([launchInutilMusicApp]) siempre se aplica.
+  const InutilMusicApp({
     this.checkForUpdatesOnStartup = false,
     this.enforceLicenseGates = true,
     super.key,

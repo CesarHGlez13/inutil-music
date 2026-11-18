@@ -12,7 +12,7 @@ import 'package:image/image.dart' as image;
 
 void main() {
   late Directory directory;
-  setUp(() => directory = Directory.systemTemp.createTempSync('bstream-ogg-'));
+  setUp(() => directory = Directory.systemTemp.createTempSync('inutil-ogg-'));
   tearDown(() => directory.deleteSync(recursive: true));
 
   for (final opus in [true, false]) {
@@ -34,7 +34,7 @@ void main() {
           _expectAudioUnchanged(before, after);
           final metadata = readMetadata(file, getImage: true);
           expect(metadata.title, 'Canci\u00f3n \u65e5\u672c\u8a9e');
-          expect(metadata.artist, 'BStream Music');
+          expect(metadata.artist, 'Inútil Music');
           expect(metadata.album, '\u00c1lbum');
           expect(metadata.pictures, hasLength(1));
           expect(image.decodeImage(metadata.pictures.single.bytes)?.width, 4);
@@ -76,7 +76,7 @@ void main() {
         );
         final tags = AudioMetadataTags(
           title: 'Large header',
-          artist: 'BStream Music',
+          artist: 'Inútil Music',
           artworkBytes: bytes,
           artworkMimeType: 'image/png',
         );
@@ -243,7 +243,7 @@ void main() {
 
 AudioMetadataTags _tags() => AudioMetadataTags(
   title: 'Canci\u00f3n \u65e5\u672c\u8a9e',
-  artist: 'BStream Music',
+  artist: 'Inútil Music',
   album: '\u00c1lbum',
   artworkBytes: Uint8List.fromList(
     image.encodePng(

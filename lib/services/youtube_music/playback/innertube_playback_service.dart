@@ -461,7 +461,7 @@ class InnerTubePlaybackService {
           'resolved client=${profile.key}, video=${videoId.value}, '
           'itag=${resolved.format.itag}, '
           'elapsedMs=${stopwatch.elapsedMilliseconds}',
-          name: 'BStreamInnerTube',
+          name: 'InutilInnerTube',
         );
         return resolved;
       } catch (error) {
@@ -490,7 +490,7 @@ class InnerTubePlaybackService {
         developer.log(
           'client failed client=${profile.key}, video=${videoId.value}, '
           'elapsedMs=${attemptStopwatch.elapsedMilliseconds}',
-          name: 'BStreamInnerTube',
+          name: 'InutilInnerTube',
           error: error,
         );
       } finally {
@@ -735,7 +735,7 @@ class InnerTubePlaybackService {
         developer.log(
           'optional visitor bootstrap failed client=${profile.key}, '
           'video=${videoId.value}',
-          name: 'BStreamInnerTube',
+          name: 'InutilInnerTube',
           error: error,
           stackTrace: stackTrace,
         );

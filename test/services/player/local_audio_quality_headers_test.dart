@@ -12,7 +12,7 @@ void main() {
 
   setUp(() async {
     fixtures = await Directory.systemTemp.createTemp(
-      'bstream_audio_quality_headers_',
+      'inutil_audio_quality_headers_',
     );
     service = LocalAudioQualityService();
   });
@@ -22,7 +22,7 @@ void main() {
     // This exact directory was created by this test, never a workspace root.
     expect(
       fixtures.uri.pathSegments.where((part) => part.isNotEmpty).last,
-      startsWith('bstream_audio_quality_headers_'),
+      startsWith('inutil_audio_quality_headers_'),
     );
     await fixtures.delete(recursive: true);
   });

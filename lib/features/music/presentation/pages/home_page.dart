@@ -22,7 +22,7 @@ import '../../../../core/platform/app_platform.dart';
 import '../../../../platform_channels/android_app_activation_channel.dart';
 import '../../../../platform_channels/android_external_audio_channel.dart';
 import '../../../../services/recommendations/recommendation_feed_models.dart';
-import '../../../../services/sharing/bstream_track_link.dart';
+import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/sharing/incoming_csv_file_service.dart';
 import '../../../../services/sharing/youtube_music_link.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
@@ -42,7 +42,7 @@ import '../../../../core/firebase/inutil_update_service.dart';
 import '../../../../core/theme/inutil_design_system.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
-import '../widgets/bstream_logo.dart';
+import '../widgets/inutil_logo.dart';
 import '../widgets/favorite_star_badge.dart';
 import '../widgets/home_loading_content.dart';
 import '../widgets/library_panel.dart';
@@ -191,7 +191,7 @@ class _HomePageState extends ConsumerState<HomePage>
   DateTime? _lastRootBackAt;
   StreamSubscription<ExternalAudioRequest>? _externalAudioSubscription;
   StreamSubscription<AndroidAppActivationEvent>? _appActivationSubscription;
-  ProviderSubscription<AsyncValue<BStreamTrackLink>>?
+  ProviderSubscription<AsyncValue<InutilTrackLink>>?
   _incomingTrackLinkSubscription;
   ProviderSubscription<AsyncValue<YouTubeMusicLink>>?
   _incomingYouTubeMusicLinkSubscription;
@@ -274,7 +274,7 @@ class _HomePageState extends ConsumerState<HomePage>
           },
         );
     _incomingTrackLinkSubscription = ref
-        .listenManual<AsyncValue<BStreamTrackLink>>(
+        .listenManual<AsyncValue<InutilTrackLink>>(
           incomingTrackLinkProvider,
           (_, next) => next.whenData(_queueIncomingTrackLink),
           fireImmediately: true,
@@ -354,16 +354,16 @@ class _HomePageState extends ConsumerState<HomePage>
     });
   }
 
-  void _queueIncomingTrackLink(BStreamTrackLink link) {
+  void _queueIncomingTrackLink(InutilTrackLink link) {
     _incomingTrackLinkWork = _incomingTrackLinkWork
         .then((_) => _handleIncomingTrackLink(link))
         .catchError((Object error, StackTrace stackTrace) {
-          debugPrint('Could not open shared BStream track: $error');
+          debugPrint('Could not open shared Inutil track: $error');
           debugPrintStack(stackTrace: stackTrace);
         });
   }
 
-  Future<void> _handleIncomingTrackLink(BStreamTrackLink link) async {
+  Future<void> _handleIncomingTrackLink(InutilTrackLink link) async {
     if (!mounted) {
       return;
     }
@@ -406,7 +406,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _enrichIncomingTrackMetadata({
-    required BStreamTrackLink link,
+    required InutilTrackLink link,
     required String watchUrl,
     required YouTubeMusicSearch search,
     required GetTrackInfo getTrackInfo,
@@ -488,7 +488,7 @@ class _HomePageState extends ConsumerState<HomePage>
   Future<void> _handleIncomingYouTubeMusicLink(YouTubeMusicLink link) async {
     if (!mounted) return;
     if (link.isTrack && link.videoId != null) {
-      await _handleIncomingTrackLink(BStreamTrackLink(videoId: link.videoId!));
+      await _handleIncomingTrackLink(InutilTrackLink(videoId: link.videoId!));
       return;
     }
     final collectionId = link.collectionId;
@@ -938,7 +938,7 @@ class _HomePageState extends ConsumerState<HomePage>
     final profileRequestId = kProfileMode ? ++_profileTabRequestId : 0;
     if (kProfileMode) {
       developer.Timeline.instantSync(
-        'BStream.tab.request',
+        'Inutil.tab.request',
         arguments: {
           'requestId': profileRequestId,
           'from': _selectedIndex,
@@ -997,7 +997,7 @@ class _HomePageState extends ConsumerState<HomePage>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         developer.Timeline.instantSync(
-          'BStream.tab.firstBuildComplete',
+          'Inutil.tab.firstBuildComplete',
           arguments: {
             'requestId': profileRequestId,
             'to': index,
@@ -3087,7 +3087,7 @@ class _SideNavigationBrand extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const BStreamLogo(size: 40),
+          const InutilLogo(size: 40),
           const SizedBox(width: 10),
           Expanded(
             child: Text(

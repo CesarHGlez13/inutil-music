@@ -15,22 +15,22 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
 
   final DesktopMusicRootsProvider _rootsProvider;
   List<DeviceAudioTrack>? _rawTracks;
-  String? _rawBstreamRoot;
+  String? _rawInutilRoot;
   Future<List<DeviceAudioTrack>>? _scanInFlight;
   String? _scanInFlightRoot;
 
   @override
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
-    final tracks = await _rawCatalog(bstreamRoot: bstreamRoot);
+    final tracks = await _rawCatalog(inutilRoot: inutilRoot);
     return DeviceAudioCatalogResult(
       status: DeviceAudioPermissionStatus.notRequired,
       tracks: filterDeviceAudioTracks(
         tracks,
         options: options,
-        bstreamRoot: bstreamRoot,
+        inutilRoot: inutilRoot,
       ),
     );
   }
@@ -38,25 +38,25 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
   @override
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
-    await _rawCatalog(bstreamRoot: bstreamRoot, forceRefresh: true);
-    return load(options: options, bstreamRoot: bstreamRoot);
+    await _rawCatalog(inutilRoot: inutilRoot, forceRefresh: true);
+    return load(options: options, inutilRoot: inutilRoot);
   }
 
   @override
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
-  }) => load(options: options, bstreamRoot: bstreamRoot);
+    String? inutilRoot,
+  }) => load(options: options, inutilRoot: inutilRoot);
 
   Future<List<DeviceAudioTrack>> _rawCatalog({
-    required String? bstreamRoot,
+    required String? inutilRoot,
     bool forceRefresh = false,
   }) {
-    final rootIdentity = _pathIdentityOrNull(bstreamRoot);
+    final rootIdentity = _pathIdentityOrNull(inutilRoot);
     final cached = _rawTracks;
-    if (!forceRefresh && cached != null && _rawBstreamRoot == rootIdentity) {
+    if (!forceRefresh && cached != null && _rawInutilRoot == rootIdentity) {
       return Future.value(cached);
     }
     final active = _scanInFlight;
@@ -68,14 +68,14 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
       // multiple callers waiting for it must still share that next scan.
       return active.then(
         (_) =>
-            _rawCatalog(bstreamRoot: bstreamRoot, forceRefresh: forceRefresh),
+            _rawCatalog(inutilRoot: inutilRoot, forceRefresh: forceRefresh),
       );
     }
 
     // Reserve the whole operation before resolving the roots. A second load
     // can arrive while that asynchronous lookup is still pending.
     late final Future<List<DeviceAudioTrack>> request;
-    request = _scanCatalog(bstreamRoot, rootIdentity).whenComplete(() {
+    request = _scanCatalog(inutilRoot, rootIdentity).whenComplete(() {
       if (identical(_scanInFlight, request)) {
         _scanInFlight = null;
         _scanInFlightRoot = null;
@@ -87,7 +87,7 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
   }
 
   Future<List<DeviceAudioTrack>> _scanCatalog(
-    String? bstreamRoot,
+    String? inutilRoot,
     String? rootIdentity,
   ) async {
     final roots = await _rootsProvider();
@@ -96,10 +96,10 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
         .toSet()
         .toList(growable: false);
     final tracks = List<DeviceAudioTrack>.unmodifiable(
-      await Isolate.run(() => _scanDesktopAudio(rootPaths, bstreamRoot)),
+      await Isolate.run(() => _scanDesktopAudio(rootPaths, inutilRoot)),
     );
     _rawTracks = tracks;
-    _rawBstreamRoot = rootIdentity;
+    _rawInutilRoot = rootIdentity;
     return tracks;
   }
 }
@@ -121,19 +121,19 @@ Future<List<Directory>> _defaultDesktopMusicRoots() async {
 
 Future<List<DeviceAudioTrack>> _scanDesktopAudio(
   List<String> rootPaths,
-  String? bstreamRoot,
+  String? inutilRoot,
 ) async {
   final tracks = <DeviceAudioTrack>[];
   final seenFiles = <String>{};
   for (final rootPath in rootPaths) {
     final root = Directory(rootPath);
-    if (!await root.exists() || _isInsideRoot(root.path, bstreamRoot)) {
+    if (!await root.exists() || _isInsideRoot(root.path, inutilRoot)) {
       continue;
     }
     final pending = <Directory>[root];
     while (pending.isNotEmpty) {
       final directory = pending.removeLast();
-      if (_isInsideRoot(directory.path, bstreamRoot)) {
+      if (_isInsideRoot(directory.path, inutilRoot)) {
         continue;
       }
       try {
@@ -142,7 +142,7 @@ Future<List<DeviceAudioTrack>> _scanDesktopAudio(
             continue;
           }
           if (entity is Directory) {
-            if (!_isInsideRoot(entity.path, bstreamRoot)) {
+            if (!_isInsideRoot(entity.path, inutilRoot)) {
               pending.add(entity);
             }
             continue;

@@ -13,31 +13,31 @@ class AndroidDeviceAudioCatalog implements DeviceAudioCatalog {
   @override
   Future<DeviceAudioCatalogResult> load({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
     final status = await _channel.permissionStatus();
-    return _loadGranted(status, options: options, bstreamRoot: bstreamRoot);
+    return _loadGranted(status, options: options, inutilRoot: inutilRoot);
   }
 
   @override
   Future<DeviceAudioCatalogResult> requestPermissionAndLoad({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
     final status = await _channel.requestPermission();
-    return _loadGranted(status, options: options, bstreamRoot: bstreamRoot);
+    return _loadGranted(status, options: options, inutilRoot: inutilRoot);
   }
 
   @override
   Future<DeviceAudioCatalogResult> refresh({
     DeviceAudioFilterOptions options = const DeviceAudioFilterOptions(),
-    String? bstreamRoot,
+    String? inutilRoot,
   }) async {
     final status = await _channel.permissionStatus();
     return _loadGranted(
       status,
       options: options,
-      bstreamRoot: bstreamRoot,
+      inutilRoot: inutilRoot,
       forceRefresh: true,
     );
   }
@@ -45,7 +45,7 @@ class AndroidDeviceAudioCatalog implements DeviceAudioCatalog {
   Future<DeviceAudioCatalogResult> _loadGranted(
     DeviceAudioPermissionStatus status, {
     required DeviceAudioFilterOptions options,
-    required String? bstreamRoot,
+    required String? inutilRoot,
     bool forceRefresh = false,
   }) async {
     if (status != DeviceAudioPermissionStatus.granted) {
@@ -57,7 +57,7 @@ class AndroidDeviceAudioCatalog implements DeviceAudioCatalog {
       tracks: filterDeviceAudioTracks(
         tracks,
         options: options,
-        bstreamRoot: bstreamRoot,
+        inutilRoot: inutilRoot,
       ),
     );
   }

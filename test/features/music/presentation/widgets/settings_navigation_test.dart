@@ -1016,7 +1016,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('settings-player-style-option-bstream-music')),
+      find.byKey(const ValueKey('settings-player-style-option-inutil-music')),
       findsOneWidget,
     );
     expect(
@@ -2879,7 +2879,7 @@ void main() {
         findsOneWidget,
       );
       for (final profile in const <(String, String)>[
-        ('bstream', 'Inútil Music'),
+        ('inutil', 'Inútil Music'),
         ('metroList', 'MetroList'),
         ('harmony', 'Harmony / RiMusic'),
         ('soundiiz', 'Soundiiz'),

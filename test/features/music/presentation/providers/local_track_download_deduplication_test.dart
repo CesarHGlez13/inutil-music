@@ -1470,7 +1470,7 @@ class _DownloadFixture {
     _RecordingAudioMetadataService? metadataService,
   }) async {
     final tempDirectory = await Directory.systemTemp.createTemp(
-      'bstream-download-dedupe-',
+      'inutil-download-dedupe-',
     );
     final libraryRepository = _MemoryLibraryRepository(
       failSavingLocalTrack: failSavingLocalTrack,

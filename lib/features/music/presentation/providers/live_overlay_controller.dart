@@ -191,7 +191,7 @@ class DartLiveOverlayClient implements LiveOverlayClient {
         'La overlay LIVE local solo está disponible en PC.',
       );
     }
-    final iconData = await rootBundle.load('assets/icons/bstream_icon.png');
+    final iconData = await rootBundle.load('assets/icons/inutil_icon.png');
     final server = LocalLiveOverlayServer(
       hostProvisioner: WindowsLocalOverlayHostProvisioner(),
       htmlDocument: liveOverlayHtml,

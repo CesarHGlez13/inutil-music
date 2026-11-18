@@ -17,7 +17,7 @@
 // --motion-tail-ms 150 also reports presentationWithTail over the union of
 // gesture windows extended after input ends, so release-time hitches are not
 // hidden. This is not idle FPS: a quiet tail may intentionally stop rendering.
-// --clock-helper /data/local/tmp/bstream_profile_clock uses device-native
+// --clock-helper /data/local/tmp/inutil_profile_clock uses device-native
 // BOOTTIME/MONOTONIC markers around each input command instead of estimating
 // their offset over ADB. See android_profile_clock.c for the tiny helper.
 // Markers bracket the input process, not actual touchscreen delivery events.
@@ -175,7 +175,7 @@ function presentationIntervalsMs(presentationFrames, windows) {
 function parseClockMarkers(output) {
   const markers = [];
   for (const line of output.trim().split(/\r?\n/)) {
-    const match = /^BSTREAM_CLOCK ([0-9]+) ([0-9]+)$/.exec(line.trim());
+    const match = /^INUTIL_CLOCK ([0-9]+) ([0-9]+)$/.exec(line.trim());
     if (!match) continue;
     const bootNs = Number(match[1]);
     const monotonicNs = Number(match[2]);
@@ -205,7 +205,7 @@ function hasExactContentDescription(xml, label) {
   return false;
 }
 async function verifyExpectedScreen(stage) {
-  const uiPath = '/sdcard/bstream_profile_ui.xml';
+  const uiPath = '/sdcard/inutil_profile_ui.xml';
   try {
     const dump = await run(options.get('--adb'), [
       '-s', options.get('--device'), 'shell', `uiautomator dump ${uiPath}`,
@@ -214,7 +214,7 @@ async function verifyExpectedScreen(stage) {
     // UI Automator can exit 0 on an idle timeout without replacing the XML.
     // Do not read a previous dump unless this invocation confirms success.
     if (/\bERROR\b/i.test(output) ||
-        !/UI hier(?:archy|chary) dumped to:\s*\/sdcard\/bstream_profile_ui\.xml(?:\s|$)/.test(output)) {
+        !/UI hier(?:archy|chary) dumped to:\s*\/sdcard\/inutil_profile_ui\.xml(?:\s|$)/.test(output)) {
       throw new Error(`UI Automator did not confirm a fresh dump: ${output.trim()}`);
     }
     const result = await run(options.get('--adb'), [
@@ -278,7 +278,7 @@ try {
       '-s', options.get('--device'), 'shell', clockHelper,
     ], { timeout: 15000 });
     const markers = parseClockMarkers(result.stdout);
-    if (markers.length !== 1) throw new Error('Clock helper must output exactly one BSTREAM_CLOCK marker');
+    if (markers.length !== 1) throw new Error('Clock helper must output exactly one INUTIL_CLOCK marker');
     clockSync = {
       source: 'android-native-clock-helper',
       helperPath: clockHelper,
@@ -296,8 +296,8 @@ if (presentationEnabled) {
   const layers = await run(options.get('--adb'), [
     '-s', options.get('--device'), 'shell', 'dumpsys SurfaceFlinger --list',
   ], { timeout: 15000 });
-  const candidates = [...new Set([...layers.stdout.matchAll(/([^\r\n{}]*SurfaceView\[com\.bstream\.bstream_music\/[^\r\n{}]*?\(BLAST\)#\d+)/g)].map((match) => match[1].trim()))];
-  if (candidates.length !== 1) throw new Error(`Need one unambiguous BStream Flutter BLAST surface, found ${candidates.length}; never substitute global display FPS.`);
+  const candidates = [...new Set([...layers.stdout.matchAll(/([^\r\n{}]*SurfaceView\[com\.inutil\.inutil_music\/[^\r\n{}]*?\(BLAST\)#\d+)/g)].map((match) => match[1].trim()))];
+  if (candidates.length !== 1) throw new Error(`Need one unambiguous Inutil Flutter BLAST surface, found ${candidates.length}; never substitute global display FPS.`);
   surfaceName = candidates[0];
   if (!clockHelper) {
     const before = await rpc('getVMTimelineMicros');

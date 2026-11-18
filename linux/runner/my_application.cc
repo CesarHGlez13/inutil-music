@@ -266,12 +266,12 @@ static void my_application_activate(GApplication* application) {
   g_autoptr(FlStandardMethodCodec) codec = fl_standard_method_codec_new();
   self->csv_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-      "bstream_music/incoming_csv", FL_METHOD_CODEC(codec));
+      "inutil_music/incoming_csv", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(self->csv_channel, csv_method_call_cb,
                                            self, nullptr);
   g_autoptr(FlMethodChannel) window_channel = fl_method_channel_new(
       fl_engine_get_binary_messenger(fl_view_get_engine(view)),
-      "bstream/desktop_window", FL_METHOD_CODEC(codec));
+      "inutil/desktop_window", FL_METHOD_CODEC(codec));
   fl_method_channel_set_method_call_handler(window_channel, window_method_call_cb,
                                            view, nullptr);
 

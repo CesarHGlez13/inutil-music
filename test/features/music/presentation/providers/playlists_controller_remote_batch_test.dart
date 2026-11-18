@@ -19,7 +19,7 @@ void main() {
     () async {
       sqfliteFfiInit();
       final directory = await Directory.systemTemp.createTemp(
-        'bstream-selection-removal-',
+        'inutil-selection-removal-',
       );
       final database = _DiskCatalogDatabase('${directory.path}/library.db');
       addTearDown(() async {

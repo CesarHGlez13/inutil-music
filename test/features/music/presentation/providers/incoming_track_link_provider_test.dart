@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
-import 'package:inutil_music/services/sharing/bstream_track_link.dart';
+import 'package:inutil_music/services/sharing/inutil_track_link.dart';
 import 'package:inutil_music/services/sharing/incoming_track_link_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,8 +19,8 @@ void main() {
       addTearDown(container.dispose);
       addTearDown(service.close);
 
-      final emitted = <BStreamTrackLink>[];
-      final subscription = container.listen<AsyncValue<BStreamTrackLink>>(
+      final emitted = <InutilTrackLink>[];
+      final subscription = container.listen<AsyncValue<InutilTrackLink>>(
         incomingTrackLinkProvider,
         (_, next) => next.whenData(emitted.add),
         fireImmediately: true,
