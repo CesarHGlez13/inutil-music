@@ -256,7 +256,7 @@ manifest = {
     "checksums": checksums,
 }
 
-manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
+manifest_path.write_text(json.dumps(manifest, ensure_ascii=True, indent=2) + "\n")
 print(
     "artefactos: "
     + ", ".join(os.path.basename(path) for _, path, _ in artifacts)

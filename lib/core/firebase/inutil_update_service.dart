@@ -440,7 +440,8 @@ class InutilUpdateService {
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final decoded =
+            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
         final release = _decodeFirestoreRelease(
           decoded,
           currentVersion: effectiveCurrent,
@@ -507,7 +508,7 @@ class InutilUpdateService {
           .get(Uri.parse(url), headers: const {'Accept': 'application/json'})
           .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) return null;
-      final decoded = jsonDecode(response.body);
+      final decoded = jsonDecode(utf8.decode(response.bodyBytes));
       if (decoded is! Map<String, dynamic>) return null;
       return _releaseFromRaw(decoded, currentVersion: currentVersion);
     } catch (_) {
