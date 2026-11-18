@@ -18,6 +18,25 @@ Current version: **2.5.6+256**.
 > builds neither bundle nor launch an external media resolver. Users are
 > responsible for complying with copyright laws and provider terms.
 
+## Propiedad del código, licencias y plan de independencia
+
+Mientras Inútil Music completa su transición gradual hacia un código fuente 100 % reescrito desde cero, este repositorio distingue explícitamente la titularidad de cada bloque conforme a `LICENSE` y `THIRD_PARTY_NOTICES.md`:
+
+### Qué pertenece 100 % a Inútil Music (`Copyright (c) 2026, Inútil Music`)
+- **Identidad visual y marca:** nombre «Inútil Music», iconografía **iM**, glifos vectoriales (`lib/core/theme/inutil_icons.dart`), sistema de diseño (`lib/core/theme/inutil_design_system.dart`) e iconos/recursos propios en todas las plataformas (`assets/icons/`, `res/drawable-nodpi/ic_stat_inutil_music.png`, mipmaps adaptativos, `.ico`, `.appiconset`).
+- **Infraestructura Firebase, cuentas, nube y OTA (`lib/core/firebase/`, `firebase/`, `lib/services/app_update/`, `tool/`):** autenticación, acceso por vigencia/inactividad, panel administrativo (`inutil_admin_panel.dart`), respaldo y restauración en la nube de playlists/pistas/ajustes (`inutil_cloud_backup_service.dart`), sincronización de reproducción entre dispositivos, campañas/popup de apoyo, Wrapped (`inutil_wrapped_*`), motor de actualizaciones OTA (`InutilUpdateService`, `OtaDownloadManager`, `AndroidPackageInstaller`, `OtaPlaybackResumeStore`) y scripts de publicación (`tool/publish_release.sh`, `tool/package_linux.sh`).
+- **Módulos y pantallas nuevas en Dart/nativo:** motor separado de vistas previas de video (`lib/services/video_preview/video_preview_resolver.dart`, `video_preview_reel_sheet.dart`, `video_preview_provider.dart`), diálogo e importador avanzado de Spotify (`inutil_spotify_import_dialog.dart`), tour interactivo (`inutil_onboarding_tour.dart`), canvas engine (`inutil_canvas_engine.dart`, `InutilCanvasEnginePlugin.kt`, `spotify_fullscreen_canvas_player.dart`), enlace canónico (`inutil_track_link.dart`), hoja Connect/SleepTimer/Account (`inutil_connect_sheet.dart`, `inutil_sleep_timer_sheet.dart`, `inutil_account_dialog.dart`) y enrutamiento Mesa EGL en Linux NVIDIA (`linux/runner/main.cc`) + icono `_NET_WM_ICON` (`linux/runner/my_application.cc`).
+
+### Qué proviene de la base de Bryam Contreras (`Copyright (c) 2026, Bryam Contreras` — BSD 2-Clause)
+- **Núcleo y módulos base en `lib/`:** `375` archivos `.dart` compartidos con el repositorio original (`262` sin cambios + `113` con adaptaciones propias; aprox. `87.7 %` de líneas heredadas en `lib/`), incluyendo la mayor parte de `features/music/presentation/`, `services/youtube_music/`, `services/player/`, `services/storage/`, `services/downloader/`, `services/lyrics/`, `services/live/`, `services/casting/`, `services/recommendations/`, `services/jiosaavn/` y `core/widgets/`.
+- **Capas nativas adaptadas/renombradas:** wrappers base en `android/app/src/main/kotlin/com/inutilmusic/app/` (migrados desde el paquete original), `ios/Runner/`, `ios/NowPlayingWidget/`, `macos/Runner/`, `windows/runner/` y base del runner GTK en `linux/runner/`.
+
+### Componentes de terceros externos
+- Incluyen `just_audio` 0.10.6 (fork local bajo **MIT** + ExoPlayer/Media3 **Apache-2.0**, ver `third_party/just_audio/LICENSE`), `Kyant AndroidLiquidGlass` (**Apache-2.0**), `piratetok_live` (**0BSD**), `EJS` (**Unlicense** / `meriyah` **ISC** / `astring` **MIT**), `csv` y `xml` (**MIT**), SDKs de Google Cast y dependencias de Flutter (`THIRD_PARTY_NOTICES.md` y visor en *Ajustes → Acerca de → Licencias de código abierto*).
+
+### Objetivo y plan paso a paso
+El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada módulo heredado por código 100 % propio**, conservando intacto el aviso `Copyright (c) 2026, Bryam Contreras` en `LICENSE` y `THIRD_PARTY_NOTICES.md` hasta completar la última fase (`0` líneas heredadas). Consulta la hoja de ruta técnica y legal completa en [`docs/INDEPENDENCE_PLAN.md`](docs/INDEPENDENCE_PLAN.md).
+
 <img width="1221" height="840" alt="{3AC80665-A6EC-436D-9C87-A1413432F0E3}" src="https://github.com/user-attachments/assets/8c918bae-6f84-46fa-8923-24ea68b6f8a4" />
 
 ## What's new in 1.3.1
