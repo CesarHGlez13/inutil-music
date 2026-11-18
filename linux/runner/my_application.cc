@@ -146,6 +146,11 @@ static gboolean nudge_viewport_cb(gpointer user_data) {
 }
 
 static void nudge_viewport_after_first_frame(GtkWidget* toplevel) {
+#ifdef GDK_WINDOWING_X11
+  if (!GDK_IS_X11_DISPLAY(gtk_widget_get_display(toplevel))) {
+    return;
+  }
+#endif
   GtkWindow* window = GTK_WINDOW(toplevel);
   GdkWindowState state = gdk_window_get_state(gtk_widget_get_window(toplevel));
   if (gtk_window_is_maximized(window) ||
@@ -238,6 +243,7 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Inútil Music");
   }
 
+  gtk_window_set_position(window, GTK_WIN_POS_CENTER);
   gtk_window_set_default_size(window, 1280, 720);
   gtk_widget_set_size_request(GTK_WIDGET(window), 960, 600);
 

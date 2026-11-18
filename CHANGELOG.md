@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.5.3+253 — 2026-11-18
+
+### Fixed
+
+- Corrección crítica de renderizado y centrado en escritorio Linux (Wayland/GNOME): el ejecutable ahora utiliza Wayland nativo cuando `WAYLAND_DISPLAY` está activo en lugar de forzar XWayland (`GDK_BACKEND=x11`), eliminando el recorte al cuarto inferior izquierdo de la ventana bajo `xwayland-native-scaling` y centrando la ventana principal en X11 y Windows.
+
 ## 2.5.2+252 — 2026-11-18
 
 ### Fixed
