@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/firebase/inutil_promo_popup_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
 import '../../../../core/theme/inutil_icons.dart';
@@ -37,6 +38,7 @@ import '../providers/local_track_index_provider.dart';
 import '../providers/track_selection_controller.dart';
 import '../widgets/inutil_account_dialog.dart';
 import '../widgets/inutil_connect_sheet.dart';
+import '../widgets/inutil_support_popup.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
 import '../widgets/inutil_logo.dart';
@@ -55,7 +57,6 @@ import '../widgets/scrolled_under_tab_frame.dart';
 import '../widgets/settings_panel.dart';
 import '../widgets/source_image.dart';
 import '../widgets/surface_detail_app_bar.dart';
-import '../widgets/youtube_music_account_button.dart';
 import 'artist_profile_page.dart';
 import 'remote_collection_detail_page.dart';
 import 'search_view.dart';
@@ -159,6 +160,7 @@ class _HomePageState extends ConsumerState<HomePage>
   static const _bottomNavigationShowTravel = 12.0;
 
   late int _selectedIndex;
+  Timer? _promoPopupTimer;
   int _profileTabRequestId = 0;
   final List<int> _viewHistory = [];
   final LibraryNavigationController _libraryNavigationController =
@@ -249,6 +251,7 @@ class _HomePageState extends ConsumerState<HomePage>
         unawaited(_reconcileLocalLibrary());
         if (widget.checkForUpdatesOnStartup) {
           unawaited(_checkForAppUpdateAtStartup());
+          _scheduleCreatorSupportPopup();
         }
       }
     });
@@ -1134,8 +1137,23 @@ class _HomePageState extends ConsumerState<HomePage>
       );
   }
 
+  void _scheduleCreatorSupportPopup() {
+    _promoPopupTimer?.cancel();
+    _promoPopupTimer = Timer(const Duration(seconds: 22), () async {
+      if (!mounted || !_appForeground || !_rootRouteVisible) return;
+      final campaign =
+          await InutilPromoPopupService.instance.evaluateScheduledPopup();
+      if (!mounted || !_appForeground || !_rootRouteVisible || campaign == null) {
+        return;
+      }
+      await InutilSupportPopupDialog.show(context, campaign);
+    });
+  }
+
   @override
   void dispose() {
+    _promoPopupTimer?.cancel();
+    _promoPopupTimer = null;
     WidgetsBinding.instance.removeObserver(this);
     _removePlayerHistoryEntry();
     unawaited(_externalAudioSubscription?.cancel());
@@ -2277,8 +2295,8 @@ class _BottomNavigation extends StatelessWidget {
       key: const ValueKey('bottom-navigation-glass'),
       child: BackdropFilter(
         filter: ImageFilter.blur(
-          sigmaX: transparent ? 18 : 32,
-          sigmaY: transparent ? 18 : 32,
+          sigmaX: transparent ? 14 : 16,
+          sigmaY: transparent ? 14 : 16,
         ),
         child: surface,
       ),
@@ -3878,11 +3896,6 @@ class _HomeViewState extends ConsumerState<_HomeView> {
                 size: 18,
                 color: colors.onSurface.withValues(alpha: 0.88),
               ),
-            ),
-            const SizedBox(width: 7),
-            SizedBox.square(
-              dimension: 36,
-              child: YouTubeMusicAccountButton(strings: strings),
             ),
           ],
         ),

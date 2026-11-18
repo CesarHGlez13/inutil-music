@@ -244,6 +244,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
 
   bool _resolveFullscreenCanvasMode({
     required bool eligible,
+    required bool visualActive,
     required bool hasCanvasNow,
   }) {
     if (!eligible) {
@@ -251,6 +252,14 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
       _fullscreenCanvasReleaseTimer = null;
       _holdFullscreenCanvas = false;
       return false;
+    }
+    if (!visualActive) {
+      // Do not fire delayed teardown timers while the player is collapsed
+      // off-screen — releasing MediaCodec mid-tab-switch causes micro-stutters
+      // on Android Bluetooth audio.
+      _fullscreenCanvasReleaseTimer?.cancel();
+      _fullscreenCanvasReleaseTimer = null;
+      return _holdFullscreenCanvas;
     }
     if (hasCanvasNow) {
       _fullscreenCanvasReleaseTimer?.cancel();
@@ -608,6 +617,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                       final useSpotifyFullscreenCanvas =
                           _resolveFullscreenCanvasMode(
                             eligible: canUseSpotifyFullscreenCanvas,
+                            visualActive: visualActive,
                             hasCanvasNow: canvasUrl != null,
                           );
                       final Widget activePlayerLayout = useSpotifyFullscreenCanvas

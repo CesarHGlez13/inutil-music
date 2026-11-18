@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.2.1+221 — 2026-11-17
+
+### Added
+
+- Tarjeta destacada «Listas de Spotify» en Ajustes con el mismo estilo elegante e integrado que la tarjeta de YouTube Music.
+- Pop-ups creativos rotativos de apoyo al creador (8 mensajes distintos que cambian cada vez) con arquitectura modular lista para futuras campañas.
+- Selector propio de salida de audio en móvil integrado 100 % con el tema activo de la aplicación.
+
+### Fixed
+
+- Eliminados micro-cortes de audio al navegar entre pestañas en Android (desactivado offload scheduling inestable, evitada destrucción diferida del decoder Canvas fuera de pantalla y optimizado el blur GPU).
+- Unificados al 100 % con el tema nativo de la app el panel «Conectar a un dispositivo» y la tarjeta superior de cuenta en Ajustes.
+- Retirado el icono redundante de YouTube Music de la cabecera de Inicio (ya disponible en Ajustes).
+
 ## 2.2.0+220 — 2026-11-17
 
 ### Added

@@ -404,6 +404,8 @@ class JustAudioPlayerService
     // overrides that header in just_audio and can invalidate signed YouTube
     // media URLs on Android.
     useProxyForRequestHeaders: false,
+    androidApplyAudioAttributes: true,
+    androidOffloadSchedulingEnabled: false,
     audioLoadConfiguration: _androidAudioLoadConfiguration,
   );
 
@@ -411,6 +413,8 @@ class JustAudioPlayerService
     // Either deck can become authoritative after a crossfade. Keep audio
     // session activation and interruption handling enabled on both roles.
     useProxyForRequestHeaders: false,
+    androidApplyAudioAttributes: true,
+    androidOffloadSchedulingEnabled: false,
     audioLoadConfiguration: _androidAudioLoadConfiguration,
   );
 

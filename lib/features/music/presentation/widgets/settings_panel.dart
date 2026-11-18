@@ -36,7 +36,9 @@ import 'youtube_music_settings_account_card.dart';
 import 'inutil_account_dialog.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_spotify_import_dialog.dart';
+import 'inutil_support_popup.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
+import '../../../../core/firebase/inutil_promo_popup_service.dart';
 import '../../../../core/firebase/inutil_update_service.dart';
 
 typedef DownloadDirectoryPicker =
@@ -651,6 +653,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                 strings: strings,
                 active: widget.active,
               ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(bottom: appSectionGap),
+              child: _SpotifyImportSettingsHeroCard(),
             ),
             _SettingsGroup(
               titleKey: const ValueKey('settings-first-section-title'),
@@ -1811,6 +1817,20 @@ class _AboutApplicationSettings extends StatelessWidget {
           title: strings.supportDevelopmentTitle,
           subtitle: strings.supportDevelopmentBody,
           onTap: onSupport,
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-creator-popup'),
+          glyph: InutilGlyph.sparkles,
+          title: 'Mensaje del creador',
+          subtitle: 'Ver tarjeta de apoyo voluntario (rota en cada apertura)',
+          onTap: () async {
+            final campaign =
+                await InutilPromoPopupService.instance.nextRotatingCampaign();
+            if (context.mounted) {
+              await InutilSupportPopupDialog.show(context, campaign);
+            }
+          },
         ),
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
@@ -5570,25 +5590,31 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
         ? displayName[0].toUpperCase()
         : 'U';
 
-    return Material(
-      color: AppColors.cardSurfaceFor(context),
-      borderRadius: BorderRadius.circular(appCardRadius),
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: colors.surfaceContainerLow.withValues(alpha: 0.88),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+      ),
       clipBehavior: Clip.antiAlias,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 CircleAvatar(
-                  radius: 20,
-                  backgroundColor: colors.primaryContainer,
-                  foregroundColor: colors.onPrimaryContainer,
+                  radius: 22,
+                  backgroundColor: colors.primary.withValues(alpha: 0.16),
+                  foregroundColor: colors.primary,
                   child: Text(
                     initial,
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w800,
+                      color: colors.primary,
                     ),
                   ),
                 ),
@@ -5602,9 +5628,10 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
+                      const SizedBox(height: 1),
                       Text(
                         user.email,
                         maxLines: 1,
@@ -5618,12 +5645,15 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 3,
+                    horizontal: 10,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
                     color: badgeColor.withValues(alpha: 0.14),
                     borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: badgeColor.withValues(alpha: 0.3),
+                    ),
                   ),
                   child: Text(
                     badgeText,
@@ -5635,13 +5665,17 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
-                  child: FilledButton.tonalIcon(
+                  child: FilledButton.icon(
                     onPressed: () => InutilAccountDialog.show(context),
-                    icon: const Icon(Icons.manage_accounts_rounded, size: 18),
+                    icon: InutilIcon(
+                      InutilGlyph.profile,
+                      size: 18,
+                      color: colors.onPrimary,
+                    ),
                     label: const Text('Mi cuenta'),
                   ),
                 ),
@@ -5649,11 +5683,90 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () => InutilConnectSheet.show(context),
-                    icon: const Icon(Icons.devices_rounded, size: 18),
+                    icon: InutilIcon(
+                      InutilGlyph.devices,
+                      size: 18,
+                      color: colors.primary,
+                    ),
                     label: const Text('Dispositivos'),
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SpotifyImportSettingsHeroCard extends ConsumerWidget {
+  const _SpotifyImportSettingsHeroCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
+    return Card(
+      key: const ValueKey('settings-spotify-import-hero-card'),
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      color: colors.surfaceContainerLow.withValues(alpha: 0.88),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(22),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+        child: Column(
+          children: [
+            Container(
+              width: 88,
+              height: 88,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors.primary.withValues(alpha: 0.12),
+                border: Border.all(
+                  color: colors.outlineVariant.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Center(
+                child: InutilIcon(
+                  InutilGlyph.library,
+                  size: 40,
+                  color: colors.primary,
+                  filled: true,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Listas de Spotify',
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Importa tus playlists públicas de Spotify directo a tu biblioteca',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                key: const ValueKey('settings-spotify-import-hero-button'),
+                onPressed: () => showInutilSpotifyImportDialog(context, ref),
+                icon: const Icon(Icons.playlist_add_rounded, size: 20),
+                label: const Text('Importar desde Spotify'),
+              ),
             ),
           ],
         ),

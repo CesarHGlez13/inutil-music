@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_sync_providers.dart';
-import '../../../../core/theme/inutil_design_system.dart';
+import '../../../../core/theme/inutil_icons.dart';
 import '../providers/music_providers.dart';
 
 /// Modal estilo Spotify Connect para control de reproducción y cambio de dispositivos.
@@ -28,25 +28,25 @@ class InutilConnectSheet extends ConsumerWidget {
     final remoteSession = syncService.remoteSession;
     final isLocalActive = syncService.isCurrentDeviceActive;
     final autoPairedPeer = syncService.autoPairedPeer;
-    // Dispositivos de la misma cuenta que están en la red pero aún no son el
-    // destino elegido: el usuario puede pulsarlos para cambiar el mando.
     final otherPeers = syncService.discoveredPeers
         .where((peer) => peer.deviceId != autoPairedPeer?.deviceId)
         .toList(growable: false);
 
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    final cardSurface = colors.surfaceContainerLow.withValues(alpha: 0.92);
+    final cardBorder = colors.outlineVariant.withValues(alpha: 0.45);
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
       decoration: BoxDecoration(
         color: colors.surfaceContainerHigh,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(
-          color: colors.outlineVariant.withValues(alpha: 0.4),
-        ),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: cardBorder),
       ),
       child: SafeArea(
+        top: false,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -54,21 +54,39 @@ class InutilConnectSheet extends ConsumerWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 38,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: 18),
+                  margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: colors.outlineVariant,
-                    borderRadius: BorderRadius.circular(2),
+                    color: colors.onSurfaceVariant.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(99),
                   ),
                 ),
               ),
               Row(
                 children: [
-                  Icon(
-                    Icons.devices_rounded,
-                    color: colors.primary,
-                    size: 24,
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(13),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          colors.primary.withValues(alpha: 0.22),
+                          colors.primary.withValues(alpha: 0.07),
+                        ],
+                      ),
+                    ),
+                    child: Center(
+                      child: InutilIcon(
+                        InutilGlyph.devices,
+                        color: colors.primary,
+                        size: 21,
+                        filled: autoPairedPeer != null,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -76,6 +94,7 @@ class InutilConnectSheet extends ConsumerWidget {
                       'Conectar a un dispositivo',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                     ),
                   ),
@@ -86,44 +105,34 @@ class InutilConnectSheet extends ConsumerWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
+                        color: colors.primary.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(999),
                         border: Border.all(
-                          color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.4),
+                          color: colors.primary.withValues(alpha: 0.35),
                         ),
                       ),
                       child: Text(
-                        authService.currentUser?.displayName ?? 'César',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: InutilDesignSystem.primaryNeon,
-                          fontWeight: FontWeight.w600,
+                        authService.currentUser?.displayName ?? 'Cuenta',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
-              // -----------------------------------------------------------------
-              // SECCIÓN: VINCULACIÓN AUTOMÁTICA POR MISMA CUENTA
-              // -----------------------------------------------------------------
+              // Vinculación automática por misma cuenta
               if (autoPairedPeer != null) ...[
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        InutilDesignSystem.primaryNeon.withValues(alpha: 0.12),
-                        InutilDesignSystem.surfaceElevated,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(16),
+                    color: cardSurface,
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.5),
-                      width: 1.5,
+                      color: colors.primary.withValues(alpha: 0.45),
+                      width: 1.2,
                     ),
                   ),
                   child: Column(
@@ -133,8 +142,8 @@ class InutilConnectSheet extends ConsumerWidget {
                         children: [
                           Icon(
                             _getPlatformIcon(autoPairedPeer.platform),
-                            color: InutilDesignSystem.primaryNeon,
-                            size: 32,
+                            color: colors.primary,
+                            size: 30,
                           ),
                           const SizedBox(width: 14),
                           Expanded(
@@ -143,30 +152,27 @@ class InutilConnectSheet extends ConsumerWidget {
                               children: [
                                 Text(
                                   autoPairedPeer.deviceName,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: InutilDesignSystem.textPrimary,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
                                   ),
                                 ),
                                 const SizedBox(height: 3),
                                 Row(
                                   children: [
                                     Container(
-                                      width: 8,
-                                      height: 8,
-                                      decoration: const BoxDecoration(
-                                        color: InutilDesignSystem.primaryNeon,
+                                      width: 7,
+                                      height: 7,
+                                      decoration: BoxDecoration(
+                                        color: colors.primary,
                                         shape: BoxShape.circle,
                                       ),
                                     ),
                                     const SizedBox(width: 6),
-                                    const Text(
-                                      'Misma Cuenta · Vinculado Automático',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: InutilDesignSystem.primaryNeon,
-                                        fontWeight: FontWeight.w600,
+                                    Text(
+                                      'Misma cuenta · Vinculado automático',
+                                      style: theme.textTheme.labelSmall?.copyWith(
+                                        color: colors.primary,
+                                        fontWeight: FontWeight.w700,
                                       ),
                                     ),
                                   ],
@@ -177,114 +183,112 @@ class InutilConnectSheet extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          // Botón para reproducir en la PC
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () async {
-                                final trackId = playerSnapshot?.trackId ?? remoteSession?.trackId;
-                                final title = playerSnapshot?.title ?? remoteSession?.title ?? 'Canción';
-                                final artist = playerSnapshot?.artist ?? remoteSession?.artist ?? 'Inútil Music';
-                                final album = playerSnapshot?.album ?? remoteSession?.album;
-                                final thumb = playerSnapshot?.thumbnailUrl ?? remoteSession?.thumbnailUrl;
-                                final pos = playerSnapshot?.position.inMilliseconds ?? 0;
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            final trackId =
+                                playerSnapshot?.trackId ??
+                                remoteSession?.trackId;
+                            final title =
+                                playerSnapshot?.title ??
+                                remoteSession?.title ??
+                                'Canción';
+                            final artist =
+                                playerSnapshot?.artist ??
+                                remoteSession?.artist ??
+                                'Inútil Music';
+                            final album =
+                                playerSnapshot?.album ?? remoteSession?.album;
+                            final thumb =
+                                playerSnapshot?.thumbnailUrl ??
+                                remoteSession?.thumbnailUrl;
+                            final pos =
+                                playerSnapshot?.position.inMilliseconds ?? 0;
 
-                                if (trackId != null && trackId.isNotEmpty) {
-                                  await syncService.playTrackOnPeer(
-                                    trackId: trackId,
-                                    title: title,
-                                    artist: artist,
-                                    album: album,
-                                    thumbnailUrl: thumb,
-                                    positionMs: pos,
-                                  );
-                                  // Pausar celular para que solo suene la PC
-                                  unawaited(ref.read(playerControllerProvider.notifier).pause());
-                                }
-                              },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: InutilDesignSystem.primaryNeon,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              icon: const Icon(Icons.speaker_group_rounded, size: 20),
-                              label: const Text(
-                                'Reproducir en la PC',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
+                            if (trackId != null && trackId.isNotEmpty) {
+                              await syncService.playTrackOnPeer(
+                                trackId: trackId,
+                                title: title,
+                                artist: artist,
+                                album: album,
+                                thumbnailUrl: thumb,
+                                positionMs: pos,
+                              );
+                              unawaited(
+                                ref
+                                    .read(playerControllerProvider.notifier)
+                                    .pause(),
+                              );
+                            }
+                          },
+                          icon: const Icon(
+                            Icons.speaker_group_rounded,
+                            size: 19,
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Switch para reproducción automática en PC al iniciar
-                      SwitchListTile(
-                        contentPadding: EdgeInsets.zero,
-                        dense: true,
-                        title: const Text(
-                          'Reproducir siempre en la PC',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: InutilDesignSystem.textPrimary,
+                          label: const Text(
+                            'Reproducir en la PC',
+                            style: TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
-                        subtitle: const Text(
-                          'Envía canciones a la PC automáticamente al darle play en el celular',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: InutilDesignSystem.textSecondary,
+                      ),
+                      const SizedBox(height: 8),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'Reproducir siempre en la PC',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        subtitle: Text(
+                          'Envía canciones a la PC automáticamente al dar play',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                         value: syncService.autoPlayOnPc,
-                        activeColor: InutilDesignSystem.primaryNeon,
                         onChanged: (val) => syncService.setAutoPlayOnPc(val),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
               ] else ...[
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: InutilDesignSystem.surfaceElevated,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white10),
+                    color: cardSurface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: cardBorder),
                   ),
                   child: Row(
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: InutilDesignSystem.accentCyan,
+                          strokeWidth: 2.2,
+                          color: colors.primary,
                         ),
                       ),
                       const SizedBox(width: 14),
-                      const Expanded(
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               'Buscando tu PC en la red local...',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: InutilDesignSystem.textPrimary,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'Abre Inútil Music en la PC con tu misma cuenta para vincular al instante.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: InutilDesignSystem.textSecondary,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -293,30 +297,30 @@ class InutilConnectSheet extends ConsumerWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
               ],
 
-              // -----------------------------------------------------------------
-              // SECCIÓN: OTROS DISPOSITIVOS DE LA MISMA CUENTA EN LA RED
-              // -----------------------------------------------------------------
+              // Otros dispositivos en tu red
               if (otherPeers.isNotEmpty) ...[
-                const Text(
+                Text(
                   'Otros dispositivos en tu red',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: InutilDesignSystem.textSecondary,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 for (final peer in otherPeers)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Material(
-                      color: InutilDesignSystem.surfaceElevated,
-                      borderRadius: BorderRadius.circular(14),
+                      color: cardSurface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: cardBorder),
+                      ),
+                      clipBehavior: Clip.antiAlias,
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
                         onTap: () => syncService.selectPeer(peer),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -327,8 +331,8 @@ class InutilConnectSheet extends ConsumerWidget {
                             children: [
                               Icon(
                                 _getPlatformIcon(peer.platform),
-                                color: InutilDesignSystem.textSecondary,
-                                size: 24,
+                                color: colors.primary,
+                                size: 22,
                               ),
                               const SizedBox(width: 12),
                               Expanded(
@@ -337,27 +341,26 @@ class InutilConnectSheet extends ConsumerWidget {
                                   children: [
                                     Text(
                                       peer.deviceName,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: InutilDesignSystem.textPrimary,
-                                      ),
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
                                       '${peer.ip}:${peer.port} · en línea',
-                                      style: const TextStyle(
-                                        fontSize: 11.5,
-                                        color: InutilDesignSystem.textSecondary,
-                                      ),
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colors.onSurfaceVariant,
+                                          ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const Icon(
+                              Icon(
                                 Icons.north_east_rounded,
-                                size: 16,
-                                color: InutilDesignSystem.textSecondary,
+                                size: 17,
+                                color: colors.onSurfaceVariant,
                               ),
                             ],
                           ),
@@ -365,31 +368,28 @@ class InutilConnectSheet extends ConsumerWidget {
                       ),
                     ),
                   ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
               ],
 
-              // -----------------------------------------------------------------
-              // SECCIÓN: SESIÓN ACTIVA Y CONTROLES REMOTOS
-              // -----------------------------------------------------------------
+              // Sesión activa y controles remotos
               if (remoteSession != null && remoteSession.trackId.isNotEmpty) ...[
-                const Text(
-                  'Sesión de Reproducción Actual',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: InutilDesignSystem.textSecondary,
+                Text(
+                  'Sesión de reproducción actual',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: InutilDesignSystem.surfaceElevated,
-                    borderRadius: BorderRadius.circular(14),
+                    color: cardSurface,
+                    borderRadius: BorderRadius.circular(18),
                     border: Border.all(
-                      color: isLocalActive
-                          ? InutilDesignSystem.primaryNeon.withValues(alpha: 0.4)
-                          : InutilDesignSystem.accentCyan.withValues(alpha: 0.4),
+                      color: colors.primary.withValues(
+                        alpha: isLocalActive ? 0.42 : 0.28,
+                      ),
                     ),
                   ),
                   child: Column(
@@ -397,13 +397,13 @@ class InutilConnectSheet extends ConsumerWidget {
                       Row(
                         children: [
                           Icon(
-                            _getPlatformIcon(remoteSession.activeDevicePlatform),
-                            color: isLocalActive
-                                ? InutilDesignSystem.primaryNeon
-                                : InutilDesignSystem.accentCyan,
-                            size: 32,
+                            _getPlatformIcon(
+                              remoteSession.activeDevicePlatform,
+                            ),
+                            color: colors.primary,
+                            size: 28,
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,10 +412,8 @@ class InutilConnectSheet extends ConsumerWidget {
                                   remoteSession.title.isNotEmpty
                                       ? remoteSession.title
                                       : 'Canción activa',
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    color: InutilDesignSystem.textPrimary,
+                                  style: theme.textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
                                   ),
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
@@ -423,19 +421,16 @@ class InutilConnectSheet extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   'Sonando en: ${remoteSession.activeDeviceName}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: isLocalActive
-                                        ? InutilDesignSystem.primaryNeon
-                                        : InutilDesignSystem.accentCyan,
-                                    fontWeight: FontWeight.w500,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.primary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
                           if (!isLocalActive)
-                            FilledButton.tonal(
+                            FilledButton(
                               onPressed: () {
                                 syncService.transferPlaybackToThisDevice(
                                   trackId: remoteSession.trackId,
@@ -448,32 +443,23 @@ class InutilConnectSheet extends ConsumerWidget {
                                   isPlaying: remoteSession.isPlaying,
                                 );
                               },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: InutilDesignSystem.primaryNeon,
-                                foregroundColor: Colors.black,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                              ),
                               child: const Text('Transferir aquí'),
                             ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      // Controles remotos en vivo para controlar la PC desde el celular
+                      const SizedBox(height: 12),
                       Container(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(12),
+                          color: colors.onSurface.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(14),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: const Icon(Icons.skip_previous_rounded),
-                              color: Colors.white,
+                              color: colors.onSurface,
                               onPressed: () {
                                 syncService.sendRemoteControlCommand(
                                   commandType: 'previous',
@@ -487,17 +473,18 @@ class InutilConnectSheet extends ConsumerWidget {
                                     : Icons.play_circle_filled_rounded,
                                 size: 42,
                               ),
-                              color: InutilDesignSystem.primaryNeon,
+                              color: colors.primary,
                               onPressed: () {
                                 syncService.sendRemoteControlCommand(
-                                  commandType:
-                                      remoteSession.isPlaying ? 'pause' : 'play',
+                                  commandType: remoteSession.isPlaying
+                                      ? 'pause'
+                                      : 'play',
                                 );
                               },
                             ),
                             IconButton(
                               icon: const Icon(Icons.skip_next_rounded),
-                              color: Colors.white,
+                              color: colors.onSurface,
                               onPressed: () {
                                 syncService.sendRemoteControlCommand(
                                   commandType: 'next',
@@ -512,16 +499,14 @@ class InutilConnectSheet extends ConsumerWidget {
                 ),
               ],
 
-              // Pie de diagnóstico: dirección del servidor LAN de este
-              // dispositivo, para confirmar que el otro equipo apunta aquí.
               Padding(
                 padding: const EdgeInsets.only(top: 14),
                 child: Row(
                   children: [
-                    const Icon(
+                    Icon(
                       Icons.router_rounded,
                       size: 15,
-                      color: InutilDesignSystem.textSecondary,
+                      color: colors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -529,11 +514,10 @@ class InutilConnectSheet extends ConsumerWidget {
                         authService.isAuthenticated
                             ? 'Este dispositivo: ${authService.deviceName} · '
                                   '${syncService.localAddressHint}:${syncService.currentLanPort}'
-                            : 'Inicia la misma cuenta en los dos equipos para '
-                                  'vincularlos automáticamente.',
-                        style: const TextStyle(
+                            : 'Inicia la misma cuenta en ambos equipos para vincularlos automáticamente.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
                           fontSize: 11.5,
-                          color: InutilDesignSystem.textSecondary,
                         ),
                       ),
                     ),

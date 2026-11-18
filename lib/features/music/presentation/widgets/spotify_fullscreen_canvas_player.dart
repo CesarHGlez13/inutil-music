@@ -109,17 +109,17 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                 children: [...previousChildren, ?currentChild],
               ),
               child: artworkSource?.trim().isNotEmpty == true
-                  ? KeyedSubtree(
+                  ? RepaintBoundary(
                       key: ValueKey('canvas-backdrop-${artworkSource ?? visualIdentity}'),
                       child: ImageFiltered(
                         imageFilter: ImageFilter.blur(
-                          sigmaX: 34,
-                          sigmaY: 34,
+                          sigmaX: 18,
+                          sigmaY: 18,
                           tileMode: TileMode.mirror,
                         ),
                         child: ColorFiltered(
                           colorFilter: ColorFilter.mode(
-                            const Color(0xFF0A0C10).withValues(alpha: 0.34),
+                            const Color(0xFF0A0C10).withValues(alpha: 0.36),
                             BlendMode.darken,
                           ),
                           child: ProportionalArtwork(

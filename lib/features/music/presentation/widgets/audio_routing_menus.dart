@@ -33,12 +33,247 @@ Future<void> showAudioOutputPicker(BuildContext context, WidgetRef ref) async {
       await player.disconnectCast();
     }
     if (!context.mounted) return;
-    final shown = await ref.read(audioOutputServiceProvider).showSystemPicker();
-    if (!shown && context.mounted) {
-      _showOutputUnavailable(context, ref);
-    }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => const _MobileAudioOutputSheet(),
+    );
   } catch (_) {
     if (context.mounted) _showOutputUnavailable(context, ref);
+  }
+}
+
+class _MobileAudioOutputSheet extends ConsumerStatefulWidget {
+  const _MobileAudioOutputSheet();
+
+  @override
+  ConsumerState<_MobileAudioOutputSheet> createState() =>
+      _MobileAudioOutputSheetState();
+}
+
+class _MobileAudioOutputSheetState
+    extends ConsumerState<_MobileAudioOutputSheet> {
+  AudioOutputState _state = const AudioOutputState();
+  StreamSubscription<AudioOutputState>? _sub;
+  bool _loading = true;
+  bool _busy = false;
+  double? _dragVolume;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_init());
+  }
+
+  Future<void> _init() async {
+    final service = ref.read(audioOutputServiceProvider);
+    _sub = service.changes.listen((next) {
+      if (mounted) setState(() => _state = next);
+    });
+    final initial = await service.startWatching();
+    if (mounted) {
+      setState(() {
+        _state = initial;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_sub?.cancel());
+    unawaited(ref.read(audioOutputServiceProvider).stopWatching());
+    super.dispose();
+  }
+
+  IconData _routeIcon(AudioOutputType type) => switch (type) {
+    AudioOutputType.bluetooth => Icons.headphones_rounded,
+    AudioOutputType.wired => Icons.headset_rounded,
+    AudioOutputType.usb => Icons.usb_rounded,
+    AudioOutputType.speaker => Icons.phone_android_rounded,
+    AudioOutputType.other => Icons.speaker_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+    final service = ref.read(audioOutputServiceProvider);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      padding: EdgeInsets.fromLTRB(20, 14, 20, bottomInset + 18),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 38,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colors.onSurfaceVariant.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Icon(Icons.speaker_rounded, color: colors.primary, size: 22),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Salida de audio',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded, size: 20),
+                color: colors.onSurfaceVariant,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2.2)),
+            )
+          else if (_state.routes.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(
+                'No se detectaron salidas de audio adicionales.',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+            )
+          else
+            for (final route in _state.routes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: route.selected
+                      ? colors.primary.withValues(alpha: 0.14)
+                      : colors.surfaceContainerLow.withValues(alpha: 0.9),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: route.selected
+                          ? colors.primary.withValues(alpha: 0.5)
+                          : colors.outlineVariant.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _busy || !route.selectable
+                        ? null
+                        : () async {
+                            setState(() => _busy = true);
+                            try {
+                              await service.selectRoute(route.id);
+                            } finally {
+                              if (mounted) setState(() => _busy = false);
+                            }
+                          },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _routeIcon(route.type),
+                            color: route.selected
+                                ? colors.primary
+                                : colors.onSurfaceVariant,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              route.name.isEmpty ? 'Este dispositivo' : route.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: route.selected
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                color: route.selected
+                                    ? colors.primary
+                                    : colors.onSurface,
+                              ),
+                            ),
+                          ),
+                          if (route.selected)
+                            Icon(
+                              Icons.check_circle_rounded,
+                              color: colors.primary,
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          if (!_loading && _state.volumeAdjustable) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  Icons.volume_down_rounded,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
+                Expanded(
+                  child: Slider(
+                    value: (_dragVolume ?? _state.volume).clamp(0.0, 1.0),
+                    onChanged: (v) => setState(() => _dragVolume = v),
+                    onChangeEnd: (v) async {
+                      await service.setVolume(v);
+                      if (mounted) setState(() => _dragVolume = null);
+                    },
+                  ),
+                ),
+                Icon(
+                  Icons.volume_up_rounded,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ],
+          if (_state.hasSystemPicker) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await service.showSystemPicker();
+              },
+              icon: const Icon(Icons.tune_rounded, size: 17),
+              label: const Text('Selector avanzado del sistema'),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 }
 
