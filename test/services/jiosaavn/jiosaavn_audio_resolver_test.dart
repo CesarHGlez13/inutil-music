@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/downloader/audio_stream_resolver.dart';
-import 'package:bstream_music/services/jiosaavn/jiosaavn_audio_resolver.dart';
-import 'package:bstream_music/services/jiosaavn/jiosaavn_http_transport.dart';
-import 'package:bstream_music/services/jiosaavn/jiosaavn_recording_matcher.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/downloader/audio_stream_resolver.dart';
+import 'package:inutil_music/services/jiosaavn/jiosaavn_audio_resolver.dart';
+import 'package:inutil_music/services/jiosaavn/jiosaavn_http_transport.dart';
+import 'package:inutil_music/services/jiosaavn/jiosaavn_recording_matcher.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'mp4_fixture.dart';

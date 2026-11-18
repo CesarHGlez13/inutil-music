@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_header_factory.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_cookie_codec.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_navigation_policy.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_sid_auth_signer.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_header_factory.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_cookie_codec.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_navigation_policy.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_sid_auth_signer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

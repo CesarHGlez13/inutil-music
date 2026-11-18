@@ -1,7 +1,7 @@
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/track_selection_controller.dart';
-import 'package:bstream_music/features/music/presentation/widgets/track_selection_toolbar.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/track_selection_controller.dart';
+import 'package:inutil_music/features/music/presentation/widgets/track_selection_toolbar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

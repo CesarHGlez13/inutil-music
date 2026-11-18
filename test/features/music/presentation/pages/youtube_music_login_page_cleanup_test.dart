@@ -1,10 +1,10 @@
-import 'package:bstream_music/features/music/presentation/pages/youtube_music_login_page.dart';
-import 'package:bstream_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
-import 'package:bstream_music/services/youtube_music/auth/inappwebview_youtube_music_web_auth_port.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_account_client.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_session_store.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_web_auth_port.dart';
+import 'package:inutil_music/features/music/presentation/pages/youtube_music_login_page.dart';
+import 'package:inutil_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
+import 'package:inutil_music/services/youtube_music/auth/inappwebview_youtube_music_web_auth_port.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_account_client.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_session_store.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_web_auth_port.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

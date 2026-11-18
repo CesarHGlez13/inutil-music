@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_player_response_parser.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_models.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_validator.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_video_id.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_player_response_parser.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_models.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_video_id.dart';
 
 /// Live, raw/tokenless capability diagnostic for maintained InnerTube profiles.
 ///

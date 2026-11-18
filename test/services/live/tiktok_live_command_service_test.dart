@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:bstream_music/services/live/tiktok_live_command_service.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/live/tiktok_live_command_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

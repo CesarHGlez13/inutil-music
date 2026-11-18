@@ -1,8 +1,8 @@
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/widgets/app_shared_widgets.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/painted_glass_button_style.dart';
-import 'package:bstream_music/features/music/presentation/widgets/artwork_detail_scaffold.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/widgets/app_shared_widgets.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/painted_glass_button_style.dart';
+import 'package:inutil_music/features/music/presentation/widgets/artwork_detail_scaffold.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

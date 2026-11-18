@@ -1,16 +1,16 @@
 import 'dart:async';
 
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/pages/artist_profile_page.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/artwork_detail_scaffold.dart';
-import 'package:bstream_music/features/music/presentation/widgets/expanded_artwork_header_background.dart';
-import 'package:bstream_music/features/music/presentation/widgets/mini_player.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/youtube_music/account/youtube_music_account.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/pages/artist_profile_page.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/artwork_detail_scaffold.dart';
+import 'package:inutil_music/features/music/presentation/widgets/expanded_artwork_header_background.dart';
+import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/youtube_music/account/youtube_music_account.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

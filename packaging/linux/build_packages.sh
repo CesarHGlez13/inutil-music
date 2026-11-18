@@ -11,12 +11,24 @@ version="$2"
 output_dir="$(mkdir -p "$3" && realpath "$3")"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-if [[ ! -x "$bundle/bstream_music" ]]; then
+# El bundle de Flutter trae el entry point que espera el tool (`inutil_music`,
+# hoy un script) y el binario real con nombre legible (`Inútil Music`, el que
+# muestra KDE/PipeWire). Se aceptan también los nombres heredados de BStream
+# para poder empaquetar bundles de checks anteriores.
+launcher=""
+for candidate in inutil_music bstream_music; do
+  if [[ -e "$bundle/$candidate" ]]; then launcher="$candidate"; break; fi
+done
+if [[ -z "$launcher" ]]; then
   echo "Flutter Linux launcher not found at $bundle" >&2
   exit 1
 fi
 
-if [[ ! -x "$bundle/BStream Music" ]]; then
+executable=""
+for candidate in "Inútil Music" "BStream Music"; do
+  if [[ -x "$bundle/$candidate" ]]; then executable="$candidate"; break; fi
+done
+if [[ -z "$executable" ]]; then
   echo "Flutter Linux executable not found at $bundle" >&2
   exit 1
 fi
@@ -46,6 +58,15 @@ install -d \
   "$stage/usr/share/applications" \
   "$stage/usr/share/icons/hicolor/512x512/apps"
 cp -a "$bundle/." "$stage/opt/bstream-music/"
+# El entry point que escribe Flutter repite el `BINARY_NAME` del CMake, así que
+# al tener el binario real renombrado (`OUTPUT_NAME`) se exec a sí mismo en vez
+# de arrancar la app. Se reescribe aquí para que apunte al ejecutable legible.
+cat >"$stage/opt/bstream-music/$launcher" <<EOF
+#!/bin/sh
+set -e
+exec "\$(dirname "\$0")/$executable" "\$@"
+EOF
+chmod 0755 "$stage/opt/bstream-music/$launcher"
 install -m 0755 "$repo_root/packaging/linux/bstream-music" \
   "$stage/usr/bin/bstream-music"
 install -m 0644 "$repo_root/packaging/linux/com.bstream.bstream_music.desktop" \
@@ -63,11 +84,11 @@ Version: $version
 Section: sound
 Priority: optional
 Architecture: amd64
-Maintainer: BryamContreras <BryamContreras@users.noreply.github.com>
+Maintainer: Cesar <cesar@inutilmusic.com>
 Depends: libgtk-3-0 | libgtk-3-0t64, libmpv2 | libmpv1, libsqlite3-0, libsecret-1-0, libc6, libstdc++6
-Homepage: https://github.com/BryamContreras/BStream-Music
+Homepage: https://github.com/CesarHGlez13/inutil-music
 Description: Reproductor y gestor musical multiplataforma
- BStream Music permite buscar, reproducir, descargar y organizar musica,
+ Inútil Music permite buscar, reproducir, descargar y organizar musica,
  playlists y favoritos desde una interfaz construida con Flutter.
 EOF
 cat >"$deb_root/DEBIAN/postinst" <<'EOF'

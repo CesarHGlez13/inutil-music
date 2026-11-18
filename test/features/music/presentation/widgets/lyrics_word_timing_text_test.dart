@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/domain/entities/lyric_word.dart';
-import 'package:bstream_music/features/music/presentation/widgets/lyrics_word_timing_text.dart';
+import 'package:inutil_music/features/music/domain/entities/lyric_word.dart';
+import 'package:inutil_music/features/music/presentation/widgets/lyrics_word_timing_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

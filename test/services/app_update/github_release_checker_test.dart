@@ -1,4 +1,4 @@
-import 'package:bstream_music/services/app_update/github_release_checker.dart';
+import 'package:inutil_music/services/app_update/github_release_checker.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -21,7 +21,7 @@ void main() {
       expect(
         requestedEndpoint,
         Uri.parse(
-          'https://api.github.com/repos/BryamContreras/BStream-Music/releases/latest',
+          'https://api.github.com/repos/CesarHGlez13/inutil-music/releases/latest',
         ),
       );
       expect(result.currentVersion, '1.2.6');

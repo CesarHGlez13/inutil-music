@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/core/startup/app_startup_coordinator.dart';
-import 'package:bstream_music/features/music/presentation/pages/youtube_music_login_page.dart';
-import 'package:bstream_music/features/music/presentation/providers/mini_player_mode.dart';
-import 'package:bstream_music/main.dart' show startupServicesForPlatform;
-import 'package:bstream_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/core/startup/app_startup_coordinator.dart';
+import 'package:inutil_music/features/music/presentation/pages/youtube_music_login_page.dart';
+import 'package:inutil_music/features/music/presentation/providers/mini_player_mode.dart';
+import 'package:inutil_music/main.dart' show startupServicesForPlatform;
+import 'package:inutil_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 

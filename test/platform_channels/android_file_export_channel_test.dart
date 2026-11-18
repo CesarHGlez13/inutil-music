@@ -1,5 +1,5 @@
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/platform_channels/android_file_export_channel.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/platform_channels/android_file_export_channel.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

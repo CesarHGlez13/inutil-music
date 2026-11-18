@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/player/fragmented_artwork_mp4.dart';
+import 'package:inutil_music/services/player/fragmented_artwork_mp4.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

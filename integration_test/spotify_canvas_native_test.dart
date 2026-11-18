@@ -1,16 +1,16 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/presentation/widgets/spotify_canvas_video.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/playback_visual_cache_provider.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/services/player/playback_visual_cache.dart';
-import 'package:bstream_music/services/player/fragmented_artwork_mp4.dart';
-import 'package:bstream_music/services/player/artwork_video_rendering.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/presentation/widgets/spotify_canvas_video.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/playback_visual_cache_provider.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/services/player/playback_visual_cache.dart';
+import 'package:inutil_music/services/player/fragmented_artwork_mp4.dart';
+import 'package:inutil_music/services/player/artwork_video_rendering.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

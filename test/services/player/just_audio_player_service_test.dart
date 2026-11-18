@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/player/just_audio_player_service.dart';
-import 'package:bstream_music/services/player/notification_artwork_service.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/player/just_audio_player_service.dart';
+import 'package:inutil_music/services/player/notification_artwork_service.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';

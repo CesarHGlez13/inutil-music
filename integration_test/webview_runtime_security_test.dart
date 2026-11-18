@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 

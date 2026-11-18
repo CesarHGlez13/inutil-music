@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_gradient_background.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_gradient_background.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

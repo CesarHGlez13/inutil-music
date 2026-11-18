@@ -1,13 +1,13 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/utils/image_source.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playlist_artwork.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playlist_artwork_mosaic.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playlist_artwork.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playlist_artwork_mosaic.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

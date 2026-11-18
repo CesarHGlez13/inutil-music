@@ -1,11 +1,11 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/providers/mini_player_background_mode.dart';
-import 'package:bstream_music/features/music/presentation/providers/player_artwork_style.dart';
-import 'package:bstream_music/features/music/presentation/providers/player_style.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/providers/mini_player_background_mode.dart';
+import 'package:inutil_music/features/music/presentation/providers/player_artwork_style.dart';
+import 'package:inutil_music/features/music/presentation/providers/player_style.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -280,7 +280,7 @@ void main() {
     expect(spanish.surfaceBackgroundLiquidGlass, 'Liquid Glass Style');
     expect(spanish.player, 'Reproductor');
     expect(spanish.playerStyle, 'Estilo');
-    expect(spanish.playerStyleBStreamMusic, 'BStream Music');
+    expect(spanish.playerStyleBStreamMusic, 'Inútil Music');
     expect(spanish.playerStyleAppleMusic, 'Apple Music Style');
     expect(spanish.playerStyleClassicVinyl, 'Vinilo Clásico');
     expect(spanish.animatedArtwork, 'Portadas en Movimiento');
@@ -310,7 +310,7 @@ void main() {
     expect(english.surfaceBackgroundLiquidGlass, 'Liquid Glass Style');
     expect(english.player, 'Player');
     expect(english.playerStyle, 'Style');
-    expect(english.playerStyleBStreamMusic, 'BStream Music');
+    expect(english.playerStyleBStreamMusic, 'Inútil Music');
     expect(english.playerStyleAppleMusic, 'Apple Music Style');
     expect(english.playerStyleClassicVinyl, 'Classic Vinyl');
     expect(english.animatedArtwork, 'Artwork motion');
@@ -351,7 +351,7 @@ void main() {
       ),
       'Liquid Glass Style',
     );
-    expect(spanish.playerStyleLabel(PlayerStyle.bstreamMusic), 'BStream Music');
+    expect(spanish.playerStyleLabel(PlayerStyle.bstreamMusic), 'Inútil Music');
     expect(
       english.playerStyleLabel(PlayerStyle.appleMusic),
       'Apple Music Style',

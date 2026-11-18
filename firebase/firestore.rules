@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // Modelo de seguridad de INÚTIL MUSIC (v3)
+    //
+    //   * La identidad la pone Firebase Auth; el ROL y la LICENCIA viven en
+    //     el documento users/{uid} y solo un admin puede mutar los campos
+    //     protegidos. Conocer el correo del fundador no es una credencial:
+    //     Firebase Auth sigue exigiendo la contraseña.
+    //   * Los campos de licencia (role/status/isActive/accountExpiresAt/
+    //     accountDurationDays) son inmutables para el propio usuario: un
+    //     cliente manipulado no puede autoconcederse vigencia.
+    //   * El teléfono y el registro de cambios de teléfono sí los puede
+    //     escribir el propio usuario (su cliente legítimo los gestiona), pero
+    //     el contador solo puede crecer dentro del mismo mes. En producción
+    //     estos movimientos deberían hacerlos Cloud Functions.
+    // ------------------------------------------------------------------
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Correo del fundador: único caso en que el propio usuario puede
+    // sembrar/elevar su documento a rol admin (su contraseña ya la validó
+    // Firebase Auth).
+    function isBootstrapAdminIdentity() {
+      return isSignedIn() &&
+        request.auth.token.email == 'cesar@inutilmusic.com';
+    }
+
+    // Campos que el usuario jamás puede cambiar en su propio documento.
+    function licenseFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data)
+        .affectedKeys()
+        .hasAny([
+          'role', 'status', 'isActive', 'accountExpiresAt',
+          'accountDurationDays', 'phoneSwitchCount', 'phoneSwitchMonth'
+        ]);
+    }
+
+    // El cliente legítimo puede mover su teléfono y su validación, siempre
+    // que el contador de cambios no retroceda dentro del mismo mes.
+    function phoneBookkeepingAllowed() {
+      return request.resource.data.diff(resource.data)
+          .affectedKeys()
+          .hasOnly(['currentPhoneDeviceId', 'lastValidatedAt',
+                    'phoneSwitchCount', 'phoneSwitchMonth']) &&
+        (request.resource.data.phoneSwitchMonth != resource.data.phoneSwitchMonth ||
+         request.resource.data.phoneSwitchCount >= resource.data.phoneSwitchCount);
+    }
+
+    // Al crear su documento, el usuario normal se limita a rol user y estado
+    // pending/active; el rol admin solo para la identidad fundadora.
+    function isSelfSeed(userId) {
+      return isSelf(userId) &&
+        (request.resource.data.role == 'user' ||
+         (request.resource.data.role == 'admin' && isBootstrapAdminIdentity())) &&
+        request.resource.data.status in ['pending', 'active'];
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId) || isAdmin();
+
+      allow create: if isSelfSeed(userId) || isAdmin();
+
+      allow update: if isAdmin() ||
+                    (isSelf(userId) && licenseFieldsUnchanged()) ||
+                    (isSelf(userId) && phoneBookkeepingAllowed()) ||
+                    (isBootstrapAdminIdentity() &&
+                     resource.data.role != 'admin' &&
+                     request.resource.data.role == 'admin');
+
+      // Solo el admin borra cuentas (el cliente nunca borra perfiles).
+      allow delete: if isAdmin();
+
+      // Respaldo en la nube: playlists, biblioteca y ajustes.
+      match /data/{itemId} {
+        allow read, write: if isSelf(userId) || isAdmin();
+      }
+
+      // Subcolecciones heredadas (favoritos/historial por pista).
+      match /{sub}/{item} {
+        allow read, write: if isSelf(userId) || isAdmin();
+      }
+    }
+
+    // Manifiesto de versión OTA: lectura pública para que la app pueda
+    // comprobar su versión sin sesión; escritura solo para admins.
+    match /app_config/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}

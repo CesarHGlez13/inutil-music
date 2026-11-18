@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/services/storage/playlist_artwork_service.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/services/storage/playlist_artwork_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

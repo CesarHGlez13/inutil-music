@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/services/casting/media_cast_relay.dart';
+import 'package:inutil_music/services/casting/media_cast_relay.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

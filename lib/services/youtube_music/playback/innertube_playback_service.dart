@@ -185,6 +185,7 @@ class InnerTubePlaybackService {
     this.language = 'en',
     this.region = 'US',
     this.requestTimeout = const Duration(seconds: 12),
+    this.firstAttemptTimeout = const Duration(seconds: 6),
     this.resolveTimeout = const Duration(seconds: 90),
     this.maxFormatsPerClient = 4,
     this.maxRequestAttempts = 2,
@@ -211,6 +212,17 @@ class InnerTubePlaybackService {
        _clock = clock ?? DateTime.now {
     if (requestTimeout <= Duration.zero || resolveTimeout <= Duration.zero) {
       throw ArgumentError('Playback timeouts must be positive.');
+    }
+    // Medido con el perfil primario en un enlace sano: el primer intento de
+    // /player responde en 78-300 ms. Una primera ventana mas corta solo
+    // penaliza a los clientes que ya estan fallando, y su reintento conserva
+    // el presupuesto completo de requestTimeout.
+    if (firstAttemptTimeout > requestTimeout) {
+      throw ArgumentError.value(
+        firstAttemptTimeout,
+        'firstAttemptTimeout',
+        'Must not exceed requestTimeout.',
+      );
     }
     if (maxFormatsPerClient < 1 || maxRequestAttempts < 1) {
       throw ArgumentError('Playback attempt limits must be positive.');
@@ -267,6 +279,13 @@ class InnerTubePlaybackService {
   final String language;
   final String region;
   final Duration requestTimeout;
+
+  /// Deadline of the first `/player` attempt of a profile.
+  ///
+  /// A hung identity is abandoned this early and retried with the full
+  /// [requestTimeout], so a blocked client reaches the next fallback profile
+  /// without giving up any recovery budget.
+  final Duration firstAttemptTimeout;
   final Duration resolveTimeout;
   final int maxFormatsPerClient;
   final int maxRequestAttempts;
@@ -852,7 +871,9 @@ class InnerTubePlaybackService {
           profile.playerEndpoint,
           headers: headers,
           body: body,
-          timeout: requestTimeout,
+          // El primer intento falla rapido; su reintento mantiene el
+          // presupuesto completo de requestTimeout.
+          timeout: attempt == 0 ? firstAttemptTimeout : requestTimeout,
         );
         _ensureCurrent(shouldContinue);
         if (raw.statusCode < 200 || raw.statusCode >= 300) {

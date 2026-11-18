@@ -1,5 +1,5 @@
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/po_token_binding.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/po_token_binding.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

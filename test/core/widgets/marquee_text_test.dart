@@ -1,4 +1,4 @@
-import 'package:bstream_music/core/widgets/marquee_text.dart';
+import 'package:inutil_music/core/widgets/marquee_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';

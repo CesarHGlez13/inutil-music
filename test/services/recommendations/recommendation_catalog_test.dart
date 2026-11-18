@@ -1,5 +1,5 @@
-import 'package:bstream_music/services/recommendations/recommendations.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/recommendations/recommendations.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

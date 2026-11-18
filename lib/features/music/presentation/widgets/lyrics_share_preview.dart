@@ -1249,7 +1249,7 @@ class _LyricsCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'BStream Music',
+                          'Inútil Music',
                           style: TextStyle(
                             color: foreground,
                             fontSize: 17,

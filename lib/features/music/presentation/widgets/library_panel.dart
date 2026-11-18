@@ -43,6 +43,7 @@ import 'playlist_track_subtitle.dart';
 import 'scrolled_under_tab_frame.dart';
 import 'source_image.dart';
 import 'track_play_button.dart';
+import 'inutil_spotify_import_dialog.dart';
 
 enum _LibraryRouteType { root, downloads, live, playlist }
 
@@ -1239,6 +1240,58 @@ class _LibraryRootView extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: _SectionTitle(strings.playlist)),
+                Consumer(
+                  // La etiqueta del importador sólo se muestra cuando el
+                  // encabezado tiene sitio: en móviles estrechos el botón
+                  // queda como icono con tooltip y la fila deja de desbordar.
+                  builder: (context, ref, _) {
+                    final showLabel = MediaQuery.sizeOf(context).width >= 460;
+                    final button = OutlinedButton.icon(
+                      key: const ValueKey('library-import-spotify-button'),
+                      onPressed: () =>
+                          showInutilSpotifyImportDialog(context, ref),
+                      icon: const Icon(
+                        Icons.queue_music_rounded,
+                        size: 17,
+                        color: Color(0xFF1DB954),
+                      ),
+                      label: showLabel
+                          ? const Text(
+                              'Importar Spotify',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(
+                          0xFF1DB954,
+                        ).withValues(alpha: 0.14),
+                        side: BorderSide(
+                          color: const Color(0xFF1DB954).withValues(alpha: 0.55),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 11,
+                          vertical: 6,
+                        ),
+                        minimumSize: const Size(0, 34),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    );
+                    // Sin etiqueta el botón es sólo un icono: el tooltip
+                    // conserva accesible su significado.
+                    return showLabel
+                        ? button
+                        : Tooltip(message: 'Importar Spotify', child: button);
+                  },
+                ),
+                const SizedBox(width: 8),
                 _NeutralLibraryIconButton(
                   key: const ValueKey('library-create-playlist-button'),
                   tooltip: strings.newPlaylist,

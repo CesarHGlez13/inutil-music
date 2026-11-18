@@ -1,6 +1,6 @@
-import 'package:bstream_music/core/errors/app_exception.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/downloader/audio_stream_resolver.dart';
+import 'package:inutil_music/core/errors/app_exception.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/downloader/audio_stream_resolver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

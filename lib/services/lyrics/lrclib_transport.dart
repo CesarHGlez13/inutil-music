@@ -71,7 +71,17 @@ class IoLrclibTransport implements LrclibTransport {
     final operation = () async {
       final request = await _client.getUrl(uri);
       activeRequest = request;
-      headers.forEach(request.headers.set);
+      headers.forEach((name, value) {
+        final safeValue = value
+            .replaceAll('ú', 'u')
+            .replaceAll('Ú', 'U')
+            .replaceAll('á', 'a')
+            .replaceAll('é', 'e')
+            .replaceAll('í', 'i')
+            .replaceAll('ó', 'o')
+            .replaceAll(RegExp(r'[^\x20-\x7E]'), '');
+        request.headers.set(name, safeValue);
+      });
       final response = await request.close();
       final responseHeaders = <String, String>{};
       response.headers.forEach((name, values) {

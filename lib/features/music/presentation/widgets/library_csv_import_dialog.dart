@@ -362,7 +362,7 @@ class _CsvImportProgressDialogState
 
 String _csvDetectedFormatLabel(LibraryCsvDetectedFormat format) =>
     switch (format) {
-      LibraryCsvDetectedFormat.bstream => 'BStream',
+      LibraryCsvDetectedFormat.bstream => 'Inútil Music',
       LibraryCsvDetectedFormat.metroList => 'MetroList',
       LibraryCsvDetectedFormat.harmony => 'Harmony / RiMusic',
       LibraryCsvDetectedFormat.exportify => 'Exportify',

@@ -1,6 +1,6 @@
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,4 +1,4 @@
-import 'package:bstream_music/core/animation/frame_rate_ticker_provider.dart';
+import 'package:inutil_music/core/animation/frame_rate_ticker_provider.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_test/flutter_test.dart';
 

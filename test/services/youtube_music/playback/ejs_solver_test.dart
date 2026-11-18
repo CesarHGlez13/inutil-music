@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:bstream_music/services/youtube_music/innertube_transport.dart';
-import 'package:bstream_music/services/youtube_music/playback/ejs_solver.dart';
-import 'package:bstream_music/services/youtube_music/playback/javascript_runtime.dart';
+import 'package:inutil_music/services/youtube_music/innertube_transport.dart';
+import 'package:inutil_music/services/youtube_music/playback/ejs_solver.dart';
+import 'package:inutil_music/services/youtube_music/playback/javascript_runtime.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 

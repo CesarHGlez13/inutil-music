@@ -1,14 +1,14 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/ejs_solver.dart';
-import 'package:bstream_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_router.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_playback_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_video_id.dart';
-import 'package:bstream_music/services/youtube_music/playback/po_token_provider.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/ejs_solver.dart';
+import 'package:inutil_music/services/youtube_music/playback/headless_inappwebview_runtime.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_router.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_playback_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_video_id.dart';
+import 'package:inutil_music/services/youtube_music/playback/po_token_provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

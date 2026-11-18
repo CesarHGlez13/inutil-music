@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/recommendations/recommendation_storage_models.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/recommendations/recommendation_storage_models.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

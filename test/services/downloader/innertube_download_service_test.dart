@@ -2,20 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/errors/app_exception.dart';
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/services/audio_sources/audio_format_details.dart';
-import 'package:bstream_music/services/downloader/http_audio_transfer.dart';
-import 'package:bstream_music/services/downloader/innertube_download_service.dart';
-import 'package:bstream_music/services/downloader/audio_stream_resolver.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_router.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_playback_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_models.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_validator.dart';
+import 'package:inutil_music/core/errors/app_exception.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/services/audio_sources/audio_format_details.dart';
+import 'package:inutil_music/services/downloader/http_audio_transfer.dart';
+import 'package:inutil_music/services/downloader/innertube_download_service.dart';
+import 'package:inutil_music/services/downloader/audio_stream_resolver.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_router.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_playback_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_models.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -208,7 +208,7 @@ void main() {
       );
 
       expect(await File(result.filePath).readAsBytes(), bytes);
-      expect(result.fileName, 'BStream - Test Song.m4a');
+      expect(result.fileName, 'Inútil Music - Test Song.m4a');
       expect(progress, contains(1));
       expect(await File('${result.filePath}.part').exists(), isFalse);
     },
@@ -269,7 +269,7 @@ void main() {
     );
 
     expect(await File(result.filePath).readAsBytes(), bytes);
-    expect(result.fileName, 'BStream - Test Song.webm');
+    expect(result.fileName, 'Inútil Music - Test Song.webm');
     expect(requestedPaths, <String>['/opus']);
   });
 
@@ -318,7 +318,7 @@ void main() {
     );
 
     expect(await File(result.filePath).readAsBytes(), bytes);
-    expect(result.fileName, 'BStream - Test Song.mp4');
+    expect(result.fileName, 'Inútil Music - Test Song.mp4');
     expect(playerTransport.postCalls, 2);
   });
 
@@ -498,7 +498,7 @@ void main() {
     final results = await downloader.search('test song');
 
     expect(info.title, 'Test Song');
-    expect(info.artist, 'BStream');
+    expect(info.artist, 'Inútil Music');
     expect(playbackInfo.streamClientProfileKey, 'androidSdkless');
     expect(playbackInfo.streamBitrate, 129000);
     expect(playbackInfo.streamSampleRate, 44100);
@@ -758,7 +758,7 @@ final class _Catalog implements YouTubeMusicSearch, YouTubeMusicTrackLookup {
   static final song = InnerTubeSong(
     videoId: 'dQw4w9WgXcQ',
     title: 'Test Song',
-    artists: const ['BStream'],
+    artists: const ['Inútil Music'],
   );
   final List<String> queries = <String>[];
   int songLookups = 0;

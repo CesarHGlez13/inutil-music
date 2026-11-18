@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/utils/image_source.dart';
-import 'package:bstream_music/services/widgets/home_screen_widget_sync.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
+import 'package:inutil_music/services/widgets/home_screen_widget_sync.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

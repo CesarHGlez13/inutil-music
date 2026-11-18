@@ -1,5 +1,5 @@
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_audio_quality.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_audio_quality.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

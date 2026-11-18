@@ -2,9 +2,9 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/local_media/desktop_device_audio_catalog.dart';
-import 'package:bstream_music/services/local_media/device_audio_catalog.dart';
-import 'package:bstream_music/services/local_media/device_audio_filter.dart';
+import 'package:inutil_music/services/local_media/desktop_device_audio_catalog.dart';
+import 'package:inutil_music/services/local_media/device_audio_catalog.dart';
+import 'package:inutil_music/services/local_media/device_audio_filter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

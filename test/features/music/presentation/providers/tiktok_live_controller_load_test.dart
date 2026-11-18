@@ -1,14 +1,14 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/domain/repositories/music_repository.dart';
-import 'package:bstream_music/features/music/domain/usecases/search_tracks.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/live/tiktok_live_command_service.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/domain/repositories/music_repository.dart';
+import 'package:inutil_music/features/music/domain/usecases/search_tracks.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/live/tiktok_live_command_service.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';

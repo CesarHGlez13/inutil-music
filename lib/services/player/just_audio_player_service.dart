@@ -38,17 +38,12 @@ class JustAudioPlayerService
   static const _interruptedLoadErrorCode = 10000000;
   static const _androidAudioLoadConfiguration = AudioLoadConfiguration(
     androidLoadControl: AndroidLoadControl(
-      // Keep enough encoded audio ahead for the native PCM detector to scan a
-      // long silent section without immediately catching up with a slow CDN.
-      // This is independent from InnerTube's 3 MiB URL-validity probe.
-      minBufferDuration: Duration(seconds: 6),
+      minBufferDuration: Duration(seconds: 4),
       maxBufferDuration: Duration(seconds: 24),
-      // The RMS processor needs 4.5 seconds of causal lookahead to preserve a
-      // musical pause bit-for-bit while still removing an actually long gap
-      // down to its 150/250 ms margins. Starting with less can starve
-      // AudioTrack when a CDN delivers close to real time.
-      bufferForPlaybackDuration: Duration(seconds: 5),
-      bufferForPlaybackAfterRebufferDuration: Duration(seconds: 5),
+      // Start playback as soon as 500ms of audio is buffered instead of waiting
+      // 5 full seconds before emitting the first sample.
+      bufferForPlaybackDuration: Duration(milliseconds: 500),
+      bufferForPlaybackAfterRebufferDuration: Duration(milliseconds: 1500),
       prioritizeTimeOverSizeThresholds: true,
       backBufferDuration: Duration(seconds: 1),
     ),
@@ -2930,7 +2925,7 @@ class JustAudioPlayerService
     final artworkSource = track.thumbnailUrl?.trim();
     return MediaItem(
       id: track.id.isEmpty ? track.url : track.id,
-      album: track.album ?? 'BStream Music',
+      album: track.album ?? 'Inútil Music',
       title: track.title,
       artist: track.artist,
       artUri: _notificationArtUri(artworkSource),
@@ -2949,7 +2944,7 @@ class JustAudioPlayerService
     final artworkSource = (track.thumbnailPath ?? track.thumbnailUrl)?.trim();
     return MediaItem(
       id: track.id,
-      album: track.album ?? 'BStream Music',
+      album: track.album ?? 'Inútil Music',
       title: track.title,
       artist: track.artist,
       artUri: _notificationArtUri(artworkSource),

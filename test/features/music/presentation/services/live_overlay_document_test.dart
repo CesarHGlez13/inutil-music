@@ -1,4 +1,4 @@
-import 'package:bstream_music/features/music/presentation/services/live_overlay_document.dart';
+import 'package:inutil_music/features/music/presentation/services/live_overlay_document.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

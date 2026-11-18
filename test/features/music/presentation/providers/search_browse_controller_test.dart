@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/search_browse_catalog_cache.dart';
-import 'package:bstream_music/services/youtube_music/search_browse_artwork_cache.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/search_browse_catalog_cache.dart';
+import 'package:inutil_music/services/youtube_music/search_browse_artwork_cache.dart';
 
 void main() {
   test('keeps the complete advertised catalog beyond 24 cards', () async {

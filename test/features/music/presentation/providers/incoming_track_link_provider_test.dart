@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/sharing/bstream_track_link.dart';
-import 'package:bstream_music/services/sharing/incoming_track_link_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/sharing/bstream_track_link.dart';
+import 'package:inutil_music/services/sharing/incoming_track_link_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 

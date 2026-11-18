@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:bstream_music/services/storage/portable_sqlite_upsert.dart';
+import 'package:inutil_music/services/storage/portable_sqlite_upsert.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 

@@ -3,18 +3,24 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Anuncios UDP de descubrimiento LAN (barrido de subred + broadcast).
+         El nivel de peligro es "normal": se concede solo con instalar la app. -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- La actualización OTA dentro de la app descarga un APK y pide al sistema
+         que lo instale; sin este permiso el instalador se niega en silencio. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
 
     <application
-        android:label="BStream Music"
+        android:label="Inútil Music"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
@@ -45,7 +51,7 @@
             android:exported="false" />
         <activity
             android:name=".MainActivity"
-            android:label="BStream Music"
+            android:label="Inútil Music"
             android:exported="true"
             android:launchMode="singleTask"
             android:taskAffinity=""
@@ -159,9 +165,24 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!--
+             URIs content:// para el instalador de paquetes del OTA. Android 7
+             (API 24, minSdk de esta app) rechaza una URI file:// que sale de la
+             aplicación con FileUriExposedException, así que el APK descargado
+             se comparte sólo con el instalador y sólo mientras lo necesita.
+        -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/provider_paths" />
+        </provider>
         <service
             android:name="com.ryanheise.audioservice.AudioService"
-            android:label="BStream Music"
+            android:label="Inútil Music"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true"
             tools:ignore="Instantiatable">

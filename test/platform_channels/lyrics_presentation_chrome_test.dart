@@ -1,5 +1,5 @@
-import 'package:bstream_music/platform_channels/android_screen_channel.dart';
-import 'package:bstream_music/platform_channels/lyrics_presentation_chrome.dart';
+import 'package:inutil_music/platform_channels/android_screen_channel.dart';
+import 'package:inutil_music/platform_channels/lyrics_presentation_chrome.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

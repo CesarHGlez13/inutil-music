@@ -1,5 +1,5 @@
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/features/music/presentation/widgets/gradient_progress_bar.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/features/music/presentation/widgets/gradient_progress_bar.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

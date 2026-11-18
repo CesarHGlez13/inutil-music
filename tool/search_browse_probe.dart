@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
 
 /// Read-only smoke check against YouTube Music's current regional catalog.
 Future<void> main() async {

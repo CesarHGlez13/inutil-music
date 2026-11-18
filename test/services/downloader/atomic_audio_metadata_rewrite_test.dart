@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:bstream_music/services/downloader/atomic_audio_metadata_rewrite.dart';
-import 'package:bstream_music/services/downloader/audio_metadata_fields.dart';
+import 'package:inutil_music/services/downloader/atomic_audio_metadata_rewrite.dart';
+import 'package:inutil_music/services/downloader/audio_metadata_fields.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

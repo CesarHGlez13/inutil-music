@@ -580,7 +580,7 @@ final class WindowsLocalOverlayHostProvisioner
                 bytes[2] == 0xFE &&
                 bytes[3] == 0xFF))) {
       throw const LocalOverlayHostsException(
-        'BStream will not modify a UTF-32 Windows hosts file.',
+        'Inútil Music will not modify a UTF-32 Windows hosts file.',
       );
     }
     if (bytes.length >= 3 &&
@@ -753,7 +753,7 @@ function Get-BStreamEncoding([byte[]]$bytes) {
         $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) -or
        ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and
         $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF))) {
-    throw 'BStream will not modify a UTF-32 Windows hosts file.'
+    throw 'Inútil Music will not modify a UTF-32 Windows hosts file.'
   }
   if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
       $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {

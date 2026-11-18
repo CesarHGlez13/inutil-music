@@ -1,5 +1,5 @@
-import 'package:bstream_music/features/music/presentation/providers/lyrics_animation_style.dart';
-import 'package:bstream_music/features/music/presentation/widgets/lyrics_animation_transition.dart';
+import 'package:inutil_music/features/music/presentation/providers/lyrics_animation_style.dart';
+import 'package:inutil_music/features/music/presentation/widgets/lyrics_animation_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

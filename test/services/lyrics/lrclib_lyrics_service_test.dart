@@ -3,13 +3,13 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
 
-import 'package:bstream_music/core/utils/background_work.dart';
-import 'package:bstream_music/features/music/data/parsers/lrc_parser.dart';
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/services/lyrics/lrclib_lyrics_service.dart';
-import 'package:bstream_music/services/lyrics/lrclib_request_pacing.dart';
-import 'package:bstream_music/services/lyrics/lrclib_transport.dart';
-import 'package:bstream_music/services/lyrics/lyrics_service.dart';
+import 'package:inutil_music/core/utils/background_work.dart';
+import 'package:inutil_music/features/music/data/parsers/lrc_parser.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/services/lyrics/lrclib_lyrics_service.dart';
+import 'package:inutil_music/services/lyrics/lrclib_request_pacing.dart';
+import 'package:inutil_music/services/lyrics/lrclib_transport.dart';
+import 'package:inutil_music/services/lyrics/lyrics_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

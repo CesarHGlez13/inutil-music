@@ -1,9 +1,9 @@
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/marquee_text.dart';
-import 'package:bstream_music/features/music/presentation/widgets/animated_artwork_motion.dart';
-import 'package:bstream_music/features/music/presentation/widgets/classic_vinyl_deck.dart';
-import 'package:bstream_music/features/music/presentation/widgets/gradient_progress_bar.dart';
-import 'package:bstream_music/features/music/presentation/widgets/now_playing_equalizer.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/marquee_text.dart';
+import 'package:inutil_music/features/music/presentation/widgets/animated_artwork_motion.dart';
+import 'package:inutil_music/features/music/presentation/widgets/classic_vinyl_deck.dart';
+import 'package:inutil_music/features/music/presentation/widgets/gradient_progress_bar.dart';
+import 'package:inutil_music/features/music/presentation/widgets/now_playing_equalizer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

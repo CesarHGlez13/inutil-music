@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:bstream_music/services/spotify_canvas/spotify_canvas_resolver.dart';
+import 'package:inutil_music/services/spotify_canvas/spotify_canvas_resolver.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,7 +1,7 @@
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/widgets/app_menu_bottom_sheet.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/widgets/app_menu_bottom_sheet.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

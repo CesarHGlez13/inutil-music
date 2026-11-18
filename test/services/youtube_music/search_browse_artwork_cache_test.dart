@@ -1,5 +1,5 @@
-import 'package:bstream_music/services/youtube_music/search_browse_artwork_cache.dart';
-import 'package:bstream_music/services/youtube_music/search_browse_catalog_cache.dart';
+import 'package:inutil_music/services/youtube_music/search_browse_artwork_cache.dart';
+import 'package:inutil_music/services/youtube_music/search_browse_catalog_cache.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

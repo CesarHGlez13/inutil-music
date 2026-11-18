@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:bstream_music/features/music/presentation/widgets/artwork_inset_detector.dart';
+import 'package:inutil_music/features/music/presentation/widgets/artwork_inset_detector.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 ArtworkInsetFrame _frame(

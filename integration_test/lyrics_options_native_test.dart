@@ -1,10 +1,10 @@
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/lyrics_page.dart';
-import 'package:bstream_music/services/lyrics/lyrics_service.dart';
-import 'package:bstream_music/services/lyrics/lyrics_translation_service.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/lyrics_page.dart';
+import 'package:inutil_music/services/lyrics/lyrics_service.dart';
+import 'package:inutil_music/services/lyrics/lyrics_translation_service.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

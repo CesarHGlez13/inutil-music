@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:bstream_music/core/widgets/desktop_window_shortcuts.dart';
-import 'package:bstream_music/platform_channels/desktop_window_channel.dart';
+import 'package:inutil_music/core/widgets/desktop_window_shortcuts.dart';
+import 'package:inutil_music/platform_channels/desktop_window_channel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

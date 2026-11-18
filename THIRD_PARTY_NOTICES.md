@@ -1,8 +1,40 @@
 # Third-party notices
 
+## Proyecto original: BStream Music
+
+Inútil Music parte de **BStream Music**, proyecto original de Bryam Contreras
+publicado bajo la licencia BSD 2-Clause (el texto íntegro está en `LICENSE`).
+Se reproduce aquí el aviso porque la cláusula 2 de esa licencia exige que las
+redistribuciones en forma binaria incluyan el aviso de copyright y la lista de
+condiciones en la documentación que se distribuye con el programa, y este
+fichero es el que viaja dentro del bundle del binario.
+
+Copyright (c) 2026, Bryam Contreras
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 ## Online lyrics services
 
-BStream Music can query the separately operated Better Lyrics, LyricsPlus,
+Inútil Music can query the separately operated Better Lyrics, LyricsPlus,
 and LRCLIB services, in that priority order. LyricsPlus is the backend used by
 the separate YouLy+ browser extension. Provider attribution accompanies the displayed
 lyrics. Responses are retained only in a small in-memory cache; lyrics and the
@@ -13,13 +45,13 @@ providers' server code are not bundled with the application.
 - LRCLIB: <https://lrclib.net/docs>
 
 Better Lyrics' public TTML API availability depends on its cached catalog.
-When TTML is unavailable, BStream can try Better Lyrics' documented public
-Kugou endpoint within the same bounded lookup. BStream does not embed private
+When TTML is unavailable, Inútil Music can try Better Lyrics' documented public
+Kugou endpoint within the same bounded lookup. Inútil Music does not embed private
 API keys or bypass the service's authentication.
 
 ## Google Cast sender SDKs
 
-BStream Music integrates the official Google Cast sender SDKs for Android
+Inútil Music integrates the official Google Cast sender SDKs for Android
 (`com.google.android.gms:play-services-cast-framework` 22.3.1) and iOS
 (`google-cast-sdk-no-bluetooth` 4.8.0), using the default media receiver.
 These proprietary SDKs are distributed under Google's applicable SDK terms,
@@ -34,13 +66,13 @@ AndroidX MediaRouter is licensed under Apache-2.0:
 
 ## xml 6.6.1
 
-BStream Music uses the Dart `xml` package (MIT license) for bounded UPnP device
+Inútil Music uses the Dart `xml` package (MIT license) for bounded UPnP device
 descriptions and SOAP messages. Source and license:
 <https://github.com/renggli/dart-xml/blob/v6.6.1/LICENSE>
 
 ## Kyant AndroidLiquidGlass 2.0.0
 
-BStream Music's rounded-rectangle refraction shader adapts the optical model
+Inútil Music's rounded-rectangle refraction shader adapts the optical model
 from Kyant AndroidLiquidGlass, also used by Echo Music.
 
 Source: <https://github.com/Kyant0/AndroidLiquidGlass/tree/2.0.0>
@@ -50,7 +82,7 @@ included at `third_party/kyant_android_liquid_glass/LICENSE`.
 
 ## csv 8.0.0
 
-BStream Music uses the `csv` Dart package to parse and encode interoperable
+Inútil Music uses the `csv` Dart package to parse and encode interoperable
 CSV library files.
 
 Source: <https://pub.dev/packages/csv>
@@ -79,7 +111,7 @@ SOFTWARE.
 
 ## PirateTok Live 0.1.5
 
-BStream Music includes an audited in-tree fork of `piratetok_live` 0.1.5 for
+Inútil Music includes an audited in-tree fork of `piratetok_live` 0.1.5 for
 its direct TikTok LIVE transport.
 
 Source: <https://github.com/PirateTok/live-dart>
@@ -101,7 +133,7 @@ USE OR PERFORMANCE OF THIS SOFTWARE.
 
 ## EJS 0.8.0
 
-BStream Music directly consumes Base64-encoded copies of the checksum-pinned
+Inútil Music directly consumes Base64-encoded copies of the checksum-pinned
 EJS release modules to solve YouTube player challenges inside its isolated
 headless JavaScript runtime. The decoded bytes are verified against the
 upstream SHA-256 values before execution. A download of those same pinned
@@ -109,8 +141,8 @@ release artifacts is kept only as a checksum-verified recovery fallback when a
 bundled asset is missing or corrupt.
 
 EJS is a separate upstream project hosted under the yt-dlp GitHub organization.
-Its inclusion does not make BStream dependent on the yt-dlp program or Python
-package: BStream neither bundles nor invokes the yt-dlp executable.
+Its inclusion does not make Inútil Music dependent on the yt-dlp program or Python
+package: Inútil Music neither bundles nor invokes the yt-dlp executable.
 
 Source: <https://github.com/yt-dlp/ejs>
 

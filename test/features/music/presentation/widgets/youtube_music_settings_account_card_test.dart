@@ -1,7 +1,7 @@
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
-import 'package:bstream_music/features/music/presentation/widgets/youtube_music_settings_account_card.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
+import 'package:inutil_music/features/music/presentation/widgets/youtube_music_settings_account_card.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;

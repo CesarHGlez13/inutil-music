@@ -166,7 +166,7 @@ class DefaultLyricsImageShareService implements LyricsImageShareService {
     if (name.toLowerCase().endsWith('.png')) {
       name = name.substring(0, name.length - 4).trim();
     }
-    if (name.isEmpty) name = 'BStream Music';
+    if (name.isEmpty) name = 'Inútil Music';
     if (RegExp(
       r'^(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\.|$)',
       caseSensitive: false,

@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,8 +1,8 @@
-import 'package:bstream_music/features/music/presentation/providers/playback_artwork_provider.dart';
+import 'package:inutil_music/features/music/presentation/providers/playback_artwork_provider.dart';
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
+import 'package:inutil_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

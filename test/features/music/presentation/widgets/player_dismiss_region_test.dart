@@ -1,4 +1,4 @@
-import 'package:bstream_music/features/music/presentation/widgets/player_dismiss_region.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_dismiss_region.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -16,7 +16,7 @@ Uint8List updateVorbisComments(
   bool embedPicture = false,
 }) {
   final parsed = existing.isEmpty
-      ? _Comments(Uint8List.fromList(utf8.encode('BStream Music')), const [])
+      ? _Comments(Uint8List.fromList(utf8.encode('Inútil Music')), const [])
       : _readComments(existing, requireEnd: true);
   final edits = <String, Uint8List>{};
   void text(String key, String? value) {

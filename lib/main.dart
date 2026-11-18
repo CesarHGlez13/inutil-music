@@ -16,6 +16,11 @@ import 'features/music/presentation/providers/music_providers.dart';
 import 'services/player/notification_artwork_service.dart';
 import 'services/player/artwork_video_rendering.dart';
 import 'services/media_session/audio_service_desktop_media_session.dart';
+import 'core/firebase/firebase_auth_service.dart';
+import 'core/firebase/firebase_playback_sync_service.dart';
+import 'core/firebase/firebase_sync_providers.dart';
+import 'core/firebase/inutil_auth_gate.dart';
+import 'core/firebase/inutil_update_gate.dart';
 
 void main() {
   launchBStreamMusicApp();
@@ -53,6 +58,23 @@ void _scheduleStartupAfterFirstFrame(VoidCallback callback) {
   WidgetsBinding.instance.addPostFrameCallback((_) => callback());
 }
 
+/// Arranca la sesión de licencia y la sincronización LAN sin propagar sus
+/// fallos al montaje de la interfaz: si faltan los plugins nativos (pruebas
+/// de widget) o no hay red, la app queda simplemente "sin sesión" hasta que
+/// el usuario vuelva a iniciarla, en lugar de abortar el arranque.
+Future<void> _startLicenceServices() async {
+  try {
+    await InutilAuthService.instance.initialize();
+  } catch (error) {
+    debugPrint('InutilAuthService.initialize falló: $error');
+  }
+  try {
+    InutilPlaybackSyncService.instance.startSync();
+  } catch (error) {
+    debugPrint('InutilPlaybackSyncService.startSync falló: $error');
+  }
+}
+
 @visibleForTesting
 AppStartupCoordinator launchBStreamMusicApp({
   bool? initializeAndroidServices,
@@ -63,6 +85,7 @@ AppStartupCoordinator launchBStreamMusicApp({
 }) {
   WidgetsFlutterBinding.ensureInitialized();
   configureArtworkVideoRendering();
+  unawaited(_startLicenceServices());
   // Keep artwork memory bounded across long sessions with many searches and
   // queue transitions. The default Flutter image cache allows 100 MiB and
   // 1,000 entries, which is excessive for music thumbnails.
@@ -95,7 +118,7 @@ AppStartupCoordinator launchBStreamMusicApp({
   (runApplication ?? runApp)(
     const ProviderScope(
       child: _LocalArtworkMaintenance(
-        child: BStreamMusicApp(checkForUpdatesOnStartup: true),
+        child: BStreamMusicApp(checkForUpdatesOnStartup: false),
       ),
     ),
   );
@@ -134,6 +157,26 @@ class _LocalArtworkMaintenanceState
         _requestArtworkRepair(force: true);
       }
     });
+    // El mando remoto (Spotify Connect) necesita que el proveedor de
+    // sincronización esté vivo desde el arranque: su constructor registra el
+    // callback que ejecuta los comandos que llegan por LAN y escucha al
+    // reproductor local. Si se construía perezosamente al abrir el panel, la
+    // app aceptaba los comandos pero no los ejecutaba nunca.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(inutilPlaybackSyncProvider);
+      }
+    });
+    // Respaldo en la nube: restaura playlists/biblioteca/ajustes si esta
+    // instalación está vacía (desinstalaste o borraste datos) y mantiene el
+    // auto-respaldo periódico mientras la app vive.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final backup = ref.read(inutilCloudBackupProvider);
+        backup.startAutoSync();
+        unawaited(backup.pullAndRestoreIfEmpty());
+      }
+    });
   }
 
   @override
@@ -145,10 +188,20 @@ class _LocalArtworkMaintenanceState
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
+      // Revalida la licencia (vigencia, teléfono único) al volver a primer
+      // plano e intenta restaurar un respaldo recién publicado en la nube.
+      unawaited(InutilAuthService.instance.onAppResumed());
+      unawaited(ref.read(inutilCloudBackupProvider).pullAndRestoreIfEmpty());
       // A legacy download may have started while offline or before artwork
       // persistence existed. Resuming gives the cache/network repair another
       // chance without touching its already downloaded audio.
       _requestArtworkRepair();
+    } else if ((state == AppLifecycleState.paused ||
+            state == AppLifecycleState.detached) &&
+        mounted) {
+      // Al salir de la app se fuerza el respaldo pendiente: es el momento
+      // crítico antes de que el usuario desinstale o borre datos.
+      unawaited(ref.read(inutilCloudBackupProvider).pushNow());
     }
   }
 
@@ -194,9 +247,18 @@ class _LocalArtworkMaintenanceState
 }
 
 class BStreamMusicApp extends ConsumerWidget {
-  const BStreamMusicApp({this.checkForUpdatesOnStartup = false, super.key});
+  /// [enforceLicenseGates] aplica la barrera de licencia y el kill switch de
+  /// OTA sobre la pantalla de inicio. Las pruebas de widget lo desactivan
+  /// porque nunca inicializan Firebase y montan el shell directamente; en
+  /// producción ([launchBStreamMusicApp]) siempre se aplica.
+  const BStreamMusicApp({
+    this.checkForUpdatesOnStartup = false,
+    this.enforceLicenseGates = true,
+    super.key,
+  });
 
   final bool checkForUpdatesOnStartup;
+  final bool enforceLicenseGates;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -267,7 +329,16 @@ class BStreamMusicApp extends ConsumerWidget {
           child: child ?? const SizedBox.shrink(),
         ),
       ),
-      home: HomePage(checkForUpdatesOnStartup: checkForUpdatesOnStartup),
+      // El kill switch de OTA envuelve la barrera de autenticación: una
+      // versión deshabilitada queda inservible incluso antes de iniciar
+      // sesión (el manifiesto se puede leer sin token). Las pruebas de
+      // widget montan el shell con las barreras apagadas porque nunca
+      // inicializan Firebase.
+      home: () {
+        final home = HomePage(checkForUpdatesOnStartup: checkForUpdatesOnStartup);
+        if (!enforceLicenseGates) return home;
+        return InutilUpdateGate(child: InutilAuthGate(child: home));
+      }(),
     );
   }
 }
@@ -285,8 +356,8 @@ ThemeData _buildDarkTheme({
         seedColor: accent.seedColor,
         brightness: Brightness.dark,
       ).copyWith(
-        surface: const Color(0xFF060806),
-        surfaceContainerHighest: const Color(0xFF121612),
+        surface: const Color(0xFF0C0C0F),
+        surfaceContainerHighest: const Color(0xFF14141A),
         primary: accent.seedColor,
         primaryContainer: accent.darkColor,
         secondary: accent.darkColor,
@@ -314,13 +385,13 @@ ThemeData _buildDarkTheme({
       AppAccentTheme.fromAccent(accent),
       AppSurfaceTheme(backgroundMode: surfaceBackgroundMode),
     ],
-    scaffoldBackgroundColor: const Color(0xFF030504),
+    scaffoldBackgroundColor: const Color(0xFF070709),
     navigationRailTheme: NavigationRailThemeData(
-      backgroundColor: const Color(0xFF050705),
+      backgroundColor: const Color(0xFF09090C),
       indicatorColor: accent.darkColor.withValues(alpha: 0.34),
     ),
     navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: const Color(0xFF050705),
+      backgroundColor: const Color(0xFF09090C),
       indicatorColor: accent.darkColor.withValues(alpha: 0.34),
     ),
     cardTheme: CardThemeData(

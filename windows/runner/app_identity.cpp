@@ -14,11 +14,12 @@ namespace {
 
 // Keep this value in sync with the AppUserModelID assigned by the installer.
 constexpr wchar_t kAppUserModelId[] = L"BStreamMusic.Desktop";
-constexpr wchar_t kShortcutName[] = L"BStream Music.lnk";
+// Nombre visible del acceso directo (Menú Inicio / Escritorio).
+constexpr wchar_t kShortcutName[] = L"In\u00FAtil Music.lnk";
 
 void LogIdentityError(const wchar_t* message, HRESULT result) {
   wchar_t buffer[256] = {};
-  ::swprintf_s(buffer, L"BStream Music: %s (HRESULT 0x%08X)\n", message,
+  ::swprintf_s(buffer, L"In\u00FAtil Music: %s (HRESULT 0x%08X)\n", message,
                static_cast<unsigned int>(result));
   ::OutputDebugStringW(buffer);
 }
@@ -103,7 +104,7 @@ HRESULT CreateOrUpdateStartMenuShortcut() {
       }
     }
 
-    shell_link->SetDescription(L"BStream Music");
+    shell_link->SetDescription(L"In\u00FAtil Music");
     shell_link->SetIconLocation(executable_path.c_str(), 0);
   }
 

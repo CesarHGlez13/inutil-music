@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/providers/player/recommendation_playback_item.dart';
-import 'package:bstream_music/features/music/presentation/providers/player/recommendation_queue_extension_coordinator.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/providers/player/recommendation_playback_item.dart';
+import 'package:inutil_music/features/music/presentation/providers/player/recommendation_queue_extension_coordinator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

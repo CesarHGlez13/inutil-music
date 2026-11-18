@@ -33,6 +33,12 @@ import 'live_widget_style_settings.dart';
 import 'scrolled_under_tab_frame.dart';
 import 'player_style_gallery.dart';
 import 'youtube_music_settings_account_card.dart';
+import 'inutil_account_dialog.dart';
+import 'inutil_admin_panel.dart';
+import 'inutil_spotify_import_dialog.dart';
+import '../../../../core/firebase/firebase_sync_providers.dart';
+import '../../../../core/firebase/inutil_update_service.dart';
+import '../../../../core/theme/inutil_design_system.dart';
 
 typedef DownloadDirectoryPicker =
     Future<String?> Function({String? dialogTitle, String? initialDirectory});
@@ -632,6 +638,13 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         ),
         sliver: SliverList.list(
           children: [
+            // Sin sesión la tarjeta de cuenta no se pinta; tampoco debe dejar
+            // su padding, que desplazaría el resto del panel hacia abajo.
+            if (ref.watch(inutilAuthProvider).currentUser != null)
+              const Padding(
+                padding: EdgeInsets.only(bottom: appSectionGap),
+                child: _InutilAccountSettingsCard(),
+              ),
             Padding(
               padding: const EdgeInsets.only(bottom: appSectionGap),
               child: YouTubeMusicSettingsAccountCard(
@@ -1064,11 +1077,87 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     );
   }
 
+  /// Descarga la actualización dentro de la aplicación. En Linux el servicio
+  /// reemplanta el bundle en `~/.local/share/inutil-music` y reinicia Inútil
+  /// Music; en Android entrega el APK al instalador del sistema. Si la versión
+  /// publicada no trae enlace de descarga directa se abre la página de
+  /// descargas en el navegador, como respaldo.
   Future<void> _openUpdateDownloadPage() async {
-    await _openExternalPage(
-      url: AppConstants.appDownloadUrl,
-      failureMessage: ref.read(appStringsProvider).updateDownloadOpenFailed,
-    );
+    final strings = ref.read(appStringsProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    InutilReleaseInfo release;
+    try {
+      release = await InutilUpdateService.instance.checkForUpdate(
+        currentVersion: AppConstants.appVersion,
+      );
+    } catch (_) {
+      release = InutilReleaseInfo.defaultCinemaEdition(
+        currentVersion: AppConstants.appVersion,
+      );
+    }
+    if (!mounted) {
+      return;
+    }
+    if (release.platformDownloadUrl.trim().isEmpty) {
+      await _openExternalPage(
+        url: AppConstants.appDownloadUrl,
+        failureMessage: strings.updateDownloadOpenFailed,
+      );
+      return;
+    }
+
+    final progress = ValueNotifier<double?>(null);
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => ValueListenableBuilder<double?>(
+        valueListenable: progress,
+        builder: (context, value, _) => AlertDialog(
+          title: Text(strings.downloading),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              LinearProgressIndicator(value: value),
+              const SizedBox(height: 12),
+              Text(value == null ? '…' : '${(value * 100).clamp(0, 100).round()} %'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).maybePop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      ),
+    ));
+
+    String? failure;
+    try {
+      await InutilUpdateService.instance.downloadUpdate(
+        release,
+        onProgress: (received, total) {
+          progress.value = total > 0 ? received / total : null;
+        },
+      );
+    } catch (error) {
+      failure = error is FileSystemException || error is HttpException
+          ? strings.updateDownloadOpenFailed
+          : '${strings.updateDownloadOpenFailed}: $error';
+    } finally {
+      progress.dispose();
+    }
+
+    if (failure == null) {
+      // En Linux la instalación diferida espera a que este proceso cierre para
+      // reemplazar los binarios y volver a abrir la aplicación.
+      if (Platform.isLinux) {
+        exit(0);
+      }
+      return;
+    }
+    messenger.showSnackBar(SnackBar(content: Text(failure)));
   }
 
   Future<void> _openGitHubRepository() async {
@@ -1686,6 +1775,19 @@ class _AboutApplicationSettings extends StatelessWidget {
         ),
         const SizedBox(height: appCardGap),
         _SettingsEntryCard(
+          key: const ValueKey('settings-about-ota-update'),
+          icon: Icons.system_update_alt_rounded,
+          title: 'Actualizaciones OTA de Inútil Music',
+          subtitle: 'Verificar e instalar nuevas versiones directamente desde la app',
+          onTap: () async {
+            final release = await InutilUpdateService.instance.checkForUpdate();
+            if (context.mounted) {
+              await showInutilUpdateDialog(context, release);
+            }
+          },
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
           key: const ValueKey('settings-about-support'),
           icon: Icons.favorite_outline_rounded,
           title: strings.supportDevelopmentTitle,
@@ -1699,6 +1801,20 @@ class _AboutApplicationSettings extends StatelessWidget {
           title: strings.githubRepositoryTitle,
           subtitle: strings.githubRepositoryBody,
           onTap: onGitHub,
+        ),
+        const SizedBox(height: 24),
+        Center(
+          child: Text(
+            'Inútil Music v${AppConstants.appVersion} · '
+            '${AppConstants.supportEmail} · '
+            '${AppConstants.upstreamCredit}',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: Colors.white24,
+              letterSpacing: 0.3,
+            ),
+          ),
         ),
       ],
     );
@@ -5382,6 +5498,230 @@ class _PathField extends StatelessWidget {
               onPressed: onBrowse,
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _InutilAccountSettingsCard extends ConsumerWidget {
+  const _InutilAccountSettingsCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final auth = ref.watch(inutilAuthProvider);
+    final user = auth.currentUser;
+    if (user == null) return const SizedBox.shrink();
+
+    final isExpired = user.isExpired;
+    final isSuspended = !user.isActive;
+    final days = user.daysRemaining;
+
+    Color badgeColor;
+    String badgeText;
+    if (user.isAdmin) {
+      badgeColor = Colors.amberAccent;
+      badgeText = '👑 ADMINISTRADOR';
+    } else if (isSuspended) {
+      badgeColor = Colors.orangeAccent;
+      badgeText = '⛔ SUSPENDIDA';
+    } else if (isExpired) {
+      badgeColor = Colors.redAccent;
+      badgeText = '🔴 VENCIDA';
+    } else if (user.isPermanent) {
+      badgeColor = Colors.cyanAccent;
+      badgeText = '💎 PREMIUM PERMANENTE';
+    } else {
+      badgeColor = Colors.greenAccent;
+      badgeText = '🟢 ACTIVA ($days días)';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: InutilDesignSystem.surfaceElevated,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: user.isAdmin
+              ? Colors.amberAccent.withValues(alpha: 0.35)
+              : InutilDesignSystem.borderSubtle,
+          width: 1.2,
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: badgeColor.withValues(alpha: 0.2),
+                child: Text(
+                  user.displayName.isNotEmpty
+                      ? user.displayName[0].toUpperCase()
+                      : user.email[0].toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      user.displayName.isNotEmpty
+                          ? user.displayName
+                          : user.email.split('@').first,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: InutilDesignSystem.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      user.email,
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: InutilDesignSystem.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: badgeColor.withValues(alpha: 0.4)),
+                ),
+                child: Text(
+                  badgeText,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: badgeColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => InutilAccountDialog.show(context),
+                  icon: const Icon(Icons.manage_accounts_rounded, size: 16),
+                  label: const Text('Mi Suscripción'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white24),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              if (user.isAdmin) ...[
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => InutilAdminPanel.show(context),
+                    icon: const Icon(
+                      Icons.admin_panel_settings_rounded,
+                      size: 16,
+                      color: Colors.amberAccent,
+                    ),
+                    label: const Text(
+                      'Panel Admin César',
+                      style: TextStyle(color: Colors.amberAccent),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber.withValues(alpha: 0.2),
+                      side: const BorderSide(color: Colors.amberAccent),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => showInutilSpotifyImportDialog(context, ref),
+                  icon: const Icon(
+                    Icons.queue_music_rounded,
+                    size: 17,
+                    color: Color(0xFF1DB954),
+                  ),
+                  label: const Text(
+                    'Importar Spotify / CSV',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1DB954).withValues(alpha: 0.18),
+                    side: BorderSide(
+                      color: const Color(0xFF1DB954).withValues(alpha: 0.55),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final release =
+                        await InutilUpdateService.instance.checkForUpdate();
+                    if (context.mounted) {
+                      await showInutilUpdateDialog(context, release);
+                    }
+                  },
+                  icon: const Icon(
+                    Icons.system_update_alt_rounded,
+                    size: 16,
+                    color: InutilDesignSystem.accentCyan,
+                  ),
+                  label: const Text(
+                    'Actualizar App',
+                    style: TextStyle(
+                      color: InutilDesignSystem.accentCyan,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(
+                      color: InutilDesignSystem.accentCyan.withValues(alpha: 0.45),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

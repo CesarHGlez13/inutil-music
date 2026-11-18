@@ -16,8 +16,8 @@ enum AppThemeMode {
 
   static AppThemeMode fromCode(String? code) => switch (code) {
     'light' => AppThemeMode.light,
-    'dark' => AppThemeMode.dark,
-    _ => AppThemeMode.system,
+    'system' => AppThemeMode.system,
+    _ => AppThemeMode.dark,
   };
 }
 

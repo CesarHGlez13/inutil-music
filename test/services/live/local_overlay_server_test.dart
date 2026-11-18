@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/live/local_overlay_hosts.dart';
-import 'package:bstream_music/services/live/local_overlay_server.dart';
+import 'package:inutil_music/services/live/local_overlay_hosts.dart';
+import 'package:inutil_music/services/live/local_overlay_server.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

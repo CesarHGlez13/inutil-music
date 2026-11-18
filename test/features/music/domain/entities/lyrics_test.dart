@@ -1,4 +1,4 @@
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

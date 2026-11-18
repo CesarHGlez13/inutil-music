@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:bstream_music/services/recommendations/recommendation_repository.dart';
-import 'package:bstream_music/services/recommendations/recommendation_storage_models.dart';
-import 'package:bstream_music/services/storage/library_operation_coordinator.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/services/recommendations/recommendation_repository.dart';
+import 'package:inutil_music/services/recommendations/recommendation_storage_models.dart';
+import 'package:inutil_music/services/storage/library_operation_coordinator.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

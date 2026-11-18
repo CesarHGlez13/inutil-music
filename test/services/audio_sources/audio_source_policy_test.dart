@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:bstream_music/services/audio_sources/audio_network_monitor.dart';
-import 'package:bstream_music/services/audio_sources/audio_source_policy.dart';
+import 'package:inutil_music/services/audio_sources/audio_network_monitor.dart';
+import 'package:inutil_music/services/audio_sources/audio_source_policy.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_test/flutter_test.dart';
 

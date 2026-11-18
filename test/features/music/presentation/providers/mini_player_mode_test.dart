@@ -1,4 +1,4 @@
-import 'package:bstream_music/features/music/presentation/providers/mini_player_mode.dart';
+import 'package:inutil_music/features/music/presentation/providers/mini_player_mode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 

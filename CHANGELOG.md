@@ -1,5 +1,30 @@
 # Changelog
 
+## 2.1.0+210 — 2026-11-17
+
+### Added
+
+- Licencias por cuenta en Firestore: el registro queda en estado `pending` y
+  nada suena hasta que la administración concede la vigencia; el panel de
+  administración concede, suspende y reactiva cuentas desde la app.
+- Respaldo en la nube del perfil, playlists, biblioteca y ajustes en
+  `users/{uid}/data`, con restauración automática al reinstalar la app o
+  borrar sus datos y sincronización periódica/por pausa.
+- Una sola sesión de teléfono por cuenta: el teléfono reclama el dispositivo
+  activo y un segundo teléfono desplaza al primero; la PC sigue funcionando
+  como altavoz/control remoto por LAN.
+- Kill switch de actualizaciones forzadas: `app_config/release` publica
+  `minSupportedVersion` y las versiones anteriores quedan bloqueadas con
+  pantalla de actualización obligatoria que no se puede descartar.
+- Reglas de Firestore endurecidas (bootstrap del administrador, roles,
+  respaldo propio, reclamo de teléfono y publicación del manifiesto) y su
+  verificación end-to-end contra el emulador.
+
+### Changed
+
+- Sin credenciales embebidas en el cliente: el único secreto es el identificador
+  público del proyecto Firebase; la seguridad la ejercen las reglas.
+
 ## Unreleased
 
 ### Added

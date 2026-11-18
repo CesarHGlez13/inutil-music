@@ -251,7 +251,7 @@ class LibraryCsvDocument {
     return LibraryCsvDocument(
       tracks: List.unmodifiable(exported.values),
       detectedFormat: LibraryCsvDetectedFormat.bstream,
-      defaultPlaylistName: 'BStream Music',
+      defaultPlaylistName: 'Inútil Music',
       hasPlaylistColumn: true,
     );
   }

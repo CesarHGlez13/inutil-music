@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/utils/cached_artwork_image_provider.dart';
-import 'package:bstream_music/core/utils/image_source.dart';
-import 'package:bstream_music/features/music/presentation/widgets/device_audio_artwork_image_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/core/utils/cached_artwork_image_provider.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
+import 'package:inutil_music/features/music/presentation/widgets/device_audio_artwork_image_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

@@ -3,60 +3,60 @@ import 'dart:convert';
 import 'dart:io' as io;
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/theme/app_ui.dart';
-import 'package:bstream_music/core/widgets/app_shared_widgets.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/marquee_text.dart';
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/features/music/domain/entities/device_audio_track.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist_entry.dart';
-import 'package:bstream_music/features/music/domain/entities/search_result.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/domain/repositories/library_repository.dart';
-import 'package:bstream_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/track_selection_controller.dart';
-import 'package:bstream_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
-import 'package:bstream_music/features/music/presentation/pages/artist_profile_page.dart';
-import 'package:bstream_music/features/music/presentation/pages/home_page.dart';
-import 'package:bstream_music/features/music/presentation/pages/search_view.dart';
-import 'package:bstream_music/features/music/presentation/widgets/library_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/lyrics_text_style_transition.dart';
-import 'package:bstream_music/features/music/presentation/widgets/download_progress_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/decorative_progress_transition.dart';
-import 'package:bstream_music/features/music/presentation/widgets/gradient_progress_bar.dart';
-import 'package:bstream_music/features/music/presentation/widgets/mini_player.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_page_transition.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_gradient_background.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/scrolled_under_tab_frame.dart';
-import 'package:bstream_music/features/music/presentation/widgets/settings_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
-import 'package:bstream_music/features/music/presentation/widgets/track_result_tile.dart';
-import 'package:bstream_music/main.dart';
-import 'package:bstream_music/platform_channels/android_app_activation_channel.dart';
-import 'package:bstream_music/platform_channels/android_external_audio_channel.dart';
-import 'package:bstream_music/services/app_update/github_release_checker.dart';
-import 'package:bstream_music/services/downloader/downloader_service.dart';
-import 'package:bstream_music/services/lyrics/lyrics_service.dart';
-import 'package:bstream_music/services/local_media/device_audio_catalog.dart';
-import 'package:bstream_music/services/local_media/device_audio_filter.dart';
-import 'package:bstream_music/services/local_media/local_media_providers.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/recommendations/recommendations.dart';
-import 'package:bstream_music/services/sharing/incoming_track_link_service.dart';
-import 'package:bstream_music/services/storage/local_library_reconciler.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/theme/app_ui.dart';
+import 'package:inutil_music/core/widgets/app_shared_widgets.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/marquee_text.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/features/music/domain/entities/device_audio_track.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist_entry.dart';
+import 'package:inutil_music/features/music/domain/entities/search_result.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/domain/repositories/library_repository.dart';
+import 'package:inutil_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/track_selection_controller.dart';
+import 'package:inutil_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
+import 'package:inutil_music/features/music/presentation/pages/artist_profile_page.dart';
+import 'package:inutil_music/features/music/presentation/pages/home_page.dart';
+import 'package:inutil_music/features/music/presentation/pages/search_view.dart';
+import 'package:inutil_music/features/music/presentation/widgets/library_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/lyrics_text_style_transition.dart';
+import 'package:inutil_music/features/music/presentation/widgets/download_progress_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/decorative_progress_transition.dart';
+import 'package:inutil_music/features/music/presentation/widgets/gradient_progress_bar.dart';
+import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_page_transition.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_gradient_background.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/scrolled_under_tab_frame.dart';
+import 'package:inutil_music/features/music/presentation/widgets/settings_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/features/music/presentation/widgets/track_result_tile.dart';
+import 'package:inutil_music/main.dart';
+import 'package:inutil_music/platform_channels/android_app_activation_channel.dart';
+import 'package:inutil_music/platform_channels/android_external_audio_channel.dart';
+import 'package:inutil_music/services/app_update/github_release_checker.dart';
+import 'package:inutil_music/services/downloader/downloader_service.dart';
+import 'package:inutil_music/services/lyrics/lyrics_service.dart';
+import 'package:inutil_music/services/local_media/device_audio_catalog.dart';
+import 'package:inutil_music/services/local_media/device_audio_filter.dart';
+import 'package:inutil_music/services/local_media/local_media_providers.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/recommendations/recommendations.dart';
+import 'package:inutil_music/services/sharing/incoming_track_link_service.dart';
+import 'package:inutil_music/services/storage/local_library_reconciler.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart' hide SearchController;
@@ -100,7 +100,7 @@ void main() {
     expect(find.text('Inicio'), findsWidgets);
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('home-tab-title'))).data,
-      'BStream Music',
+      'Inútil Music',
     );
     expect(find.byIcon(Icons.search_rounded), findsWidgets);
     expect(find.text('Reproductor'), findsNothing);
@@ -306,7 +306,12 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('startup checks once and shows a newer release', (tester) async {
+  // Inútil Music actualiza por su propio manifiesto en Firestore (kill switch
+  // obligatorio en InutilUpdateGate), no por releases de GitHub. El arranque
+  // no debe llamar al checker de GitHub: este test fija ese contrato.
+  testWidgets('startup defers update policy to the OTA manifest', (
+    tester,
+  ) async {
     var checkCount = 0;
     final settingsController = _FakeSettingsController(
       const SettingsState(
@@ -321,8 +326,8 @@ void main() {
           checkCount += 1;
           return AppReleaseCheckResult(
             currentVersion: currentVersion,
-            latestVersion: '1.3.2',
-            releaseTag: 'v1.3.2',
+            latestVersion: '2.2.0',
+            releaseTag: 'v2.2.0',
           );
         },
         testHome: const HomePage(checkForUpdatesOnStartup: true),
@@ -331,17 +336,20 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(checkCount, 1);
+    expect(checkCount, 0);
     expect(
       find.byKey(const ValueKey('settings-update-available-dialog')),
-      findsOneWidget,
+      findsNothing,
     );
     await tester.pump(const Duration(seconds: 1));
-    expect(checkCount, 1);
+    expect(checkCount, 0);
+    expect(find.byKey(const ValueKey('home-view')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('offline startup update check fails silently', (tester) async {
+  testWidgets('offline startup stays silent without a GitHub check', (
+    tester,
+  ) async {
     var checkCount = 0;
     final settingsController = _FakeSettingsController(
       const SettingsState(
@@ -362,7 +370,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(checkCount, 1);
+    expect(checkCount, 0);
     expect(
       find.byKey(const ValueKey('settings-update-available-dialog')),
       findsNothing,
@@ -391,7 +399,7 @@ void main() {
 
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('home-tab-title'))).data,
-      'BStream Music',
+      'Inútil Music',
     );
     expect(find.text('Inicio'), findsWidgets);
   });
@@ -1428,10 +1436,15 @@ void main() {
         tester.getRect(homeScroll).bottom,
         tester.getRect(navigation).bottom,
       );
-      expect(navigationColor.a, greaterThan(0.5));
-      expect(navigationColor.a, lessThan(0.6));
-      expect(headerMaterial.color?.a, greaterThan(0.45));
-      expect(headerMaterial.color?.a, lessThan(0.55));
+      // El tema por defecto de Inútil Music es oscuro (AppThemeMode.dark), así
+      // que la barra en modo transparente usa transparentDarkAlpha 0.42 más el
+      // tinte de acento 0.05, lo que da un alfa de 0.449.
+      expect(navigationColor.a, greaterThan(0.4));
+      expect(navigationColor.a, lessThan(0.5));
+      // Mismo criterio que la barra: con el tema oscuro por defecto el header
+      // transparente queda en ~0.43 de alfa.
+      expect(headerMaterial.color?.a, greaterThan(0.4));
+      expect(headerMaterial.color?.a, lessThan(0.5));
       expect(
         find.ancestor(of: header, matching: find.byType(BackdropFilter)),
         findsOneWidget,
@@ -2589,8 +2602,17 @@ void main() {
       expect(expandedDestination(3), findsOneWidget);
       expect(expandedDestination(4), findsOneWidget);
 
+      // Tras el estante de acciones rápidas, el centro del scroll cae encima
+      // de un estante horizontal. El gesto se ancla a la franja del primer
+      // título de sección: superficie lisa del scroll vertical raíz.
+      final verticalGestureAnchor = find
+          .descendant(
+            of: find.byKey(const ValueKey('home-view')),
+            matching: find.byType(AppSectionTitle),
+          )
+          .first;
       final scrollGesture = await tester.startGesture(
-        tester.getCenter(homeScroll),
+        tester.getCenter(verticalGestureAnchor),
       );
       await scrollGesture.moveBy(const Offset(0, -180));
       await tester.pump();
@@ -3478,9 +3500,18 @@ void main() {
       isA<KeyedSubtree>(),
       reason: 'Liquid chrome must stay outside an Opacity layer.',
     );
+    // Tras el estante de acciones rápidas, el centro del scroll cae encima
+    // de un estante horizontal. El gesto se ancla a la franja del primer
+    // título de sección: superficie lisa del scroll vertical raíz.
+    final verticalGestureAnchor = find
+        .descendant(
+        of: find.byKey(const ValueKey('home-view')),
+        matching: find.byType(AppSectionTitle),
+        )
+        .first;
     final initialMiniPlayerRect = tester.getRect(miniPlayer);
 
-    await tester.drag(homeScroll, const Offset(0, -20));
+    await tester.drag(verticalGestureAnchor, const Offset(0, -20));
     await tester.pump(const Duration(milliseconds: 320));
 
     expect(currentPosition().pixels, greaterThan(0));
@@ -6893,7 +6924,8 @@ void main() {
       );
       expect(calls, 1);
       expect(refresh, findsOneWidget);
-      expect(tester.getSize(refresh), const Size.square(48));
+      // El cromo del Home compacto usa botones de 38 pt desde el rediseño.
+      expect(tester.getSize(refresh), const Size.square(38));
       expect(
         tester.widget<IconButton>(refresh).tooltip,
         'Refrescar recomendaciones',
@@ -7221,23 +7253,43 @@ void main() {
       required Finder header,
       required Finder title,
       required Finder firstSection,
+      bool checkTopGap = true,
     }) {
       expect(
         tester.getTopLeft(firstSection).dx,
         closeTo(tester.getTopLeft(title).dx, 0.01),
       );
-      expect(
-        tester.getTopLeft(firstSection).dy - tester.getBottomLeft(header).dy,
-        closeTo(appTabFirstSectionTopGap, 0.01),
-      );
+      if (checkTopGap) {
+        expect(
+          tester.getTopLeft(firstSection).dy - tester.getBottomLeft(header).dy,
+          closeTo(appTabFirstSectionTopGap, 0.01),
+        );
+      }
     }
 
+    // El Home abre con el estante de acciones rápidas (Spotify, Dispositivos,
+    // Admin, OTA): ese estante es el primer contenido y empuja hacia abajo el
+    // título de la primera sección. El inset horizontal sí se comparte.
     expectSharedInsets(
       header: find.byKey(const ValueKey('home-tab-header-surface')),
       title: find.byKey(const ValueKey('home-tab-title')),
       firstSection: find.byKey(
         const ValueKey('home-section-title-Escuchado recientemente'),
       ),
+      checkTopGap: false,
+    );
+    expect(
+      tester.getTopLeft(
+        find.byKey(
+          const ValueKey('home-section-title-Escuchado recientemente'),
+        ),
+      ).dy -
+          tester.getBottomLeft(
+            find.byKey(const ValueKey('home-tab-header-surface')),
+          ).dy,
+      greaterThan(appTabFirstSectionTopGap),
+      reason: 'El estante de acciones rápidas vive entre el header y la '
+          'primera sección del Home.',
     );
 
     await tester.tap(find.text('Biblioteca').last);
@@ -7985,8 +8037,8 @@ void main() {
           checkedVersions.add(currentVersion);
           return AppReleaseCheckResult(
             currentVersion: currentVersion,
-            latestVersion: '1.3.2',
-            releaseTag: 'v1.3.2',
+            latestVersion: '2.2.0',
+            releaseTag: 'v2.2.0',
           );
         },
       ),
@@ -8015,7 +8067,7 @@ void main() {
     expect(find.text('Nueva versión disponible'), findsOneWidget);
     expect(
       find.text(
-        'BStream Music 1.3.2 está disponible. Versión actual: ${AppConstants.appVersion}.',
+        'Inútil Music 2.2.0 está disponible. Versión actual: ${AppConstants.appVersion}.',
       ),
       findsOneWidget,
     );
@@ -10844,7 +10896,7 @@ Widget _testApp({
       libraryRepositoryProvider.overrideWithValue(resolvedLibraryRepository),
     ],
     child: testHome == null
-        ? const BStreamMusicApp()
+        ? const BStreamMusicApp(enforceLicenseGates: false)
         : MaterialApp(
             theme: ThemeData(
               useMaterial3: true,

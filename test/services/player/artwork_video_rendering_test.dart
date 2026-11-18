@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/services/player/artwork_video_rendering.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/services/player/artwork_video_rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';

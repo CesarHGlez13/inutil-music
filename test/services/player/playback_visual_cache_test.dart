@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bstream_music/services/player/playback_visual_cache.dart';
+import 'package:inutil_music/services/player/playback_visual_cache.dart';
 
 Future<void> waitFor(bool Function() ready) async {
   final deadline = DateTime.now().add(const Duration(seconds: 5));

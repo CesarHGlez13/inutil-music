@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "BStream Music" "\0"
-            VALUE "FileDescription", "BStream Music" "\0"
+            VALUE "CompanyName", "Inútil Music" "\0"
+            VALUE "FileDescription", "Inútil Music" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "BStream Music" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 BStream Music. All rights reserved." "\0"
+            VALUE "InternalName", "Inútil Music" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Inútil Music · basado en BStream Music (BSD-2-Clause)" "\0"
             VALUE "OriginalFilename", "bstream_music.exe" "\0"
-            VALUE "ProductName", "BStream Music" "\0"
+            VALUE "ProductName", "Inútil Music" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

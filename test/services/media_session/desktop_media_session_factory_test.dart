@@ -1,7 +1,7 @@
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/services/media_session/audio_service_desktop_media_session.dart';
-import 'package:bstream_music/services/media_session/desktop_media_session_factory.dart';
-import 'package:bstream_music/services/media_session/windows_smtc_media_session.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/services/media_session/audio_service_desktop_media_session.dart';
+import 'package:inutil_music/services/media_session/desktop_media_session_factory.dart';
+import 'package:inutil_music/services/media_session/windows_smtc_media_session.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

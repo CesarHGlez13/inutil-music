@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/providers/player/remote_prefetch_coordinator.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/providers/player/remote_prefetch_coordinator.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

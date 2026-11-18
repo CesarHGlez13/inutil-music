@@ -1,4 +1,4 @@
-import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_consent_store.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/playlist_sync_consent_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

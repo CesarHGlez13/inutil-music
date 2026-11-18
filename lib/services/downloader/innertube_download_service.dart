@@ -571,7 +571,7 @@ final class InnerTubeDownloadService
     if (artist.isNotEmpty && artist != 'Desconocido' && title.isNotEmpty) {
       return '$artist - $title';
     }
-    return title.isNotEmpty ? title : 'BStream - ${track.id}';
+    return title.isNotEmpty ? title : 'Inútil Music - ${track.id}';
   }
 
   Future<File> _availableDestination(

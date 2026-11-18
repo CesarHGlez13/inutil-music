@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/services/player/media_kit_player_service.dart';
-import 'package:bstream_music/services/player/player_audio_output.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/services/player/media_kit_player_service.dart';
+import 'package:inutil_music/services/player/player_audio_output.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';

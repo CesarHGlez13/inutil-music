@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_validator.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

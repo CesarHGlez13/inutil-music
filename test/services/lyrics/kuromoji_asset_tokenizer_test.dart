@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:bstream_music/services/lyrics/kuromoji_asset_tokenizer.dart';
+import 'package:inutil_music/services/lyrics/kuromoji_asset_tokenizer.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

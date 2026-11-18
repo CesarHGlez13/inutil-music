@@ -2,17 +2,17 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:isolate';
 
-import 'package:bstream_music/core/utils/background_work.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/ejs_solver.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_router.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_playback_service.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_player_bootstrap.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_models.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_validator.dart';
-import 'package:bstream_music/services/youtube_music/playback/po_token_binding.dart';
-import 'package:bstream_music/services/youtube_music/playback/po_token_provider.dart';
+import 'package:inutil_music/core/utils/background_work.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/ejs_solver.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_router.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_playback_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_player_bootstrap.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_models.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
+import 'package:inutil_music/services/youtube_music/playback/po_token_binding.dart';
+import 'package:inutil_music/services/youtube_music/playback/po_token_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

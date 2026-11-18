@@ -104,9 +104,70 @@ static void window_method_call_cb(FlMethodChannel* channel, FlMethodCall* call,
   fl_method_call_respond_success(call, nullptr, nullptr);
 }
 
+// Some GL stacks (notably NVIDIA under GNOME on XWayland) report a device pixel
+// ratio of 2 for the first frames while the window surface is still 1:1, so the
+// GL viewport ends up at half the framebuffer size and the whole scene is
+// painted into the bottom-left quarter of the window with the rest left black.
+// The ratio settles shortly after the window is mapped, and any real window
+// resize then makes the embedder recompute the viewport. A short series of
+// one-pixel resizes covers the whole settling window without the user noticing
+// anything: each attempt alternates the delta so it is always an actual size
+// change.
+typedef struct {
+  GtkWindow* window;
+  int width;
+  int height;
+  int attempts;
+} ViewportNudge;
+
+static constexpr int kViewportNudgeDelaysMs[] = {500, 900, 1000, 1200, 1500};
+static constexpr int kViewportNudgeAttempts =
+    static_cast<int>(sizeof(kViewportNudgeDelaysMs) / sizeof(int));
+
+static gboolean nudge_viewport_cb(gpointer user_data) {
+  ViewportNudge* nudge = static_cast<ViewportNudge*>(user_data);
+  if (!GTK_IS_WINDOW(nudge->window) || gtk_window_is_maximized(nudge->window)) {
+    g_free(nudge);
+    return G_SOURCE_REMOVE;
+  }
+
+  nudge->attempts += 1;
+  // Alternate the delta so consecutive attempts always change the size.
+  const int delta = (nudge->attempts % 2) == 1 ? 1 : 2;
+  gtk_window_resize(nudge->window, nudge->width + delta, nudge->height + delta);
+
+  if (nudge->attempts >= kViewportNudgeAttempts) {
+    g_free(nudge);
+    return G_SOURCE_REMOVE;
+  }
+  g_timeout_add(kViewportNudgeDelaysMs[nudge->attempts], nudge_viewport_cb,
+                nudge);
+  return G_SOURCE_REMOVE;
+}
+
+static void nudge_viewport_after_first_frame(GtkWidget* toplevel) {
+  GtkWindow* window = GTK_WINDOW(toplevel);
+  GdkWindowState state = gdk_window_get_state(gtk_widget_get_window(toplevel));
+  if (gtk_window_is_maximized(window) ||
+      (state & (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_FULLSCREEN))) {
+    return;
+  }
+  int width = 0, height = 0;
+  gtk_window_get_size(window, &width, &height);
+  if (width <= 4 || height <= 4) return;
+  ViewportNudge* nudge = g_new(ViewportNudge, 1);
+  nudge->window = window;
+  nudge->width = width;
+  nudge->height = height;
+  nudge->attempts = 0;
+  g_timeout_add(kViewportNudgeDelaysMs[0], nudge_viewport_cb, nudge);
+}
+
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
-  gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+  GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+  gtk_widget_show(toplevel);
+  nudge_viewport_after_first_frame(toplevel);
 }
 
 static void load_bundled_window_icon() {
@@ -170,17 +231,18 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "BStream Music");
+    gtk_header_bar_set_title(header_bar, "Inútil Music");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "BStream Music");
+    gtk_window_set_title(window, "Inútil Music");
   }
 
   gtk_window_set_default_size(window, 1280, 720);
   gtk_widget_set_size_request(GTK_WIDGET(window), 960, 600);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
+  fl_dart_project_set_enable_impeller(project, FALSE);
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
 
@@ -243,9 +305,9 @@ static void my_application_startup(GApplication* application) {
   // audio stream. GTK forwards these values to PulseAudio/PipeWire, allowing
   // volume controls to show the application name and its XDG icon instead of
   // the executable and package defaults.
-  g_set_application_name("BStream Music");
+  g_set_application_name("Inútil Music");
   gtk_window_set_default_icon_name(APPLICATION_ID);
-  g_setenv("PULSE_PROP_application.name", "BStream Music", TRUE);
+  g_setenv("PULSE_PROP_application.name", "Inútil Music", TRUE);
   g_setenv("PULSE_PROP_application.icon_name", APPLICATION_ID, TRUE);
   g_setenv("PULSE_PROP_media.role", "music", TRUE);
   // Fedora commonly uses mpv's native PipeWire backend instead of
@@ -253,9 +315,9 @@ static void my_application_startup(GApplication* application) {
   // stream metadata independent of the executable name.
   g_setenv(
       "PIPEWIRE_PROPS",
-      "{ application.name = \"BStream Music\" application.icon-name = "
-      "\"com.bstream.bstream_music\" application.id = "
-      "\"com.bstream.bstream_music\" }",
+      "{ application.name = \"Inútil Music\" application.icon-name = "
+      "\"com.inutilmusic.app\" application.id = "
+      "\"com.inutilmusic.app\" }",
       TRUE);
 
   G_APPLICATION_CLASS(my_application_parent_class)->startup(application);

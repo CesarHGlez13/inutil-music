@@ -1,13 +1,13 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/features/music/presentation/providers/live_overlay_controller.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/settings_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/live_widget_style_settings.dart';
-import 'package:bstream_music/services/live/local_overlay_hosts.dart';
-import 'package:bstream_music/services/live/tiktok_live_command_service.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/presentation/providers/live_overlay_controller.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/settings_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/live_widget_style_settings.dart';
+import 'package:inutil_music/services/live/local_overlay_hosts.dart';
+import 'package:inutil_music/services/live/tiktok_live_command_service.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

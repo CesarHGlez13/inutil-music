@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/services/live/local_overlay_hosts.dart';
+import 'package:inutil_music/services/live/local_overlay_hosts.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _hostsPath = r'C:\Windows\System32\drivers\etc\hosts';

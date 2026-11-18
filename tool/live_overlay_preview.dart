@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/features/music/presentation/services/live_overlay_document.dart';
-import 'package:bstream_music/features/music/presentation/providers/live_widget_style.dart';
-import 'package:bstream_music/services/live/local_overlay_hosts.dart';
-import 'package:bstream_music/services/live/local_overlay_server.dart';
+import 'package:inutil_music/features/music/presentation/services/live_overlay_document.dart';
+import 'package:inutil_music/features/music/presentation/providers/live_widget_style.dart';
+import 'package:inutil_music/services/live/local_overlay_hosts.dart';
+import 'package:inutil_music/services/live/local_overlay_server.dart';
 
 /// Starts the real loopback-only HTTP/WS overlay with sample queue data.
 ///

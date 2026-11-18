@@ -1,10 +1,10 @@
-import 'package:bstream_music/features/music/presentation/widgets/track_change_transition.dart';
+import 'package:inutil_music/features/music/presentation/widgets/track_change_transition.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   testWidgets(
-    'keeps the outgoing surface opaque while the next song fades over it',
+    'fades out outgoing metadata before incoming metadata appears so text never overlaps',
     (tester) async {
       var identity = 'first';
       late StateSetter update;
@@ -30,7 +30,9 @@ void main() {
 
       update(() => identity = 'second');
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 210));
+      // At 45% through the 300ms transition (135ms), outgoing is already 0.0
+      // while incoming is fading in cleanly.
+      await tester.pump(const Duration(milliseconds: 150));
 
       Finder nearestAncestor(String value, Type type) {
         final candidates = find
@@ -56,20 +58,11 @@ void main() {
           tester.widget<FractionalTranslation>(
             nearestAncestor(value, FractionalTranslation),
           );
-      Transform scaleFor(String value) =>
-          tester.widget<Transform>(nearestAncestor(value, Transform));
 
-      expect(opacityFor('first').opacity, 1);
+      expect(opacityFor('first').opacity, 0);
       expect(opacityFor('second').opacity, greaterThan(0));
       expect(opacityFor('second').opacity, lessThan(1));
-      expect(translationFor('first').translation, Offset.zero);
       expect(translationFor('second').translation.dy, greaterThan(0));
-      expect(translationFor('second').translation.dy, lessThan(0.025));
-      expect(scaleFor('first').transform.entry(0, 0), 1);
-      expect(
-        scaleFor('second').transform.entry(0, 0),
-        inExclusiveRange(0.985, 1),
-      );
       expect(tester.takeException(), isNull);
     },
   );

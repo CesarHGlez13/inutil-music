@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/services/live/tiktok_live_command_service.dart';
+import 'package:inutil_music/services/live/tiktok_live_command_service.dart';
 
 /// Manual end-to-end check for the direct Dart TikTok LIVE transport.
 ///

@@ -104,7 +104,7 @@ class SettingsState {
   const SettingsState({
     required this.downloadDirectory,
     required this.language,
-    this.themeMode = AppThemeMode.system,
+    this.themeMode = AppThemeMode.dark,
     this.accent = AppAccent.white,
     this.surfaceBackgroundMode = SurfaceBackgroundMode.accent,
     this.appBackgroundFileName,

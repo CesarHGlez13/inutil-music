@@ -1,8 +1,8 @@
-import 'package:bstream_music/features/music/domain/entities/device_audio_track.dart';
-import 'package:bstream_music/platform_channels/ios_local_media_channel.dart';
-import 'package:bstream_music/services/local_media/device_audio_catalog.dart';
-import 'package:bstream_music/services/local_media/device_audio_filter.dart';
-import 'package:bstream_music/services/local_media/ios_device_audio_catalog.dart';
+import 'package:inutil_music/features/music/domain/entities/device_audio_track.dart';
+import 'package:inutil_music/platform_channels/ios_local_media_channel.dart';
+import 'package:inutil_music/services/local_media/device_audio_catalog.dart';
+import 'package:inutil_music/services/local_media/device_audio_filter.dart';
+import 'package:inutil_music/services/local_media/ios_device_audio_catalog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

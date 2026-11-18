@@ -33,9 +33,15 @@ import '../../domain/usecases/get_track_info.dart';
 import '../providers/music_providers.dart';
 import '../providers/local_track_index_provider.dart';
 import '../providers/track_selection_controller.dart';
+import '../widgets/inutil_account_dialog.dart';
+import '../widgets/inutil_admin_panel.dart';
+import '../widgets/inutil_connect_sheet.dart';
+import '../widgets/inutil_spotify_import_dialog.dart';
+import '../../../../core/firebase/firebase_sync_providers.dart';
+import '../../../../core/firebase/inutil_update_service.dart';
+import '../../../../core/theme/inutil_design_system.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
-import '../widgets/app_update_dialog.dart';
 import '../widgets/bstream_logo.dart';
 import '../widgets/favorite_star_badge.dart';
 import '../widgets/home_loading_content.dart';
@@ -529,42 +535,8 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _checkForAppUpdateAtStartup() async {
-    try {
-      final result = await ref.read(settingsReleaseCheckerProvider)(
-        currentVersion: AppConstants.appVersion,
-      );
-      if (!mounted || !result.updateAvailable) {
-        return;
-      }
-      await showAppUpdateAvailableDialog(
-        context: context,
-        strings: ref.read(appStringsProvider),
-        release: result,
-        onDownload: _openStartupUpdateDownloadPage,
-      );
-    } catch (_) {
-      // Startup update checks are optional. Offline launches and transient
-      // GitHub failures must never interrupt, delay or notify the user.
-    }
-  }
-
-  Future<void> _openStartupUpdateDownloadPage() async {
-    final strings = ref.read(appStringsProvider);
-    try {
-      final opened = await ref.read(settingsExternalLauncherProvider)(
-        Uri.parse(AppConstants.appDownloadUrl),
-      );
-      if (!mounted || opened) {
-        return;
-      }
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-    }
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(strings.updateDownloadOpenFailed)));
+    // Inútil Music uses independent release channels.
+    return;
   }
 
   Future<void> _addRemoteTracksToPlaylist(
@@ -3693,16 +3665,20 @@ class _HomeView extends ConsumerWidget {
       header: Row(
         children: [
           Expanded(
-            child: Text(
-              key: const ValueKey('home-tab-title'),
-              'BStream Music',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: appTabTitleStyle(context),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                key: const ValueKey('home-tab-title'),
+                AppConstants.appName,
+                maxLines: 1,
+                style: appTabTitleStyle(context),
+              ),
             ),
           ),
+          const SizedBox(width: 4),
           SizedBox.square(
-            dimension: 48,
+            dimension: 38,
             child: IconButton(
               key: const ValueKey('home-recommendations-refresh'),
               tooltip: strings.refreshHomeRecommendations,
@@ -3711,13 +3687,13 @@ class _HomeView extends ConsumerWidget {
                   : () => unawaited(
                       ref.read(homeRecommendationsProvider.notifier).refresh(),
                     ),
-              iconSize: 30,
-              padding: const EdgeInsets.all(6),
+              iconSize: 22,
+              padding: EdgeInsets.zero,
               icon: recommendationsState.isLoading
                   ? SizedBox.square(
-                      dimension: 26,
+                      dimension: 20,
                       child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
+                        strokeWidth: 2.2,
                         semanticsLabel: strings.refreshingHomeRecommendations,
                       ),
                     )
@@ -3725,7 +3701,54 @@ class _HomeView extends ConsumerWidget {
             ),
           ),
           SizedBox.square(
-            dimension: 48,
+            dimension: 38,
+            child: IconButton(
+              tooltip: 'Importar Playlists de Spotify / CSV',
+              padding: EdgeInsets.zero,
+              iconSize: 21,
+              onPressed: () => showInutilSpotifyImportDialog(context, ref),
+              icon: const Icon(
+                Icons.queue_music_rounded,
+                color: Color(0xFF1DB954),
+              ),
+            ),
+          ),
+          SizedBox.square(
+            dimension: 38,
+            child: IconButton(
+              tooltip: 'Dispositivos y Sincronización',
+              padding: EdgeInsets.zero,
+              iconSize: 21,
+              onPressed: () => InutilConnectSheet.show(context),
+              icon: const Icon(Icons.devices_rounded),
+            ),
+          ),
+          if (ref.watch(inutilAuthProvider).currentUser?.isAdmin == true)
+            SizedBox.square(
+              dimension: 38,
+              child: IconButton(
+                tooltip: 'Panel de Administración César',
+                padding: EdgeInsets.zero,
+                iconSize: 21,
+                onPressed: () => InutilAdminPanel.show(context),
+                icon: const Icon(
+                  Icons.admin_panel_settings_rounded,
+                  color: Colors.amberAccent,
+                ),
+              ),
+            ),
+          SizedBox.square(
+            dimension: 38,
+            child: IconButton(
+              tooltip: 'Cuenta Inútil Music',
+              padding: EdgeInsets.zero,
+              iconSize: 21,
+              onPressed: () => InutilAccountDialog.show(context),
+              icon: const Icon(Icons.account_circle_rounded),
+            ),
+          ),
+          SizedBox.square(
+            dimension: 38,
             child: YouTubeMusicAccountButton(strings: strings),
           ),
         ],
@@ -3737,6 +3760,54 @@ class _HomeView extends ConsumerWidget {
           ? const ScrollCacheExtent.pixels(600)
           : const ScrollCacheExtent.pixels(900),
       slivers: [
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _InutilQuickActionChip(
+                    icon: Icons.queue_music_rounded,
+                    label: 'Importar de Spotify',
+                    accentColor: const Color(0xFF1DB954),
+                    onTap: () => showInutilSpotifyImportDialog(context, ref),
+                  ),
+                  const SizedBox(width: 8),
+                  _InutilQuickActionChip(
+                    icon: Icons.devices_rounded,
+                    label: 'Sincronizar Dispositivos',
+                    accentColor: InutilDesignSystem.accentCyan,
+                    onTap: () => InutilConnectSheet.show(context),
+                  ),
+                  if (ref.watch(inutilAuthProvider).currentUser?.isAdmin ==
+                      true) ...[
+                    const SizedBox(width: 8),
+                    _InutilQuickActionChip(
+                      icon: Icons.admin_panel_settings_rounded,
+                      label: 'Panel Admin César',
+                      accentColor: Colors.amberAccent,
+                      onTap: () => InutilAdminPanel.show(context),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
+                  _InutilQuickActionChip(
+                    icon: Icons.system_update_alt_rounded,
+                    label: 'Actualizar App (OTA)',
+                    accentColor: InutilDesignSystem.primaryNeon,
+                    onTap: () async {
+                      final release =
+                          await InutilUpdateService.instance.checkForUpdate();
+                      if (context.mounted) {
+                        await showInutilUpdateDialog(context, release);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         if (showLegacyHistory)
           SliverToBoxAdapter(
             child: _HomeRecentSection(
@@ -4654,4 +4725,68 @@ double _singleLineTextHeight(BuildContext context, TextStyle? style) {
   final height = painter.height;
   painter.dispose();
   return height;
+}
+
+class _InutilQuickActionChip extends StatelessWidget {
+  const _InutilQuickActionChip({
+    required this.icon,
+    required this.label,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: LinearGradient(
+              colors: [
+                accentColor.withValues(alpha: 0.22),
+                InutilDesignSystem.surfaceElevated.withValues(alpha: 0.92),
+              ],
+            ),
+            border: Border.all(
+              color: accentColor.withValues(alpha: 0.55),
+              width: 1.1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: accentColor.withValues(alpha: 0.16),
+                blurRadius: 12,
+                spreadRadius: 0.5,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: accentColor),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

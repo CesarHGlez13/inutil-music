@@ -1,7 +1,7 @@
 import 'dart:isolate';
 
-import 'package:bstream_music/core/utils/background_work.dart';
-import 'package:bstream_music/services/youtube_music/account/youtube_music_account.dart';
+import 'package:inutil_music/core/utils/background_work.dart';
+import 'package:inutil_music/services/youtube_music/account/youtube_music_account.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

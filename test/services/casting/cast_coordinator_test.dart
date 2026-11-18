@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/services/casting/cast_coordinator.dart';
-import 'package:bstream_music/services/casting/dlna_cast_client.dart';
-import 'package:bstream_music/services/casting/media_cast_relay.dart';
-import 'package:bstream_music/services/casting/native_cast_client.dart';
+import 'package:inutil_music/services/casting/cast_coordinator.dart';
+import 'package:inutil_music/services/casting/dlna_cast_client.dart';
+import 'package:inutil_music/services/casting/media_cast_relay.dart';
+import 'package:inutil_music/services/casting/native_cast_client.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _speaker = CastDevice(

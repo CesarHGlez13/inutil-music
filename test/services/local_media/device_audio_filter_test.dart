@@ -1,6 +1,6 @@
-import 'package:bstream_music/features/music/domain/entities/device_audio_track.dart';
-import 'package:bstream_music/services/local_media/device_audio_filter.dart';
-import 'package:bstream_music/services/local_media/device_audio_grouping.dart';
+import 'package:inutil_music/features/music/domain/entities/device_audio_track.dart';
+import 'package:inutil_music/services/local_media/device_audio_filter.dart';
+import 'package:inutil_music/services/local_media/device_audio_grouping.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:isolate';
 
-import 'package:bstream_music/core/utils/background_work.dart';
-import 'package:bstream_music/services/youtube_music/innertube_json_parser.dart';
+import 'package:inutil_music/core/utils/background_work.dart';
+import 'package:inutil_music/services/youtube_music/innertube_json_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 String? _isolateName(Object? _) => Isolate.current.debugName;

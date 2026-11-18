@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
 
 void main() {
   group('AppLanguage', () {
@@ -205,7 +205,7 @@ void main() {
         latestVersion: latestVersion,
         currentVersion: currentVersion,
       ),
-      'BStream Music $latestVersion está disponible. '
+      'Inútil Music $latestVersion está disponible. '
       'Versión actual: $currentVersion.',
     );
     expect(
@@ -220,7 +220,7 @@ void main() {
         currentVersion: currentVersion,
       );
       final heading = strings.updateReleaseNotesTitle(latestVersion);
-      expect(message, contains('BStream Music'), reason: language.code);
+      expect(message, contains('Inútil Music'), reason: language.code);
       expect(message, contains(latestVersion), reason: language.code);
       expect(message, contains(currentVersion), reason: language.code);
       expect(heading, contains(latestVersion), reason: language.code);

@@ -6,8 +6,8 @@ Version:        %{app_version}
 Release:        1
 Summary:        Reproductor y gestor musical multiplataforma
 License:        Proprietary
-URL:            https://github.com/BryamContreras/BStream-Music
-Vendor:         BryamContreras
+URL:            https://github.com/CesarHGlez13/inutil-music
+Vendor:         Inútil Music
 BuildArch:      x86_64
 AutoReqProv:    no
 
@@ -19,7 +19,7 @@ Requires:       glibc
 Requires:       libstdc++
 
 %description
-BStream Music permite buscar, reproducir, descargar y organizar musica,
+Inútil Music permite buscar, reproducir, descargar y organizar musica,
 playlists y favoritos desde una interfaz construida con Flutter.
 
 %install

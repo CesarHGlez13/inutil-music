@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/constants/app_constants.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -28,7 +28,7 @@ void main() {
       r'#define MyAppVersion "([0-9]+\.[0-9]+\.[0-9]+)"',
     ).firstMatch(windowsInstaller)?.group(1);
 
-    expect(pubspecVersion, '1.3.1+131');
+    expect(pubspecVersion, '2.1.0+210');
     expect(readmeVersion, pubspecVersion);
     expect(changelogVersion, pubspecVersion);
     expect(runtimeVersion, AppConstants.appVersion);
@@ -43,13 +43,53 @@ void main() {
   test('uses the requested search size and official project URLs', () {
     expect(AppConstants.defaultSearchLimit, 20);
     expect(
-      AppConstants.supportDevelopmentUrl,
-      'https://ko-fi.com/soybryam06c/donate',
+      AppConstants.githubRepositoryUrl,
+      'https://github.com/CesarHGlez13/inutil-music',
     );
     expect(
-      AppConstants.githubRepositoryUrl,
-      'https://github.com/BryamContreras/BStream-Music',
+      AppConstants.appDownloadUrl,
+      'https://github.com/CesarHGlez13/inutil-music/releases/latest',
     );
+    // El contacto propio coincide con el fundador de las reglas de Firestore.
+    expect(AppConstants.supportEmail, 'cesar@inutilmusic.com');
+    // El único resto del proyecto original en estas constantes es el credito
+    // legal que exige la licencia BSD-2-Clause del upstream.
+    expect(AppConstants.upstreamCredit, contains('BSD-2-Clause'));
+  });
+
+  test('brand strings point at Inútil Music, not the upstream project', () {
+    final constants = File('lib/core/constants/app_constants.dart')
+        .readAsStringSync();
+    final settingsPanel = File(
+      'lib/features/music/presentation/widgets/settings_panel.dart',
+    ).readAsStringSync();
+    final widgetEs = File(
+      'android/app/src/main/res/values/widget_strings.xml',
+    ).readAsStringSync();
+    final widgetEn = File(
+      'android/app/src/main/res/values-en/widget_strings.xml',
+    ).readAsStringSync();
+
+    expect(AppConstants.appName, 'Inútil Music');
+    // Ninguna URL del repositorio, las descargas o el contacto debe apuntar ya
+    // al proyecto original.
+    for (final stale in <String>[
+      'BryamContreras/BStream-Music',
+      'bstreammusic.pages.dev',
+    ]) {
+      expect(constants, isNot(contains(stale)), reason: '$stale must be gone');
+    }
+    // El pie de Ajustes muestra la marca propia y conserva el credito legal.
+    expect(settingsPanel, contains("'Inútil Music v\${AppConstants.appVersion} · '"));
+    expect(settingsPanel, contains('AppConstants.upstreamCredit'));
+    expect(settingsPanel, contains('AppConstants.supportEmail'));
+    // El nombre del widget visible en el launcher debe ser el nuestro.
+    for (final xml in <String>[widgetEs, widgetEn]) {
+      expect(xml, isNot(contains('BStream Music')));
+      expect(xml, contains('Inútil Music'));
+    }
+    // Sin mojibake en las cadenas en español.
+    expect(widgetEs, isNot(contains('canciÃ³n')));
   });
 
   test('uses only the in-process Dart YouTube resolver architecture', () {

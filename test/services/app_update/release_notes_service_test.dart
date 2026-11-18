@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:bstream_music/services/app_update/github_release_checker.dart';
-import 'package:bstream_music/services/app_update/release_notes_service.dart';
-import 'package:bstream_music/services/lyrics/lyrics_translation_service.dart';
+import 'package:inutil_music/services/app_update/github_release_checker.dart';
+import 'package:inutil_music/services/app_update/release_notes_service.dart';
+import 'package:inutil_music/services/lyrics/lyrics_translation_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

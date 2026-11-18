@@ -1,6 +1,6 @@
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/providers/player_style.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_style_gallery.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/providers/player_style.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_style_gallery.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -69,7 +69,7 @@ void main() {
       expect(
         find.descendant(
           of: previewFinder,
-          matching: find.text('BStream Music'),
+          matching: find.text('Inútil Music'),
         ),
         findsNWidgets(2),
       );

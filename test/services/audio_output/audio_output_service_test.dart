@@ -1,4 +1,4 @@
-import 'package:bstream_music/services/audio_output/audio_output_service.dart';
+import 'package:inutil_music/services/audio_output/audio_output_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

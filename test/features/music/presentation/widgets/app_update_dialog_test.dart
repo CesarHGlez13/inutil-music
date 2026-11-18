@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/providers/app_update_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/app_update_dialog.dart';
-import 'package:bstream_music/services/app_update/github_release_checker.dart';
-import 'package:bstream_music/services/app_update/release_notes_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_update_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/app_update_dialog.dart';
+import 'package:inutil_music/services/app_update/github_release_checker.dart';
+import 'package:inutil_music/services/app_update/release_notes_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -30,7 +30,7 @@ void main() {
 
     expect(find.text('Nueva versión disponible'), findsOneWidget);
     expect(
-      find.text('BStream Music 1.3.0 está disponible. Versión actual: 1.2.9.'),
+      find.text('Inútil Music 1.3.0 está disponible. Versión actual: 1.2.9.'),
       findsOneWidget,
     );
     expect(find.text('Novedades 1.3.0'), findsOneWidget);

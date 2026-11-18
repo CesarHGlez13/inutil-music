@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/audio_sources/audio_format_details.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/audio_sources/audio_format_details.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -321,7 +321,7 @@ void main() {
               .having(
                 (error) => error.message,
                 'message',
-                contains('cannot be persisted in the BStream library'),
+                contains('cannot be persisted in the Inútil Music library'),
               ),
         ),
       );

@@ -1,8 +1,8 @@
 import 'dart:convert';
 
-import 'package:bstream_music/features/music/data/models/local_track_model.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/audio_sources/audio_format_details.dart';
+import 'package:inutil_music/features/music/data/models/local_track_model.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/audio_sources/audio_format_details.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

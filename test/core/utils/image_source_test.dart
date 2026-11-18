@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/utils/image_source.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/services/lyrics/lrclib_transport.dart';
-import 'package:bstream_music/services/lyrics/remote_lyrics_parsing.dart';
-import 'package:bstream_music/services/lyrics/youlyplus_lyrics_service.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/services/lyrics/lrclib_transport.dart';
+import 'package:inutil_music/services/lyrics/remote_lyrics_parsing.dart';
+import 'package:inutil_music/services/lyrics/youlyplus_lyrics_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

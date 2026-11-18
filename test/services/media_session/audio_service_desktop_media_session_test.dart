@@ -1,7 +1,7 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:bstream_music/services/media_session/audio_service_desktop_media_session.dart';
-import 'package:bstream_music/services/media_session/desktop_media_session.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/services/media_session/audio_service_desktop_media_session.dart';
+import 'package:inutil_music/services/media_session/desktop_media_session.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

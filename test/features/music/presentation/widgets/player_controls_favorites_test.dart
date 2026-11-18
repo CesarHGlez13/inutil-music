@@ -2,29 +2,29 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/marquee_text.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/audio_source_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/local_audio_quality_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/animated_artwork_motion.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_controls_capsule.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_dismiss_region.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_gradient_background.dart';
-import 'package:bstream_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
-import 'package:bstream_music/features/music/presentation/widgets/uniform_playback_slider_track_shape.dart';
-import 'package:bstream_music/features/music/presentation/widgets/wavy_playback_seek_bar.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/player/local_audio_quality_service.dart';
-import 'package:bstream_music/services/sharing/track_share_service.dart';
-import 'package:bstream_music/services/youtube_music/innertube_search_service.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/marquee_text.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/audio_source_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/local_audio_quality_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/animated_artwork_motion.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_controls_capsule.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_dismiss_region.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_gradient_background.dart';
+import 'package:inutil_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/features/music/presentation/widgets/uniform_playback_slider_track_shape.dart';
+import 'package:inutil_music/features/music/presentation/widgets/wavy_playback_seek_bar.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/player/local_audio_quality_service.dart';
+import 'package:inutil_music/services/sharing/track_share_service.dart';
+import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
 import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -6713,8 +6713,10 @@ void main() {
       final metadataTransition = tester.widget<AnimatedSwitcher>(
         find.byKey(const ValueKey('player-metadata-track-transition')),
       );
+      // La portadora usa los 420 ms explícitos del panel; la metadata usa la
+      // duración por defecto de TrackChangeTransition (300 ms).
       expect(artworkTransition.duration, const Duration(milliseconds: 420));
-      expect(metadataTransition.duration, const Duration(milliseconds: 420));
+      expect(metadataTransition.duration, const Duration(milliseconds: 300));
 
       controller.emit(second);
       await tester.pump();

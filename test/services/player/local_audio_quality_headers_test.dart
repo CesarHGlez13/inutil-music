@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/audio_sources/mp4_audio_format.dart';
-import 'package:bstream_music/services/audio_sources/webm_audio_format.dart';
-import 'package:bstream_music/services/player/local_audio_quality_service.dart';
+import 'package:inutil_music/services/audio_sources/mp4_audio_format.dart';
+import 'package:inutil_music/services/audio_sources/webm_audio_format.dart';
+import 'package:inutil_music/services/player/local_audio_quality_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

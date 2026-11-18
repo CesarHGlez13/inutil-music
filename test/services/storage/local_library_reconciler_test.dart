@@ -1,14 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/features/music/data/datasources/local_music_datasource.dart';
-import 'package:bstream_music/features/music/data/repositories/library_repository_impl.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/repositories/library_repository.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
-import 'package:bstream_music/services/storage/local_library_reconciler.dart';
+import 'package:inutil_music/features/music/data/datasources/local_music_datasource.dart';
+import 'package:inutil_music/features/music/data/repositories/library_repository_impl.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/repositories/library_repository.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/services/storage/local_library_reconciler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;

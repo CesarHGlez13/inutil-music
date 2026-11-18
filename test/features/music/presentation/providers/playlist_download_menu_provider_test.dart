@@ -1,13 +1,13 @@
 import 'dart:collection';
 
-import 'package:bstream_music/features/music/domain/entities/catalog_playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist_entry.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist_entry.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';

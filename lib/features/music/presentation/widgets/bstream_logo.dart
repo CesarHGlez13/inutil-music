@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-class BStreamLogo extends StatelessWidget {
-  const BStreamLogo({this.size = 40, super.key});
+class InutilLogo extends StatelessWidget {
+  const InutilLogo({this.size = 40, super.key});
 
   final double size;
 
   @override
   Widget build(BuildContext context) {
     return Image.asset(
-      'assets/icons/bstream_icon.png',
+      'assets/icons/inutil_icon.png',
       width: size,
       height: size,
       fit: BoxFit.contain,
@@ -17,3 +17,5 @@ class BStreamLogo extends StatelessWidget {
     );
   }
 }
+
+typedef BStreamLogo = InutilLogo;

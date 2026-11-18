@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
@@ -2000,7 +2001,7 @@ class _AppleMusicControls extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 2),
           child: Text(
             key: const ValueKey('player-track-artist'),
-            snapshot.artist ?? 'BStream Music',
+            snapshot.artist ?? AppConstants.appName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -4085,7 +4086,7 @@ class _PlayerControls extends ConsumerWidget {
                       onTap: onOpenArtist,
                       child: Text(
                         key: const ValueKey('player-track-artist'),
-                        snapshot.artist ?? 'BStream Music',
+                        snapshot.artist ?? AppConstants.appName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: artistStyle,
@@ -4141,7 +4142,7 @@ class _PlayerControls extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: 3),
                       child: Text(
                         key: const ValueKey('player-track-artist'),
-                        snapshot.artist ?? 'BStream Music',
+                        snapshot.artist ?? AppConstants.appName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: artistStyle,

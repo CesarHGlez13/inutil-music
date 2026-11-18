@@ -55,6 +55,26 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
     );
   }
 
+  /// Avisa al respaldo en la nube de que la biblioteca cambió. `schedulePush`
+  /// lleva 20 s de debounce, así que una ráfaga de cambios (importar un álbum,
+  /// reordenar una playlist) produce un solo viaje a Firestore. Sin este aviso
+  /// la biblioteca solo se respaldaría cada 30 minutos o al salir de la app, y
+  /// en el escritorio cerrar la ventana no siempre emite `paused`.
+  void _scheduleCloudBackup() {
+    try {
+      ref.read(inutilCloudBackupProvider).schedulePush();
+    } catch (_) {
+      // Proveedor no disponible (p. ej. pruebas que montan el controlador sin
+      // el ProviderScope completo): el respaldo periódico sigue cubriendo.
+    }
+  }
+
+  /// Recarga el estado tras una mutación y marca el respaldo pendiente.
+  Future<void> _mutateAndReload() async {
+    await _reloadCatalogState();
+    _scheduleCloudBackup();
+  }
+
   Future<Playlist?> create(String name) async {
     final normalized = name.trim();
     if (normalized.isEmpty) {
@@ -70,6 +90,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
     state = AsyncData(_sorted(<Playlist>[playlist, ...?state.value]));
     _invalidateCatalogProviders();
     _requestYouTubeMusicSync();
+    _scheduleCloudBackup();
     return playlist;
   }
 
@@ -139,6 +160,8 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
               playlist,
         ]);
         ref.invalidate(catalogPlaylistProvider(playlistId));
+        // La portada elegida forma parte del respaldo (`customArtworkFileName`).
+        _scheduleCloudBackup();
       }
       try {
         await service.delete(mediaRoot: mediaRoot, fileName: oldName);
@@ -254,7 +277,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
         ref.read(downloadControllerProvider.notifier).downloadAudio(track),
       );
     }
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
     return entry;
@@ -332,7 +355,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
     }
 
     if (added > 0) {
-      await _reloadCatalogState();
+      await _mutateAndReload();
       await _syncActivePlaybackQueueById(playlistId);
       _requestYouTubeMusicSync();
     }
@@ -347,7 +370,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
           entryId: entryId,
           now: DateTime.now(),
         );
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
   }
@@ -378,7 +401,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
         now: now,
       );
     }
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
     return matches.length;
@@ -417,7 +440,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
       expectedRevision: catalog.playlist.localRevision,
       now: DateTime.now(),
     );
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
   }
@@ -437,7 +460,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
           name: normalized,
           now: DateTime.now(),
         );
-    await _reloadCatalogState();
+    await _mutateAndReload();
     _requestYouTubeMusicSync();
   }
 
@@ -538,7 +561,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
           // media directory must not keep the deleted playlist in the UI.
         }
       }
-      await _reloadCatalogState();
+      await _mutateAndReload();
       await ref
           .read(playerControllerProvider.notifier)
           .clearQueueSource(PlayerController.playlistQueueSourceId(playlistId));
@@ -610,7 +633,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
       added += 1;
     }
     if (added == 0) return 0;
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
     return added;
@@ -654,7 +677,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
       );
     }
     if (matches.isEmpty) return 0;
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(playlistId);
     _requestYouTubeMusicSync();
     return matches.length;
@@ -717,7 +740,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
         now: now,
       );
     }
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(Playlist.favoritesId);
     _requestYouTubeMusicSync();
     return !wasFavorite;
@@ -753,7 +776,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
           now: DateTime.now(),
         );
       }
-      await _reloadCatalogState();
+      await _mutateAndReload();
       await _syncActivePlaybackQueueById(Playlist.favoritesId);
       _requestYouTubeMusicSync();
       return false;
@@ -777,7 +800,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
       ),
       now: DateTime.now(),
     );
-    await _reloadCatalogState();
+    await _mutateAndReload();
     await _syncActivePlaybackQueueById(Playlist.favoritesId);
     _requestYouTubeMusicSync();
     if (download) {
@@ -825,7 +848,7 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
       if (matches.isNotEmpty) changedIds.add(playlist.id);
     }
     if (changedIds.isEmpty) return;
-    await _reloadCatalogState();
+    await _mutateAndReload();
     for (final playlistId in changedIds) {
       await _syncActivePlaybackQueueById(playlistId);
     }

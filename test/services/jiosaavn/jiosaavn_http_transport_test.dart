@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/jiosaavn/jiosaavn_http_transport.dart';
+import 'package:inutil_music/services/jiosaavn/jiosaavn_http_transport.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

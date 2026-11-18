@@ -1,4 +1,4 @@
-import 'package:bstream_music/core/platform/app_platform.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 

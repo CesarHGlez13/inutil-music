@@ -4,10 +4,10 @@ project(runner LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "bstream_music")
+set(BINARY_NAME "inutil_music")
 # The unique GTK application identifier for this application. See:
 # https://wiki.gnome.org/HowDoI/ChooseApplicationID
-set(APPLICATION_ID "com.bstream.bstream_music")
+set(APPLICATION_ID "com.inutilmusic.app")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -63,7 +63,7 @@ add_subdirectory("runner")
 # KDE's volume controls display.
 set_target_properties(${BINARY_NAME}
   PROPERTIES
-  OUTPUT_NAME "BStream Music"
+  OUTPUT_NAME "Inútil Music"
 )
 
 # Run the Flutter tool portions of the build. This must not be removed.
@@ -88,9 +88,7 @@ include(flutter/generated_plugins.cmake)
 # By default, "installing" just makes a relocatable bundle in the build
 # directory.
 set(BUILD_BUNDLE_DIR "${PROJECT_BINARY_DIR}/bundle")
-if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
-  set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
-endif()
+set(CMAKE_INSTALL_PREFIX "${BUILD_BUNDLE_DIR}" CACHE PATH "..." FORCE)
 
 # Start with a clean build bundle directory every time.
 install(CODE "
@@ -103,7 +101,7 @@ set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
 
-install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/runner/bstream_music_launcher"
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/runner/inutil_music_launcher"
   DESTINATION "${CMAKE_INSTALL_PREFIX}"
   RENAME "${BINARY_NAME}"
   COMPONENT Runtime)

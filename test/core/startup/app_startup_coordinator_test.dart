@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/core/startup/app_startup_coordinator.dart';
-import 'package:bstream_music/main.dart' as app;
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/core/startup/app_startup_coordinator.dart';
+import 'package:inutil_music/main.dart' as app;
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 

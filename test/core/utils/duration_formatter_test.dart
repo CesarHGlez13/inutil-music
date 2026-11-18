@@ -1,4 +1,4 @@
-import 'package:bstream_music/core/utils/duration_formatter.dart';
+import 'package:inutil_music/core/utils/duration_formatter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -1,7 +1,7 @@
-import 'package:bstream_music/features/music/presentation/providers/app_strings.dart';
-import 'package:bstream_music/features/music/presentation/widgets/youtube_music_playlist_conflicts_dialog.dart';
-import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_models.dart';
-import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_store.dart';
+import 'package:inutil_music/features/music/presentation/providers/app_strings.dart';
+import 'package:inutil_music/features/music/presentation/widgets/youtube_music_playlist_conflicts_dialog.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/playlist_sync_models.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/playlist_sync_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Rutas expuestas por `androidx.core.content.FileProvider` al instalador de
+  paquetes de Android (OTA de Inútil Music).
+
+  El gestor de descargas del OTA escribe en
+  `getExternalStorageDirectory()/updates`, que en Android resuelve a
+  `/storage/emulated/0/Android/data/<applicationId>/files/updates`. Desde
+  Android 7 (API 24) una URI `file://` que abandona la aplicación lanza
+  `FileUriExposedException`, por eso el APK se entrega como `content://` con
+  permiso de lectura temporal (`FLAG_GRANT_READ_URI_PERMISSION`) en lugar de
+  compartir el almacenamiento entero.
+
+  Las demás entradas cubren respaldos antiguos: `Directory.systemTemp` era la
+  ubicación del OTA original y sigue siendo válida para APKs ya descargados.
+-->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-files-path
+        name="ota_updates"
+        path="updates/" />
+    <external-files-path
+        name="ota_external_files"
+        path="." />
+    <external-cache-path
+        name="ota_external_cache"
+        path="." />
+    <cache-path
+        name="ota_internal_cache"
+        path="." />
+    <files-path
+        name="ota_internal_files"
+        path="." />
+    <root-path
+        name="ota_system_temp"
+        path="/" />
+</paths>

@@ -1,5 +1,5 @@
-import 'package:bstream_music/features/music/data/models/track_info_model.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/data/models/track_info_model.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

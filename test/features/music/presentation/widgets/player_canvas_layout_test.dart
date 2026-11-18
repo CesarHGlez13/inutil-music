@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/playback_visual_cache_provider.dart';
-import 'package:bstream_music/features/music/presentation/providers/spotify_canvas_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/features/music/presentation/widgets/spotify_canvas_video.dart';
-import 'package:bstream_music/services/player/playback_visual_cache.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/spotify_canvas/spotify_canvas_resolver.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/playback_visual_cache_provider.dart';
+import 'package:inutil_music/features/music/presentation/providers/spotify_canvas_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/features/music/presentation/widgets/spotify_canvas_video.dart';
+import 'package:inutil_music/services/player/playback_visual_cache.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/spotify_canvas/spotify_canvas_resolver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';

@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:bstream_music/core/utils/image_source.dart';
-import 'package:bstream_music/services/player/just_audio_player_service.dart';
-import 'package:bstream_music/services/player/notification_artwork_service.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
+import 'package:inutil_music/services/player/just_audio_player_service.dart';
+import 'package:inutil_music/services/player/notification_artwork_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image;
 

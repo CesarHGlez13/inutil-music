@@ -421,7 +421,7 @@ class _PreviewMetadata extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'BStream Music',
+                  'Inútil Music',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -435,7 +435,7 @@ class _PreviewMetadata extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'BStream Music',
+                  'Inútil Music',
                   maxLines: 1,
                   style: TextStyle(
                     fontFamily: Theme.of(

@@ -1,7 +1,7 @@
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_account_client.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_coordinator.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_session_store.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_account_client.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_coordinator.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_session_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
@@ -242,7 +243,7 @@ class MiniPlayer extends ConsumerWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  compactErrorText ?? presentation.artist ?? 'BStream Music',
+                  compactErrorText ?? presentation.artist ?? AppConstants.appName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

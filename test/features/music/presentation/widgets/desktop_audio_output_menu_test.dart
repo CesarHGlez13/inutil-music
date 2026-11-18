@@ -1,13 +1,13 @@
-import 'package:bstream_music/features/music/presentation/providers/playback_artwork_provider.dart';
+import 'package:inutil_music/features/music/presentation/providers/playback_artwork_provider.dart';
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/audio_route_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/audio_routing_menus.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
-import 'package:bstream_music/services/audio_output/audio_output_service.dart';
-import 'package:bstream_music/services/player/player_audio_output.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/audio_route_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/audio_routing_menus.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_menu_bottom_sheet.dart';
+import 'package:inutil_music/services/audio_output/audio_output_service.dart';
+import 'package:inutil_music/services/player/player_audio_output.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

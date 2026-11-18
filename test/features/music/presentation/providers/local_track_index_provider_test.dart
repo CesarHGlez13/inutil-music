@@ -1,6 +1,6 @@
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/presentation/providers/local_track_index_provider.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/presentation/providers/local_track_index_provider.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter_test/flutter_test.dart';

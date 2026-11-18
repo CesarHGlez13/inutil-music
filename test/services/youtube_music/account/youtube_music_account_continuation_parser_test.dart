@@ -1,4 +1,4 @@
-import 'package:bstream_music/services/youtube_music/account/youtube_music_account_parser.dart';
+import 'package:inutil_music/services/youtube_music/account/youtube_music_account_parser.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

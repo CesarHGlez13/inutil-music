@@ -1,5 +1,5 @@
-import 'package:bstream_music/features/music/data/parsers/lrc_parser.dart';
-import 'package:bstream_music/features/music/domain/entities/lyric_line.dart';
+import 'package:inutil_music/features/music/data/parsers/lrc_parser.dart';
+import 'package:inutil_music/features/music/domain/entities/lyric_line.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

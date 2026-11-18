@@ -1,14 +1,14 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
-import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_models.dart';
-import 'package:bstream_music/services/youtube_music/playlist_sync/playlist_sync_store.dart';
-import 'package:bstream_music/services/youtube_music/playlist_sync/sqlite_playlist_sync_store.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/playlist_sync_models.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/playlist_sync_store.dart';
+import 'package:inutil_music/services/youtube_music/playlist_sync/sqlite_playlist_sync_store.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

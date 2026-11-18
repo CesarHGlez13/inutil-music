@@ -1,8 +1,8 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/recommendations/recommendation_storage_models.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/recommendations/recommendation_storage_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

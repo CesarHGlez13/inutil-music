@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../services/player/cast_aware_player_service.dart';
@@ -320,6 +321,7 @@ final innerTubePlaybackServiceProvider = Provider<InnerTubePlaybackService>((
         : null,
     language: PlatformDispatcher.instance.locale.languageCode,
     region: _innerTubeDeviceRegion(),
+    bootstrapVisitorData: false,
   );
   ref.onDispose(() => unawaited(service.dispose()));
   return service;
@@ -477,8 +479,8 @@ final incomingYouTubeMusicLinkProvider = StreamProvider<YouTubeMusicLink>((
 });
 
 const _lyricsUserAgent =
-    '${AppConstants.appName}/${AppConstants.appVersion} '
-    '(https://github.com/BryamContreras/BStream-Music)';
+    'InutilMusic/${AppConstants.appVersion} '
+    '(https://inutilmusic.app)';
 
 int _lyricsProviderMask(SettingsState settings) => settings
     .enabledLyricsProviders

@@ -1,7 +1,7 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';

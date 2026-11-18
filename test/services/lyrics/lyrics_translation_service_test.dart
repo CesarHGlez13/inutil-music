@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/services/lyrics/lyrics_translation_service.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/services/lyrics/lyrics_translation_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 LyricsDocument _document(List<String> texts) => LyricsDocument(

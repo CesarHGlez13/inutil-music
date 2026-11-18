@@ -1,8 +1,8 @@
-import 'package:bstream_music/services/youtube_music/innertube_transport.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_client_profile.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_player_response_parser.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_stream_validator.dart';
-import 'package:bstream_music/services/youtube_music/playback/innertube_video_id.dart';
+import 'package:inutil_music/services/youtube_music/innertube_transport.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_player_response_parser.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_video_id.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../tool/innertube_playback_benchmark.dart';

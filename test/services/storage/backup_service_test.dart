@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:archive/archive.dart';
-import 'package:bstream_music/core/constants/app_constants.dart';
-import 'package:bstream_music/services/storage/backup_service.dart';
-import 'package:bstream_music/services/storage/library_operation_coordinator.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
+import 'package:inutil_music/services/storage/backup_service.dart';
+import 'package:inutil_music/services/storage/library_operation_coordinator.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;

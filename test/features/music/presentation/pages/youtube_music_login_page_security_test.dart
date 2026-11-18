@@ -1,4 +1,4 @@
-import 'package:bstream_music/features/music/presentation/pages/youtube_music_login_page.dart';
+import 'package:inutil_music/features/music/presentation/pages/youtube_music_login_page.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:flutter_test/flutter_test.dart';

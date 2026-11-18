@@ -1,4 +1,4 @@
-import 'package:bstream_music/core/widgets/horizontal_shelf_scroll_behavior.dart';
+import 'package:inutil_music/core/widgets/horizontal_shelf_scroll_behavior.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

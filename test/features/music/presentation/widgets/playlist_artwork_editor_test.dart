@@ -1,11 +1,11 @@
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/presentation/providers/lyrics_share_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/lyrics_share_photo_cropper.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playlist_artwork_editor.dart';
-import 'package:bstream_music/services/sharing/lyrics_share_photo_service.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/presentation/providers/lyrics_share_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/lyrics_share_photo_cropper.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playlist_artwork_editor.dart';
+import 'package:inutil_music/services/sharing/lyrics_share_photo_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

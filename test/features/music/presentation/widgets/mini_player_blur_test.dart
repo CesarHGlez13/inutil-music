@@ -1,15 +1,15 @@
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/marquee_text.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/mini_player.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
-import 'package:bstream_music/features/music/presentation/widgets/track_change_transition.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/marquee_text.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/features/music/presentation/widgets/track_change_transition.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -138,7 +138,7 @@ void main() {
           .widget<AnimatedSwitcher>(backgroundTransition)
           .child!
           .key!;
-      expect(switcher.duration, const Duration(milliseconds: 420));
+      expect(switcher.duration, const Duration(milliseconds: 300));
       expect(find.text(first.title!), findsOneWidget);
 
       controller.emit(second);

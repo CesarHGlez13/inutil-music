@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/presentation/services/live_overlay_artwork_service.dart';
+import 'package:inutil_music/features/music/presentation/services/live_overlay_artwork_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image;

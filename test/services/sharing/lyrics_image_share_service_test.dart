@@ -3,8 +3,8 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/services/sharing/lyrics_image_share_service.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/services/sharing/lyrics_image_share_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:share_plus/share_plus.dart';

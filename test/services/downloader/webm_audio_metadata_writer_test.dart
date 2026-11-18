@@ -3,9 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:audio_metadata_reader/audio_metadata_reader.dart';
-import 'package:bstream_music/services/downloader/audio_metadata_fields.dart';
-import 'package:bstream_music/services/downloader/download_audio_metadata_service.dart';
-import 'package:bstream_music/services/downloader/webm_audio_metadata_writer.dart';
+import 'package:inutil_music/services/downloader/audio_metadata_fields.dart';
+import 'package:inutil_music/services/downloader/download_audio_metadata_service.dart';
+import 'package:inutil_music/services/downloader/webm_audio_metadata_writer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

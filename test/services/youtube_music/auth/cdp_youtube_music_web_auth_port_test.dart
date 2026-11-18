@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/services/youtube_music/auth/cdp_youtube_music_web_auth_port.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_web_auth_port.dart';
+import 'package:inutil_music/services/youtube_music/auth/cdp_youtube_music_web_auth_port.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_web_auth_port.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

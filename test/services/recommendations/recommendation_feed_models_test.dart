@@ -1,4 +1,4 @@
-import 'package:bstream_music/services/recommendations/recommendations.dart';
+import 'package:inutil_music/services/recommendations/recommendations.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

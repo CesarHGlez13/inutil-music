@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/services/downloader/http_audio_transfer.dart';
+import 'package:inutil_music/services/downloader/http_audio_transfer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

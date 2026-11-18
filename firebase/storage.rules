@@ -1,0 +1,78 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Rol admin leído del documento users/{uid} (misma fuente de verdad que
+    // las reglas de Firestore). `firestore.get` funciona también dentro de las
+    // reglas de Cloud Storage.
+    function isAdmin() {
+      return isAuthenticated() &&
+        firestore.exists(/databases/(default)/documents/users/$(request.auth.uid)) &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Correo del fundador: respaldo por identidad para que César pueda
+    // publicar versiones aunque su documento users/{uid} aún no esté sembrado.
+    function isFounder() {
+      return isAuthenticated() &&
+        request.auth.token.email == 'cesar@inutilmusic.com';
+    }
+
+    // Avatares de usuario: solo el propietario puede subir su avatar
+    match /users/{userId}/avatar.jpg {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId) &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // Carátulas de playlists y música propia:
+    match /covers/{userId}/{fileName} {
+      allow read: if true; // Lectura pública para carátulas
+      allow write: if isOwner(userId) &&
+        request.resource.size < 10 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+    }
+
+    // ------------------------------------------------------------------
+    // Canal OTA: `releases/inutil_music_latest.apk`, `releases/release.json`,
+    // etc. La LECTURA es pública porque el teléfono puede comprobar e
+    // instalar una versión antes de iniciar sesión (el kill switch bloquea
+    // justo ahí). La ESCRITURA es solo del administrador: un cliente
+    // manipulado no puede sustituir el APK que instala toda la base de
+    // usuarios. Sin esta regla la descarga OTA devuelve 403 incluso con el
+    // objeto subido, así que el canal queda inservible.
+    // ------------------------------------------------------------------
+    function isReleaseArtifact() {
+      return request.resource.size < 200 * 1024 * 1024 && (
+        request.resource.contentType.matches('application/vnd.android.package-archive') ||
+        request.resource.contentType.matches('application/octet-stream') ||
+        request.resource.contentType.matches('application/gzip') ||
+        request.resource.contentType.matches('application/x-gzip') ||
+        request.resource.contentType.matches('application/json'));
+    }
+
+    match /releases/{fileName} {
+      allow read: if true;
+      allow write: if (isAdmin() || isFounder()) && isReleaseArtifact();
+      // En un DELETE `request.resource` es nulo, así que la comprobación de
+      // artefacto no aplica: borrar una versión es potestad del admin.
+      allow delete: if isAdmin() || isFounder();
+    }
+
+    // Versiones históricas en subcarpeta (`releases/2.1.0/app-arm64.apk`).
+    match /releases/{dir}/{fileName} {
+      allow read: if true;
+      allow write: if (isAdmin() || isFounder()) && isReleaseArtifact();
+      allow delete: if isAdmin() || isFounder();
+    }
+  }
+}

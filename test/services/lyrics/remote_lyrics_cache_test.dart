@@ -1,6 +1,6 @@
-import 'package:bstream_music/features/music/domain/entities/lyrics.dart';
-import 'package:bstream_music/services/lyrics/lrclib_transport.dart';
-import 'package:bstream_music/services/lyrics/remote_lyrics_service_base.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics.dart';
+import 'package:inutil_music/services/lyrics/lrclib_transport.dart';
+import 'package:inutil_music/services/lyrics/remote_lyrics_service_base.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _firstLookup = LyricsLookup(

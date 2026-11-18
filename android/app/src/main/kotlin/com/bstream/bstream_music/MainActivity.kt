@@ -15,6 +15,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
+import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
@@ -165,6 +166,21 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            APP_UPDATE_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "primaryAbi" -> result.success(primaryInstallAbi())
+                "canRequestPackageInstalls" ->
+                    result.success(canRequestPackageInstalls())
+                "openInstallUnknownAppsSettings" ->
+                    openInstallUnknownAppsSettings(result)
+                "installPackage" -> installDownloadedPackage(call, result)
+                else -> result.notImplemented()
+            }
+        }
+
         appActivationChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             APP_ACTIVATION_CHANNEL,
@@ -293,6 +309,100 @@ class MainActivity : AudioServiceActivity() {
         )
         pendingLocalAudioPermissionResult = null
         super.onDestroy()
+    }
+
+    /**
+     * ABI principal del dispositivo. El OTA la usa para elegir el APK dividido
+     * publicado en Firestore (`arm64-v8a`, `armeabi-v7a`, `x86_64`, ...).
+     */
+    private fun primaryInstallAbi(): String = Build.SUPPORTED_ABIS.firstOrNull() ?: ""
+
+    /**
+     * Android 8+ exige el permiso de runtime `REQUEST_INSTALL_PACKAGES` para
+     * abrir el instalador con un APK descargado fuera de la Play Store.
+     */
+    private fun canRequestPackageInstalls(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return true
+        return packageManager.canRequestPackageInstalls()
+    }
+
+    private fun openInstallUnknownAppsSettings(result: MethodChannel.Result) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            result.success(true)
+            return
+        }
+        val intent = Intent(
+            Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+            Uri.parse("package:$packageName"),
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        try {
+            startActivity(intent)
+            result.success(true)
+        } catch (error: Exception) {
+            Log.w(TAG, "Unknown-sources settings unavailable", error)
+            result.success(false)
+        }
+    }
+
+    /**
+     * Abre el instalador de paquetes con el APK que el OTA descargó dentro de
+     * `getExternalStorageDirectory()/updates`.
+     *
+     * El archivo se expone con `FileProvider` como `content://` porque desde
+     * Android 7 (API 24, el `minSdk` de esta app) una URI `file://` que sale de
+     * la aplicación lanza `FileUriExposedException`. El permiso de lectura se
+     * otorga sólo a la actividad del instalador
+     * (`FLAG_GRANT_READ_URI_PERMISSION`) y se revoca al cerrarla, así que no
+     * queda ningún acceso persistente ni notificación de ningún tipo. La app
+     * permanece viva: el audio gestionado por `audio_service` sigue sonando
+     * mientras el usuario acepta el instalador.
+     */
+    private fun installDownloadedPackage(
+        call: MethodCall,
+        result: MethodChannel.Result,
+    ) {
+        val path = call.argument<String>("path")
+        if (path.isNullOrEmpty()) {
+            result.error("invalid_path", "Falta la ruta del APK.", null)
+            return
+        }
+        val file = File(path)
+        if (!file.exists() || file.length() <= 0L) {
+            result.error(
+                "missing_file",
+                "El paquete descargado ya no existe en el almacenamiento.",
+                null,
+            )
+            return
+        }
+        val apkUri = try {
+            FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+        } catch (error: IllegalArgumentException) {
+            result.error(
+                "unshared_path",
+                "El paquete descargado está fuera de las carpetas compartidas " +
+                    "con el instalador.",
+                null,
+            )
+            return
+        }
+        val intent = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(apkUri, "application/vnd.android.package-archive")
+            .addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        try {
+            startActivity(intent)
+            result.success(true)
+        } catch (error: Exception) {
+            Log.w(TAG, "Package installer unavailable", error)
+            result.error(
+                "no_installer",
+                "No hay ninguna aplicación que pueda instalar este paquete.",
+                null,
+            )
+        }
     }
 
     private fun saveFile(call: MethodCall, result: MethodChannel.Result) {
@@ -786,6 +896,7 @@ class MainActivity : AudioServiceActivity() {
             "bstream_music/supported_links_settings"
         private const val EXTERNAL_AUDIO_CHANNEL = "bstream_music/external_audio"
         private const val APP_ACTIVATION_CHANNEL = "bstream_music/app_activation"
+        private const val APP_UPDATE_CHANNEL = "bstream_music/app_update"
         private const val LOCAL_AUDIO_CHANNEL = "bstream_music/local_audio"
         private const val AUDIO_SERVICE_NOTIFICATION_CLICK_ACTION =
             "com.ryanheise.audioservice.NOTIFICATION_CLICK"

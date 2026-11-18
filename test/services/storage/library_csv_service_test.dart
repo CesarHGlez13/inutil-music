@@ -1,12 +1,12 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:bstream_music/features/music/domain/entities/catalog_playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist_entry.dart';
-import 'package:bstream_music/services/storage/library_csv_service.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist_entry.dart';
+import 'package:inutil_music/services/storage/library_csv_service.dart';
 import 'package:csv/csv.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -79,8 +79,8 @@ class AppStrings {
   String get audioOutput => choose('Salida Multimedia', 'Media output');
   String get playerAudioOutput => choose('Salida de audio', 'Audio output');
   String get playerAudioOutputHint => choose(
-    'Elige dónde escuchar BStream. Solo afecta al audio del reproductor.',
-    'Choose where to listen to BStream. Only the player audio is affected.',
+    'Elige dónde escuchar Inútil Music. Solo afecta al audio del reproductor.',
+    'Choose where to listen to Inútil Music. Only the player audio is affected.',
   );
   String get systemDefaultAudioOutput =>
       choose('Predeterminada del sistema', 'System default');
@@ -206,10 +206,10 @@ class AppStrings {
       choose('Integración no oficial', 'Unofficial integration');
   String get youtubeMusicUnofficialDisclosure => choose(
     'La integración con YouTube Music utiliza interfaces no oficiales y no '
-        'está afiliada con Google. BStream no guarda tu contraseña. YouTube '
+        'está afiliada con Google. Inútil Music no guarda tu contraseña. YouTube '
         'puede cambiar, bloquear o restringir esta función.',
     'The YouTube Music integration uses unofficial interfaces and is not '
-        'affiliated with Google. BStream never stores your password. YouTube '
+        'affiliated with Google. Inútil Music never stores your password. YouTube '
         'may change, block, or restrict this feature.',
   );
   String get understandAndContinue =>
@@ -232,11 +232,11 @@ class AppStrings {
                 : 'Your $localPlaylistCount local playlists will stay',
           );
     return choose(
-      '$localPreservation en BStream. Favoritos se vinculará con "Me gusta" '
+      '$localPreservation en Inútil Music. Favoritos se vinculará con "Me gusta" '
           'de YouTube Music; las playlists locales aún no vinculadas se crearán '
           'como privadas y las remotas se importarán aquí. Esta primera '
           'sincronización no elimina tus playlists locales.',
-      '$localPreservation in BStream. Favorites will sync with YouTube Music '
+      '$localPreservation in Inútil Music. Favorites will sync with YouTube Music '
           'Liked Music; unlinked local playlists are created as private playlists '
           'and remote playlists are imported here. This first sync does not '
           'delete your local playlists.',
@@ -265,12 +265,12 @@ class AppStrings {
   String get resolvePlaylistSyncConflicts =>
       choose('Resolver conflictos', 'Resolve conflicts');
   String get playlistSyncConflictWarning => choose(
-    'BStream detuvo estas playlists para no repetir ni sobrescribir cambios '
+    'Inútil Music detuvo estas playlists para no repetir ni sobrescribir cambios '
         'inciertos. Elige qué versión conservar en cada una.',
-    'BStream paused these playlists to avoid repeating or overwriting '
+    'Inútil Music paused these playlists to avoid repeating or overwriting '
         'uncertain changes. Choose which version to keep for each one.',
   );
-  String get keepBStreamPlaylist => choose('Conservar BStream', 'Keep BStream');
+  String get keepBStreamPlaylist => choose('Conservar Inútil Music', 'Keep Inútil Music');
   String get keepYouTubeMusicPlaylist =>
       choose('Conservar YouTube Music', 'Keep YouTube Music');
   String get noPlaylistSyncConflicts => choose(
@@ -288,9 +288,9 @@ class AppStrings {
       choose('Desconectar YouTube Music', 'Disconnect YouTube Music');
   String get youtubeMusicLoginBlocked => choose(
     'Google bloqueó el inicio de sesión dentro de la app. Por seguridad, '
-        'BStream no puede copiar la sesión de tu navegador. Puedes seguir '
+        'Inútil Music no puede copiar la sesión de tu navegador. Puedes seguir '
         'usando la app sin cuenta.',
-    'Google blocked sign-in inside the app. For security, BStream cannot copy '
+    'Google blocked sign-in inside the app. For security, Inútil Music cannot copy '
         'the session from your browser. You can keep using the app without an '
         'account.',
   );
@@ -343,8 +343,8 @@ class AppStrings {
   String get localMusicPermissionTitle =>
       choose('Permite el acceso a tu música', 'Allow access to your music');
   String get localMusicPermissionBody => choose(
-    'BStream necesita permiso para mostrar y reproducir los archivos de audio del dispositivo.',
-    'BStream needs permission to show and play audio files on this device.',
+    'Inútil Music necesita permiso para mostrar y reproducir los archivos de audio del dispositivo.',
+    'Inútil Music needs permission to show and play audio files on this device.',
   );
   String get allowMusicAccess => choose('Permitir acceso', 'Allow access');
   String get localMusicLoadError => choose(
@@ -885,31 +885,31 @@ class AppStrings {
   String get playlistDeleted =>
       choose('Playlist eliminada.', 'Playlist deleted.');
   String get removePlaylistFromBStream =>
-      choose('Quitar sólo de BStream', 'Remove only from BStream');
+      choose('Quitar sólo de Inútil Music', 'Remove only from Inútil Music');
   String get deletePlaylistFromYouTubeMusic => choose(
     'Eliminar también de YouTube Music',
     'Also delete from YouTube Music',
   );
   String get confirmDeleteSyncedPlaylist => choose(
     'Esta playlist está sincronizada con YouTube Music. Puedes quitarla sólo '
-        'de BStream o eliminar también la playlist de tu cuenta. Las canciones '
+        'de Inútil Music o eliminar también la playlist de tu cuenta. Las canciones '
         'descargadas no se borrarán.',
     'This playlist is synced with YouTube Music. You can remove it only from '
-        'BStream or also delete the playlist from your account. Downloaded '
+        'Inútil Music or also delete the playlist from your account. Downloaded '
         'songs will not be deleted.',
   );
   String get confirmDeleteReadOnlySyncedPlaylist => choose(
     'Esta playlist está vinculada con YouTube Music, pero la cuenta activa no '
-        'puede eliminarla allí. Sólo se quitará de BStream y no se volverá a '
+        'puede eliminarla allí. Sólo se quitará de Inútil Music y no se volverá a '
         'importar automáticamente.',
     'This playlist is linked to YouTube Music, but the active account cannot '
-        'delete it there. It will only be removed from BStream and will not be '
+        'delete it there. It will only be removed from Inútil Music and will not be '
         'imported automatically again.',
   );
   String get youtubeMusicPlaylistDeletionScheduled => choose(
-    'La playlist se quitó de BStream. Su eliminación en YouTube Music quedó '
+    'La playlist se quitó de Inútil Music. Su eliminación en YouTube Music quedó '
         'programada para la próxima sincronización.',
-    'The playlist was removed from BStream. Its YouTube Music deletion is '
+    'The playlist was removed from Inútil Music. Its YouTube Music deletion is '
         'scheduled for the next sync.',
   );
   String get confirmDeletePlaylist => choose(
@@ -1058,7 +1058,7 @@ class AppStrings {
   );
   String get chooseCsvProfile =>
       choose('Formato del archivo CSV', 'CSV file format');
-  String get csvProfileBStream => 'BStream Music';
+  String get csvProfileBStream => 'Inútil Music';
   String get csvProfileMetroList => 'MetroList';
   String get csvProfileHarmony => 'Harmony / RiMusic';
   String get csvProfileSoundiiz => 'Soundiiz';
@@ -1147,7 +1147,7 @@ class AppStrings {
   String get audioQualityMono => 'Mono';
   String audioQualityChannels(int channels) =>
       choose('$channels canales', '$channels channels');
-  String get playerStyleBStreamMusic => 'BStream Music';
+  String get playerStyleBStreamMusic => 'Inútil Music';
   String get playerStyleAppleMusic => 'Apple Music Style';
   String get playerStyleSpotifyMusic => 'Spotify Style';
   String get playerStyleClassicVinyl =>
@@ -1211,8 +1211,8 @@ class AppStrings {
   String get recommendationHistory =>
       choose('Historial de recomendaciones', 'Recommendation history');
   String get recommendationHistoryEnabled => choose(
-    'BStream aprende de las canciones que escuchas para personalizar Inicio.',
-    'BStream learns from the songs you listen to in order to personalize Home.',
+    'Inútil Music aprende de las canciones que escuchas para personalizar Inicio.',
+    'Inútil Music learns from the songs you listen to in order to personalize Home.',
   );
   String get recommendationHistoryDisabled => choose(
     'Las nuevas reproducciones no se usarán para personalizar Inicio.',
@@ -1231,8 +1231,8 @@ class AppStrings {
     'Clear history and recommendations?',
   );
   String get clearRecommendationHistoryMessage => choose(
-    'BStream olvidará lo aprendido de tus escuchas. Tus descargas, favoritos y playlists permanecerán intactos.',
-    'BStream will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.',
+    'Inútil Music olvidará lo aprendido de tus escuchas. Tus descargas, favoritos y playlists permanecerán intactos.',
+    'Inútil Music will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.',
   );
   String get recommendationHistoryCleared => choose(
     'Historial y recomendaciones eliminados.',
@@ -1323,8 +1323,8 @@ class AppStrings {
   String get supportedLinks =>
       choose('Abrir enlaces compatibles', 'Open supported links');
   String get supportedLinksSummary => choose(
-    'Elige BStream para abrir enlaces de YouTube y YouTube Music.',
-    'Choose BStream to open YouTube and YouTube Music links.',
+    'Elige Inútil Music para abrir enlaces de YouTube y YouTube Music.',
+    'Choose Inútil Music to open YouTube and YouTube Music links.',
   );
   String get supportedLinksOpenFailed => choose(
     'No se pudo abrir la configuración de enlaces compatibles.',
@@ -1479,14 +1479,14 @@ class AppStrings {
         '$host entry and try again.',
   );
   String get liveOverlayHostsVerificationError => choose(
-    'Windows no pudo confirmar el dominio local. Reinicia BStream y vuelve a '
+    'Windows no pudo confirmar el dominio local. Reinicia Inútil Music y vuelve a '
         'intentarlo.',
-    'Windows could not verify the local domain. Restart BStream and try again.',
+    'Windows could not verify the local domain. Restart Inútil Music and try again.',
   );
   String get liveOverlayEndpointVerificationError => choose(
-    'El dominio quedó configurado, pero BStream no pudo abrir la overlay por '
+    'El dominio quedó configurado, pero Inútil Music no pudo abrir la overlay por '
         'DNS o HTTP. Revisa el proxy, VPN o antivirus y vuelve a intentarlo.',
-    'The domain was configured, but BStream could not open the overlay through '
+    'The domain was configured, but Inútil Music could not open the overlay through '
         'DNS or HTTP. Check the proxy, VPN, or antivirus and try again.',
   );
   String get liveOverlayPortInUseError => choose(
@@ -1649,8 +1649,8 @@ class AppStrings {
     required String latestVersion,
     required String currentVersion,
   }) => choose(
-    'BStream Music $latestVersion está disponible. Versión actual: $currentVersion.',
-    'BStream Music $latestVersion is available. Current version: $currentVersion.',
+    'Inútil Music $latestVersion está disponible. Versión actual: $currentVersion.',
+    'Inútil Music $latestVersion is available. Current version: $currentVersion.',
   );
   String updateReleaseNotesTitle(String version) =>
       choose('Novedades $version', 'What’s new in $version');
@@ -1680,8 +1680,8 @@ class AppStrings {
   String get supportDevelopmentTitle =>
       choose('Apoyar el desarrollo', 'Support development');
   String get supportDevelopmentBody => choose(
-    'Ayuda a mantener BStream Music y a seguir agregando funciones.',
-    'Help maintain BStream Music and keep adding features.',
+    'Ayuda a mantener Inútil Music y a seguir agregando funciones.',
+    'Help maintain Inútil Music and keep adding features.',
   );
   String get supportDevelopmentOpenFailed => choose(
     'No se pudo abrir la página de apoyo.',

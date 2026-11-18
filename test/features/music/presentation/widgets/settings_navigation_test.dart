@@ -2,27 +2,27 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:bstream_music/core/theme/app_colors.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/core/widgets/liquid_glass_surface.dart';
-import 'package:bstream_music/core/widgets/app_shared_widgets.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/presentation/pages/home_page.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
-import 'package:bstream_music/features/music/presentation/widgets/settings_panel.dart';
-import 'package:bstream_music/services/live/tiktok_live_command_service.dart';
-import 'package:bstream_music/services/lyrics/lyrics_romanization_service.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/sharing/incoming_track_link_service.dart';
-import 'package:bstream_music/services/storage/library_csv_import_service.dart';
-import 'package:bstream_music/services/sharing/incoming_csv_file_service.dart';
-import 'package:bstream_music/services/storage/library_csv_service.dart';
-import 'package:bstream_music/services/storage/local_library_reconciler.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_account_client.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_auth_models.dart';
-import 'package:bstream_music/services/youtube_music/auth/youtube_music_session_store.dart';
+import 'package:inutil_music/core/theme/app_colors.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
+import 'package:inutil_music/core/widgets/app_shared_widgets.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/presentation/pages/home_page.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/youtube_music_auth_controller.dart';
+import 'package:inutil_music/features/music/presentation/widgets/settings_panel.dart';
+import 'package:inutil_music/services/live/tiktok_live_command_service.dart';
+import 'package:inutil_music/services/lyrics/lyrics_romanization_service.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/sharing/incoming_track_link_service.dart';
+import 'package:inutil_music/services/storage/library_csv_import_service.dart';
+import 'package:inutil_music/services/sharing/incoming_csv_file_service.dart';
+import 'package:inutil_music/services/storage/library_csv_service.dart';
+import 'package:inutil_music/services/storage/local_library_reconciler.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_account_client.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_auth_models.dart';
+import 'package:inutil_music/services/youtube_music/auth/youtube_music_session_store.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -864,7 +864,7 @@ void main() {
     expect(
       find.descendant(
         of: playerStyleSelector,
-        matching: find.text('BStream Music'),
+        matching: find.text('Inútil Music'),
       ),
       findsOneWidget,
     );
@@ -2879,7 +2879,7 @@ void main() {
         findsOneWidget,
       );
       for (final profile in const <(String, String)>[
-        ('bstream', 'BStream Music'),
+        ('bstream', 'Inútil Music'),
         ('metroList', 'MetroList'),
         ('harmony', 'Harmony / RiMusic'),
         ('soundiiz', 'Soundiiz'),

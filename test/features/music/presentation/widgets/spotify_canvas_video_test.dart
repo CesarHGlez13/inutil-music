@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:bstream_music/features/music/presentation/widgets/spotify_canvas_video.dart';
+import 'package:inutil_music/features/music/presentation/widgets/spotify_canvas_video.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';

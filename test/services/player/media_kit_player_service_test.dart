@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:bstream_music/core/errors/app_exception.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/player/media_kit_player_service.dart';
-import 'package:bstream_music/services/player/player_audio_output.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/core/errors/app_exception.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/player/media_kit_player_service.dart';
+import 'package:inutil_music/services/player/player_audio_output.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:media_kit/media_kit.dart';
 

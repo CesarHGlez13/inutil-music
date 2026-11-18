@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/core/utils/bounded_byte_stream.dart';
+import 'package:inutil_music/core/utils/bounded_byte_stream.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

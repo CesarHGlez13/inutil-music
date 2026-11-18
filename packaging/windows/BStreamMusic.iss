@@ -1,10 +1,10 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "1.3.1"
+  #define MyAppVersion "2.1.0"
 #endif
 
-#define MyAppName "BStream Music"
-#define MyAppPublisher "BryamContreras"
-#define MyAppURL "https://github.com/BryamContreras/BStream-Music"
+#define MyAppName "Inútil Music"
+#define MyAppPublisher "Inútil Music"
+#define MyAppURL "https://github.com/CesarHGlez13/inutil-music"
 #define MyAppExeName "bstream_music.exe"
 #define MyAppUserModelId "BStreamMusic.Desktop"
 #define BundleDir "..\..\build\windows\x64\runner\Release"

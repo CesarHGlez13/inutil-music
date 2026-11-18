@@ -1,8 +1,8 @@
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/domain/repositories/music_repository.dart';
-import 'package:bstream_music/features/music/domain/usecases/download_audio.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/domain/repositories/music_repository.dart';
+import 'package:inutil_music/features/music/domain/usecases/download_audio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

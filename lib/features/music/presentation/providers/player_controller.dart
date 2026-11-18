@@ -1564,7 +1564,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
           }
         }
       }
-      final cachedTrack = cachedSourceFailed
+      final cachedTrack = cachedSourceFailed || nativeRemoteService != null
           ? null
           : await _cachedRemoteTrack(track);
       if (!_isCurrentPlayRequest(requestId)) {
@@ -1635,6 +1635,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
       var playableTrack = await _resolveRemoteTrack(
         track,
+        checkLocalDownload: false,
         shouldContinue: () => _isCurrentRemoteSelection(
           track,
           requestId,
@@ -2808,11 +2809,13 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     TrackInfo track, {
     bool forceRefresh = false,
     bool allowStaleStreamFallback = true,
+    bool checkLocalDownload = true,
     AudioResolutionMode mode = AudioResolutionMode.primaryThenFallback,
     AudioResolverFailureCallback? onResolverFailure,
     AudioResolverContinuationCallback? shouldContinue,
   }) async {
     if (!forceRefresh &&
+        checkLocalDownload &&
         ref.read(playerServiceProvider) is AudioSourceUpgradePlayer) {
       final downloaded = await _usableDownloadedAudioTrack(track);
       if (downloaded != null) return downloaded;

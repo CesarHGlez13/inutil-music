@@ -1,17 +1,21 @@
-# BStream Music
+# Inútil Music
 
 ![Flutter 3.47.9](https://img.shields.io/badge/Flutter-3.47.9-02569B?logo=flutter&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-blue)
-![Version](https://img.shields.io/badge/version-1.3.1%2B131-brightgreen)
-![Build](https://github.com/BryamContreras/BStream-Music/actions/workflows/desktop-builds.yml/badge.svg?branch=main)
+![Version](https://img.shields.io/badge/version-2.1.0%2B210-brightgreen)
+![Release](https://img.shields.io/badge/release-v2.1.0-brightgreen)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
 
-BStream Music is a cross-platform music player and library manager built with Flutter. It lets you search for music, play and download tracks, organize a local library, and manage playlists on Android, iOS, Windows, Linux, and macOS.
+Inútil Music is a cross-platform music player and library manager built with Flutter. It lets you search for music, play and download tracks, organize a local library, and manage playlists on Android, iOS, Windows, Linux, and macOS.
 
-Current version: **1.3.1+131**.
+It is based on the open-source project BStream Music by Bryam Contreras
+(BSD-2-Clause); see `LICENSE`. Published artifacts and the update channel live
+in <https://github.com/CesarHGlez13/inutil-music>.
+
+Current version: **2.1.0+210**.
 
 > The repository does not store media content. YouTube search, playback, and
-> downloads use BStream's self-contained Dart InnerTube pipeline. Supported
+> downloads use Inútil Music's self-contained Dart InnerTube pipeline. Supported
 > builds neither bundle nor launch an external media resolver. Users are
 > responsible for complying with copyright laws and provider terms.
 
@@ -33,10 +37,10 @@ Current version: **1.3.1+131**.
 
 - Optional YouTube Music account sign-in and bidirectional playlist sync. New
   local playlists are created remotely as private playlists, imported remote
-  playlists may contain streaming-only entries, and BStream Favorites maps to
+  playlists may contain streaming-only entries, and Inútil Music Favorites maps to
   YouTube Music's **Liked Music** collection. The system playlist “Episodes for
   later” is intentionally excluded.
-- Synced playlist playback is download-first: BStream uses a valid local copy
+- Synced playlist playback is download-first: Inútil Music uses a valid local copy
   when available and falls back to streaming the same catalog entry when the
   file is missing or cannot be opened.
 - InnerTube search tabs for Songs, Videos, and Albums, with up to 20 results,
@@ -58,7 +62,7 @@ Current version: **1.3.1+131**.
   Web BotGuard PO tokens only for profiles that require them; degraded fallback
   tokens fail closed and independent EJS/WebPO capability circuit breakers
   advance immediately to tokenless clients. If an active stream loses
-  connectivity, BStream
+  connectivity, Inútil Music
   retries the resolver chain with bounded backoff; navigation cancels obsolete
   attempts. YouTube candidates are deep-probed at or beyond 3 MiB before
   publication, and downloads resume through validated range requests and safe
@@ -93,11 +97,11 @@ Current version: **1.3.1+131**.
 - Dedicated **Favorites** playlist with accent-colored hearts on favorited
   tracks.
 - ZIP backup and restore for the database, audio files, and thumbnails.
-- CSV imports recognize BStream, MetroList, Harmony/RiMusic, Soundiiz,
+- CSV imports recognize Inútil Music, MetroList, Harmony/RiMusic, Soundiiz,
   Exportify, and common title/artist/album/ISRC layouts. They show a preview,
   reuse existing local tracks, and process up to three missing songs
   concurrently only after confirmation while retaining source playlist order.
-  Exports offer BStream Music, MetroList, Harmony/RiMusic, and Soundiiz profiles
+  Exports offer Inútil Music, MetroList, Harmony/RiMusic, and Soundiiz profiles
   and contain metadata, not audio.
 
 ### Player
@@ -111,14 +115,14 @@ Current version: **1.3.1+131**.
   applications can recognize: YouTube Music when the track came from the
   InnerTube catalog, otherwise the regular YouTube watch URL. Local-only files
   without a YouTube identity are intentionally not shared.
-- Android can also offer BStream when opening public YouTube/YouTube Music
+- Android can also offer Inútil Music when opening public YouTube/YouTube Music
   links. Video links open the player directly; playlist and album links open a
   catalog view with Play and Add to playlist actions. Unsupported or unsafe
   URLs are ignored.
 - Lyrics offer three persistent animation styles (Smooth by default),
   Normal/Centered alignment, optional per-script romanization, and a live
   preview in Appearance settings.
-- Appearance opens a dedicated gallery with responsive previews of BStream
+- Appearance opens a dedicated gallery with responsive previews of Inútil Music
   Music, Apple Music Style, Classic Vinyl, and Spotify Style. Selecting a style
   applies it immediately. Their controls and artwork adapt to portrait,
   compact landscape, large phones, and desktop windows.
@@ -150,7 +154,7 @@ Current version: **1.3.1+131**.
 - Animated progress waves use the current artwork's color, with a smooth color
   transition and an accent-color fallback when artwork is unavailable.
 - Volume is available directly in the player controls.
-- On Windows, Linux, and macOS, choose BStream's audio output device from the
+- On Windows, Linux, and macOS, choose Inútil Music's audio output device from the
   player's More menu, with independent player volume and crossfade support.
 - On desktop, Space toggles Play/Pause from the mini or full player unless an
   editable text field such as Search currently has focus.
@@ -165,7 +169,7 @@ Current version: **1.3.1+131**.
 - Source opens use bounded deadlines and generation/epoch isolation. A broken
   decoder or network source cannot hold a newer selection, Stop, or shutdown
   indefinitely, and late events from the retired source are ignored.
-- Windows registers a stable application identity so SMTC shows the BStream
+- Windows registers a stable application identity so SMTC shows the Inútil Music
   Music name and icon in system media controls.
 - Failed-track handling: a track that cannot be downloaded or played does not leave the queue stuck on the previous track.
 
@@ -183,7 +187,7 @@ Current version: **1.3.1+131**.
   restore their last valid source playlist and fall back safely when that
   playlist no longer exists.
 - Without requiring an account, Home learns only from qualified local playback
-  events and combines YouTube Music related candidates with BStream's own
+  events and combines YouTube Music related candidates with Inútil Music's own
   ranking. Personalized shelves include **Because you listened**, **Your
   mixes**, **New for you**, and **Discovery for you**; the previous feed is
   shown instantly while a fresh one is prepared in the background.
@@ -195,14 +199,14 @@ Current version: **1.3.1+131**.
   selectable from Settings, including localized release highlights.
 - An Application information section in Settings opens an organized About the
   app detail with the current version, optional Ko-fi development support, and
-  the official GitHub repository; BStream Music remains free.
+  the official GitHub repository; Inútil Music remains free.
 - Windows window minimum size of `960 × 600`; the player progressively adapts artwork, text, spacing, and controls to the available height.
 - Icons generated from one source asset for Android, iOS, Windows, macOS, and
   Flutter resources.
 
 ## TikTok LIVE on Android, iOS, Windows, Linux, and macOS
 
-Every supported BStream platform connects to TikTok LIVE through a client
+Every supported Inútil Music platform connects to TikTok LIVE through a client
 implemented directly in Dart and turns chat commands into a temporary music
 queue. The integration does not launch an external bridge.
 
@@ -248,7 +252,7 @@ from the LIVE queue, while `!stop` pauses the current LIVE song.
 
 The local LIVE overlay is available only in the Windows build. Connect to LIVE
 and enable **Local LIVE overlay** immediately below the connection control.
-On first use, Windows asks for administrator confirmation once so BStream can
+On first use, Windows asks for administrator confirmation once so Inútil Music can
 add its marked `hosts` entry:
 
 ```text
@@ -257,12 +261,12 @@ add its marked `hosts` entry:
 
 Afterward, activating the overlay does not need elevation. The name uses the
 reserved `.test` namespace, contains neither `localhost` nor a raw IP, and has
-no explicit port, while Windows still resolves it directly to this PC. BStream
+no explicit port, while Windows still resolves it directly to this PC. Inútil Music
 listens exclusively on `127.0.0.1`; it does not publish the server to the LAN
 or Internet. No HTTPS
 certificate is created or installed for the overlay.
 
-BStream reports the overlay as active only after the hostname resolves safely
+Inútil Music reports the overlay as active only after the hostname resolves safely
 and a direct request to its local `/health` endpoint succeeds. These checks use
 bounded retries, never use an HTTP proxy, and release port `80` completely if
 startup cannot be verified.
@@ -287,12 +291,12 @@ the scene background transparent. The choice is saved and updates an active
 Windows browser source immediately; no reconnect is required. The wave pauses
 with playback, when the browser source is hidden, and for reduced motion.
 
-Keep BStream running while the source is in use. The page contains its own
-HTML, CSS, and JavaScript and receives queue updates from BStream over WS; it
+Keep Inútil Music running while the source is in use. The page contains its own
+HTML, CSS, and JavaScript and receives queue updates from Inútil Music over WS; it
 does not contact an external overlay service. Port `80` must be free because an
-HTTP URL without an explicit port necessarily uses it; BStream reports an error
+HTTP URL without an explicit port necessarily uses it; Inútil Music reports an error
 instead of stopping or reconfiguring another application that already owns the
-port. If Windows access is declined, the rest of BStream remains unaffected and
+port. If Windows access is declined, the rest of Inútil Music remains unaffected and
 the overlay can be activated again later.
 
 To preview and style the real HTTP/WS overlay without installing or
@@ -310,8 +314,8 @@ or Android reclaiming that process also ends the LIVE connection; it is not an
 independent background service.
 
 This integration uses an unofficial, reverse-engineered protocol. If TikTok
-changes it, the Dart client may need to be updated. BStream Music is not
-affiliated with or endorsed by TikTok or ByteDance. BStream can keep its local
+changes it, the Dart client may need to be updated. Inútil Music is not
+affiliated with or endorsed by TikTok or ByteDance. Inútil Music can keep its local
 processing responsive, but it can only act on chat messages that TikTok
 actually delivers to the WebSocket client.
 
@@ -349,9 +353,9 @@ bounded bytes, requests and elapsed time; unavailable details remain unknown
 without preventing a verified source upgrade. Catalog availability depends on the track
 and region; an unavailable recording remains on YouTube. Its source-upgrade
 behavior was researched against [BitChord](https://github.com/kushagrasinghx/BitChord)
-and implemented independently for BStream's existing playback infrastructure.
+and implemented independently for Inútil Music's existing playback infrastructure.
 
-BStream preserves the original audio samples and does not extract, remux, or
+Inútil Music preserves the original audio samples and does not extract, remux, or
 transcode them. Compatible downloaded files receive
 embedded title, artist and album before entering the library, reusing the
 resolved catalog data. Container detection uses the file contents, with these
@@ -391,13 +395,13 @@ reuse each catalog's session snapshot; refreshing updates the device catalog.
 Mobile device artwork is requested separately on demand rather than extracted
 for every song during a library scan. Desktop text scans skip embedded images.
 
-BStream does not invoke or bundle standalone `ffmpeg` or `ffprobe`
+Inútil Music does not invoke or bundle standalone `ffmpeg` or `ffprobe`
 executables. Desktop playback still relies on the codec libraries included by
 `media_kit`/libmpv; those libraries decode M4A, Opus, and other formats during
 playback, but they are not a transcoding or download post-processing step.
 
 Lyrics are requested from the selected Better Lyrics, LyricsPlus, and
-[LRCLIB](https://lrclib.net) providers when the lyrics view is opened. BStream
+[LRCLIB](https://lrclib.net) providers when the lyrics view is opened. Inútil Music
 sends the current title, artist, duration, and album when available, identifies
 itself with the required client header, and keeps bounded 15-minute in-memory
 caches of at most 24 songs per provider to avoid duplicate requests. Word timing
@@ -531,12 +535,12 @@ URL scheme, keeps account credentials in the system Keychain, and enables the
 audio background mode for lock-screen and Now Playing controls. Remote search,
 playback, downloads, embedded YouTube Music account login, TikTok LIVE, backup
 export, and CSV export are adapted to iOS. The system document picker handles
-exports outside BStream's sandbox.
+exports outside Inútil Music's sandbox.
 
 The Now Playing home-screen widget is available on iOS 14 or newer (small and
 medium sizes). Its artwork and metadata are copied into the shared App Group
 `group.com.bstream.bstreamMusic`; the widget never starts an audio engine or
-downloads music. Its controls open BStream to execute playback actions. For
+downloads music. Its controls open Inútil Music to execute playback actions. For
 device signing, register that App Group for **both** the Runner and
 `com.bstream.bstreamMusic.NowPlayingWidget` extension and sign both targets
 with profiles that include the entitlement. An external signing tool that
@@ -547,22 +551,22 @@ for its transport controls.
 With the user's Media Library permission, the Local view reads songs through
 `MPMediaLibrary`. Only media that is downloaded to the device, exposes a
 playable asset URL, and is not DRM-protected is listed. Cloud-only Apple Music
-items remain unavailable until iOS downloads them locally. BStream's downloaded
+items remain unavailable until iOS downloads them locally. Inútil Music's downloaded
 tracks remain in its own library as on the other platforms.
 
 The app cannot claim public `youtube.com` links as Universal Links because
-those domains do not publish an association for BStream; app-owned
+those domains do not publish an association for Inútil Music; app-owned
 `bstreammusic://` links remain supported.
 
 The repository's CI compiles both an unsigned simulator application and an
 unsigned Release application for physical devices. It packages the latter as
-`BStream-Music-<version>-iOS-unsigned.ipa` and uploads it to the corresponding
+`Inútil Music-Music-<version>-iOS-unsigned.ipa` and uploads it to the corresponding
 GitHub Actions run; it does not sign the package or publish it to a store.
 
 The unsigned IPA can be used as input for an external signing or sideloading
 tool such as GBox. It is not directly installable in its unsigned state: the
 chosen tool must sign or re-sign it using credentials and provisioning that the
-target device accepts. GBox and similar services are independent of BStream,
+target device accepts. GBox and similar services are independent of Inútil Music,
 and their availability and compatibility are not guaranteed by this project.
 
 Media Library behavior must be tested on a physical device because it is not
@@ -572,7 +576,7 @@ distribution require the corresponding Apple signing and provisioning setup.
 ## macOS permissions
 
 The application is distributed outside the Mac App Store. App Sandbox is
-disabled so BStream can access the selected download folder and make network
+disabled so Inútil Music can access the selected download folder and make network
 connections. Hardened Runtime remains enabled for Developer ID signing and
 notarization. Release bundles contain no external YouTube resolver or
 JavaScript runtime. TikTok LIVE uses the same in-process Dart transport on
@@ -681,8 +685,8 @@ The workflow verifies all three APK signatures before uploading the artifacts.
   duplicate playlist. “Episodes for later” is ignored during account bootstrap.
 - ZIP backups contain the database, `audio/`, `thumbnails/`, and a manifest.
 - The Storage page separates local ZIP backup transfer from portable CSV
-  transfer. BStream CSV preserves playlist membership and order; importing can
-  resolve up to three missing tracks concurrently, and BStream Music,
+  transfer. Inútil Music CSV preserves playlist membership and order; importing can
+  resolve up to three missing tracks concurrently, and Inútil Music,
   MetroList, Harmony/RiMusic, or Soundiiz can be selected as export profiles.
 - Restore validates the manifest, archive paths and limits, SQLite integrity,
   schema, and version before touching local data. Database and media changes
@@ -733,7 +737,7 @@ build/linux/x64/release/bundle/bstream_music
 build/macos/Build/Products/Release/bstream_music.app
 build/ios/iphonesimulator/Runner.app
 build/ios/iphoneos/Runner.app
-dist/BStream-Music-<version>-iOS-unsigned.ipa
+dist/Inútil Music-Music-<version>-iOS-unsigned.ipa
 ```
 
 ## Release packages with GitHub Actions
@@ -752,24 +756,24 @@ application and needs no additional runtime. Artifacts are retained for 30
 days:
 
 ```text
-BStream-Music-<version>-Android-armeabi-v7a.apk
-BStream-Music-<version>-Android-arm64-v8a.apk
-BStream-Music-<version>-Android-x86_64.apk
-BStream-Music-<version>-Windows-x64-Setup.exe
-BStream-Music-<version>-linux-amd64.deb
-BStream-Music-<version>-linux-x86_64.rpm
-BStream-Music-<version>-macOS-arm64.pkg
-BStream-Music-<version>-macOS-x64.pkg
-BStream-Music-<version>-iOS-unsigned.ipa
+Inútil Music-Music-<version>-Android-armeabi-v7a.apk
+Inútil Music-Music-<version>-Android-arm64-v8a.apk
+Inútil Music-Music-<version>-Android-x86_64.apk
+Inútil Music-Music-<version>-Windows-x64-Setup.exe
+Inútil Music-Music-<version>-linux-amd64.deb
+Inútil Music-Music-<version>-linux-x86_64.rpm
+Inútil Music-Music-<version>-macOS-arm64.pkg
+Inútil Music-Music-<version>-macOS-x64.pkg
+Inútil Music-Music-<version>-iOS-unsigned.ipa
 ```
 
 ### Which file should I install?
 
-- **Most Android phones and tablets:** install `BStream-Music-<version>-Android-arm64-v8a.apk`.
-- **Older 32-bit ARM Android devices:** install `BStream-Music-<version>-Android-armeabi-v7a.apk`.
-- **Android x86_64 devices and emulators:** install `BStream-Music-<version>-Android-x86_64.apk`.
+- **Most Android phones and tablets:** install `Inútil Music-Music-<version>-Android-arm64-v8a.apk`.
+- **Older 32-bit ARM Android devices:** install `Inútil Music-Music-<version>-Android-armeabi-v7a.apk`.
+- **Android x86_64 devices and emulators:** install `Inútil Music-Music-<version>-Android-x86_64.apk`.
 - **iPhone and iPad:** download
-  `BStream-Music-<version>-iOS-unsigned.ipa` from the artifacts of a successful
+  `Inútil Music-Music-<version>-iOS-unsigned.ipa` from the artifacts of a successful
   **Release installers** run in GitHub Actions, then supply it to GBox or
   another compatible signing/sideloading tool. The IPA is deliberately
   unsigned and cannot be installed directly without being signed or re-signed
@@ -778,17 +782,93 @@ BStream-Music-<version>-iOS-unsigned.ipa
 - **Windows 64-bit:** open `Setup.exe`. The per-user installer does not require
   administrator access, shows a language selector, creates a Start Menu
   shortcut, and lets you choose whether to create a desktop shortcut. The
-  uninstaller entry is displayed as `BStream Music` without the version number.
-- **Ubuntu, Debian, Linux Mint, and derivatives:** install the `.deb` with `sudo apt install ./BStream-Music-<version>-linux-amd64.deb`.
-- **Fedora, RHEL, and derivatives:** install the `.rpm` with `sudo dnf install ./BStream-Music-<version>-linux-x86_64.rpm`.
-- **Mac with Apple Silicon (M1, M2, M3, M4, or later):** open `BStream-Music-<version>-macOS-arm64.pkg`.
-- **Mac with an Intel processor:** open `BStream-Music-<version>-macOS-x64.pkg`.
+  uninstaller entry is displayed as `Inútil Music` without the version number.
+- **Ubuntu, Debian, Linux Mint, and derivatives:** install the `.deb` with `sudo apt install ./Inútil Music-Music-<version>-linux-amd64.deb`.
+- **Fedora, RHEL, and derivatives:** install the `.rpm` with `sudo dnf install ./Inútil Music-Music-<version>-linux-x86_64.rpm`.
+- **Mac with Apple Silicon (M1, M2, M3, M4, or later):** open `Inútil Music-Music-<version>-macOS-arm64.pkg`.
+- **Mac with an Intel processor:** open `Inútil Music-Music-<version>-macOS-x64.pkg`.
 
-An `.app` is the complete application and should be opened as one unit, not by entering its `Contents`, `Frameworks`, or `Resources` folders. The `.pkg` installer places `BStream Music.app` in `/Applications` automatically.
+An `.app` is the complete application and should be opened as one unit, not by entering its `Contents`, `Frameworks`, or `Resources` folders. The `.pkg` installer places `Inútil Music.app` in `/Applications` automatically.
 
 The automated installers are not signed with commercial certificates yet. Windows may show a SmartScreen warning and macOS may show a Gatekeeper warning. Public distribution without those warnings requires a Windows code-signing certificate and Apple Developer ID certificates with notarization.
 
 The version is defined in `pubspec.yaml`, while the text shown inside the application is defined in `lib/core/constants/app_constants.dart`.
+
+## Self-updates and release publishing
+
+Inútil Music compares its own version at start-up and offers the update inside
+the app, so a new build reaches every device without the Play Store or a package
+manager.
+
+Sources consulted, in order:
+
+1. The manifest URL saved in Settings → Updates.
+2. `INUTIL_RELEASE_MANIFEST_URL` in the process environment.
+3. `releases/release.json` in the release bucket.
+4. The Firestore document `app_config/release` (legacy path, still supported).
+5. Any machine on the local network signed in with the same account
+   (`GET /api/release`, answered from `~/inutil-releases/release.json`).
+6. The last manifest cached on the device.
+
+When none of them answers the app reports the installed version as the latest
+one instead of inventing an update it cannot download.
+
+Manifest schema (`release.json`):
+
+```json
+{
+  "schemaVersion": 1,
+  "latestVersion": "2.0.1",
+  "mandatory": false,
+  "publishedAt": "2026-11-17T04:00:00+00:00",
+  "apkDownloadUrl": "/api/releases/app-arm64-v8a-release.apk",
+  "linuxDownloadUrl": "/api/releases/inutil_music_linux_x64.tar.gz",
+  "androidDownloads": {
+    "arm64_v8a": "/api/releases/app-arm64-v8a-release.apk",
+    "armeabi_v7a": "/api/releases/app-armeabi-v7a-release.apk",
+    "x86_64": "/api/releases/app-x86_64-release.apk"
+  },
+  "androidDownloadSizes": {"arm64_v8a": 34365793},
+  "packageSizeBytes": 34365793,
+  "releaseNotes": ["Mejoras de rendimiento y estabilidad."],
+  "checksums": {"app-arm64-v8a-release.apk": "6124e1cf…"}
+}
+```
+
+`androidDownloads` keys are normalized (`arm64-v8a` → `arm64_v8a`) so each
+phone downloads only the package matching its ABI.
+
+Publishing a version:
+
+```bash
+flutter build apk --release --split-per-abi
+flutter build linux --release && bash tool/package_linux.sh
+bash tool/publish_release.sh 2.0.1 --dry-run   # prints release.json only
+bash tool/publish_release.sh 2.0.1             # local: ~/inutil-releases
+bash tool/publish_release.sh 2.0.1 --upload    # Storage + Firestore
+```
+
+`--local` (the default) copies the artifacts plus `release.json` into
+`~/inutil-releases/`; the running app serves that folder to the rest of the
+network on `/api/release` and `/api/releases/<file>`, honouring `Range` requests
+so an interrupted download resumes where it stopped. `--github` (the recommended
+public channel) publishes the same files as assets of a GitHub Release in
+`RELEASE_REPO` (`CesarHGlez13/inutil-music` by default, the same value the app is
+compiled with) and then syncs `app_config/release`. `--upload` pushes to Firebase
+Storage instead and needs a token for the release project
+(`FIREBASE_ACCESS_TOKEN`, or `firebase auth:token --project inutil-music-app`);
+both also mirror the manifest into `app_config/release` for devices still on the
+old lookup order.
+
+Applying the update:
+
+- Android opens the downloaded APK with `ACTION_VIEW`
+  (`REQUEST_INSTALL_PACKAGES`); the playback position is handed over before the
+  installer opens and restored afterwards, so updating does not lose the song.
+- Linux re-plants the bundle with a detached helper: it waits for the app to
+  exit, replaces `data/` and `lib/` (dropping files the new package no longer
+  ships), relaunches the new executable and deletes its staging directory.
+  `bash tool/test_update_swap.sh` exercises that path against the real tarball.
 
 ## Quality
 
@@ -816,3 +896,211 @@ The repository deliberately excludes:
 - Local developer tool caches and their auxiliary directories.
 - Signing keys, passwords, and local Android configuration files.
 - Databases, downloaded music, thumbnails, and user backups.
+
+## Publicar una nueva versión (OTA)
+
+> Complemento operativo de la sección anterior (*Self-updates and release
+> publishing*): comandos exactos, modos de `publish_release.sh` y mediciones
+> reales de esta máquina.
+
+Guía verificada en esta máquina (Flutter 3.50.0 · 2026-11-16). La app compara
+`AppConstants.appVersion` (`lib/core/constants/app_constants.dart:9`, hoy `2.0.0`)
+contra `latestVersion` del manifiesto y, si nada responde, informa «estás al día»
+en vez de inventar una actualización.
+
+### 1. Compilar los artefactos
+
+Android, un APK por ABI. El flag es `--split-per-abi`; **`--split-abi` no existe**
+(en el `flutter build apk --help` de este SDK sólo aparece
+`--[no-]split-per-abi`):
+
+```bash
+flutter build apk --release --split-per-abi
+# build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+# build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+# build/app/outputs/flutter-apk/app-x86_64-release.apk
+```
+
+Linux (el `.tar.gz` es el paquete que la app descomprime y reemplanta dentro de
+`~/.local/share/inutil-music`):
+
+```bash
+flutter build linux --release
+bash tool/package_linux.sh          # → dist/inutil_music_linux_x64.tar.gz
+```
+
+`tool/package_linux.sh` guarda el contenido del bundle en la raíz del tar
+(`Inútil Music`, `data/`, `lib/`, `THIRD_PARTY_NOTICES.md`), sin carpetas
+intermedias; por eso el instalador puede reemplantar directo.
+
+APK universal opcional (todas las ABIs, ~121 MB): `flutter build apk --release`
+genera `app-release.apk`, pero `publish_release.sh` busca
+`app-universal-release.apk`, así que hay que copiarlo con ese nombre:
+
+```bash
+cp build/app/outputs/flutter-apk/app-release.apk \
+   build/app/outputs/flutter-apk/app-universal-release.apk
+```
+
+Si no existe, el manifiesto simplemente omite la clave `universal` y
+`apkDownloadUrl` apunta al `arm64_v8a` (comprobado con `--dry-run`).
+
+### 2. El manifiesto `release.json`
+
+Esquema exacto (`schemaVersion: 1`) que genera `tool/publish_release.sh`; esta es
+la salida real de `bash tool/publish_release.sh 2.0.0 --dry-run`, recortada:
+
+```json
+{
+  "schemaVersion": 1,
+  "latestVersion": "2.0.0",
+  "mandatory": false,
+  "publishedAt": "2026-11-17T05:18:43+00:00",
+  "apkDownloadUrl": "/api/releases/app-arm64-v8a-release.apk",
+  "linuxDownloadUrl": "/api/releases/inutil_music_linux_x64.tar.gz",
+  "androidDownloads": {
+    "arm64_v8a": "/api/releases/app-arm64-v8a-release.apk",
+    "armeabi_v7a": "/api/releases/app-armeabi-v7a-release.apk",
+    "x86_64": "/api/releases/app-x86_64-release.apk"
+  },
+  "androidDownloadSizes": {
+    "arm64_v8a": 34365793,
+    "armeabi_v7a": 34540327,
+    "x86_64": 34703970
+  },
+  "packageSizeBytes": 34365793,
+  "releaseNotes": ["Mejoras de rendimiento y estabilidad."],
+  "checksums": {
+    "app-arm64-v8a-release.apk": "6124e1cf2b0164a322bbc4c8d71d82b2ec23b4d12c32c87c90b48b2676ec0861"
+  }
+}
+```
+
+| Campo | Para qué sirve |
+| --- | --- |
+| `schemaVersion` | Versión del esquema; hoy `1`. |
+| `latestVersion` | Se compara con `AppConstants.appVersion`. |
+| `mandatory` | Si es `true`, el diálogo no ofrece «Ahora no». |
+| `publishedAt` | Fecha ISO-8601 UTC; se muestra en el diálogo. |
+| `apkDownloadUrl` | APK de respaldo (universal o `arm64_v8a`). |
+| `linuxDownloadUrl` | `.tar.gz`/AppImage que reemplanta el instalador de Linux. |
+| `androidDownloads` | URL por ABI. Claves **normalizadas con guion bajo**: `arm64_v8a`, `armeabi_v7a`, `x86_64`, `universal`. |
+| `androidDownloadSizes` | Bytes por ABI; el diálogo muestra el tamaño real antes de descargar. |
+| `packageSizeBytes` | Tamaño del paquete de la plataforma (fallback del tamaño). |
+| `releaseNotes` | Lista de líneas; salen en el diálogo (traducibles). |
+| `checksums` | SHA-256 por nombre de archivo. |
+
+Orden en que la app busca el manifiesto
+(`InutilUpdateService.checkForUpdate`,
+[lib/core/firebase/inutil_update_service.dart](file:///home/cesar/Escritorio/alo/inutil_music/lib/core/firebase/inutil_update_service.dart#L374-L426)):
+
+1. La URL escrita en **Ajustes → Actualizaciones** (prefs
+   `inutil_release_manifest_url`, línea 335).
+2. La variable de entorno `INUTIL_RELEASE_MANIFEST_URL` (línea 339).
+3. El manifiesto de la última Release de GitHub,
+   `https://github.com/CesarHGlez13/inutil-music/releases/latest/download/release.json`
+   (se omite al correr contra el emulador).
+4. `https://firebasestorage.googleapis.com/v0/b/<FirebaseConfig.storageBucket>/o/releases%2Frelease.json?alt=media`,
+   con el bucket derivado del proyecto: `inutil-music-app.firebasestorage.app`
+   (anulable con `--dart-define=FB_STORAGE_BUCKET=…`).
+5. El documento Firestore `app_config/release` (línea 329).
+6. Un PC de la misma red: `GET /api/release`
+   ([firebase_playback_sync_service.dart](file:///home/cesar/Escritorio/alo/inutil_music/lib/core/firebase/firebase_playback_sync_service.dart#L380)).
+7. La caché local (prefs `inutil_music_cached_release_v2`).
+
+Mediciones del 2026-11-17 sobre el proyecto real `inutil-music-app`: la clave
+pública ya no es un placeholder — `FirebaseConfig.apiKey`
+([lib/core/firebase/firebase_config.dart:17](file:///home/cesar/Escritorio/alo/inutil_music/lib/core/firebase/firebase_config.dart#L17))
+lleva la clave real del proyecto, leída de `firebase apps:sdkconfig ANDROID`. Con
+esa clave, la lectura REST anónima de `app_config/release` devolvía **HTTP 403
+`PERMISSION_DENIED`** porque las reglas del repositorio no estaban desplegadas; tras
+`firebase deploy --only firestore:rules --project inutil-music-app` devuelve
+**HTTP 404** (documento aún no publicado), que es lo que necesita el kill switch
+para decidir sin sesión iniciada. El bucket `inutil-music-7b1fa.firebasestorage.app`
+que citaban versiones anteriores de esta documentación **no existe**:
+`firebase projects:list` sólo expone `inutil-music-app` (número 129744480084) y
+`GET https://storage.googleapis.com/storage/v1/b?project=129744480084` no lista
+ningún bucket. La propia CLI lo dice al desplegar: *«Firebase Storage has not been
+set up on project 'inutil-music-app'. Go to …/storage and click 'Get Started'»*.
+Mientras Storage no se aprovisione desde la consola, el canal público es GitHub
+Releases (modo `--github`), que no exige credenciales en el teléfono.
+
+### 3. `tool/publish_release.sh`
+
+```bash
+bash tool/publish_release.sh <versión> [--notes-file NOTAS.txt] [--local|--github|--upload] [--dry-run]
+```
+
+| Modo | Qué hace |
+| --- | --- |
+| `--local` (por defecto) | Copia los `.apk`/`.tar.gz` y el `release.json` a `~/inutil-releases/` (anulable con `INUTIL_RELEASES_DIR`). Esa carpeta es la que la app de escritorio sirve por HTTP en `/api/release` y `/api/releases/<archivo>`, así que los equipos cercanos se actualizan sin tocar la nube. |
+| `--github` | Crea/actualiza la Release `v<versión>` de `RELEASE_REPO` (`CesarHGlez13/inutil-music`) con los artefactos y el `release.json` como assets —descargables sin autenticar— y hace `PATCH` del documento Firestore `app_config/release`. Necesita la CLI `gh` iniciada y, para Firestore, `FIREBASE_ACCESS_TOKEN`. Es el canal público recomendado mientras Cloud Storage no esté aprovisionado. |
+| `--upload` | Sube los mismos archivos a `gs://<FB_BUCKET>/releases/…` (por defecto `inutil-music-app.firebasestorage.app`, no hace falta `gsutil`: usa `uploadType=media` con el token) y hace `PATCH` de `app_config/release`. Sin `FIREBASE_ACCESS_TOKEN` sale con código 4. |
+| `--dry-run` | Genera e imprime el `release.json` en un directorio temporal y no copia ni sube nada. |
+
+Las notas se leen de `--notes-file` o, si no se indica, de la sección de la
+versión en `CHANGELOG.md`. El script exige artefactos ya construidos (código 3 si
+no hay nada en `build/app/outputs/flutter-apk` ni en `dist/`) y siempre escribe el
+manifiesto en un `mktemp -d`: en el repositorio no queda ningún `release.json`.
+
+Aviso sobre `--upload` medido el 2026-11-17: el CLI está autenticado como
+`humbertoglez96@gmail.com`, que **sí** tiene acceso al proyecto `inutil-music-app`
+(aparece en `firebase projects:list`), pero el proyecto todavía no tiene Cloud
+Storage aprovisionado, así que la subida terminará en 404/403 hasta que Cesar pulse
+«Get Started» en la consola. El token OAuth que usa el script se obtiene del
+`refresh_token` del CLI (`oauth2.googleapis.com/token`) y caduca a la hora; con él
+sí se puede escribir `app_config/release` por la API REST de Firestore, que es lo
+que hace el modo `--github`.
+
+### 4. Probar la auto-actualización de Linux
+
+```bash
+bash tool/test_update_swap.sh
+```
+
+Le extrae el script `sh` embebido al código Dart, monta una instalación falsa en
+`~/.local/share/inutil-music-sandbox`, lanza el helper con `setsid` y comprueba
+que reemplanta `data/` y `lib/`, relanza y se auto-borra. **Estado verificado
+hoy (2026-11-16):** `RESULTADO: PRUEBA SUPERADA` — el script lee el helper de
+[lib/core/firebase/inutil_update_service.dart](file:///home/cesar/Escritorio/alo/inutil_music/lib/core/firebase/inutil_update_service.dart)
+(`_installLinuxArchiveAndRelaunch`) y confirma el relanzamiento, la convergencia
+de `data/` y `lib/` (se retiran los `.so` que el paquete nuevo ya no incluye) y la
+limpieza del staging.
+
+### 5. Reglas de Firestore
+
+El fichero del repo es
+[firebase/firestore.rules](file:///home/cesar/Escritorio/alo/inutil_music/firebase/firestore.rules)
+(no `firestore.rules` en la raíz). El manifiesto vive en `app_config/release`:
+
+```
+match /app_config/{document=**} {
+  allow read: if true;      // cualquier dispositivo comprueba la versión
+  allow write: if isAdmin(); // sólo Cesar publica
+}
+```
+
+`isAdmin()` exige `request.auth.token.role == 'admin'` o
+`request.auth.token.admin == true` (líneas 18-21). Hoy no hay lista de campos, así
+que un administrador puede reescribir el documento completo, incluidos
+`linuxDownloadUrl` y `androidDownloads`; si se añade una lista explícita deben
+figurar esos dos campos más `latestVersion`, `apkDownloadUrl`, `mandatory`,
+`publishedAt`, `releaseNotes` y `packageSizeBytes`, porque tanto
+`InutilUpdateService.publishRelease` como `publish_release.sh` los escriben en el
+mismo `PATCH`. Las claves de `androidDownloads` van con guion bajo
+(`arm64_v8a`, `armeabi_v7a`, `x86_64`, `universal`), que es como la app las
+normaliza.
+
+### 6. Qué hace la app con ese manifiesto (Android)
+
+1. Al abrir, sin bloquear el arranque, `InutilUpdateService.checkForUpdate()` y
+   diálogo no bloqueante («Ahora no» / «Actualizar»).
+2. `OtaDownloadManager`
+   ([lib/services/app_update/ota_download_manager.dart](file:///home/cesar/Escritorio/alo/inutil_music/lib/services/app_update/ota_download_manager.dart))
+   descarga el APK elegido por ABI en `<documentos>/updates/` con cabecera
+   `Range`, `.part` + `.meta`: si se corta la red, reanuda donde iba. El progreso
+   sólo se pinta dentro de la app (no hay notificación persistente).
+3. `AndroidPackageInstaller.installPackage()` abre el instalador con `FileProvider`
+   (`${applicationId}.fileprovider`) y `ACTION_VIEW`.
+4. `OtaPlaybackResumeStore` guarda pista + posición antes de abrir el instalador
+   (TTL 30 min) para reanudar la música al volver, aunque el proceso se reinicie.

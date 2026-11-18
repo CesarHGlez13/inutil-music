@@ -1,5 +1,5 @@
-import 'package:bstream_music/features/music/presentation/widgets/library_subscribed_artists_shelf.dart';
-import 'package:bstream_music/services/youtube_music/account/youtube_music_account.dart';
+import 'package:inutil_music/features/music/presentation/widgets/library_subscribed_artists_shelf.dart';
+import 'package:inutil_music/services/youtube_music/account/youtube_music_account.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 

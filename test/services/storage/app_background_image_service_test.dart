@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/storage/app_background_image_service.dart';
+import 'package:inutil_music/services/storage/app_background_image_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image/image.dart' as image;
 import 'package:path/path.dart' as path;

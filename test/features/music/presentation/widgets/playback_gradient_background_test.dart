@@ -1,12 +1,12 @@
 import 'dart:ui' as ui;
 
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
-import 'package:bstream_music/features/music/presentation/widgets/app_background_photo.dart';
-import 'package:bstream_music/features/music/presentation/widgets/artwork_gradient_header_background.dart';
-import 'package:bstream_music/features/music/presentation/widgets/playback_gradient_background.dart';
-import 'package:bstream_music/features/music/presentation/widgets/source_image.dart';
-import 'package:bstream_music/services/player/player_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/artwork_progress_color_provider.dart';
+import 'package:inutil_music/features/music/presentation/widgets/app_background_photo.dart';
+import 'package:inutil_music/features/music/presentation/widgets/artwork_gradient_header_background.dart';
+import 'package:inutil_music/features/music/presentation/widgets/playback_gradient_background.dart';
+import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
+import 'package:inutil_music/services/player/player_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/foundation.dart' show listEquals;

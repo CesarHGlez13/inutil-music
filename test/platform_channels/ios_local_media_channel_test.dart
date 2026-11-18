@@ -1,6 +1,6 @@
-import 'package:bstream_music/core/utils/image_source.dart';
-import 'package:bstream_music/platform_channels/ios_local_media_channel.dart';
-import 'package:bstream_music/services/local_media/device_audio_catalog.dart';
+import 'package:inutil_music/core/utils/image_source.dart';
+import 'package:inutil_music/platform_channels/ios_local_media_channel.dart';
+import 'package:inutil_music/services/local_media/device_audio_catalog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 

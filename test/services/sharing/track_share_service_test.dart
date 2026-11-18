@@ -1,7 +1,7 @@
 import 'dart:ui';
 
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/services/sharing/track_share_service.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/services/sharing/track_share_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

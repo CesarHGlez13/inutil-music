@@ -477,7 +477,7 @@ class LocalDatabaseService {
         track.id,
         'track',
         'External device audio is transient and cannot be persisted in the '
-            'BStream library.',
+            'Inútil Music library.',
       );
     }
     final db = await database;

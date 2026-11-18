@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/features/music/domain/entities/lyrics_document.dart';
-import 'package:bstream_music/features/music/domain/entities/lyrics_lookup.dart';
-import 'package:bstream_music/services/lyrics/better_lyrics_service.dart';
-import 'package:bstream_music/services/lyrics/lrclib_transport.dart';
-import 'package:bstream_music/services/lyrics/lyrics_service.dart';
-import 'package:bstream_music/services/lyrics/remote_lyrics_service_base.dart';
-import 'package:bstream_music/services/lyrics/youlyplus_lyrics_service.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics_document.dart';
+import 'package:inutil_music/features/music/domain/entities/lyrics_lookup.dart';
+import 'package:inutil_music/services/lyrics/better_lyrics_service.dart';
+import 'package:inutil_music/services/lyrics/lrclib_transport.dart';
+import 'package:inutil_music/services/lyrics/lyrics_service.dart';
+import 'package:inutil_music/services/lyrics/remote_lyrics_service_base.dart';
+import 'package:inutil_music/services/lyrics/youlyplus_lyrics_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _lookup = LyricsLookup(

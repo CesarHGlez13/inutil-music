@@ -174,7 +174,7 @@ class LiveWidgetPreview extends StatelessWidget {
         ),
         SizedBox(height: artistGap),
         Text(
-          'BStream Music',
+          'Inútil Music',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(fontSize: artistSize, color: Colors.white70),

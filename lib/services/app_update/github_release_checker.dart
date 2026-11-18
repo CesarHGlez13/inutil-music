@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import '../../core/firebase/firebase_config.dart';
 import '../../core/utils/background_work.dart';
 import '../../core/utils/bounded_byte_stream.dart';
 
@@ -25,9 +26,17 @@ class AppReleaseCheckResult {
 
 class GitHubReleaseChecker {
   GitHubReleaseChecker({
-    this.repository = 'BryamContreras/BStream-Music',
+    this.repository = releaseRepo,
     GitHubLatestReleaseFetcher? fetchLatestRelease,
   }) : _fetchLatestRelease = fetchLatestRelease ?? _fetchFromGitHub;
+
+  /// Repositorio público donde se publican los binarios. Mismo `--dart-define`
+  /// que el servicio de actualizaciones principal, para que ambos apunten
+  /// siempre al mismo lugar.
+  static const String releaseRepo = String.fromEnvironment(
+    'RELEASE_REPO',
+    defaultValue: 'CesarHGlez13/inutil-music',
+  );
 
   final String repository;
   final GitHubLatestReleaseFetcher _fetchLatestRelease;
@@ -56,35 +65,137 @@ class GitHubReleaseChecker {
     );
   }
 
+  /// Manifiesto embebido usado sólo cuando ni Firestore ni GitHub responden
+  /// (sin red, proyecto sin configurar o cuota agotada). Así el chequeo nunca
+  /// deja al usuario sin respuesta, pero tampoco inventa una versión nueva.
+  static const Map<String, Object?> _builtinRelease = <String, Object?>{
+    'tag_name': '2.0.0',
+    'body':
+        '• Motor Inútil Music 2.0.0 Cinema Edition.\n'
+        '• Importador directo de Playlists desde Spotify, CSV y Texto.\n'
+        '• Letras sincronizadas multi-proveedor (LRCLIB + YouLyPlus + BetterLyrics).\n'
+        '• Sincronización LAN con la PC e In-App OTA Updates.',
+  };
+
   static Future<Map<String, Object?>> _fetchFromGitHub(Uri endpoint) async {
+    return await _fetchFromFirestore() ??
+        await _fetchFromGitHubApi(endpoint) ??
+        _builtinRelease;
+  }
+
+  /// Lee el manifiesto publicado por el panel de administración. La API REST de
+  /// Firestore exige una identidad de proyecto, por eso se envía la clave
+  /// pública web; sin ella la lectura devuelve 403 y el chequeo terminaba
+  /// usando siempre el manifiesto embebido.
+  static Future<Map<String, Object?>?> _fetchFromFirestore() async {
+    final firestoreEndpoint = Uri.parse(
+      'https://firestore.googleapis.com/v1/projects/${FirebaseConfig.projectId}'
+      '/databases/(default)/documents/app_config/release',
+    );
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
     try {
       final request = await client
-          .getUrl(endpoint)
-          .timeout(const Duration(seconds: 10));
+          .getUrl(firestoreEndpoint)
+          .timeout(const Duration(seconds: 8));
       request.headers
-        ..set(HttpHeaders.acceptHeader, 'application/vnd.github+json')
-        ..set(HttpHeaders.userAgentHeader, 'BStream-Music-update-check')
-        ..set('X-GitHub-Api-Version', '2022-11-28');
+        ..set(HttpHeaders.acceptHeader, 'application/json')
+        ..set(HttpHeaders.userAgentHeader, 'InutilMusic-update-check/2.0.0')
+        ..set('X-Goog-Api-Key', FirebaseConfig.apiKey);
       final response = await request.close().timeout(
-        const Duration(seconds: 10),
+        const Duration(seconds: 8),
       );
-      if (response.statusCode != HttpStatus.ok) {
-        throw HttpException(
-          'GitHub latest release request failed (${response.statusCode}).',
-          uri: endpoint,
-        );
-      }
+      if (response.statusCode != HttpStatus.ok) return null;
       final bytes = await collectBoundedByteStream(
         response,
         maximumBytes: 512 * 1024,
         declaredLength: response.contentLength < 0
             ? null
             : response.contentLength,
-        idleTimeout: const Duration(seconds: 10),
-        totalTimeout: const Duration(seconds: 10),
+        idleTimeout: const Duration(seconds: 8),
+        totalTimeout: const Duration(seconds: 8),
       );
-      return await parseJsonBytesInBackground(bytes, _githubReleasePayload);
+      final decoded = await parseJsonBytesInBackground(
+        bytes,
+        _githubReleasePayload,
+      );
+      final fields = decoded['fields'];
+      if (fields is! Map) return null;
+      // El panel de administración escribe `latestVersion`/`releaseNotes`; las
+      // publicaciones antiguas usaban `version`/`notes`, así que se aceptan
+      // ambas formas.
+      final version =
+          _firestoreString(fields['latestVersion']) ??
+          _firestoreString(fields['version']);
+      if (version == null || version.isEmpty) return null;
+      final notes =
+          _firestoreString(fields['notes']) ??
+          _firestoreNotesList(fields['releaseNotes']) ??
+          '';
+      return <String, Object?>{'tag_name': version, 'body': notes};
+    } catch (_) {
+      return null;
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  static String? _firestoreString(Object? value) {
+    if (value is Map) {
+      final raw = value['stringValue'];
+      if (raw is String && raw.trim().isNotEmpty) return raw.trim();
+    }
+    return null;
+  }
+
+  static String? _firestoreNotesList(Object? value) {
+    final values = value is Map ? value['arrayValue'] : null;
+    final list = values is Map ? values['values'] : null;
+    if (list is! List) return null;
+    final lines = <String>[];
+    for (final entry in list) {
+      final text = _firestoreString(entry);
+      if (text != null) lines.add('• $text');
+    }
+    return lines.isEmpty ? null : lines.join('\n');
+  }
+
+  /// Respaldo público: la última release del repositorio upstream, que no
+  /// requiere credenciales.
+  static Future<Map<String, Object?>?> _fetchFromGitHubApi(Uri endpoint) async {
+    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    try {
+      final request = await client
+          .getUrl(endpoint)
+          .timeout(const Duration(seconds: 8));
+      request.headers
+        ..set(HttpHeaders.acceptHeader, 'application/json')
+        ..set(HttpHeaders.userAgentHeader, 'InutilMusic-update-check/2.0.0');
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
+      if (response.statusCode != HttpStatus.ok) return null;
+      final bytes = await collectBoundedByteStream(
+        response,
+        maximumBytes: 512 * 1024,
+        declaredLength: response.contentLength < 0
+            ? null
+            : response.contentLength,
+        idleTimeout: const Duration(seconds: 8),
+        totalTimeout: const Duration(seconds: 8),
+      );
+      final decoded = await parseJsonBytesInBackground(
+        bytes,
+        _githubReleasePayload,
+      );
+      final tag = decoded['tag_name'];
+      if (tag is! String || tag.trim().isEmpty) return null;
+      final body = decoded['body'];
+      return <String, Object?>{
+        'tag_name': tag.trim(),
+        'body': body is String ? body.replaceAll('\u0000', '').trim() : '',
+      };
+    } catch (_) {
+      return null;
     } finally {
       client.close(force: true);
     }

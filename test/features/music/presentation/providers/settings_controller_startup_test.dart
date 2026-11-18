@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/core/theme/app_theme.dart';
-import 'package:bstream_music/services/storage/app_background_image_service.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/services/storage/app_background_image_service.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';

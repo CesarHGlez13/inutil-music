@@ -1,8 +1,8 @@
 import 'dart:io';
 
-import 'package:bstream_music/core/platform/app_platform.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/services/audio_sources/audio_source_policy.dart';
+import 'package:inutil_music/core/platform/app_platform.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/services/audio_sources/audio_source_policy.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';

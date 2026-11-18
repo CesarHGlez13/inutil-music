@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/services/player/local_audio_quality_service.dart';
+import 'package:inutil_music/services/player/local_audio_quality_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 

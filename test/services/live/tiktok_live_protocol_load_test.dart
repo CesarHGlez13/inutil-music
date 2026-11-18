@@ -2,7 +2,7 @@
 
 import 'dart:typed_data';
 
-import 'package:bstream_music/services/live/tiktok_live_dart_adapter.dart';
+import 'package:inutil_music/services/live/tiktok_live_dart_adapter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:piratetok_live/src/connection/wss.dart';
 import 'package:piratetok_live/src/proto/codec.dart';

@@ -1,26 +1,26 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:bstream_music/core/errors/app_exception.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/catalog_track.dart';
-import 'package:bstream_music/features/music/domain/entities/local_track.dart';
-import 'package:bstream_music/features/music/domain/entities/download_options.dart';
-import 'package:bstream_music/features/music/domain/entities/download_result.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist.dart';
-import 'package:bstream_music/features/music/domain/entities/playlist_entry.dart';
-import 'package:bstream_music/features/music/domain/entities/track_info.dart';
-import 'package:bstream_music/features/music/domain/repositories/library_repository.dart';
-import 'package:bstream_music/features/music/domain/repositories/music_repository.dart';
-import 'package:bstream_music/features/music/presentation/providers/music_providers.dart';
-import 'package:bstream_music/features/music/presentation/widgets/mini_player.dart';
-import 'package:bstream_music/features/music/presentation/widgets/player_panel.dart';
-import 'package:bstream_music/services/downloader/audio_stream_resolver.dart';
-import 'package:bstream_music/services/downloader/fallback_audio_resolver.dart';
-import 'package:bstream_music/services/media_session/desktop_media_session.dart';
-import 'package:bstream_music/services/player/player_service.dart';
-import 'package:bstream_music/services/storage/local_database_service.dart';
-import 'package:bstream_music/services/storage/local_library_reconciler.dart';
+import 'package:inutil_music/core/errors/app_exception.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
+import 'package:inutil_music/features/music/domain/entities/local_track.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist.dart';
+import 'package:inutil_music/features/music/domain/entities/playlist_entry.dart';
+import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/domain/repositories/library_repository.dart';
+import 'package:inutil_music/features/music/domain/repositories/music_repository.dart';
+import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
+import 'package:inutil_music/features/music/presentation/widgets/player_panel.dart';
+import 'package:inutil_music/services/downloader/audio_stream_resolver.dart';
+import 'package:inutil_music/services/downloader/fallback_audio_resolver.dart';
+import 'package:inutil_music/services/media_session/desktop_media_session.dart';
+import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/storage/local_database_service.dart';
+import 'package:inutil_music/services/storage/local_library_reconciler.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -4110,9 +4110,13 @@ void main() {
       final cachedFile = File('${temporaryDirectory.path}/late-invalid.m4a');
       await cachedFile.writeAsBytes(const [0, 1, 2, 3]);
       final player = _NativeRemoteQueuePlayerService(failCachedOpen: true);
+      // La sonda previa a la resolución falla; la posterior ya ve el archivo
+      // aparecer. Con un reproductor de cola nativo el controlador ya no hace
+      // la búsqueda extra de caché previa a la resolución, así que sólo hay
+      // dos búsquedas y la caída a red la ejecuta el servicio nativo.
       final remoteCache = _FakeRemotePlaybackCache(
         cachedFile,
-        missesBeforeHit: 2,
+        missesBeforeHit: 1,
       );
       final track = _remoteTrack(
         streamUrl: 'https://media.example/native-network-fallback.m4a',
@@ -4123,7 +4127,11 @@ void main() {
       await container.read(playerControllerProvider.future);
       await container.read(playerControllerProvider.notifier).playRemote(track);
 
-      expect(remoteCache.lookupCalls, 3);
+      // Con un reproductor de cola nativo el controlador no hace la búsqueda
+      // extra de caché previa a la resolución: la sonda previa y la posterior
+      // a la resolución bastan (2 búsquedas), y la caída a red la ejecuta el
+      // propio servicio nativo.
+      expect(remoteCache.lookupCalls, 2);
       expect(remoteCache.evictCalls, 1);
       expect(player.cachedOpenFailures, 1);
       expect(player.nativeRemoteStarts, 1);
