@@ -544,6 +544,8 @@ class _InutilSpotifyImportModalState
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final transferState = ref.watch(libraryCsvTransferControllerProvider);
     final isImporting =
         _importStartedHere &&
@@ -555,59 +557,38 @@ class _InutilSpotifyImportModalState
 
     return PopScope(
       canPop: !isImporting,
-      child: Material(
-        color: Colors.transparent,
-        child: ClipRRect(
-          borderRadius: InutilDesignSystem.borderXl,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-            child: Container(
-              constraints: const BoxConstraints(
-                maxWidth: 660,
-                maxHeight: 740,
-              ),
-              decoration: BoxDecoration(
-                color: InutilDesignSystem.backgroundCarbon.withValues(alpha: 0.92),
-                borderRadius: InutilDesignSystem.borderXl,
-                border: Border.all(
-                  color: _spotifyNeonGreen.withValues(alpha: 0.35),
-                  width: 1.3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _spotifyNeonGreen.withValues(alpha: 0.16),
-                    blurRadius: 42,
-                    spreadRadius: -6,
-                    offset: const Offset(0, 14),
-                  ),
-                  BoxShadow(
-                    color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.14),
-                    blurRadius: 32,
-                    spreadRadius: -8,
-                    offset: const Offset(0, -6),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildHeader(context, isImporting: isImporting),
-                  if (!isImporting && !isCompletedOrFailed)
-                    _buildModeTabs(),
-                  Flexible(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(InutilDesignSystem.spaceLg),
-                      child: _buildBody(
-                        context,
-                        transferState: transferState,
-                        isImporting: isImporting,
-                        isCompletedOrFailed: isCompletedOrFailed,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: 620,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.84,
+        ),
+        child: Material(
+          color: colors.surfaceContainerHigh,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(
+              color: colors.outlineVariant.withValues(alpha: 0.45),
             ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeader(context, isImporting: isImporting),
+              if (!isImporting && !isCompletedOrFailed) _buildModeTabs(),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(20),
+                  child: _buildBody(
+                    context,
+                    transferState: transferState,
+                    isImporting: isImporting,
+                    isCompletedOrFailed: isCompletedOrFailed,
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -615,25 +596,15 @@ class _InutilSpotifyImportModalState
   }
 
   Widget _buildHeader(BuildContext context, {required bool isImporting}) {
+    final colors = Theme.of(context).colorScheme;
     return Container(
-      padding: const EdgeInsets.fromLTRB(
-        InutilDesignSystem.spaceLg,
-        InutilDesignSystem.spaceLg,
-        InutilDesignSystem.spaceMd,
-        InutilDesignSystem.spaceMd,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            _spotifyNeonGreen.withValues(alpha: 0.18),
-            InutilDesignSystem.primaryNeon.withValues(alpha: 0.12),
-            Colors.transparent,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        border: const Border(
-          bottom: BorderSide(color: InutilDesignSystem.borderSubtle),
+        color: colors.surfaceContainerHighest.withValues(alpha: 0.45),
+        border: Border(
+          bottom: BorderSide(
+            color: colors.outlineVariant.withValues(alpha: 0.35),
+          ),
         ),
       ),
       child: Row(

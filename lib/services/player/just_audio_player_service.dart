@@ -2697,6 +2697,12 @@ class JustAudioPlayerService
       _localQueueTracks = const [];
       _nativeLocalQueueLoaded = false;
       await _player.stop();
+      try {
+        await _player.clearAudioSources();
+      } catch (_) {
+        // Fake/stub players in unit tests may not implement clearAudioSources
+        // after stop; real Android/iOS decks drop the MediaSession queue here.
+      }
       if (generation == _playbackGeneration) {
         // An already-dispatched incremental playlist command may finish after
         // stop on some backends. Forget the optimistic queue identity so the

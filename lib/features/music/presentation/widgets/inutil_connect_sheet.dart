@@ -34,19 +34,17 @@ class InutilConnectSheet extends ConsumerWidget {
         .where((peer) => peer.deviceId != autoPairedPeer?.deviceId)
         .toList(growable: false);
 
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       decoration: BoxDecoration(
-        color: InutilDesignSystem.surfaceDark,
+        color: colors.surfaceContainerHigh,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: InutilDesignSystem.borderSubtle),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black54,
-            blurRadius: 30,
-            offset: Offset(0, -6),
-          ),
-        ],
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.4),
+        ),
       ),
       child: SafeArea(
         child: SingleChildScrollView(
@@ -56,30 +54,28 @@ class InutilConnectSheet extends ConsumerWidget {
             children: [
               Center(
                 child: Container(
-                  width: 44,
+                  width: 40,
                   height: 4,
-                  margin: const EdgeInsets.only(bottom: 20),
+                  margin: const EdgeInsets.only(bottom: 18),
                   decoration: BoxDecoration(
-                    color: Colors.white24,
+                    color: colors.outlineVariant,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.devices_rounded,
-                    color: InutilDesignSystem.primaryNeon,
-                    size: 26,
+                    color: colors.primary,
+                    size: 24,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Conectar a un dispositivo',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: InutilDesignSystem.textPrimary,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),

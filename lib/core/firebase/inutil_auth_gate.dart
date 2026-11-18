@@ -3,13 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/music/presentation/providers/music_providers.dart';
 import '../theme/inutil_design_system.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_sync_providers.dart';
 
 /// Barrera de autenticación obligatoria (Gatekeeper) para INÚTIL MUSIC.
-/// Bloquea el uso de la aplicación a usuarios no registrados o sin licencia activa.
-class InutilAuthGate extends ConsumerWidget {
+/// Bloquea el uso de la aplicación a usuarios no registrados o sin licencia activa
+/// y detiene inmediatamente cualquier reproducción activa si se cierra la sesión.
+class InutilAuthGate extends ConsumerStatefulWidget {
   const InutilAuthGate({
     super.key,
     required this.child,
@@ -18,9 +20,36 @@ class InutilAuthGate extends ConsumerWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InutilAuthGate> createState() => _InutilAuthGateState();
+}
+
+class _InutilAuthGateState extends ConsumerState<InutilAuthGate> {
+  bool _wasAllowed = false;
+
+  void _stopPlaybackSafely() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      try {
+        unawaited(ref.read(playerControllerProvider.notifier).stop());
+      } catch (_) {
+        // Isolated widget tests may mount InutilAuthGate without player providers.
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final auth = ref.watch(inutilAuthProvider);
     final user = auth.currentUser;
+    final allowed =
+        user != null &&
+        !auth.isKickedOut &&
+        (user.isAdmin || (user.isActive && !user.isExpired));
+
+    if (!allowed && _wasAllowed) {
+      _stopPlaybackSafely();
+    }
+    _wasAllowed = allowed;
 
     // 1. Si no hay usuario autenticado -> Obligatorio Iniciar Sesión / Registrarse
     if (user == null) {
@@ -39,7 +68,7 @@ class InutilAuthGate extends ConsumerWidget {
     }
 
     // 4. Acceso autorizado: Administrador o usuario con licencia activa
-    return child;
+    return widget.child;
   }
 }
 
@@ -651,7 +680,7 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
 }
 
 /// Pantalla mostrada cuando la cuenta está inactiva o su vigencia ha expirado
-class InutilLicenseExpiredScreen extends StatefulWidget {
+class InutilLicenseExpiredScreen extends ConsumerStatefulWidget {
   const InutilLicenseExpiredScreen({
     super.key,
     required this.user,
@@ -666,10 +695,12 @@ class InutilLicenseExpiredScreen extends StatefulWidget {
   final String? reason;
 
   @override
-  State<InutilLicenseExpiredScreen> createState() => _InutilLicenseExpiredScreenState();
+  ConsumerState<InutilLicenseExpiredScreen> createState() =>
+      _InutilLicenseExpiredScreenState();
 }
 
-class _InutilLicenseExpiredScreenState extends State<InutilLicenseExpiredScreen> {
+class _InutilLicenseExpiredScreenState
+    extends ConsumerState<InutilLicenseExpiredScreen> {
   bool _isChecking = false;
 
   Future<void> _checkStatus() async {
@@ -843,7 +874,12 @@ class _InutilLicenseExpiredScreenState extends State<InutilLicenseExpiredScreen>
                 const SizedBox(height: 12),
 
                 OutlinedButton.icon(
-                  onPressed: () => InutilAuthService.instance.signOut(),
+                  onPressed: () async {
+                    try {
+                      await ref.read(playerControllerProvider.notifier).stop();
+                    } catch (_) {}
+                    await InutilAuthService.instance.signOut();
+                  },
                   icon: const Icon(Icons.logout_rounded, size: 16, color: Colors.white70),
                   label: const Text(
                     'Cerrar Sesión e Ingresar con otra Cuenta',

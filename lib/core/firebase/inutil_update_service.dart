@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../constants/app_constants.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_ui.dart';
 import '../theme/inutil_design_system.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_config.dart';
@@ -305,24 +307,22 @@ class InutilReleaseInfo {
   }
 
   factory InutilReleaseInfo.defaultCinemaEdition({String? currentVersion}) {
+    final resolvedVersion = currentVersion ?? AppConstants.appVersion;
     return InutilReleaseInfo(
-      currentVersion: currentVersion ?? AppConstants.appVersion,
-      latestVersion: '2.0.0',
+      currentVersion: resolvedVersion,
+      latestVersion: resolvedVersion,
       releaseNotes: _defaultCinemaReleaseNotes,
-      apkDownloadUrl:
-          'https://firebasestorage.googleapis.com/v0/b/${FirebaseConfig.storageBucket}/o/releases%2Finutil_music_latest.apk?alt=media',
-      linuxDownloadUrl:
-          'https://firebasestorage.googleapis.com/v0/b/${FirebaseConfig.storageBucket}/o/releases%2Finutil_music_linux_x64.tar.gz?alt=media',
+      apkDownloadUrl: AppConstants.appDownloadUrl,
+      linuxDownloadUrl: AppConstants.appDownloadUrl,
       mandatory: false,
-      publishedAt: DateTime.utc(2026, 11, 16),
+      publishedAt: DateTime.utc(2026, 11, 17),
     );
   }
 
   static const List<String> _defaultCinemaReleaseNotes = [
-    'Inútil Music 2.0.0 Cinema Edition con interfaz Carbon Dark & Glassmorphism.',
-    'Importación directa de playlists y álbumes públicos desde enlaces de Spotify.',
-    'Sincronización en la nube con Firebase Auth, Firestore y licencias en tiempo real.',
-    'Motor de audio de alta fidelidad con letras sincronizadas y caché inteligente.',
+    'Reproducción fluida incluso en conexiones lentas con caché inteligente.',
+    'Video Previews en canciones, perfiles de artistas y álbumes.',
+    'Importación de playlists y mejoras de rendimiento y estabilidad.',
   ];
 
   static int _compareSemver(String a, String b) {
@@ -885,47 +885,46 @@ rm -rf "$STAGING"
   }
 }
 
-/// Muestra el diálogo modal de actualización de Inútil Music con soporte OTA.
+/// Muestra el diálogo modal de actualización de Inútil Music integrado con el
+/// tema nativo de la app.
 Future<void> showInutilUpdateDialog(
   BuildContext context,
   InutilReleaseInfo release,
 ) {
-  return showGeneralDialog<void>(
+  return showDialog<void>(
     context: context,
     barrierDismissible: !release.effectiveMandatory,
-    barrierLabel: 'Actualizar Inútil Music',
-    barrierColor: Colors.black.withValues(alpha: 0.78),
-    transitionDuration: InutilDesignSystem.durationNormal,
-    pageBuilder: (dialogContext, animation, secondaryAnimation) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(InutilDesignSystem.spaceMd),
-          child: InutilUpdateDialogContent(release: release),
-        ),
-      );
-    },
-    transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
-      final curved = CurvedAnimation(
-        parent: animation,
-        curve: InutilDesignSystem.curveEnter,
-        reverseCurve: InutilDesignSystem.curveExit,
-      );
-      return FadeTransition(
-        opacity: curved,
-        child: ScaleTransition(
-          scale: Tween<double>(begin: 0.94, end: 1.0).animate(curved),
-          child: child,
-        ),
+    builder: (dialogContext) {
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: InutilUpdateDialogContent(release: release),
       );
     },
   );
 }
 
+/// Filtra notas internas/técnicas (Firebase, Firestore, admin, licencias, etc.)
+/// para que el usuario final solo vea novedades orientadas a su experiencia.
+List<String> _userFacingReleaseNotes(List<String> notes) {
+  final internalPattern = RegExp(
+    r'\b(firebase|firestore|admin|superadmin|licencia|licencias|keystore|commit|ota|kill\s*switch|rebrand|cinema\s*edition|storage|bucket)\b',
+    caseSensitive: false,
+  );
+  final filtered = notes
+      .map((n) => n.trim())
+      .where((n) => n.isNotEmpty && !internalPattern.hasMatch(n))
+      .toList(growable: false);
+  if (filtered.isNotEmpty) return filtered;
+  return const [
+    'Mejoras de rendimiento, estabilidad y reproducción fluida.',
+    'Optimizaciones visuales y correcciones generales.',
+  ];
+}
+
 /// Cuerpo del diálogo de actualización (tarjeta con novedades, progreso de
-/// descarga y botón "Descargar e Instalar"). Es público porque
-/// [InutilUpdateGate] lo reutiliza a pantalla completa cuando el kill switch
-/// dejó la versión instalada sin soporte: así el bloqueo usa exactamente la
-/// misma UI de descarga que el diálogo manual de Ajustes.
+/// descarga y botones siempre visibles y accesibles). Es público porque
+/// [InutilUpdateGate] lo reutiliza cuando la actualización es obligatoria.
 class InutilUpdateDialogContent extends StatefulWidget {
   const InutilUpdateDialogContent({super.key, required this.release});
 
@@ -969,14 +968,12 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
         _downloading = false;
         _downloadedPath = path;
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _downloading = false;
-        _error = e.toString().replaceFirst(
-          RegExp(r'^(FormatException|HttpException|Exception):\s*'),
-          '',
-        );
+        _error =
+            'No se pudo descargar la actualización en este momento. Verifica tu conexión e inténtalo de nuevo.';
       });
     }
   }
@@ -988,266 +985,237 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final release = widget.release;
     final hasUpdate = release.updateAvailable;
+    final visibleNotes = _userFacingReleaseNotes(release.releaseNotes);
     final fraction = _totalBytes > 0
         ? (_receivedBytes / _totalBytes).clamp(0.0, 1.0)
         : null;
+    final maxDialogHeight = MediaQuery.sizeOf(context).height * 0.72;
 
     return PopScope(
       canPop: !release.effectiveMandatory && !_downloading,
-      child: Material(
-        color: Colors.transparent,
-        child: ClipRRect(
-          borderRadius: InutilDesignSystem.borderXl,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 26, sigmaY: 26),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 500),
-              padding: const EdgeInsets.all(InutilDesignSystem.spaceLg),
-              decoration: BoxDecoration(
-                color: InutilDesignSystem.backgroundCarbon.withValues(alpha: 0.92),
-                borderRadius: InutilDesignSystem.borderXl,
-                border: Border.all(
-                  color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.4),
-                  width: 1.3,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: InutilDesignSystem.primaryNeon.withValues(alpha: 0.22),
-                    blurRadius: 36,
-                    spreadRadius: -4,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            colors: [
-                              InutilDesignSystem.primaryNeon,
-                              InutilDesignSystem.accentCyan,
-                            ],
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.system_update_alt_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: 440, maxHeight: maxDialogHeight),
+        child: Material(
+          color: colors.surfaceContainerHigh,
+          elevation: 6,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(
+              color: colors.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: release.belowMinSupported
+                          ? colors.errorContainer
+                          : colors.primaryContainer,
+                      foregroundColor: release.belowMinSupported
+                          ? colors.onErrorContainer
+                          : colors.onPrimaryContainer,
+                      child: Icon(
+                        hasUpdate
+                            ? Icons.system_update_alt_rounded
+                            : Icons.check_circle_outline_rounded,
+                        size: 22,
                       ),
-                      const SizedBox(width: InutilDesignSystem.spaceMd),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              release.belowMinSupported
-                                  ? '⚠ VERSIÓN NO SOPORTADA'
-                                  : hasUpdate
-                                      ? 'Nueva Actualización Disponible'
-                                      : 'Inútil Music Cinema Edition',
-                              style: TextStyle(
-                                color: release.belowMinSupported
-                                    ? InutilDesignSystem.secondaryGlow
-                                    : InutilDesignSystem.textPrimary,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w800,
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            release.belowMinSupported
+                                ? 'Actualización requerida'
+                                : hasUpdate
+                                ? 'Actualización disponible'
+                                : 'Tu app está actualizada',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: release.belowMinSupported
+                                  ? colors.error
+                                  : colors.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            hasUpdate
+                                ? 'Versión ${release.latestVersion} disponible · Tienes v${release.currentVersion}'
+                                : 'Inútil Music v${release.currentVersion}',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (hasUpdate)
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.cardSurfaceFor(context),
+                              borderRadius: BorderRadius.circular(appCardRadius),
+                              border: Border.all(
+                                color: colors.outlineVariant.withValues(
+                                  alpha: 0.35,
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              release.belowMinSupported
-                                  ? 'La versión instalada v${release.currentVersion} quedó deshabilitada. Debes actualizar a v${release.latestVersion} para seguir usando la app.'
-                                  : 'Versión oficial v${release.latestVersion} • Instalada: v${release.currentVersion}',
-                              style: const TextStyle(
-                                color: InutilDesignSystem.accentCyan,
-                                fontSize: 12.5,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Novedades',
+                                  style: theme.textTheme.labelMedium?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                for (final note in visibleNotes)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 3),
+                                          child: Icon(
+                                            Icons.check_rounded,
+                                            color: colors.primary,
+                                            size: 16,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            note,
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(height: 1.35),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          )
+                        else
+                          Text(
+                            'Ya cuentas con la versión más reciente de Inútil Music.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        if (_downloading) ...[
+                          const SizedBox(height: 16),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              minHeight: 7,
+                              value: fraction,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _totalBytes > 0
+                                ? 'Descargando: ${_formatMegabytes(_receivedBytes)} / ${_formatMegabytes(_totalBytes)}'
+                                : 'Descargando: ${_formatMegabytes(_receivedBytes)}...',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                        if (_downloadedPath != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colors.primaryContainer.withValues(
+                                alpha: 0.45,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              'Actualización descargada y lista para instalar.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onSurface,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: InutilDesignSystem.spaceMd),
-                  Container(
-                    padding: const EdgeInsets.all(InutilDesignSystem.spaceMd),
-                    decoration: InutilDesignSystem.glassDecoration(
-                      baseColor: InutilDesignSystem.surfaceElevated,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'NOVEDADES DE ESTA VERSIÓN',
-                          style: TextStyle(
-                            color: InutilDesignSystem.textSecondary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
                           ),
-                        ),
-                        const SizedBox(height: 10),
-                        for (final note in release.releaseNotes)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Padding(
-                                  padding: EdgeInsets.only(top: 3),
-                                  child: Icon(
-                                    Icons.check_circle_rounded,
-                                    color: InutilDesignSystem.accentCyan,
-                                    size: 15,
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    note,
-                                    style: const TextStyle(
-                                      color: InutilDesignSystem.textPrimary,
-                                      fontSize: 13,
-                                      height: 1.35,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                        ],
+                        if (_error != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colors.errorContainer.withValues(
+                                alpha: 0.65,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              _error!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: colors.onErrorContainer,
+                              ),
                             ),
                           ),
+                        ],
                       ],
                     ),
                   ),
-                  if (_downloading) ...[
-                    const SizedBox(height: InutilDesignSystem.spaceMd),
-                    ClipRRect(
-                      borderRadius: InutilDesignSystem.borderFull,
-                      child: LinearProgressIndicator(
-                        minHeight: 8,
-                        value: fraction,
-                        backgroundColor: InutilDesignSystem.surfaceElevated,
-                        valueColor: const AlwaysStoppedAnimation<Color>(
-                          InutilDesignSystem.accentCyan,
-                        ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!release.effectiveMandatory && !_downloading)
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(hasUpdate ? 'Más tarde' : 'Aceptar'),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      _totalBytes > 0
-                          ? 'Descargando paquete: ${_formatMegabytes(_receivedBytes)} / ${_formatMegabytes(_totalBytes)}'
-                          : 'Descargando paquete: ${_formatMegabytes(_receivedBytes)}...',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: InutilDesignSystem.textSecondary,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                  ],
-                  if (_downloadedPath != null) ...[
-                    const SizedBox(height: InutilDesignSystem.spaceMd),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: InutilDesignSystem.accentCyan.withValues(alpha: 0.14),
-                        borderRadius: InutilDesignSystem.borderMd,
-                        border: Border.all(
-                          color: InutilDesignSystem.accentCyan.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        'Actualización descargada en:\n$_downloadedPath',
-                        style: const TextStyle(
-                          color: InutilDesignSystem.textPrimary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (_error != null) ...[
-                    const SizedBox(height: InutilDesignSystem.spaceMd),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: InutilDesignSystem.secondaryGlow.withValues(alpha: 0.14),
-                        borderRadius: InutilDesignSystem.borderMd,
-                        border: Border.all(
-                          color: InutilDesignSystem.secondaryGlow.withValues(alpha: 0.4),
-                        ),
-                      ),
-                      child: Text(
-                        _error!,
-                        style: const TextStyle(
-                          color: InutilDesignSystem.textPrimary,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: InutilDesignSystem.spaceLg),
-                  Row(
-                    children: [
+                    if (hasUpdate && release.platformDownloadUrl.isNotEmpty) ...[
                       if (!release.effectiveMandatory && !_downloading)
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: InutilDesignSystem.textSecondary,
-                              side: const BorderSide(
-                                color: InutilDesignSystem.borderSubtle,
-                              ),
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: InutilDesignSystem.borderMd,
-                              ),
-                            ),
-                            child: const Text('Cerrar'),
-                          ),
+                        const SizedBox(width: 8),
+                      FilledButton.icon(
+                        onPressed: _downloading ? null : _startDownload,
+                        icon: const Icon(Icons.download_rounded, size: 18),
+                        label: Text(
+                          _downloading
+                              ? 'Descargando...'
+                              : 'Actualizar v${release.latestVersion}',
                         ),
-                      if (!release.mandatory &&
-                          !_downloading &&
-                          release.platformDownloadUrl.isNotEmpty)
-                        const SizedBox(width: 12),
-                      if (release.platformDownloadUrl.isNotEmpty)
-                        Expanded(
-                          flex: 2,
-                          child: FilledButton.icon(
-                            onPressed: _downloading ? null : _startDownload,
-                            style: FilledButton.styleFrom(
-                              backgroundColor: InutilDesignSystem.primaryNeon,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 13),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: InutilDesignSystem.borderMd,
-                              ),
-                            ),
-                            icon: const Icon(Icons.download_rounded, size: 19),
-                            label: Text(
-                              _downloading
-                                  ? 'Descargando...'
-                                  : 'Descargar e Instalar v${release.latestVersion}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13,
-                              ),
-                            ),
-                          ),
-                        ),
+                      ),
                     ],
-                  ),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),

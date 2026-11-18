@@ -34,11 +34,10 @@ import 'scrolled_under_tab_frame.dart';
 import 'player_style_gallery.dart';
 import 'youtube_music_settings_account_card.dart';
 import 'inutil_account_dialog.dart';
-import 'inutil_admin_panel.dart';
+import 'inutil_connect_sheet.dart';
 import 'inutil_spotify_import_dialog.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/firebase/inutil_update_service.dart';
-import '../../../../core/theme/inutil_design_system.dart';
 
 typedef DownloadDirectoryPicker =
     Future<String?> Function({String? dialogTitle, String? initialDirectory});
@@ -580,6 +579,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         onBrowse: _pickDownloadDirectory,
         onImportBackup: _importBackup,
         onImportCsv: _importCsv,
+        onImportSpotify: () => showInutilSpotifyImportDialog(context, ref),
         onExportBackup: _exportBackup,
         onExportCsv: _exportCsv,
       ),
@@ -1777,8 +1777,8 @@ class _AboutApplicationSettings extends StatelessWidget {
         _SettingsEntryCard(
           key: const ValueKey('settings-about-ota-update'),
           icon: Icons.system_update_alt_rounded,
-          title: 'Actualizaciones OTA de Inútil Music',
-          subtitle: 'Verificar e instalar nuevas versiones directamente desde la app',
+          title: 'Buscar actualizaciones',
+          subtitle: 'Verifica si hay una versión más reciente disponible',
           onTap: () async {
             final release = await InutilUpdateService.instance.checkForUpdate();
             if (context.mounted) {
@@ -4715,6 +4715,7 @@ class _StorageSettings extends StatelessWidget {
     required this.onBrowse,
     required this.onImportBackup,
     required this.onImportCsv,
+    required this.onImportSpotify,
     required this.onExportBackup,
     required this.onExportCsv,
   });
@@ -4727,6 +4728,7 @@ class _StorageSettings extends StatelessWidget {
   final VoidCallback onBrowse;
   final VoidCallback onImportBackup;
   final VoidCallback onImportCsv;
+  final VoidCallback onImportSpotify;
   final VoidCallback onExportBackup;
   final VoidCallback onExportCsv;
 
@@ -4771,6 +4773,14 @@ class _StorageSettings extends StatelessWidget {
               title: strings.importFromCsv,
               subtitle: strings.importCsvSummary,
               onTap: busy ? null : onImportCsv,
+            ),
+            const SizedBox(height: appCardGap),
+            _SettingsEntryCard(
+              key: const ValueKey('storage-import-spotify'),
+              icon: Icons.queue_music_rounded,
+              title: 'Importar desde Spotify',
+              subtitle: 'Playlists públicas, álbumes o listas en texto',
+              onTap: busy ? null : onImportSpotify,
             ),
           ],
         ),
@@ -5513,216 +5523,122 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
     final user = auth.currentUser;
     if (user == null) return const SizedBox.shrink();
 
-    final isExpired = user.isExpired;
-    final isSuspended = !user.isActive;
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+    final isExpired = !user.isAdmin && user.isExpired;
+    final isSuspended = !user.isAdmin && !user.isActive;
     final days = user.daysRemaining;
 
-    Color badgeColor;
-    String badgeText;
-    if (user.isAdmin) {
-      badgeColor = Colors.amberAccent;
-      badgeText = '👑 ADMINISTRADOR';
-    } else if (isSuspended) {
-      badgeColor = Colors.orangeAccent;
-      badgeText = '⛔ SUSPENDIDA';
+    final Color badgeColor;
+    final String badgeText;
+    if (isSuspended) {
+      badgeColor = colors.error;
+      badgeText = 'Suspendida';
     } else if (isExpired) {
-      badgeColor = Colors.redAccent;
-      badgeText = '🔴 VENCIDA';
-    } else if (user.isPermanent) {
-      badgeColor = Colors.cyanAccent;
-      badgeText = '💎 PREMIUM PERMANENTE';
+      badgeColor = colors.error;
+      badgeText = 'Vencida';
+    } else if (user.isAdmin || user.isPermanent) {
+      badgeColor = colors.primary;
+      badgeText = 'Activa';
     } else {
-      badgeColor = Colors.greenAccent;
-      badgeText = '🟢 ACTIVA ($days días)';
+      badgeColor = colors.primary;
+      badgeText = 'Activa · $days d';
     }
 
-    return Container(
-      decoration: BoxDecoration(
-        color: InutilDesignSystem.surfaceElevated,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: user.isAdmin
-              ? Colors.amberAccent.withValues(alpha: 0.35)
-              : InutilDesignSystem.borderSubtle,
-          width: 1.2,
-        ),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                backgroundColor: badgeColor.withValues(alpha: 0.2),
-                child: Text(
-                  user.displayName.isNotEmpty
-                      ? user.displayName[0].toUpperCase()
-                      : user.email[0].toUpperCase(),
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      user.displayName.isNotEmpty
-                          ? user.displayName
-                          : user.email.split('@').first,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
-                        color: InutilDesignSystem.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      user.email,
-                      style: const TextStyle(
-                        fontSize: 12.5,
-                        color: InutilDesignSystem.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: badgeColor.withValues(alpha: 0.4)),
-                ),
-                child: Text(
-                  badgeText,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                    color: badgeColor,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => InutilAccountDialog.show(context),
-                  icon: const Icon(Icons.manage_accounts_rounded, size: 16),
-                  label: const Text('Mi Suscripción'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white24),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+    final displayName = user.displayName.trim().isNotEmpty
+        ? user.displayName.trim()
+        : user.email.split('@').first;
+    final initial = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : 'U';
+
+    return Material(
+      color: AppColors.cardSurfaceFor(context),
+      borderRadius: BorderRadius.circular(appCardRadius),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 20,
+                  backgroundColor: colors.primaryContainer,
+                  foregroundColor: colors.onPrimaryContainer,
+                  child: Text(
+                    initial,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
-              ),
-              if (user.isAdmin) ...[
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => InutilAdminPanel.show(context),
-                    icon: const Icon(
-                      Icons.admin_panel_settings_rounded,
-                      size: 16,
-                      color: Colors.amberAccent,
-                    ),
-                    label: const Text(
-                      'Panel Admin César',
-                      style: TextStyle(color: Colors.amberAccent),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.amber.withValues(alpha: 0.2),
-                      side: const BorderSide(color: Colors.amberAccent),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
+                      Text(
+                        user.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    badgeText,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: badgeColor,
                     ),
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => showInutilSpotifyImportDialog(context, ref),
-                  icon: const Icon(
-                    Icons.queue_music_rounded,
-                    size: 17,
-                    color: Color(0xFF1DB954),
-                  ),
-                  label: const Text(
-                    'Importar Spotify / CSV',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1DB954).withValues(alpha: 0.18),
-                    side: BorderSide(
-                      color: const Color(0xFF1DB954).withValues(alpha: 0.55),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.tonalIcon(
+                    onPressed: () => InutilAccountDialog.show(context),
+                    icon: const Icon(Icons.manage_accounts_rounded, size: 18),
+                    label: const Text('Mi cuenta'),
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final release =
-                        await InutilUpdateService.instance.checkForUpdate();
-                    if (context.mounted) {
-                      await showInutilUpdateDialog(context, release);
-                    }
-                  },
-                  icon: const Icon(
-                    Icons.system_update_alt_rounded,
-                    size: 16,
-                    color: InutilDesignSystem.accentCyan,
-                  ),
-                  label: const Text(
-                    'Actualizar App',
-                    style: TextStyle(
-                      color: InutilDesignSystem.accentCyan,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(
-                      color: InutilDesignSystem.accentCyan.withValues(alpha: 0.45),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => InutilConnectSheet.show(context),
+                    icon: const Icon(Icons.devices_rounded, size: 18),
+                    label: const Text('Dispositivos'),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

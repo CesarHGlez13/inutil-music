@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../theme/inutil_design_system.dart';
 import 'inutil_update_service.dart';
 
 /// Puerta del kill switch de actualizaciones (OTA forzosa).
@@ -121,12 +120,14 @@ class InutilForceUpdateScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     return Scaffold(
-      backgroundColor: InutilDesignSystem.backgroundCarbon,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) => SingleChildScrollView(
-            padding: const EdgeInsets.all(InutilDesignSystem.spaceLg),
+            padding: const EdgeInsets.all(20),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Center(
@@ -135,29 +136,25 @@ class InutilForceUpdateScreen extends StatelessWidget {
                   children: [
                     Text(
                       release.belowMinSupported
-                          ? '⚠ LA APP QUEDÓ DESHABILITADA'
-                          : 'ACTUALIZACIÓN OBLIGATORIA',
+                          ? 'ACTUALIZACIÓN REQUERIDA'
+                          : 'ACTUALIZACIÓN DISPONIBLE',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
+                      style: theme.textTheme.labelLarge?.copyWith(
                         color: release.belowMinSupported
-                            ? InutilDesignSystem.secondaryGlow
-                            : InutilDesignSystem.primaryNeon,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.4,
+                            ? colors.error
+                            : colors.primary,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
                       ),
                     ),
-                    const SizedBox(height: InutilDesignSystem.spaceMd),
+                    const SizedBox(height: 14),
                     InutilUpdateDialogContent(release: release),
                     if (onRetry != null) ...[
-                      const SizedBox(height: InutilDesignSystem.spaceMd),
+                      const SizedBox(height: 14),
                       TextButton.icon(
                         onPressed: onRetry,
-                        style: TextButton.styleFrom(
-                          foregroundColor: InutilDesignSystem.textSecondary,
-                        ),
                         icon: const Icon(Icons.refresh_rounded, size: 18),
-                        label: const Text('Reintentar'),
+                        label: const Text('Comprobar de nuevo'),
                       ),
                     ],
                   ],

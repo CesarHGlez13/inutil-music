@@ -3,15 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_auth_service.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
-import '../../../../core/theme/inutil_design_system.dart';
-import 'inutil_admin_panel.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_dialog.dart';
+import '../../../../core/theme/app_ui.dart';
+import '../providers/music_providers.dart';
 
-/// Diálogo de gestión de cuenta Firebase para INÚTIL MUSIC.
+/// Diálogo de cuenta de usuario de Inútil Music, integrado con el tema nativo
+/// de la app. Sin controles administrativos (la administración vive en el
+/// portal web).
 class InutilAccountDialog extends ConsumerStatefulWidget {
   const InutilAccountDialog({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showDialog<void>(
+    return showAppDialog<void>(
       context: context,
       builder: (context) => const InutilAccountDialog(),
     );
@@ -26,6 +30,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
   bool _isRegister = false;
   bool _isLoading = false;
   bool _isGoogleLoading = false;
+  bool _signingOut = false;
   String? _errorMessage;
 
   final _emailController = TextEditingController();
@@ -46,7 +51,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      setState(() => _errorMessage = 'Por favor ingresa correo y contraseña.');
+      setState(() => _errorMessage = 'Ingresa tu correo y contraseña.');
       return;
     }
 
@@ -67,9 +72,11 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
       }
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString().replaceAll('Exception: ', '');
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -86,11 +93,28 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _errorMessage = e.toString().replaceFirst('Exception: ', '');
         });
       }
     } finally {
       if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
+  Future<void> _signOut() async {
+    if (_signingOut) return;
+    setState(() => _signingOut = true);
+    try {
+      // Detener inmediatamente la reproducción y vaciar la cola nativa antes
+      // de cerrar sesión para que la música no continúe sonando ni se pueda
+      // controlar desde la notificación o pantalla de bloqueo.
+      try {
+        await ref.read(playerControllerProvider.notifier).stop();
+      } catch (_) {}
+      await ref.read(inutilAuthProvider).signOut();
+      if (mounted) Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
     }
   }
 
@@ -99,44 +123,59 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     final auth = ref.watch(inutilAuthProvider);
     final user = auth.currentUser;
 
-    return Dialog(
-      backgroundColor: InutilDesignSystem.surfaceDark,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: const BorderSide(color: InutilDesignSystem.borderSubtle),
-      ),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: user != null ? _buildUserDashboard(user) : _buildAuthForm(),
-        ),
+    return AppAlertDialog(
+      scrollable: true,
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 400),
+        child: user != null
+            ? _buildUserProfile(context, user)
+            : _buildAuthForm(context),
       ),
     );
   }
 
-  Widget _buildUserDashboard(InutilUser user) {
-    final auth = ref.read(inutilAuthProvider);
+  Widget _buildUserProfile(BuildContext context, InutilUser user) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
     final days = user.daysRemaining;
-    final isExpired = user.isExpired;
+    final isExpired = !user.isAdmin && user.isExpired;
+    final isPermanent = user.isAdmin || user.isPermanent;
+
+    final statusColor = isExpired
+        ? colors.error
+        : colors.primary;
+    final statusLabel = isExpired
+        ? 'Vencida'
+        : isPermanent
+        ? 'Activa'
+        : 'Activa · $days d';
+    final statusMessage = isExpired
+        ? 'Tu acceso ha vencido. Solicita una renovación para continuar.'
+        : isPermanent
+        ? 'Acceso completo activo sin límite de fecha.'
+        : 'Vigencia restante: $days días de acceso completo.';
+
+    final displayName = user.displayName.trim().isNotEmpty
+        ? user.displayName.trim()
+        : user.email.split('@').first;
+    final initial = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : 'U';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Row(
           children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: InutilDesignSystem.primaryNeon.withValues(alpha: 0.2),
+              backgroundColor: colors.primaryContainer,
+              foregroundColor: colors.onPrimaryContainer,
               child: Text(
-                user.displayName.isNotEmpty
-                    ? user.displayName[0].toUpperCase()
-                    : user.email[0].toUpperCase(),
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: InutilDesignSystem.primaryNeon,
+                initial,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
@@ -146,20 +185,20 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.displayName.isNotEmpty
-                        ? user.displayName
-                        : 'Usuario Inútil',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: InutilDesignSystem.textPrimary,
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     user.email,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: InutilDesignSystem.textSecondary,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
@@ -167,18 +206,14 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 18),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: isExpired
-                ? Colors.red.withValues(alpha: 0.12)
-                : InutilDesignSystem.surfaceElevated,
-            borderRadius: BorderRadius.circular(12),
+            color: AppColors.cardSurfaceFor(context),
+            borderRadius: BorderRadius.circular(appCardRadius),
             border: Border.all(
-              color: isExpired
-                  ? Colors.redAccent.withValues(alpha: 0.4)
-                  : InutilDesignSystem.primaryNeon.withValues(alpha: 0.3),
+              color: colors.outlineVariant.withValues(alpha: 0.45),
             ),
           ),
           child: Column(
@@ -187,42 +222,27 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Estado de la Cuenta',
-                    style: TextStyle(
-                      fontSize: 13,
+                  Text(
+                    'Estado de la cuenta',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
-                      color: InutilDesignSystem.textSecondary,
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                      horizontal: 9,
+                      vertical: 3,
                     ),
                     decoration: BoxDecoration(
-                      color: user.isAdmin
-                          ? Colors.amber.withValues(alpha: 0.2)
-                          : isExpired
-                              ? Colors.red
-                              : Colors.green,
-                      borderRadius: BorderRadius.circular(8),
-                      border: user.isAdmin
-                          ? Border.all(color: Colors.amberAccent)
-                          : null,
+                      color: statusColor.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
-                      user.isAdmin
-                          ? '👑 ADMIN'
-                          : user.isPermanent
-                              ? '💎 PERMANENTE'
-                              : isExpired
-                                  ? 'VENCIDA'
-                                  : 'ACTIVA',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: user.isAdmin ? Colors.amberAccent : Colors.white,
+                      statusLabel,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: statusColor,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -230,120 +250,40 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
               ),
               const SizedBox(height: 8),
               Text(
-                user.isAdmin
-                    ? 'Acceso Supremo de Administrador (Sin límites).'
-                    : user.isPermanent
-                        ? 'Licencia Premium Permanente activa.'
-                        : isExpired
-                            ? 'Tu suscripción ha vencido. Contacta al administrador para renovarla.'
-                            : 'Vigencia restante: $days días de acceso completo.',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: user.isAdmin
-                      ? Colors.amberAccent
-                      : isExpired
-                          ? Colors.redAccent
-                          : Colors.white,
+                statusMessage,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: isExpired ? colors.error : colors.onSurface,
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-
-        // Botón Exclusivo para César / Admin: Panel de Control
-        if (user.isAdmin) ...[
-          ElevatedButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              InutilAdminPanel.show(context);
-            },
-            icon: const Icon(Icons.admin_panel_settings_rounded, size: 20, color: Colors.amberAccent),
-            label: const Text(
-              'Panel de Control de Usuarios César',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 13.5,
-                color: Colors.amberAccent,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.amber.withValues(alpha: 0.15),
-              side: const BorderSide(color: Colors.amberAccent, width: 1.2),
-              padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 16),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-
-        // Panel de Administración de Vencimiento
-        const Text(
-          'Añadir Vigencia a tu Cuenta',
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: InutilDesignSystem.textMuted,
-          ),
-        ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 20),
         Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => auth.adminGrantVigencia(uid: user.uid, additionalDays: 30),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  side: const BorderSide(color: Colors.white24),
-                ),
-                child: const Text('+30 días'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => auth.adminGrantVigencia(uid: user.uid, additionalDays: 90),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.white70,
-                  side: const BorderSide(color: Colors.white24),
-                ),
-                child: const Text('+90 días'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: OutlinedButton(
-                onPressed: () => auth.adminGrantVigencia(uid: user.uid, additionalDays: 9999, isPermanent: true),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Colors.amberAccent,
-                  side: const BorderSide(color: Colors.amberAccent),
-                ),
-                child: const Text('💎 Permanente'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.end,
           children: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cerrar', style: TextStyle(color: Colors.white60)),
+              onPressed: _signingOut ? null : () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
             ),
-            ElevatedButton.icon(
-              onPressed: () async {
-                await auth.signOut();
-                if (!mounted) return;
-                Navigator.of(context).pop();
-              },
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: const Text('Cerrar Sesión'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.withValues(alpha: 0.2),
-                foregroundColor: Colors.redAccent,
+            const SizedBox(width: 8),
+            FilledButton.tonalIcon(
+              key: const ValueKey('account-sign-out'),
+              onPressed: _signingOut ? null : _signOut,
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.errorContainer,
+                foregroundColor: colors.onErrorContainer,
               ),
+              icon: _signingOut
+                  ? SizedBox.square(
+                      dimension: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: colors.onErrorContainer,
+                      ),
+                    )
+                  : const Icon(Icons.logout_rounded, size: 18),
+              label: const Text('Cerrar sesión'),
             ),
           ],
         ),
@@ -351,131 +291,96 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     );
   }
 
-  Widget _buildAuthForm() {
+  Widget _buildAuthForm(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = theme.colorScheme;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            const Icon(
-              Icons.music_note_rounded,
-              color: InutilDesignSystem.primaryNeon,
-              size: 28,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              _isRegister ? 'Crear Cuenta Inútil Music' : 'Iniciar Sesión',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: InutilDesignSystem.textPrimary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        if (_errorMessage != null)
-          Container(
-            padding: const EdgeInsets.all(10),
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: Colors.red.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
-            ),
-            child: Text(
-              _errorMessage!,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-            ),
+        Text(
+          _isRegister ? 'Crear cuenta' : 'Iniciar sesión',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          _isRegister
+              ? 'Sincroniza tus playlists y dispositivos en la nube.'
+              : 'Accede a tu biblioteca y configuración en la nube.',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colors.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 18),
         if (_isRegister) ...[
           TextField(
             controller: _displayNameController,
-            style: const TextStyle(color: Colors.white),
             decoration: const InputDecoration(
-              labelText: 'Nombre de usuario',
-              labelStyle: TextStyle(color: Colors.white60),
-              prefixIcon: Icon(Icons.person_outline_rounded, color: Colors.white54),
+              labelText: 'Nombre o alias',
+              prefixIcon: Icon(Icons.person_outline_rounded),
             ),
           ),
           const SizedBox(height: 12),
         ],
         TextField(
           controller: _emailController,
-          style: const TextStyle(color: Colors.white),
           keyboardType: TextInputType.emailAddress,
           decoration: const InputDecoration(
             labelText: 'Correo electrónico',
-            labelStyle: TextStyle(color: Colors.white60),
-            prefixIcon: Icon(Icons.email_outlined, color: Colors.white54),
+            prefixIcon: Icon(Icons.email_outlined),
           ),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _passwordController,
-          style: const TextStyle(color: Colors.white),
           obscureText: true,
           decoration: const InputDecoration(
             labelText: 'Contraseña',
-            labelStyle: TextStyle(color: Colors.white60),
-            prefixIcon: Icon(Icons.lock_outline_rounded, color: Colors.white54),
+            prefixIcon: Icon(Icons.lock_outline_rounded),
           ),
+          onSubmitted: (_) => _submit(),
         ),
-        const SizedBox(height: 20),
-        ElevatedButton(
-          onPressed: (_isLoading || _isGoogleLoading) ? null : _submit,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: InutilDesignSystem.primaryNeon,
-            foregroundColor: Colors.white,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        if (_errorMessage != null) ...[
+          const SizedBox(height: 12),
+          Text(
+            _errorMessage!,
+            style: theme.textTheme.bodySmall?.copyWith(color: colors.error),
           ),
+        ],
+        const SizedBox(height: 18),
+        FilledButton(
+          onPressed: (_isLoading || _isGoogleLoading) ? null : _submit,
           child: _isLoading
               ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Text(_isRegister ? 'Registrarse' : 'Iniciar Sesión'),
+              : Text(_isRegister ? 'Registrarse' : 'Entrar'),
         ),
         const SizedBox(height: 10),
-        OutlinedButton(
+        OutlinedButton.icon(
           onPressed: (_isLoading || _isGoogleLoading) ? null : _submitGoogle,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white,
-            foregroundColor: const Color(0xFF1F1F1F),
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          child: _isGoogleLoading
+          icon: _isGoogleLoading
               ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Color(0xFF4285F4),
-                  ),
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text(
-                  'G   Continuar con Google',
-                  style: TextStyle(fontWeight: FontWeight.w800),
-                ),
+              : const Icon(Icons.g_mobiledata_rounded, size: 22),
+          label: const Text('Continuar con Google'),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         TextButton(
-          onPressed: () {
-            setState(() {
-              _isRegister = !_isRegister;
-              _errorMessage = null;
-            });
-          },
+          onPressed: () => setState(() {
+            _isRegister = !_isRegister;
+            _errorMessage = null;
+          }),
           child: Text(
             _isRegister
                 ? '¿Ya tienes cuenta? Inicia sesión'
                 : '¿No tienes cuenta? Regístrate',
-            style: const TextStyle(color: InutilDesignSystem.accentCyan),
           ),
         ),
       ],
