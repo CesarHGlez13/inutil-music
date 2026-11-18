@@ -37,8 +37,8 @@ class RemotePlaybackCachePolicy {
     useApplicationCacheDirectory: false,
     useHashedKeys: false,
     maximumAge: Duration(minutes: 30),
-    maximumFiles: 5,
-    maximumBytes: 64 * 1024 * 1024,
+    maximumFiles: 8,
+    maximumBytes: 96 * 1024 * 1024,
     maximumEntryBytes: 64 * 1024 * 1024,
     partialMaximumAge: Duration.zero,
   );

@@ -362,19 +362,13 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                 if (email.isNotEmpty && password.isNotEmpty) {
                   try {
                     final auth = ref.read(inutilAuthProvider);
-                    final newUser = await auth.register(
+                    await auth.adminCreateUser(
                       email: email,
                       password: password,
                       displayName: name,
-                      initialDays: isPermanent ? 9999 : initialDays,
+                      initialDays: initialDays,
+                      isPermanent: isPermanent,
                     );
-                    if (isPermanent) {
-                      await auth.adminGrantVigencia(
-                        uid: newUser.uid,
-                        additionalDays: 9999,
-                        isPermanent: true,
-                      );
-                    }
                     if (ctx.mounted) Navigator.of(ctx).pop();
                     await _loadUsers();
                     if (mounted) {

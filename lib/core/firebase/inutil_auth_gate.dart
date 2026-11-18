@@ -54,6 +54,7 @@ class InutilAuthScreen extends ConsumerStatefulWidget {
 class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
   bool _isRegister = false;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   final _emailController = TextEditingController();
@@ -99,6 +100,24 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      await ref.read(inutilAuthProvider).signInWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -487,7 +506,8 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
 
                           // Botón Principal de Envío
                           ElevatedButton(
-                            onPressed: _isLoading ? null : _submit,
+                            onPressed:
+                                (_isLoading || _isGoogleLoading) ? null : _submit,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: InutilDesignSystem.primaryNeon,
                               foregroundColor: Colors.white,
@@ -514,7 +534,94 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
                                     ),
                                   ),
                           ),
-                          const SizedBox(height: 18),
+                          const SizedBox(height: 14),
+
+                          // Separador
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 12),
+                                child: Text(
+                                  'o continúa con',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Divider(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+
+                          // Botón Continuar con Google
+                          SizedBox(
+                            height: 46,
+                            child: OutlinedButton(
+                              onPressed: (_isLoading || _isGoogleLoading)
+                                  ? null
+                                  : _submitGoogle,
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF1F1F1F),
+                                side: BorderSide(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _isGoogleLoading
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: Color(0xFF4285F4),
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 22,
+                                          height: 22,
+                                          alignment: Alignment.center,
+                                          decoration: const BoxDecoration(
+                                            shape: BoxShape.circle,
+                                            color: Color(0xFFF1F3F4),
+                                          ),
+                                          child: const Text(
+                                            'G',
+                                            style: TextStyle(
+                                              color: Color(0xFF4285F4),
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.w900,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        const Text(
+                                          'Continuar con Google',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
                         ],
                       ),
                     ),

@@ -45,6 +45,7 @@ class InutilFirestoreService {
   Map<String, String> _headers() {
     return {
       'Content-Type': 'application/json',
+      if (!FirebaseConfig.useEmulator) 'X-Goog-Api-Key': FirebaseConfig.apiKey,
       if (_idToken != null && _idToken!.isNotEmpty)
         'Authorization': 'Bearer $_idToken',
     };
@@ -143,8 +144,29 @@ class InutilFirestoreService {
     return _decodeDocument(json);
   }
 
-  Future<bool> setDocument(String path, Map<String, dynamic> data) async {
-    final url = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path');
+  /// Construye la URI de PATCH con `updateMask.fieldPaths` para actualizaciones
+  /// parciales seguras (preservando `email`, `displayName`, `role`, etc.).
+  @visibleForTesting
+  static Uri buildPatchUri(
+    String path,
+    Iterable<String> fieldPaths, {
+    bool merge = true,
+  }) {
+    final base = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path');
+    if (!merge || fieldPaths.isEmpty) return base;
+    return base.replace(
+      queryParameters: {
+        'updateMask.fieldPaths': fieldPaths.toList(growable: false),
+      },
+    );
+  }
+
+  Future<bool> setDocument(
+    String path,
+    Map<String, dynamic> data, {
+    bool merge = true,
+  }) async {
+    final url = buildPatchUri(path, data.keys, merge: merge);
     final body = jsonEncode(_encodeFields(data));
     final response = await http.patch(url, headers: _headers(), body: body);
     if (response.statusCode >= 200 && response.statusCode < 300) {

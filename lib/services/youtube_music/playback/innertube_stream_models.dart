@@ -250,12 +250,14 @@ final class InnerTubeParsedPlayerResponse {
     bool allowDrm = false,
     bool requireResolvedUri = false,
     bool preferAudioOnly = true,
+    int? maxPreferredBitrate,
   }) {
     return selectPreferredInnerTubeAudio(
       audioFormats,
       allowDrm: allowDrm,
       requireResolvedUri: requireResolvedUri,
       preferAudioOnly: preferAudioOnly,
+      maxPreferredBitrate: maxPreferredBitrate,
     );
   }
 }
@@ -264,12 +266,15 @@ final class InnerTubeParsedPlayerResponse {
 ///
 /// Explicit default-language tracks win first, then unknown-language tracks,
 /// non-DRC variants and audio-only formats. Within that compatible group the
-/// highest effective bitrate wins; MP4/AAC is only a tie-breaker.
+/// highest effective bitrate wins (capped by [maxPreferredBitrate] when the
+/// connection is slow so playback stays smooth without stalling); MP4/AAC is
+/// only a tie-breaker.
 InnerTubeAudioFormat? selectPreferredInnerTubeAudio(
   Iterable<InnerTubeAudioFormat> formats, {
   bool allowDrm = false,
   bool requireResolvedUri = false,
   bool preferAudioOnly = true,
+  int? maxPreferredBitrate,
 }) {
   var candidates = formats
       .where(
@@ -303,6 +308,33 @@ InnerTubeAudioFormat? selectPreferredInnerTubeAudio(
   candidates = _preferWhere(candidates, (format) => !format.isDrc);
   if (preferAudioOnly) {
     candidates = _preferWhere(candidates, (format) => format.isAudioOnly);
+  }
+
+  if (maxPreferredBitrate != null && maxPreferredBitrate > 0) {
+    final withinBudget = candidates
+        .where(
+          (format) =>
+              format.effectiveBitrate > 0 &&
+              format.effectiveBitrate <= maxPreferredBitrate,
+        )
+        .toList(growable: false);
+    if (withinBudget.isNotEmpty) {
+      withinBudget.sort(_comparePreferredFormats);
+      return withinBudget.first;
+    }
+    // Every available stream exceeds the budget: pick the lightest one so slow
+    // networks download the smallest payload possible.
+    final lightest = candidates.toList(growable: false)
+      ..sort((left, right) {
+        final leftBps = left.effectiveBitrate;
+        final rightBps = right.effectiveBitrate;
+        if (leftBps > 0 && rightBps > 0) {
+          final cmp = leftBps.compareTo(rightBps);
+          if (cmp != 0) return cmp;
+        }
+        return _comparePreferredFormats(left, right);
+      });
+    return lightest.first;
   }
 
   candidates.sort(_comparePreferredFormats);

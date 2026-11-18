@@ -304,6 +304,40 @@ class InnerTubePlaybackService {
   Object? _webPoUnavailableError;
   bool _disposed = false;
 
+  /// Adaptive slow-connection detection based on recent stream probe latency.
+  /// When latency climbs above [_slowProbeThresholdMs], format ranking favors
+  /// efficient <= [_lowBandwidthBitrateCap] streams (e.g. 48–70 kbps Opus/AAC)
+  /// so playback stays fluid without rebuffering on congested/3G links.
+  static const int lowBandwidthBitrateCap = 96000;
+  static const double _slowProbeThresholdMs = 1800;
+  static const double _fastProbeRecoveryThresholdMs = 700;
+  double? _probeLatencyEmaMs;
+  bool _slowConnectionMode = false;
+
+  bool get isSlowConnectionDetected => _slowConnectionMode;
+
+  void _recordProbeLatency(Duration elapsed) {
+    final ms = elapsed.inMilliseconds.toDouble();
+    final previous = _probeLatencyEmaMs;
+    final ema = previous == null ? ms : (previous * 0.65) + (ms * 0.35);
+    _probeLatencyEmaMs = ema;
+    if (!_slowConnectionMode && ema >= _slowProbeThresholdMs) {
+      _slowConnectionMode = true;
+      developer.log(
+        'slow network detected (probe EMA ${ema.round()}ms); '
+        'capping audio bitrate to ${lowBandwidthBitrateCap ~/ 1000}kbps',
+        name: 'InutilInnerTube',
+      );
+    } else if (_slowConnectionMode && ema <= _fastProbeRecoveryThresholdMs) {
+      _slowConnectionMode = false;
+      developer.log(
+        'network recovered (probe EMA ${ema.round()}ms); '
+        'restoring full audio bitrate',
+        name: 'InutilInnerTube',
+      );
+    }
+  }
+
   InnerTubeClientRouter get router => _router;
 
   bool get supportsJavaScript =>
@@ -618,11 +652,13 @@ class InnerTubePlaybackService {
         }
         final headers = _mediaHeaders(profile);
         try {
+          final probeWatch = Stopwatch()..start();
           final probe = await _validator.validate(
             uri,
             headers: headers,
             contentLength: format.contentLength,
           );
+          _recordProbeLatency(probeWatch.elapsed);
           _ensureCurrent(shouldContinue);
           return InnerTubeResolvedAudio(
             videoId: videoId.value,
@@ -917,9 +953,13 @@ class InnerTubePlaybackService {
               (!requireAudioOnly || format.isAudioOnly),
         )
         .toList(growable: true);
+    final bitrateCap = _slowConnectionMode ? lowBandwidthBitrateCap : null;
     final result = <InnerTubeAudioFormat>[];
     while (remaining.isNotEmpty) {
-      final preferred = selectPreferredInnerTubeAudio(remaining);
+      final preferred = selectPreferredInnerTubeAudio(
+        remaining,
+        maxPreferredBitrate: bitrateCap,
+      );
       if (preferred == null) break;
       result.add(preferred);
       remaining.remove(preferred);

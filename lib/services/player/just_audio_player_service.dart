@@ -38,14 +38,18 @@ class JustAudioPlayerService
   static const _interruptedLoadErrorCode = 10000000;
   static const _androidAudioLoadConfiguration = AudioLoadConfiguration(
     androidLoadControl: AndroidLoadControl(
-      minBufferDuration: Duration(seconds: 4),
-      maxBufferDuration: Duration(seconds: 24),
-      // Start playback as soon as 500ms of audio is buffered instead of waiting
-      // 5 full seconds before emitting the first sample.
-      bufferForPlaybackDuration: Duration(milliseconds: 500),
-      bufferForPlaybackAfterRebufferDuration: Duration(milliseconds: 1500),
+      // Cushion generous enough to ride out 3G dips, congested towers, and
+      // brief signal drops without entering micro-rebuffer stutter loops.
+      minBufferDuration: Duration(seconds: 25),
+      maxBufferDuration: Duration(seconds: 90),
+      bufferForPlaybackDuration: Duration(milliseconds: 1200),
+      bufferForPlaybackAfterRebufferDuration: Duration(seconds: 4),
       prioritizeTimeOverSizeThresholds: true,
-      backBufferDuration: Duration(seconds: 1),
+      backBufferDuration: Duration(seconds: 15),
+    ),
+    darwinLoadControl: DarwinLoadControl(
+      automaticallyWaitsToMinimizeStalling: true,
+      preferredForwardBufferDuration: Duration(seconds: 45),
     ),
   );
 

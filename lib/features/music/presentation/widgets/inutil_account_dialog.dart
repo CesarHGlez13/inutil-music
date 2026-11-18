@@ -25,6 +25,7 @@ class InutilAccountDialog extends ConsumerStatefulWidget {
 class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
   bool _isRegister = false;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   final _emailController = TextEditingController();
@@ -71,6 +72,25 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
       });
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _submitGoogle() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final user = await ref.read(inutilAuthProvider).signInWithGoogle();
+      if (user != null && mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
     }
   }
 
@@ -404,7 +424,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: _isLoading ? null : _submit,
+          onPressed: (_isLoading || _isGoogleLoading) ? null : _submit,
           style: ElevatedButton.styleFrom(
             backgroundColor: InutilDesignSystem.primaryNeon,
             foregroundColor: Colors.white,
@@ -420,6 +440,28 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
                   ),
                 )
               : Text(_isRegister ? 'Registrarse' : 'Iniciar Sesión'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          onPressed: (_isLoading || _isGoogleLoading) ? null : _submitGoogle,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: const Color(0xFF1F1F1F),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: _isGoogleLoading
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF4285F4),
+                  ),
+                )
+              : const Text(
+                  'G   Continuar con Google',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
         ),
         const SizedBox(height: 12),
         TextButton(

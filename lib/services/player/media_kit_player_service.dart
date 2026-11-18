@@ -131,18 +131,40 @@ class _MediaKitPlayerBackend
   );
 
   Future<void>? _headlessInitialization(Player player) =>
-      _useHeadlessAudio ? _configurePlayer(player) : null;
+      _configurePlayer(player);
 
   Future<void> _configurePlayer(Player player) async {
     final platform = player.platform;
     if (platform == null) {
       return;
     }
-    // GitHub's hosted Windows runners do not expose an audio device. libmpv's
-    // timed null output preserves the real playback clock, allowing native
-    // integration tests to exercise both crossfade decks without changing the
-    // output selected by production builds.
-    await (platform as dynamic).setProperty('ao', 'null');
+    Future<void> setProp(String key, String value) async {
+      try {
+        await (platform as dynamic).setProperty(key, value);
+      } catch (_) {
+        // Ignore on mock/platform implementations that do not expose mpv options.
+      }
+    }
+
+    // Resilient read-ahead buffer & automatic HTTP reconnect so slow or
+    // intermittent desktop networks keep playing smoothly without stuttering.
+    await setProp('cache', 'yes');
+    await setProp('demuxer-readahead-secs', '60');
+    await setProp('demuxer-max-bytes', '32MiB');
+    await setProp('demuxer-max-back-bytes', '8MiB');
+    await setProp('network-timeout', '20');
+    await setProp(
+      'stream-lavf-o',
+      'reconnect=1,reconnect_streamed=1,reconnect_delay_max=5',
+    );
+
+    if (_useHeadlessAudio) {
+      // GitHub's hosted Windows runners do not expose an audio device. libmpv's
+      // timed null output preserves the real playback clock, allowing native
+      // integration tests to exercise both crossfade decks without changing the
+      // output selected by production builds.
+      await (platform as dynamic).setProperty('ao', 'null');
+    }
   }
 
   Future<void> _withPlayer(Future<void> Function(Player player) operation) {

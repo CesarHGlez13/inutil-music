@@ -32,12 +32,16 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Correo del fundador: único caso en que el propio usuario puede
-    // sembrar/elevar su documento a rol admin (su contraseña ya la validó
-    // Firebase Auth).
+    // Correos del fundador: único caso en que el propio usuario puede
+    // sembrar/elevar su documento a rol admin (su identidad ya la validó
+    // Firebase Auth o Google Sign-In).
     function isBootstrapAdminIdentity() {
       return isSignedIn() &&
-        request.auth.token.email == 'cesar@inutilmusic.com';
+        request.auth.token.email in [
+          'cesar@inutilmusic.com',
+          'humbertoglez96@gmail.com',
+          'cesarmaster133@gmail.com'
+        ];
     }
 
     // Campos que el usuario jamás puede cambiar en su propio documento.

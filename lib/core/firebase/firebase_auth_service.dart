@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -190,11 +191,19 @@ class InutilAuthService extends ChangeNotifier {
   static const _storageLegacyUserKey = 'inutil_music_auth_user_v2';
   static const _storageRegistryKey = 'inutil_music_users_registry_v2';
 
-  /// Correo del administrador fundador. NO es una credencial: Firebase Auth
-  /// sigue exigiendo la contraseña; este valor solo decide qué documento
-  /// `users/{uid}` puede crearse con `role: 'admin'` (lo validan además las
-  /// reglas de Firestore).
+  /// Correos del administrador fundador. NO son credenciales: Firebase Auth o
+  /// Google Sign-In siguen exigiendo la autenticación real; estos valores solo
+  /// deciden qué documento `users/{uid}` puede crearse o elevarse a `role: 'admin'`
+  /// (lo validan además las reglas de Firestore).
   static const String bootstrapAdminEmail = 'cesar@inutilmusic.com';
+  static const Set<String> bootstrapAdminEmails = {
+    'cesar@inutilmusic.com',
+    'humbertoglez96@gmail.com',
+    'cesarmaster133@gmail.com',
+  };
+
+  static bool isBootstrapAdminEmail(String email) =>
+      bootstrapAdminEmails.contains(email.trim().toLowerCase());
 
   /// Ventana de gracia sin validación en línea (72 h acordadas).
   static const Duration offlineGrace = Duration(hours: 72);
@@ -599,6 +608,90 @@ class InutilAuthService extends ChangeNotifier {
     return _currentUser!;
   }
 
+  /// Inicio de sesión o registro con cuenta de Google (Google Sign-In nativo
+  /// + intercambio `accounts:signInWithIdp` contra Firebase Auth REST).
+  ///
+  /// Las cuentas nuevas con Google quedan en estado `pending` hasta que el
+  /// administrador les conceda vigencia, salvo los correos fundadores en
+  /// [bootstrapAdminEmails].
+  Future<InutilUser?> signInWithGoogle() async {
+    final googleSignIn = GoogleSignIn(
+      scopes: const ['email', 'profile'],
+      serverClientId: FirebaseConfig.googleWebClientId,
+    );
+
+    GoogleSignInAccount? account;
+    try {
+      account = await googleSignIn.signIn();
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('ApiException: 10')) {
+        throw Exception(
+          'Error de configuración OAuth (código 10). Verifica que estés usando el APK oficial.',
+        );
+      }
+      if (msg.contains('ApiException: 7') || msg.contains('network')) {
+        throw Exception('Sin conexión a internet para iniciar sesión con Google.');
+      }
+      if (msg.contains('MissingPluginException') ||
+          msg.contains('not available')) {
+        throw Exception(
+          'Google Sign-In no está disponible en este dispositivo. Usa correo y contraseña.',
+        );
+      }
+      throw Exception('No se pudo conectar con Google: $msg');
+    }
+
+    if (account == null) return null;
+
+    final googleAuth = await account.authentication;
+    final googleIdToken = googleAuth.idToken;
+    final googleAccessToken = googleAuth.accessToken;
+    if ((googleIdToken == null || googleIdToken.isEmpty) &&
+        (googleAccessToken == null || googleAccessToken.isEmpty)) {
+      throw Exception(
+        'Google no devolvió un token válido. Intenta de nuevo o usa correo y contraseña.',
+      );
+    }
+
+    final postBody = (googleIdToken != null && googleIdToken.isNotEmpty)
+        ? 'id_token=$googleIdToken&providerId=google.com'
+        : 'access_token=$googleAccessToken&providerId=google.com';
+
+    final data = await _authPost('accounts:signInWithIdp', {
+      'postBody': postBody,
+      'requestUri': 'http://localhost',
+      'returnIdpCredential': true,
+      'returnSecureToken': true,
+    });
+
+    final email =
+        (data['email'] as String? ?? account.email).trim().toLowerCase();
+    final displayName = (data['displayName'] as String?)?.isNotEmpty == true
+        ? data['displayName'] as String
+        : ((account.displayName?.isNotEmpty == true)
+            ? account.displayName!
+            : email.split('@').first);
+
+    final user = InutilUser(
+      uid: data['localId'] as String,
+      email: email,
+      displayName: displayName,
+      idToken: data['idToken'] as String? ?? '',
+      refreshToken: data['refreshToken'] as String? ?? '',
+      createdAt: DateTime.now(),
+      lastLoginAt: DateTime.now(),
+    );
+
+    _currentUser = user;
+    _kickedOutReason = '';
+    await _saveSession();
+    await _bootstrapSession(createIfMissing: true);
+    if (!testSkipOnlineValidation) _startValidationTimer();
+    notifyListeners();
+    return _currentUser!;
+  }
+
   /// Cambio de contraseña de la cuenta en sesión (`accounts:update`).
   Future<void> changePassword(String newPassword) async {
     final user = _currentUser;
@@ -638,6 +731,11 @@ class InutilAuthService extends ChangeNotifier {
     _validateTimer = null;
     _kickedOutReason = '';
     _currentUser = null;
+    if (!testSkipOnlineValidation) {
+      try {
+        await GoogleSignIn().signOut();
+      } catch (_) {}
+    }
     await _clearSession(prefs);
   }
 
@@ -677,7 +775,7 @@ class InutilAuthService extends ChangeNotifier {
       final remote = await InutilFirestoreService.instance.getUserProfile(user.uid);
       if (remote == null || remote.isEmpty) {
         if (!createIfMissing) return;
-        final isAdminSeed = user.email.toLowerCase() == bootstrapAdminEmail;
+        final isAdminSeed = isBootstrapAdminEmail(user.email);
         final seeded = <String, dynamic>{
           'uid': user.uid,
           'email': user.email,
@@ -698,6 +796,7 @@ class InutilAuthService extends ChangeNotifier {
         final ok = await InutilFirestoreService.instance.setDocument(
           'users/${user.uid}',
           seeded,
+          merge: false,
         );
         if (ok) {
           _currentUser = user.copyWith(
@@ -715,21 +814,26 @@ class InutilAuthService extends ChangeNotifier {
       }
       await _applyRemoteDoc(remote);
       // El fundador puede elevar su propio documento a admin la primera vez:
-      // las reglas Firestore solo permiten este caso exacto y solo para su
-      // correo (la contraseña ya la validó Firebase Auth al iniciar sesión).
+      // las reglas Firestore solo permiten este caso exacto y solo para sus
+      // correos (la identidad ya la validó Firebase Auth / Google Sign-In).
       final me = _currentUser;
-      if (me != null &&
-          me.email.toLowerCase() == bootstrapAdminEmail &&
-          !me.isAdmin) {
+      if (me != null && isBootstrapAdminEmail(me.email) && !me.isAdmin) {
         final upgraded = await InutilFirestoreService.instance.setDocument(
           'users/${me.uid}',
-          {...remote, 'role': 'admin', 'status': 'active', 'isActive': true},
+          {
+            'role': 'admin',
+            'status': 'active',
+            'isActive': true,
+            'accountExpiresAt': DateTime(2099, 12, 31),
+          },
+          merge: true,
         );
         if (upgraded) {
           _currentUser = me.copyWith(
             role: 'admin',
             status: 'active',
             isActive: true,
+            accountExpiresAt: DateTime(2099, 12, 31),
           );
           await _saveSession();
         }
@@ -967,6 +1071,85 @@ class InutilAuthService extends ChangeNotifier {
     return list;
   }
 
+  /// Administrador: crea un nuevo usuario en Firebase Auth + Firestore **sin
+  /// cerrar ni sobrescribir la sesión actual del administrador**.
+  Future<InutilUser> adminCreateUser({
+    required String email,
+    required String password,
+    String? displayName,
+    int initialDays = 30,
+    bool isPermanent = false,
+  }) async {
+    final admin = _currentUser;
+    if (admin == null || !admin.isAdmin) {
+      throw Exception('Solo un administrador puede crear usuarios.');
+    }
+    final trimmedEmail = email.trim().toLowerCase();
+    if (trimmedEmail.isEmpty || password.length < 6) {
+      throw Exception(
+        'El correo y la contraseña (mínimo 6 caracteres) son obligatorios.',
+      );
+    }
+
+    await _ensureFreshIdToken();
+
+    final data = await _authPost('accounts:signUp', {
+      'email': trimmedEmail,
+      'password': password,
+      'returnSecureToken': true,
+    });
+    final newUid = data['localId'] as String;
+    final cleanName = displayName?.trim().isNotEmpty == true
+        ? displayName!.trim()
+        : trimmedEmail.split('@').first;
+    final expiresAt = isPermanent
+        ? DateTime(2099, 12, 31)
+        : DateTime.now().add(Duration(days: initialDays));
+    final durationDays = isPermanent ? 9999 : initialDays;
+
+    final ok = await InutilFirestoreService.instance.setDocument(
+      'users/$newUid',
+      {
+        'uid': newUid,
+        'email': trimmedEmail,
+        'displayName': cleanName,
+        'role': 'user',
+        'status': 'active',
+        'isActive': true,
+        'accountExpiresAt': expiresAt,
+        'accountDurationDays': durationDays,
+        'currentPhoneDeviceId': '',
+        'currentTvDeviceId': '',
+        'phoneSwitchCount': 0,
+        'phoneSwitchMonth': '',
+        'createdAt': DateTime.now(),
+        'lastLoginAt': DateTime.now(),
+        'lastValidatedAt': DateTime.now(),
+        'schemaVersion': 3,
+      },
+      merge: false,
+    );
+    if (!ok) {
+      throw Exception(
+        'La cuenta se creó en Auth, pero falló al guardar su licencia en Firestore.',
+      );
+    }
+
+    notifyListeners();
+    return InutilUser(
+      uid: newUid,
+      email: trimmedEmail,
+      displayName: cleanName,
+      role: 'user',
+      status: 'active',
+      isActive: true,
+      accountExpiresAt: expiresAt,
+      accountDurationDays: durationDays,
+      createdAt: DateTime.now(),
+      lastLoginAt: DateTime.now(),
+    );
+  }
+
   /// Administrador: Conceder vigencia en días o Licencia Premium Permanente.
   Future<void> adminGrantVigencia({
     required String uid,
@@ -1092,6 +1275,7 @@ class InutilAuthService extends ChangeNotifier {
   Future<void> adminRevokeDevice(String uid) async {
     final ok = await InutilFirestoreService.instance.adminUpdateUser(uid, {
       'currentPhoneDeviceId': '',
+      'currentTvDeviceId': '',
       'phoneSwitchCount': 0,
       'phoneSwitchMonth': '',
     });

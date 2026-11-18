@@ -5,19 +5,25 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
 import '../../../../core/widgets/painted_glass_button_style.dart';
+import '../../../../services/video_preview/video_preview_resolver.dart';
+import '../../../../services/visual_track_identity.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/music_providers.dart';
 import '../providers/track_selection_controller.dart';
+import '../providers/video_preview_provider.dart';
 import '../widgets/artwork_detail_scaffold.dart';
 import '../widgets/artwork_gradient_header_background.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/playlist_actions.dart';
 import '../widgets/source_image.dart';
+import '../widgets/spotify_canvas_video.dart';
 import '../widgets/track_result_tile.dart';
 import '../widgets/track_selection_toolbar.dart';
+import '../widgets/video_preview_reel_sheet.dart';
 
 typedef AddRemoteTracksToPlaylist =
     Future<void> Function(
@@ -124,6 +130,54 @@ class _RemoteCollectionDetailPageState
     final bottomContentPadding = underlayMiniPlayer
         ? miniPlayerHeight + MediaQuery.viewPaddingOf(context).bottom
         : 0.0;
+    final animatedArtworkEnabled = ref.watch(
+      settingsControllerProvider.select(
+        (settings) =>
+            settings.value?.animatedArtworkEnabled ??
+            defaultAnimatedArtworkEnabled,
+      ),
+    );
+    final videoPreviewAllowed =
+        animatedArtworkEnabled &&
+        AppPlatform.current != AppPlatformType.linux &&
+        AppPlatform.current != AppPlatformType.unsupported &&
+        (resolvedSubtitle.trim().isNotEmpty || resolvedTitle.trim().isNotEmpty);
+    final albumVideoClips = videoPreviewAllowed
+        ? (ref
+                  .watch(
+                    albumVideoPreviewsProvider((
+                      album: resolvedTitle,
+                      artist: resolvedSubtitle,
+                    )),
+                  )
+                  .value ??
+              const <VideoPreviewClip>[])
+        : const <VideoPreviewClip>[];
+    void openVideoReel([int initialIndex = 0]) {
+      unawaited(
+        VideoPreviewReelSheet.show(
+          context,
+          clips: albumVideoClips,
+          artistName: resolvedSubtitle.trim().isNotEmpty
+              ? resolvedSubtitle
+              : resolvedTitle,
+          artistAvatarUrl: resolvedArtworkSource,
+          artistSubtitle: resolvedTitle,
+          initialIndex: initialIndex,
+          onPlayClip: (clip) {
+            if (visibleTracks.isEmpty) return;
+            final matched = visibleTracks.cast<TrackInfo?>().firstWhere(
+              (t) => t != null && sameVisualTitle(clip.title, t.title),
+              orElse: () => visibleTracks.first,
+            );
+            if (matched != null) {
+              _play(context, matched, visibleTracks);
+            }
+          },
+        ),
+      );
+    }
+
     final scaffold = ArtworkDetailScaffold(
       key: const ValueKey('remote-collection-detail'),
       extendBody: underlayMiniPlayer,
@@ -162,6 +216,12 @@ class _RemoteCollectionDetailPageState
                   title: resolvedTitle,
                   subtitle: resolvedSubtitle,
                   artworkSource: resolvedArtworkSource,
+                  headerVideoUrl: albumVideoClips.isNotEmpty
+                      ? albumVideoClips.first.videoUrl
+                      : null,
+                  onOpenVideoPreview: albumVideoClips.isNotEmpty
+                      ? () => openVideoReel(0)
+                      : null,
                   metadata: widget.metadata,
                   fallbackIcon: widget.fallbackIcon,
                   trackCount: tracksState is AsyncData<List<TrackInfo>>
@@ -180,6 +240,37 @@ class _RemoteCollectionDetailPageState
                       : () => _addToPlaylist(visibleTracks, resolvedTitle),
                 ),
               ),
+              if (albumVideoClips.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1080),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(6, 4, 6, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+                              child: Text(
+                                'Video Previews',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: AppColors.contentTitleFor(context),
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                            ),
+                            VideoPreviewClipsStrip(
+                              clips: albumVideoClips,
+                              onTapClip: openVideoReel,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               switch (tracksState) {
                 AsyncData() when visibleTracks.isEmpty => SliverToBoxAdapter(
                   child: _CollectionStatus(
@@ -396,11 +487,15 @@ class _CollectionHeader extends StatelessWidget {
     required this.onAddToPlaylist,
     this.addingToPlaylist = false,
     this.songCountLabel,
+    this.headerVideoUrl,
+    this.onOpenVideoPreview,
   });
 
   final String title;
   final String subtitle;
   final String? artworkSource;
+  final Uri? headerVideoUrl;
+  final VoidCallback? onOpenVideoPreview;
   final List<String> metadata;
   final IconData fallbackIcon;
   final int? trackCount;
@@ -511,6 +606,14 @@ class _CollectionHeader extends StatelessWidget {
                     icon: const Icon(Icons.playlist_add_rounded),
                     label: Text(addToPlaylistLabel),
                   ),
+                if (onOpenVideoPreview != null)
+                  FilledButton.tonalIcon(
+                    key: const ValueKey('remote-collection-video-preview'),
+                    onPressed: onOpenVideoPreview,
+                    style: actionStyle,
+                    icon: const Icon(Icons.play_circle_outline_rounded),
+                    label: const Text('Video Preview'),
+                  ),
               ],
             ),
           ],
@@ -527,6 +630,30 @@ class _CollectionHeader extends StatelessWidget {
                   keyPrefix: 'remote-collection',
                 ),
               ),
+              if (headerVideoUrl != null)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Color(0x99FFFFFF),
+                          Color(0x66FFFFFF),
+                          Color(0x00FFFFFF),
+                        ],
+                        stops: [0.0, 0.6, 1.0],
+                      ).createShader(bounds),
+                      child: SpotifyCanvasVideo(
+                        key: ValueKey('collection-video-$title'),
+                        url: headerVideoUrl!,
+                        isPlaying: true,
+                        identity: 'collection:$title',
+                      ),
+                    ),
+                  ),
+                ),
               Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1080),

@@ -23,6 +23,14 @@ class FirebaseConfig {
   static const String messagingSenderId = '129744480084';
   static const String appId = '1:129744480084:android:ab2b7127b9ee6ef511cac1';
 
+  /// Client ID OAuth Web (client_type 3) de `inutil-music-app` para canjear el
+  /// `idToken` de Google Sign-In en Firebase Auth (`accounts:signInWithIdp`).
+  static const String googleWebClientId = String.fromEnvironment(
+    'FB_GOOGLE_WEB_CLIENT_ID',
+    defaultValue:
+        '129744480084-l2df9mg9o2i7218vt8mq3899nkta43pe.apps.googleusercontent.com',
+  );
+
   static String get authDomain => '$projectId.firebaseapp.com';
 
   /// true cuando se apunta a la suite de emuladores local

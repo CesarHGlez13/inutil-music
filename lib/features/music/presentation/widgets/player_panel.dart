@@ -34,6 +34,7 @@ import '../providers/playback_artwork_provider.dart';
 import '../providers/local_audio_quality_provider.dart';
 import '../providers/playback_visual_cache_provider.dart';
 import '../providers/spotify_canvas_provider.dart';
+import '../providers/video_preview_provider.dart';
 import '../pages/artist_profile_page.dart';
 import '../pages/remote_collection_detail_page.dart';
 import 'animated_artwork_motion.dart';
@@ -353,6 +354,24 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
             remoteArtworkAllowed
         ? ref.watch(_appleAnimatedArtworkUrlProvider(appleArtworkTrack)).value
         : spotifyCanvasUrl;
+    // Automatic official Music Video Preview fallback (Spotify Canvas style)
+    // when animated artwork is enabled and neither Canvas nor Apple artwork
+    // returned a clip. Streams directly via VideoPlayerController without
+    // blocking audio playback or the local 10 MB visual cache budget.
+    final fallbackVideoPreviewUrl =
+        resolvedCanvasUrl == null &&
+            widget.animatedArtworkEnabled &&
+            remoteArtworkAllowed
+        ? ref
+              .watch(
+                trackVideoPreviewProvider((
+                  title: snapshot.title ?? '',
+                  artist: snapshot.artist ?? '',
+                )),
+              )
+              .value
+              ?.videoUrl
+        : null;
     final videoStartOffset =
         widget.appleAnimatedArtworkEnabled && !widget.spotifyCanvasEnabled
         ? animatedArtworkIntroOffset
@@ -380,7 +399,8 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
       visualCache.deactivate();
     }
     final canvasUrl = visualActive
-        ? visualCache.videoFileFor(visualIdentity, resolvedCanvasUrl)
+        ? (visualCache.videoFileFor(visualIdentity, resolvedCanvasUrl) ??
+              fallbackVideoPreviewUrl)
         : null;
     final hasTrack =
         snapshot.title != null ||

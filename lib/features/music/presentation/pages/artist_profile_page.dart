@@ -9,19 +9,24 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
 import '../../../../core/widgets/horizontal_shelf_scroll_behavior.dart';
 import '../../../../core/widgets/painted_glass_button_style.dart';
+import '../../../../services/video_preview/video_preview_resolver.dart';
+import '../../../../services/visual_track_identity.dart';
 import '../../../../services/youtube_music/account/youtube_music_account.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../data/datasources/remote_music_datasource.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/music_providers.dart';
 import '../providers/subscribed_artists_controller.dart';
+import '../providers/video_preview_provider.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../widgets/artwork_detail_scaffold.dart';
 import '../widgets/artwork_gradient_header_background.dart';
 import '../widgets/expanded_artwork_header_background.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/source_image.dart';
+import '../widgets/spotify_canvas_video.dart';
 import '../widgets/track_result_tile.dart';
+import '../widgets/video_preview_reel_sheet.dart';
 import 'artist_releases_page.dart';
 import 'artist_songs_page.dart';
 import 'remote_collection_detail_page.dart';
@@ -232,6 +237,54 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
         remoteSubscription?.isSubscribed ??
         profile.isSubscribed ??
         false;
+    final animatedArtworkEnabled = ref.watch(
+      settingsControllerProvider.select(
+        (settings) =>
+            settings.value?.animatedArtworkEnabled ??
+            defaultAnimatedArtworkEnabled,
+      ),
+    );
+    final videoPreviewAllowed =
+        animatedArtworkEnabled &&
+        AppPlatform.current != AppPlatformType.linux &&
+        AppPlatform.current != AppPlatformType.unsupported;
+    final videoClips = videoPreviewAllowed
+        ? (ref.watch(artistVideoPreviewsProvider(profile.artist.name)).value ??
+              const <VideoPreviewClip>[])
+        : const <VideoPreviewClip>[];
+    void openVideoReel([int initialIndex = 0]) {
+      unawaited(
+        VideoPreviewReelSheet.show(
+          context,
+          clips: videoClips,
+          artistName: profile.artist.name,
+          artistAvatarUrl: profile.artist.thumbnailUrl,
+          artistSubtitle:
+              profile.monthlyListenerCount ?? profile.subscriberCount,
+          initialIndex: initialIndex,
+          onPlayClip: (clip) {
+            if (tracks.isEmpty) return;
+            final matched = tracks.cast<TrackInfo?>().firstWhere(
+              (t) => t != null && sameVisualTitle(clip.title, t.title),
+              orElse: () => tracks.first,
+            );
+            if (matched != null) {
+              unawaited(
+                ref
+                    .read(playerControllerProvider.notifier)
+                    .playRemote(
+                      matched,
+                      queue: tracks,
+                      queueSourceId: 'artist:${widget.artistBrowseId}:preview',
+                    ),
+              );
+              _returnToPlayer();
+            }
+          },
+        ),
+      );
+    }
+
     return CustomScrollView(
       key: const ValueKey('artist-profile-scroll'),
       scrollCacheExtent: const ScrollCacheExtent.pixels(800),
@@ -241,6 +294,12 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
             key: const ValueKey('artist-profile-header'),
             child: _ArtistHeader(
               profile: profile,
+              headerVideoUrl: videoClips.isNotEmpty
+                  ? videoClips.first.videoUrl
+                  : null,
+              onOpenVideoPreview: videoClips.isNotEmpty
+                  ? () => openVideoReel(0)
+                  : null,
               radioLabel: strings.artistMix,
               subscribeLabel: subscribed
                   ? strings.unsubscribe
@@ -311,6 +370,25 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
             ),
           )
         else if (tracks.isNotEmpty) ...[
+          if (videoClips.isNotEmpty) ...[
+            const SliverToBoxAdapter(
+              child: _SectionTitle(
+                key: ValueKey('artist-video-previews-title'),
+                title: 'Video Previews',
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _ArtistContent(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: VideoPreviewClipsStrip(
+                    clips: videoClips,
+                    onTapClip: openVideoReel,
+                  ),
+                ),
+              ),
+            ),
+          ],
           SliverToBoxAdapter(
             child: _SectionTitle(
               key: const ValueKey('artist-popular-title'),
@@ -680,6 +758,8 @@ class _ArtistHeader extends StatelessWidget {
     required this.onPlayAll,
     required this.onSubscription,
     this.subscriptionTooltip,
+    this.headerVideoUrl,
+    this.onOpenVideoPreview,
   });
 
   final InnerTubeArtistProfile profile;
@@ -687,6 +767,8 @@ class _ArtistHeader extends StatelessWidget {
   final String subscribeLabel;
   final String playLabel;
   final String? subscriptionTooltip;
+  final Uri? headerVideoUrl;
+  final VoidCallback? onOpenVideoPreview;
   final bool showSubscription;
   final bool subscriptionBusy;
   final bool radioBusy;
@@ -823,6 +905,14 @@ class _ArtistHeader extends StatelessWidget {
                                 label: Text(subscribeLabel),
                               ),
                             ),
+                          if (onOpenVideoPreview != null)
+                            FilledButton.tonalIcon(
+                              key: const ValueKey('artist-video-preview'),
+                              style: actionStyle,
+                              onPressed: onOpenVideoPreview,
+                              icon: const Icon(Icons.play_circle_outline_rounded),
+                              label: const Text('Video Preview'),
+                            ),
                         ],
                       ),
                     ),
@@ -863,6 +953,34 @@ class _ArtistHeader extends StatelessWidget {
                     keyPrefix: 'artist-profile',
                   ),
                 ),
+                if (headerVideoUrl != null)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: artworkHeight,
+                    child: IgnorePointer(
+                      child: ShaderMask(
+                        blendMode: BlendMode.dstIn,
+                        shaderCallback: (bounds) => const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Color(0xE0FFFFFF),
+                            Color(0xD8FFFFFF),
+                            Color(0x00FFFFFF),
+                          ],
+                          stops: [0.0, 0.65, 1.0],
+                        ).createShader(bounds),
+                        child: SpotifyCanvasVideo(
+                          key: ValueKey('artist-video-${profile.artist.browseId}'),
+                          url: headerVideoUrl!,
+                          isPlaying: true,
+                          identity: 'artist:${profile.artist.browseId}',
+                        ),
+                      ),
+                    ),
+                  ),
                 Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [

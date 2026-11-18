@@ -123,6 +123,29 @@ void main() {
 
       expect(isAvFoundationCompatibleInnerTubeAudio(webm), isFalse);
     });
+
+    test('caps bitrate to safe slow-connection budget when maxPreferredBitrate is set', () {
+      final low = _format(itag: 249, container: 'webm', codec: 'opus', bitrate: 52000);
+      final med = _format(itag: 250, container: 'webm', codec: 'opus', bitrate: 72000);
+      final high = _format(itag: 251, container: 'webm', codec: 'opus', bitrate: 160000);
+
+      final selected = selectPreferredInnerTubeAudio(
+        [low, med, high],
+        maxPreferredBitrate: 96000,
+      );
+      expect(selected?.itag, 250);
+    });
+
+    test('falls back to lightest stream if every format exceeds slow-connection cap', () {
+      final a = _format(itag: 140, bitrate: 128000);
+      final b = _format(itag: 251, container: 'webm', codec: 'opus', bitrate: 256000);
+
+      final selected = selectPreferredInnerTubeAudio(
+        [b, a],
+        maxPreferredBitrate: 96000,
+      );
+      expect(selected?.itag, 140);
+    });
   });
 }
 
