@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.3+213 — 2026-11-17
+
+### Changed
+
+- Transición cinematográfica suave (desvanecido lento con curva cúbica) al pasar de la carátula estándar al reproductor Canvas a pantalla completa y al cambiar de canción.
+- Fondo ambiental difuminado y aparición gradual del video Canvas en pantalla completa para una experiencia visual fluida y descansada a la vista.
+
 ## 2.1.2+212 — 2026-11-17
 
 ### Added

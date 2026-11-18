@@ -233,8 +233,49 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
   bool _desktopQueueAutoOpen = false;
   bool _artistNavigationBusy = false;
   bool _albumNavigationBusy = false;
+  bool _holdFullscreenCanvas = false;
+  Timer? _fullscreenCanvasReleaseTimer;
   final Map<String, _AlbumNavigationTarget> _albumNavigationTargets = {};
   final Set<String> _albumNavigationMisses = {};
+
+  static const _fullscreenCanvasGraceDuration = Duration(milliseconds: 1400);
+
+  bool _resolveFullscreenCanvasMode({
+    required bool eligible,
+    required bool hasCanvasNow,
+  }) {
+    if (!eligible) {
+      _fullscreenCanvasReleaseTimer?.cancel();
+      _fullscreenCanvasReleaseTimer = null;
+      _holdFullscreenCanvas = false;
+      return false;
+    }
+    if (hasCanvasNow) {
+      _fullscreenCanvasReleaseTimer?.cancel();
+      _fullscreenCanvasReleaseTimer = null;
+      _holdFullscreenCanvas = true;
+      return true;
+    }
+    if (_holdFullscreenCanvas) {
+      _fullscreenCanvasReleaseTimer ??= Timer(
+        _fullscreenCanvasGraceDuration,
+        () {
+          _fullscreenCanvasReleaseTimer = null;
+          if (!mounted || !_holdFullscreenCanvas) return;
+          setState(() => _holdFullscreenCanvas = false);
+        },
+      );
+      return true;
+    }
+    return false;
+  }
+
+  @override
+  void dispose() {
+    _fullscreenCanvasReleaseTimer?.cancel();
+    _fullscreenCanvasReleaseTimer = null;
+    super.dispose();
+  }
 
   @override
   void didChangeDependencies() {
@@ -555,40 +596,49 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                   data: playerTheme,
                   child: Builder(
                     builder: (context) {
-                      final useSpotifyFullscreenCanvas =
+                      final canUseSpotifyFullscreenCanvas =
                           mobile &&
                           !mobileLandscape &&
                           !showSideQueue &&
-                          canvasUrl != null &&
+                          hasTrack &&
                           (widget.style == PlayerStyle.inutilMusic ||
                               widget.style == PlayerStyle.spotifyMusic);
-                      if (useSpotifyFullscreenCanvas) {
-                        return _SpotifyFullscreenCanvasPlayer(
-                          snapshot: snapshot,
-                          artworkSource: artworkSource,
-                          artworkFallbackSource: artworkFallbackSource,
-                          visualIdentity: visualIdentity,
-                          trackTransitionsEnabled:
-                              widget.trackTransitionsEnabled,
-                          canvasUrl: canvasUrl,
-                          videoStartOffset: videoStartOffset,
-                          videoDurationHint: videoDurationHint,
-                          hasTrack: hasTrack,
-                          isFavorite: isFavorite,
-                          savedTrackId: savedTrackId,
-                          hasError: presentation.hasError,
-                          errorText: presentation.errorText,
-                          queueVisible: showSideQueue,
-                          onToggleQueue: toggleQueue,
-                          onCollapse: widget.onCollapse,
-                          onOpenLyrics: _openLyrics,
-                          onOpenSearch: widget.onOpenSearch,
-                          onOpenArtist: onOpenArtist,
-                          onOpenAlbum: onOpenAlbum,
-                          strings: strings,
-                        );
-                      }
-                      return widget.style == PlayerStyle.spotifyMusic
+                      final useSpotifyFullscreenCanvas =
+                          _resolveFullscreenCanvasMode(
+                            eligible: canUseSpotifyFullscreenCanvas,
+                            hasCanvasNow: canvasUrl != null,
+                          );
+                      final Widget activePlayerLayout = useSpotifyFullscreenCanvas
+                          ? KeyedSubtree(
+                              key: const ValueKey('player-mode-canvas'),
+                              child: _SpotifyFullscreenCanvasPlayer(
+                                snapshot: snapshot,
+                                artworkSource: artworkSource,
+                                artworkFallbackSource: artworkFallbackSource,
+                                visualIdentity: visualIdentity,
+                                trackTransitionsEnabled:
+                                    widget.trackTransitionsEnabled,
+                                canvasUrl: canvasUrl,
+                                videoStartOffset: videoStartOffset,
+                                videoDurationHint: videoDurationHint,
+                                hasTrack: hasTrack,
+                                isFavorite: isFavorite,
+                                savedTrackId: savedTrackId,
+                                hasError: presentation.hasError,
+                                errorText: presentation.errorText,
+                                queueVisible: showSideQueue,
+                                onToggleQueue: toggleQueue,
+                                onCollapse: widget.onCollapse,
+                                onOpenLyrics: _openLyrics,
+                                onOpenSearch: widget.onOpenSearch,
+                                onOpenArtist: onOpenArtist,
+                                onOpenAlbum: onOpenAlbum,
+                                strings: strings,
+                              ),
+                            )
+                          : KeyedSubtree(
+                              key: const ValueKey('player-mode-standard'),
+                              child: widget.style == PlayerStyle.spotifyMusic
                         ? _SpotifyPlayerLayout(
                             snapshot: snapshot,
                             artworkSource: artworkSource,
@@ -1253,7 +1303,28 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 ),
                               ),
                             ],
-                          );
+                          ),
+                            );
+                      return AnimatedSwitcher(
+                        key: const ValueKey('player-canvas-mode-switcher'),
+                        duration: disableAnimations
+                            ? Duration.zero
+                            : const Duration(milliseconds: 850),
+                        reverseDuration: disableAnimations
+                            ? Duration.zero
+                            : const Duration(milliseconds: 650),
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        layoutBuilder: (currentChild, previousChildren) => Stack(
+                          fit: StackFit.expand,
+                          children: [...previousChildren, ?currentChild],
+                        ),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: child,
+                        ),
+                        child: activePlayerLayout,
+                      );
                     },
                   ),
                 ),

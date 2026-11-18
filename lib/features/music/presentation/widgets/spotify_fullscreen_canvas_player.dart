@@ -37,7 +37,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
   final String? artworkFallbackSource;
   final String visualIdentity;
   final bool trackTransitionsEnabled;
-  final Uri canvasUrl;
+  final Uri? canvasUrl;
   final Duration videoStartOffset;
   final Duration videoDurationHint;
   final bool hasTrack;
@@ -77,35 +77,96 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
         ? snapshot.artist!.trim()
         : 'Inútil Music';
 
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final backdropFadeDuration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 850);
+    final videoRevealDuration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 950);
+    final miniArtFadeDuration = disableAnimations
+        ? Duration.zero
+        : const Duration(milliseconds: 500);
+    final activeCanvasUrl = canvasUrl;
+
     return Stack(
       key: const ValueKey('spotify-fullscreen-canvas-player'),
       fit: StackFit.expand,
       children: [
-        // 1. Instant full-bleed cover backdrop underneath while video primes.
+        // 1. Soft blurred ambient cover backdrop that cross-fades slowly
+        // while the video buffers or while skipping between tracks.
         Positioned.fill(
           child: ColoredBox(
             color: const Color(0xFF0A0C10),
-            child: artworkSource?.trim().isNotEmpty == true
-                ? ProportionalArtwork(
-                    source: artworkSource,
-                    fallbackSource: artworkFallbackSource,
-                    fallback: const ColoredBox(color: Color(0xFF0A0C10)),
-                  )
-                : const SizedBox.expand(),
+            child: AnimatedSwitcher(
+              duration: backdropFadeDuration,
+              reverseDuration: backdropFadeDuration,
+              switchInCurve: Curves.easeInOutCubic,
+              switchOutCurve: Curves.easeInOutCubic,
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                fit: StackFit.expand,
+                children: [...previousChildren, ?currentChild],
+              ),
+              child: artworkSource?.trim().isNotEmpty == true
+                  ? KeyedSubtree(
+                      key: ValueKey('canvas-backdrop-${artworkSource ?? visualIdentity}'),
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: 34,
+                          sigmaY: 34,
+                          tileMode: TileMode.mirror,
+                        ),
+                        child: ColorFiltered(
+                          colorFilter: ColorFilter.mode(
+                            const Color(0xFF0A0C10).withValues(alpha: 0.34),
+                            BlendMode.darken,
+                          ),
+                          child: ProportionalArtwork(
+                            source: artworkSource,
+                            fallbackSource: artworkFallbackSource,
+                            fallback: const ColoredBox(color: Color(0xFF0A0C10)),
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.expand(
+                      key: ValueKey('canvas-backdrop-empty'),
+                    ),
+            ),
           ),
         ),
 
-        // 2. Full-bleed edge-to-edge looping muted video Canvas.
+        // 2. Full-bleed edge-to-edge looping muted video Canvas with slow fade-in.
         Positioned.fill(
           key: const ValueKey('player-canvas-viewport'),
           child: IgnorePointer(
-            child: SpotifyCanvasVideo(
-              key: ValueKey('fullscreen-canvas-$visualIdentity'),
-              url: canvasUrl,
-              isPlaying: isPlaying,
-              identity: visualIdentity,
-              startOffset: videoStartOffset,
-              durationHint: videoDurationHint,
+            child: AnimatedSwitcher(
+              duration: disableAnimations
+                  ? Duration.zero
+                  : const Duration(milliseconds: 650),
+              reverseDuration: disableAnimations
+                  ? Duration.zero
+                  : const Duration(milliseconds: 500),
+              switchInCurve: Curves.easeInOutCubic,
+              switchOutCurve: Curves.easeInOutCubic,
+              layoutBuilder: (currentChild, previousChildren) => Stack(
+                fit: StackFit.expand,
+                children: [...previousChildren, ?currentChild],
+              ),
+              child: activeCanvasUrl != null
+                  ? SpotifyCanvasVideo(
+                      key: const ValueKey('fullscreen-canvas-video'),
+                      url: activeCanvasUrl,
+                      isPlaying: isPlaying,
+                      identity: visualIdentity,
+                      startOffset: videoStartOffset,
+                      durationHint: videoDurationHint,
+                      revealDuration: videoRevealDuration,
+                      revealCurve: Curves.easeInOutCubic,
+                    )
+                  : const SizedBox.expand(
+                      key: ValueKey('fullscreen-canvas-pending'),
+                    ),
             ),
           ),
         ),
@@ -229,15 +290,27 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: SizedBox.square(
                       dimension: 48,
-                      child: ProportionalArtwork(
-                        source: artworkSource,
-                        fallbackSource: artworkFallbackSource,
-                        cacheWidth: 160,
-                        fallback: const ColoredBox(
-                          color: Color(0xFF1F2430),
-                          child: Icon(
-                            Icons.music_note_rounded,
-                            color: Colors.white70,
+                      child: AnimatedSwitcher(
+                        duration: miniArtFadeDuration,
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        layoutBuilder: (currentChild, previousChildren) => Stack(
+                          fit: StackFit.expand,
+                          children: [...previousChildren, ?currentChild],
+                        ),
+                        child: KeyedSubtree(
+                          key: ValueKey('canvas-mini-art-${artworkSource ?? visualIdentity}'),
+                          child: ProportionalArtwork(
+                            source: artworkSource,
+                            fallbackSource: artworkFallbackSource,
+                            cacheWidth: 160,
+                            fallback: const ColoredBox(
+                              color: Color(0xFF1F2430),
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                color: Colors.white70,
+                              ),
+                            ),
                           ),
                         ),
                       ),

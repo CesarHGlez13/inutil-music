@@ -64,6 +64,8 @@ class SpotifyCanvasVideo extends StatefulWidget {
     this.durationHint = Duration.zero,
     this.autoFitInsetArtwork = false,
     this.coverPath,
+    this.revealDuration = const Duration(milliseconds: 250),
+    this.revealCurve = Curves.easeInOutCubic,
     super.key,
   });
 
@@ -74,6 +76,8 @@ class SpotifyCanvasVideo extends StatefulWidget {
   final Duration durationHint;
   final bool autoFitInsetArtwork;
   final String? coverPath;
+  final Duration revealDuration;
+  final Curve revealCurve;
 
   @override
   State<SpotifyCanvasVideo> createState() => _SpotifyCanvasVideoState();
@@ -82,7 +86,6 @@ class SpotifyCanvasVideo extends StatefulWidget {
 class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     with WidgetsBindingObserver {
   static const _introFastForwardSpeed = 8.0;
-  static const _videoRevealDuration = Duration(milliseconds: 250);
   static const _loopFrameCrossfadeDuration = Duration(milliseconds: 400);
   static const _loopFrameHoldBeforeFade = Duration(milliseconds: 100);
   static const _loopFrameDecodeGuard = Duration(milliseconds: 120);
@@ -800,8 +803,10 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
               ? Duration.zero
               : _loopFrame != null
               ? _loopFrameCrossfadeDuration
-              : _videoRevealDuration,
-          curve: _loopFrame != null ? Curves.easeInOutCubic : Curves.linear,
+              : widget.revealDuration,
+          curve: _loopFrame != null
+              ? Curves.easeInOutCubic
+              : widget.revealCurve,
           // Paint at a barely visible opacity while comparing the first
           // frame, then reveal the already fitted video over the still cover.
           opacity: _ready && size.width > 0 && size.height > 0
