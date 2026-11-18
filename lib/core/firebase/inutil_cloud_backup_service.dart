@@ -39,6 +39,7 @@ class InutilCloudBackupService {
   Timer? _interval;
   bool _pushing = false;
   bool _pulling = false;
+  bool _initialPullCompleted = false;
   bool _lastRestoreHadChanges = false;
   DateTime? _lastPushAt;
   String _lastError = '';
@@ -99,6 +100,21 @@ class InutilCloudBackupService {
       final prefs = await SharedPreferences.getInstance();
 
       final playlists = await _db.getPlaylists();
+      final tracks = await _db.getLocalTracks();
+      final hasLocalLibrary =
+          tracks.isNotEmpty || playlists.any((p) => p.trackIds.isNotEmpty);
+
+      // Protección anti-borrado tras reinstalar o borrar datos: si esta
+      // instalación está vacía y todavía no se completa la primera restauración
+      // desde la nube, JAMÁS sobrescribimos `backup_meta` ni `backup_tracks_*`
+      // con una lista vacía (p. ej. si el usuario minimiza la app antes de que
+      // termine el pull inicial).
+      if (!_initialPullCompleted && !hasLocalLibrary) {
+        await InutilWrappedService.instance.persistNow();
+        await InutilWrappedService.instance.syncCurrentYearToCloud();
+        return;
+      }
+
       final meta = <String, dynamic>{
         'playlists': playlists
             .map(
@@ -122,7 +138,6 @@ class InutilCloudBackupService {
       final metaOk = await InutilFirestoreService.instance
           .setDocument('users/$uid/data/backup_meta', meta);
 
-      final tracks = await _db.getLocalTracks();
       final encoded = tracks.map(_trackToMap).toList(growable: false);
       final chunks = <List<Map<String, dynamic>>>[];
       var current = <Map<String, dynamic>>[];
@@ -287,6 +302,7 @@ class InutilCloudBackupService {
         }
       }
 
+      _initialPullCompleted = true;
       _lastRestoreHadChanges = restoredPlaylists > 0 || restoredTracks > 0;
       _lastError = '';
       if (restoredPlaylists == 0 && restoredTracks == 0 && meta == null) {
