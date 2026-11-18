@@ -1662,6 +1662,56 @@ class _InutilSpotifyImportModalState
             ],
           ),
           const SizedBox(height: InutilDesignSystem.spaceLg),
+          if (result != null && result.failures.isNotEmpty) ...[
+            Container(
+              constraints: const BoxConstraints(maxHeight: 150),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: InutilDesignSystem.backgroundCarbon,
+                borderRadius: InutilDesignSystem.borderMd,
+                border: Border.all(
+                  color: InutilDesignSystem.secondaryGlow.withValues(alpha: 0.32),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Canciones no encontradas (${result.failures.length}):',
+                    style: const TextStyle(
+                      color: InutilDesignSystem.secondaryGlow,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Flexible(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: result.failures.length,
+                      itemBuilder: (context, index) {
+                        final failure = result.failures[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Text(
+                            '• ${failure.title}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: InutilDesignSystem.textSecondary,
+                              fontSize: 11.5,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: InutilDesignSystem.spaceMd),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(

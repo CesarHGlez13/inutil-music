@@ -206,6 +206,115 @@ void main() {
         expect(await harness.catalog.getCatalogPlaylists(), isEmpty);
       },
     );
+
+    test(
+      'resolves dual clean topic and audio uploads without ambiguity',
+      () async {
+        harness.search = (_) async => [
+          _candidate('aaaaaaaaaaa', 'Solamente Tú', artist: 'Pablo Alborán'),
+          _candidate(
+            'bbbbbbbbbbb',
+            'Solamente Tú (Official Audio)',
+            artist: 'Pablo Alborán - Topic',
+          ),
+        ];
+        final result = await harness.import(
+          _document([
+            _track(
+              rowNumber: 10,
+              title: 'Solamente Tú',
+              artist: 'Pablo Alborán',
+              album: 'Pablo Alborán (Deluxe)',
+            ),
+          ]),
+        );
+        expect(result.imported, 1);
+        expect(result.failed, 0);
+        expect(result.failures, isEmpty);
+      },
+    );
+
+    test(
+      'falls back to cleaned query when feat and remaster metadata fails primary search',
+      () async {
+        final queries = <String>[];
+        harness.search = (query) async {
+          queries.add(query);
+          if (query.contains('Remaster') || query.contains('feat.')) {
+            return const [];
+          }
+          return [
+            _candidate(
+              'ccccccccccc',
+              'Amor del Bueno',
+              artist: 'Reyli Barba',
+            ),
+          ];
+        };
+        final result = await harness.import(
+          _document([
+            _track(
+              rowNumber: 11,
+              title: 'Amor del Bueno (feat. Reyli) - 2015 Remaster',
+              artist: 'Reyli Barba',
+              album: 'Fe (Remastered 2015)',
+            ),
+          ]),
+        );
+        expect(queries.length, greaterThanOrEqualTo(2));
+        expect(result.imported, 1);
+        expect(result.failed, 0);
+      },
+    );
+
+    test(
+      'resolves multi-artist tracks regardless of artist order',
+      () async {
+        harness.search = (_) async => [
+          _candidate(
+            'ddddddddddd',
+            'PRC',
+            artist: 'Natanael Cano, Peso Pluma',
+          ),
+        ];
+        final result = await harness.import(
+          _document([
+            _track(
+              rowNumber: 12,
+              title: 'PRC',
+              artist: 'Peso Pluma',
+              artists: const ['Peso Pluma', 'Natanael Cano'],
+            ),
+          ]),
+        );
+        expect(result.imported, 1);
+        expect(result.failed, 0);
+      },
+    );
+
+    test(
+      'matches YouTube label channel videos formatted as Artist - Title',
+      () async {
+        harness.search = (_) async => [
+          _candidate(
+            'eeeeeeeeeee',
+            'Reyli Barba - Amor del Bueno (Video Oficial)',
+            artist: 'Sony Music',
+          ),
+        ];
+        final result = await harness.import(
+          _document([
+            _track(
+              rowNumber: 13,
+              title: 'Amor del Bueno',
+              artist: 'Reyli Barba',
+            ),
+          ]),
+        );
+        expect(result.imported, 1);
+        expect(result.failed, 0);
+      },
+    );
   });
 
   group('queue behavior', () {
@@ -875,6 +984,7 @@ LibraryCsvTrack _track({
   required int rowNumber,
   required String title,
   required String artist,
+  List<String> artists = const [],
   String? album,
   String? videoId,
   Duration? duration,
@@ -883,6 +993,7 @@ LibraryCsvTrack _track({
   rowNumber: rowNumber,
   title: title,
   artist: artist,
+  artists: artists,
   album: album,
   youtubeVideoId: videoId,
   duration: duration,

@@ -459,59 +459,175 @@ class LibraryCsvImportService {
       );
     }
 
-    final descriptiveFields = [entry.title, entry.artist, entry.album]
-        .whereType<String>()
-        .map((value) => value.trim())
-        .where((value) => value.isNotEmpty);
-    final descriptiveQuery = descriptiveFields.join(' ');
-    final query = descriptiveQuery.isNotEmpty
-        ? descriptiveQuery
-        : (entry.isrc?.trim() ?? '');
-    if (query.isEmpty) {
+    final queries = _buildCandidateQueries(entry);
+    if (queries.isEmpty) {
       throw const FormatException('La fila no tiene información para buscar.');
     }
-    final candidates = await _search(query);
-    if (candidates.isEmpty) {
+
+    final uniqueCandidates = <String, TrackInfo>{};
+    LibraryCsvAmbiguousMatchException? lastAmbiguous;
+
+    for (final query in queries) {
+      final candidates = await _search(query);
+      for (final candidate in candidates) {
+        final key = candidate.id.trim().isNotEmpty
+            ? candidate.id.trim()
+            : candidate.url.trim();
+        uniqueCandidates.putIfAbsent(key, () => candidate);
+      }
+      if (uniqueCandidates.isEmpty) continue;
+
+      final pick = _pickBestCandidate(entry, uniqueCandidates.values);
+      if (pick.winner != null) {
+        return pick.winner!;
+      }
+      if (pick.ambiguous != null) {
+        lastAmbiguous = pick.ambiguous;
+      }
+    }
+
+    if (uniqueCandidates.isEmpty) {
       throw const FormatException('No se encontraron resultados seguros.');
     }
-    final uniqueCandidates = <String, TrackInfo>{};
-    for (final candidate in candidates) {
-      final key = candidate.id.trim().isNotEmpty
-          ? candidate.id.trim()
-          : candidate.url.trim();
-      uniqueCandidates.putIfAbsent(key, () => candidate);
+    throw lastAmbiguous ??
+        const LibraryCsvAmbiguousMatchException(
+          'No hubo una coincidencia suficientemente segura para importar.',
+        );
+  }
+
+  List<String> _buildCandidateQueries(LibraryCsvTrack entry) {
+    final queries = <String>[];
+    final seen = <String>{};
+
+    void addQuery(Iterable<String?> parts) {
+      final joined = parts
+          .whereType<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .join(' ')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (joined.isEmpty) return;
+      if (seen.add(joined.toLowerCase())) {
+        queries.add(joined);
+      }
     }
+
+    // 1. Consulta primaria completa (mantiene compatibilidad directa).
+    addQuery([entry.title, entry.artist, entry.album]);
+
+    final cleanedTitle = _cleanTitleForQuery(entry.title);
+    final primaryArtist = entry.artist.trim().isNotEmpty
+        ? entry.artist.trim()
+        : (entry.artists.isNotEmpty ? entry.artists.first.trim() : '');
+
+    // 2. Fallback sin ruido de edición (feat., Remastered, Deluxe, álbum):
+    // muy frecuente en playlists públicas de Spotify.
+    addQuery([cleanedTitle, primaryArtist]);
+
+    // 3. Si tiene múltiples artistas o título original largo, intentar con los
+    // primeros dos artistas; si no hubo resultados, probar título limpio solo.
+    if (entry.artists.length > 1) {
+      addQuery([cleanedTitle, ...entry.artists.take(2)]);
+    }
+    if (cleanedTitle.split(RegExp(r'\s+')).length >= 2) {
+      addQuery([cleanedTitle]);
+    }
+    if (queries.isEmpty) {
+      addQuery([entry.isrc]);
+    }
+    return queries;
+  }
+
+  ({TrackInfo? winner, LibraryCsvAmbiguousMatchException? ambiguous})
+  _pickBestCandidate(LibraryCsvTrack entry, Iterable<TrackInfo> candidates) {
     final ranked = [
-      for (final candidate in uniqueCandidates.values)
+      for (final candidate in candidates)
         (candidate: candidate, score: _candidateScore(entry, candidate)),
     ]..sort((left, right) => right.score.compareTo(left.score));
+    if (ranked.isEmpty) {
+      return (winner: null, ambiguous: null);
+    }
+
     final best = ranked.first;
-    final threshold = entry.artist.trim().isEmpty ? 0.70 : 0.62;
-    final secondScore = ranked.length > 1 ? ranked[1].score : 0.0;
-    if (best.score < threshold ||
-        (best.score < 0.90 && best.score - secondScore < 0.06)) {
-      throw LibraryCsvAmbiguousMatchException(
-        'No hubo una coincidencia suficientemente segura para importar.',
+    final hasArtist = _allEntryArtists(entry).isNotEmpty;
+    final threshold = hasArtist ? 0.62 : 0.70;
+    if (best.score < threshold) {
+      return (
+        winner: null,
+        ambiguous: const LibraryCsvAmbiguousMatchException(
+          'No hubo una coincidencia suficientemente segura para importar.',
+        ),
       );
     }
-    return best.candidate;
+
+    if (ranked.length > 1) {
+      final second = ranked[1];
+      if (best.score < 0.90 && best.score - second.score < 0.06) {
+        final sourceQualifiers = _qualifiers(entry.title);
+        final bestUnrequested =
+            _qualifiers(best.candidate.title).difference(sourceQualifiers);
+        final secondUnrequested =
+            _qualifiers(second.candidate.title).difference(sourceQualifiers);
+        final bothAreSameCleanSong =
+            best.score >= 0.74 &&
+            bestUnrequested.isEmpty &&
+            secondUnrequested.isEmpty &&
+            _tokenSimilarity(
+                  _cleanTitleForComparison(best.candidate.title),
+                  _cleanTitleForComparison(second.candidate.title),
+                ) >=
+                0.75;
+        if (!bothAreSameCleanSong) {
+          return (
+            winner: null,
+            ambiguous: const LibraryCsvAmbiguousMatchException(
+              'No hubo una coincidencia suficientemente segura para importar.',
+            ),
+          );
+        }
+      }
+    }
+
+    return (winner: best.candidate, ambiguous: null);
   }
 
   double _candidateScore(LibraryCsvTrack entry, TrackInfo candidate) {
-    final titleScore = _tokenSimilarity(entry.title, candidate.title);
-    final artistScore = entry.artist.trim().isEmpty
+    final cleanedEntryTitle = _cleanTitleForComparison(entry.title);
+    final cleanedCandidateTitle = _cleanTitleForComparison(candidate.title);
+    final entryArtists = _allEntryArtists(entry);
+
+    var titleScore = math.max(
+      _tokenSimilarity(entry.title, candidate.title),
+      _tokenSimilarity(cleanedEntryTitle, cleanedCandidateTitle),
+    );
+    // Muchos vídeos de YouTube usan formato "Artista - Canción": si la canción
+    // buscada está contenida pero los tokens del artista bajan la precisión del
+    // título, evaluamos el título tras descontar tokens de artista coincidentes.
+    if (entryArtists.isNotEmpty) {
+      final strippedCandidate = _stripArtistTokens(
+        cleanedCandidateTitle,
+        entryArtists,
+      );
+      if (strippedCandidate.isNotEmpty) {
+        titleScore = math.max(
+          titleScore,
+          _tokenSimilarity(cleanedEntryTitle, strippedCandidate),
+        );
+      }
+    }
+
+    final artistScore = entryArtists.isEmpty
         ? 1.0
-        : math.max(
-            _tokenSimilarity(entry.artist, candidate.artist),
-            candidate.artists.fold<double>(
-              0,
-              (score, artist) =>
-                  math.max(score, _tokenSimilarity(entry.artist, artist)),
-            ),
-          );
-    final albumScore = entry.album == null || entry.album!.trim().isEmpty
+        : _artistSimilarity(entryArtists, candidate, cleanedCandidateTitle);
+
+    final hasEntryAlbum = entry.album != null && entry.album!.trim().isNotEmpty;
+    final hasCandidateAlbum =
+        candidate.album != null && candidate.album!.trim().isNotEmpty;
+    final albumScore = (!hasEntryAlbum || !hasCandidateAlbum)
         ? 0.5
-        : _tokenSimilarity(entry.album!, candidate.album ?? '');
+        : _tokenSimilarity(entry.album!, candidate.album!);
+
     final durationScore = _durationScore(entry.duration, candidate.duration);
     var score =
         titleScore * 0.68 +
@@ -524,6 +640,113 @@ class LibraryCsvImportService {
       score -= 0.18;
     }
     return score.clamp(0.0, 1.0);
+  }
+
+  List<String> _allEntryArtists(LibraryCsvTrack entry) {
+    final seen = <String>{};
+    final result = <String>[];
+    void addAllSplit(String raw) {
+      for (final part in raw.split(RegExp(r'\s*(?:,|;|/|•|&|\bx\b)\s*', caseSensitive: false))) {
+        final trimmed = part.trim();
+        if (trimmed.isNotEmpty && seen.add(trimmed.toLowerCase())) {
+          result.add(trimmed);
+        }
+      }
+    }
+
+    if (entry.artist.trim().isNotEmpty) {
+      addAllSplit(entry.artist);
+    }
+    for (final artist in entry.artists) {
+      if (artist.trim().isNotEmpty) {
+        addAllSplit(artist);
+      }
+    }
+    return result;
+  }
+
+  double _artistSimilarity(
+    List<String> entryArtists,
+    TrackInfo candidate,
+    String cleanedCandidateTitle,
+  ) {
+    final candidateArtistPool = <String>{
+      if (candidate.artist.trim().isNotEmpty) candidate.artist.trim(),
+      for (final a in candidate.artists)
+        if (a.trim().isNotEmpty) a.trim(),
+    }.toList(growable: false);
+
+    var best = 0.0;
+    final combinedEntry = entryArtists.join(' ');
+    final combinedCandidate = candidateArtistPool.join(' ');
+    if (combinedCandidate.isNotEmpty) {
+      best = math.max(
+        best,
+        _tokenSimilarity(combinedEntry, combinedCandidate),
+      );
+    }
+    for (final entryArtist in entryArtists) {
+      for (final candidateArtist in candidateArtistPool) {
+        best = math.max(best, _tokenSimilarity(entryArtist, candidateArtist));
+      }
+    }
+
+    // Si el canal de YouTube es el sello discográfico (VEVO, Sony, Topic, etc.)
+    // pero el nombre completo del artista está dentro del título del vídeo,
+    // otorgamos crédito parcial alto cuando todas sus palabras coinciden.
+    if (best < 0.78 && cleanedCandidateTitle.isNotEmpty) {
+      final titleTokenSet = _tokens(cleanedCandidateTitle).toSet();
+      for (final entryArtist in entryArtists) {
+        final artistTokens = _tokens(entryArtist);
+        if (artistTokens.isEmpty) continue;
+        final hits = artistTokens.where(titleTokenSet.contains).length;
+        if (hits == artistTokens.length) {
+          best = math.max(best, 0.85);
+        }
+      }
+    }
+    return best;
+  }
+
+  String _stripArtistTokens(String title, List<String> artists) {
+    final artistTokens = <String>{
+      for (final a in artists) ..._tokens(a),
+    };
+    if (artistTokens.isEmpty) return title;
+    final kept = _tokens(title)
+        .where((token) => !artistTokens.contains(token))
+        .toList(growable: false);
+    return kept.join(' ');
+  }
+
+  String _cleanTitleForQuery(String title) {
+    var cleaned = title
+        .replaceAll(
+          RegExp(
+            r'\s*[\(\[](?:feat|ft|with|con|remaster(?:ed)?|20\d{2}\s+remaster(?:ed)?|deluxe(?:\s+edition)?|explicit|clean|radio\s+edit|single\s+version|album\s+version|original\s+mix|official[^\)\]]*|audio|video[^\)\]]*|lyric[^\)\]]*|letra)[^\)\]]*[\)\]]',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(
+          RegExp(
+            r'\s+-\s+(?:feat\.?|ft\.?|remaster(?:ed)?(?:\s+20\d{2})?|20\d{2}\s+remaster(?:ed)?|deluxe(?:\s+edition)?|radio\s+edit|single\s+version|album\s+version).*$',
+            caseSensitive: false,
+          ),
+          '',
+        )
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return cleaned.isEmpty ? title.trim() : cleaned;
+  }
+
+  String _cleanTitleForComparison(String title) {
+    return _cleanTitleForQuery(title)
+        .replaceAll(
+          RegExp(r'\s*[\(\[](?:vivo|en\s+vivo)[\)\]]', caseSensitive: false),
+          ' live',
+        )
+        .trim();
   }
 
   double _durationScore(Duration? expected, Duration? actual) {
@@ -549,12 +772,15 @@ class LibraryCsvImportService {
   }
 
   List<String> _tokens(String input) {
-    var normalized = input.toLowerCase();
+    var normalized = input
+        .toLowerCase()
+        .replaceAll(RegExp(r"['’`]"), '');
     const accents = {
       'á': 'a',
       'à': 'a',
       'ä': 'a',
       'â': 'a',
+      'ã': 'a',
       'é': 'e',
       'è': 'e',
       'ë': 'e',
@@ -567,11 +793,13 @@ class LibraryCsvImportService {
       'ò': 'o',
       'ö': 'o',
       'ô': 'o',
+      'õ': 'o',
       'ú': 'u',
       'ù': 'u',
       'ü': 'u',
       'û': 'u',
       'ñ': 'n',
+      'ç': 'c',
     };
     for (final entry in accents.entries) {
       normalized = normalized.replaceAll(entry.key, entry.value);
@@ -609,10 +837,22 @@ const _ignoredTokens = {
   'a',
   'an',
   'official',
+  'oficial',
   'audio',
   'video',
   'lyrics',
   'lyric',
+  'letra',
+  'visualizer',
+  'feat',
+  'ft',
+  'remastered',
+  'remaster',
+  'remasterizado',
+  'deluxe',
+  'explicit',
+  'hd',
+  '4k',
 };
 const _versionQualifiers = {
   'live',

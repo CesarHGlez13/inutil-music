@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.5.2+252 — 2026-11-18
+
+### Fixed
+
+- Mejora profunda del motor de coincidencia al importar playlists de Spotify y archivos CSV (`LibraryCsvImportService`): búsqueda progresiva con respaldo limpio (elimina etiquetas como `(feat. ...)`, `- Remastered`, `(Deluxe)`, `[Explicit]` y álbumes cuando la consulta literal falla), puntuación multi-artista y detección de videos oficiales con formato `Artista - Título`.
+- Eliminación de falsos rechazos por ambigüedad cuando YouTube devuelve múltiples subidas limpias de la misma canción (por ejemplo, versión Topic + Official Audio/Visualizer).
+- El diálogo de importación de Spotify (`InutilSpotifyImportDialog`) ahora muestra la lista desplegable exacta de canciones no encontradas cuando alguna pista no pudo resolverse.
+
 ## 2.5.1+251 — 2026-11-18
 
 ### Fixed
