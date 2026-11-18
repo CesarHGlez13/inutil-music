@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.5.5+255 — 2026-11-18
+
+### Fixed
+
+- Reemplazado el icono monocromático heredado de notificación/controles multimedia en Android (`drawable-nodpi/ic_stat_inutil_music.png`) por la silueta oficial **iM** de Inútil Music.
+- Asignación explícita del icono empaquetado sobre cada `GtkWindow` en Linux (`apply_bundled_window_icon`), poblando `_NET_WM_ICON` bajo X11/XWayland para que el dock, Alt+Tab y barra de títulos muestren siempre el icono **iM**.
+- Eliminados archivos fuente heredados del proyecto base en `assets/branding/` y `assets/icons/source/icon-edit-prompt.txt`.
+
 ## 2.5.4+254 — 2026-11-18
 
 ### Fixed

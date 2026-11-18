@@ -179,19 +179,48 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   nudge_viewport_after_first_frame(toplevel);
 }
 
-static void load_bundled_window_icon() {
+static gchar* resolve_bundled_icon_path() {
   // Resolve relative to the executable, not the caller's working directory.
   // The theme name remains registered for installed desktops and Wayland;
-  // this pixbuf supplies the matching window icon for direct X11 launches.
+  // this pixbuf supplies the matching window icon and X11 _NET_WM_ICON.
   g_autofree gchar* executable = g_file_read_link("/proc/self/exe", nullptr);
-  if (!executable) return;
+  if (!executable) return nullptr;
   g_autofree gchar* directory = g_path_get_dirname(executable);
-  g_autofree gchar* icon_path =
-      g_build_filename(directory, "data", APPLICATION_ID ".png", nullptr);
-  g_autoptr(GError) error = nullptr;
-  if (!gtk_window_set_default_icon_from_file(icon_path, &error)) {
-    g_debug("Bundled window icon unavailable: %s", error->message);
+  return g_build_filename(directory, "data", APPLICATION_ID ".png", nullptr);
+}
+
+static GList* load_bundled_icon_list() {
+  // X11 drops _NET_WM_ICON if a single 512x512 RGBA icon (~1 MB) exceeds the
+  // XChangeProperty payload threshold. Provide standard sized pixbufs instead.
+  g_autofree gchar* icon_path = resolve_bundled_icon_path();
+  if (!icon_path) return nullptr;
+  static const int kSizes[] = {128, 64, 48};
+  GList* list = nullptr;
+  for (int size : kSizes) {
+    g_autoptr(GError) error = nullptr;
+    GdkPixbuf* pixbuf =
+        gdk_pixbuf_new_from_file_at_scale(icon_path, size, size, TRUE, &error);
+    if (pixbuf) {
+      list = g_list_append(list, pixbuf);
+    } else if (error) {
+      g_debug("Bundled icon scale %d unavailable: %s", size, error->message);
+    }
   }
+  return list;
+}
+
+static void load_bundled_window_icon() {
+  GList* list = load_bundled_icon_list();
+  if (!list) return;
+  gtk_window_set_default_icon_list(list);
+  g_list_free_full(list, g_object_unref);
+}
+
+static void apply_bundled_window_icon(GtkWindow* window) {
+  GList* list = load_bundled_icon_list();
+  if (!list) return;
+  gtk_window_set_icon_list(window, list);
+  g_list_free_full(list, g_object_unref);
 }
 
 // GNOME integrates GTK header bars with its window controls. Other desktops,
@@ -225,6 +254,7 @@ static void my_application_activate(GApplication* application) {
 
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
+  apply_bundled_window_icon(window);
 
   // Keep GTK's client-side header bar on GNOME. On other desktops, use the
   // compositor-provided title bar so minimize, maximize, and close follow the
