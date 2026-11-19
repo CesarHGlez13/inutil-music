@@ -90,11 +90,21 @@ final inutilPlaybackSyncProvider =
     if (snapshot == null) return;
 
     final isPlaying = snapshot.status == PlayerStatus.playing;
-    final isRemote = snapshot.isRemote ||
-        (!InutilPlaybackSyncService.isDesktopHost &&
-            !syncService.isCurrentDeviceActive);
+    final isRemoteController = !InutilPlaybackSyncService.isDesktopHost &&
+        !syncService.isCurrentDeviceActive;
 
-    if (!isRemote) {
+    // Si el móvil está en modo control remoto y el track que tiene coincide con el
+    // que la PC ya está reproduciendo, este evento es sólo un reflejo de UI del par:
+    // no se procesa localmente ni se reenvía a la PC (rompe completamente el ping-pong).
+    final isMirroringRemoteTrack = isRemoteController &&
+        snapshot.trackId != null &&
+        snapshot.trackId == syncService.remoteSession?.trackId;
+
+    if (isMirroringRemoteTrack) {
+      return;
+    }
+
+    if (!isRemoteController) {
       InutilWrappedService.instance.recordPlaybackTick(
         trackId: snapshot.trackId,
         title: snapshot.title,
@@ -124,6 +134,7 @@ final inutilPlaybackSyncProvider =
             isPlaybackRouteSuppressed: syncService.isPlaybackRouteSuppressed,
             forcePush: forcePush,
             isPlaying: isPlaying,
+            isRemoteSnapshot: isMirroringRemoteTrack,
           );
 
       if (shouldRouteToPeer) {
@@ -142,7 +153,7 @@ final inutilPlaybackSyncProvider =
         return;
       }
 
-      if (isRemote) {
+      if (isRemoteController) {
         // En modo control remoto, este dispositivo no reproduce el audio
         // ni publica su estado local para evitar sobreescribir la sesión del altavoz (PC)
         // y prevenir bucles de notificación.

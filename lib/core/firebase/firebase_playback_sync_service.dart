@@ -478,8 +478,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required bool isPlaybackRouteSuppressed,
     required bool forcePush,
     required bool isPlaying,
+    bool isRemoteSnapshot = false,
   }) {
     if (isDesktopHost) return false;
+    if (isRemoteSnapshot) return false;
     if (isPlaybackRouteSuppressed) return false;
     if (!forcePush || !isPlaying) return false;
     if (!hasTargetPeer) return false;
@@ -848,6 +850,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // La reproducción que vamos a iniciar aquí viene de otro dispositivo:
           // no debe reenviarse de vuelta (evita el ping-pong móvil <-> PC).
           _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
+          if (commandType == 'playTrack') {
+            _currentRemoteSession = null;
+          }
           unawaited(
             onRemoteCommandReceived!(commandType, normalizeRemoteParam(param)),
           );
@@ -1731,6 +1736,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (peer == null) return false;
     _autoPairedPeer = peer;
 
+    // GUARD: Si el peer remoto ya está reproduciendo exactamente este trackId,
+    // evitar reenvíos redundantes que generen bucles de reproducción.
+    if (_currentRemoteSession != null &&
+        _currentRemoteSession!.trackId == trackId &&
+        _currentRemoteSession!.isPlaying) {
+      return true;
+    }
+
     final trackParam = <String, dynamic>{
       'trackId': trackId,
       'title': title,
@@ -1905,16 +1918,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
     _currentLocalSession = session;
 
-    // Si este dispositivo es el activo, actualizar remoteSession también
-    if (isCurrentDeviceActive) {
+    // Si este dispositivo es el activo o es el host de escritorio, actualizar remoteSession también
+    if (isDesktopHost || isCurrentDeviceActive) {
       _currentRemoteSession = session;
     }
 
     notifyListeners();
 
-    // Debouncing para no saturar Firestore
+    // Debouncing para no saturar Firestore (mínimo 1.5s incluso con force)
     final timeSinceLastPush = now.difference(_lastPositionPushTime);
-    if (!force && timeSinceLastPush.inSeconds < 8) {
+    if ((!force && timeSinceLastPush.inSeconds < 8) ||
+        (force && timeSinceLastPush.inMilliseconds < 1500)) {
       return;
     }
     _lastPositionPushTime = now;

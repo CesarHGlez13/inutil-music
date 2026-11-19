@@ -415,6 +415,22 @@ void main() {
       expect(shouldRoute, isFalse);
     });
 
+    test('un snapshot remoto (isRemoteSnapshot) nunca se reenvía a la PC para evitar bucles', () {
+      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+        autoPlayOnPc: true,
+        isCurrentDeviceActive: false,
+        remoteActiveDeviceId: 'pc_linux_1',
+        hasTargetPeer: true,
+        isDesktopHost: false,
+        isPlaybackRouteSuppressed: false,
+        forcePush: true,
+        isPlaying: true,
+        isRemoteSnapshot: true,
+      );
+
+      expect(shouldRoute, isFalse);
+    });
+
     test('en la PC (desktop host) nunca se reenvía a otro equipo (evita bucle)', () {
       final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
         autoPlayOnPc: true,
