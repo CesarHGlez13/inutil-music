@@ -5506,7 +5506,7 @@ class _LyricsTransportPlayerController extends PlayerController {
   }
 
   @override
-  Future<void> playNext({bool automatic = false}) async {
+  Future<void> playNext({bool automatic = false, bool fromRemoteSpeaker = false}) async {
     nextCalls++;
     nextAutomaticValues.add(automatic);
   }

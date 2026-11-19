@@ -88,6 +88,13 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   Timer? _playbackRecoveryTimer;
   bool _useNativeLocalQueue = true;
   bool _activePlaybackIsRemote = false;
+  // En modo mando a distancia la cola vive aquí, pero el audio lo pone el
+  // altavoz remoto. Por eso el avance automático lo dispara la señal de
+  // "canción terminada" que llega del par, nunca el reproductor local
+  // (deliberadamente pausado). Se guarda la canción ya avanzada para no
+  // repetir la orden con cada refresco de estado.
+  String? _lastRemoteAdvanceTrackId;
+  bool _remoteAdvanceInFlight = false;
   String? _hybridLocalFallbackEntryId;
   String? _pendingHybridLocalFailureEntryId;
   String? _activeLocalQueueSourceId;
@@ -226,6 +233,10 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             isRemote: true,
           ),
         );
+        // Hecho el espejo del estado remoto, comprobamos si el altavoz terminó
+        // su canción: la cola vive en el mando, que es quien debe elegir la
+        // siguiente pista y encaminársela.
+        _maybeAdvanceForRemoteCompletion(remote);
       },
     );
     final initialSnapshot = _decorateSnapshot(service.currentSnapshot);
@@ -294,6 +305,14 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     );
     final subscription = service.snapshotStream.listen((snapshot) {
       if (_disposed) {
+        return;
+      }
+      final sync = InutilPlaybackSyncService.instance;
+      if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+        // En modo control remoto, este dispositivo actúa como mando a distancia (Spotify Connect).
+        // El audio suena en el equipo remoto (PC) y el estado de la UI es gobernado
+        // exclusivamente por InutilPlaybackSyncService. Los snapshots del reproductor local
+        // (que permanece inactivo en 0:00) NO deben pisar el estado remoto en la UI ni generar parpadeos.
         return;
       }
       if (snapshot.status == PlayerStatus.paused &&
@@ -1493,6 +1512,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _requestPlayback();
     _changingLocalTrackRequestId = null;
     _remoteRetry.resetForSelection();
+    // Selección nueva del usuario: esa canción aún no se terminó en el altavoz,
+    // así que vuelve a poder disparar el avance automático al acabar.
+    _lastRemoteAdvanceTrackId = null;
     _liveTerminalAdvanceScheduledRequestId = null;
     ref
         .read(remotePlaybackCacheProvider)
@@ -3705,16 +3727,51 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _pendingHybridLocalFailureEntryId = null;
   }
 
-  Future<void> playNext({bool automatic = false}) {
+  /// Avance automático en modo mando a distancia.
+  ///
+  /// El altavoz remoto (la PC) recibe una sola canción por comando: su propia
+  /// cola no tiene la siguiente, así que si nadie avanza, el silencio es
+  /// definitivo. Aquí se lee el estado publicado por el par y, cuando reporta
+  /// el final de su pista (pausado con la posición pegada a la duración), se
+  /// elige la siguiente canción de esta cola y se le envía.
+  void _maybeAdvanceForRemoteCompletion(PlaybackSyncSession remote) {
+    if (_remoteAdvanceInFlight || _explicitlyStopped) return;
+    if (_queue.isEmpty || _queueIndex < 0) return;
+    if (remote.isPlaying || remote.durationMs <= 0) return;
+    // Sólo se avanza si la pista que el altavoz terminó es la que el mando tiene
+    // delante: así un estado retrasado (la canción anterior ya terminada) no
+    // hace saltar dos pistas de golpe mientras la nueva está en camino.
+    final current = state.value;
+    if (current == null || current.trackId != remote.trackId) return;
+    // Margen de 2.5 s: los refrescos de posición llegan tarde y redondeados.
+    if (remote.positionMs < remote.durationMs - 2500) return;
+    if (_lastRemoteAdvanceTrackId == remote.trackId) return;
+    _lastRemoteAdvanceTrackId = remote.trackId;
+    _remoteAdvanceInFlight = true;
+    unawaited(
+      playNext(automatic: true, fromRemoteSpeaker: true)
+          .whenComplete(() => _remoteAdvanceInFlight = false),
+    );
+  }
+
+  Future<void> playNext({
+    bool automatic = false,
+    bool fromRemoteSpeaker = false,
+  }) {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
-      if (automatic) {
-        // En modo control remoto, el altavoz activo (la PC) gestiona la cola y su
-        // avance automático al terminar una canción. El mando a distancia nunca debe
-        // disparar 'next' de forma automática por inactividad o fin de su reproductor local.
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
+      if (automatic && !fromRemoteSpeaker) {
+        // En modo control remoto, el avance disparado por el reproductor local
+        // (pausado a propósito) no significa nada: se ignora.
         return Future.value();
       }
-      return sync.sendRemoteControlCommand(commandType: 'next');
+      if (!fromRemoteSpeaker) {
+        // 'next' pulsado por el usuario: la PC adelanta lo que tenga en su cola.
+        return sync.sendRemoteControlCommand(commandType: 'next');
+      }
+      // El altavoz terminó su canción; la cola real vive en el mando, que es
+      // quien debe elegir la siguiente y encaminársela (cae al camino local).
     }
     final inFlight = _nextNavigationInFlight;
     if (inFlight != null) {

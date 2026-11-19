@@ -84,6 +84,28 @@ final inutilPlaybackSyncProvider =
     }
   };
 
+  // Encaminar una selección al altavoz remoto y sólo silenciar el reproductor
+  // local si el encaminamiento llegó de verdad.
+  //
+  // Si la PC está apagada o no responde, lo único que quedó en el aire es una
+  // orden que nadie ejecutó: pausar aquí dejaría el teléfono mudo y la canción
+  // no sonaría en ningún lado.
+  Future<void> routeSelectionToPeer(PlayerSnapshot snapshot) async {
+    final routed = await syncService.playTrackOnPeer(
+      trackId: snapshot.trackId!,
+      title: snapshot.title ?? 'Canción',
+      artist: snapshot.artist ?? 'Inútil Music',
+      album: snapshot.album,
+      thumbnailUrl: snapshot.thumbnailUrl,
+      positionMs: snapshot.position.inMilliseconds,
+    );
+    if (!routed) return;
+    if (!ref.mounted) return;
+    await ref
+        .read(playerControllerProvider.notifier)
+        .pause(notifyPeer: false);
+  }
+
   // Escuchar cambios del reproductor local para sincronizarlos en LAN y la nube
   ref.listen<AsyncValue<PlayerSnapshot>>(playerControllerProvider, (prev, next) {
     final snapshot = next.value;
@@ -138,18 +160,9 @@ final inutilPlaybackSyncProvider =
           );
 
       if (shouldRouteToPeer) {
-        // Enviar a la PC y pausar el reproductor del celular LOCALMENTE (sin enviar comando remoto de pausa)
-        unawaited(
-          syncService.playTrackOnPeer(
-            trackId: snapshot.trackId!,
-            title: snapshot.title ?? 'Canción',
-            artist: snapshot.artist ?? 'Inútil Music',
-            album: snapshot.album,
-            thumbnailUrl: snapshot.thumbnailUrl,
-            positionMs: snapshot.position.inMilliseconds,
-          ),
-        );
-        unawaited(ref.read(playerControllerProvider.notifier).pause(notifyPeer: false));
+        // Enviar a la PC y pausar el reproductor del celular LOCALMENTE (sin
+        // enviar comando remoto de pausa), pero sólo si la PC aceptó la canción.
+        unawaited(routeSelectionToPeer(snapshot));
         return;
       }
 

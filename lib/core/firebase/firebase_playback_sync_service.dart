@@ -283,6 +283,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   /// después de ejecutar un comando remoto (evita el bucle PC <-> móvil).
   static const Duration _routeSuppression = Duration(seconds: 6);
 
+  /// Ventana en la que esperamos a que el altavoz remoto confirme la canción
+  /// que acabamos de transferirle. Resolver el stream puede tardar varios
+  /// segundos; mientras tanto el documento de la nube todavía describe la
+  /// canción anterior y no debe pisar la sesión optimista del mando.
+  static const Duration remoteHandoverGrace = Duration(seconds: 20);
+
   final InutilAuthService _auth = InutilAuthService.instance;
   final InutilFirestoreService _firestore = InutilFirestoreService.instance;
 
@@ -293,6 +299,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
   PlaybackSyncSession? _currentLocalSession;
   PlaybackSyncSession? _currentRemoteSession;
+
+  /// Canción transferida a un altavoz remoto que aún no la ha confirmado, y
+  /// instante hasta el cual seguimos esperando su confirmación.
+  String? _remoteHandoverTrackId;
+  DateTime _remoteHandoverUntil = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _syncPollingTimer;
   Timer? _lanDiscoveryTimer;
   int _cloudPollFailures = 0;
@@ -635,6 +646,42 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       return DateTime.fromMillisecondsSinceEpoch(asInt);
     }
     return DateTime.tryParse(value.toString());
+  }
+
+  /// Registra la canción que acabamos de transferir a un altavoz remoto para
+  /// que su confirmación espere: el mando muestra la nueva canción desde ya.
+  void _beginRemoteHandover(String trackId) {
+    if (trackId.isEmpty) return;
+    _remoteHandoverTrackId = trackId;
+    _remoteHandoverUntil = DateTime.now().add(remoteHandoverGrace);
+  }
+
+  /// Cierra la espera cuando el altavoz (por LAN o por la nube) reporta justo
+  /// la canción transferida.
+  void _confirmRemoteHandover(String trackId) {
+    final expected = _remoteHandoverTrackId;
+    if (expected != null && expected == trackId) {
+      _remoteHandoverTrackId = null;
+    }
+  }
+
+  /// true mientras la transferencia a un altavoz remoto sigue en el aire: el
+  /// documento de la nube, que todavía describe la canción anterior, no debe
+  /// pisar la sesión optimista (el mando volvería a mostrar la canción vieja).
+  bool _isAwaitingRemoteHandover(PlaybackSyncSession doc) {
+    final expected = _remoteHandoverTrackId;
+    if (expected == null) return false;
+    if (doc.trackId == expected) {
+      _remoteHandoverTrackId = null;
+      return false;
+    }
+    if (!DateTime.now().isBefore(_remoteHandoverUntil)) {
+      // El altavoz nunca llegó a la canción (apagado, sin red o la perdió por
+      // el camino): ya no hay nada que esperar, manda lo que reporte la nube.
+      _remoteHandoverTrackId = null;
+      return false;
+    }
+    return true;
   }
 
   /// Si este dispositivo es el que actualmente reproduce el audio físicamente.
@@ -1303,8 +1350,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         final session = PlaybackSyncSession.fromJson(map);
 
         if (session.trackId.isNotEmpty) {
-          _currentRemoteSession = session;
-          notifyListeners();
+          _confirmRemoteHandover(session.trackId);
+          // Igual que con la nube: mientras esperamos que el altavoz estrene la
+          // canción que le enviamos, su respuesta todavía puede describir la
+          // anterior y pisaría la sesión optimista del mando.
+          if (!_isAwaitingRemoteHandover(session)) {
+            _currentRemoteSession = session;
+            notifyListeners();
+          }
         } else if (_currentRemoteSession != null &&
             _currentRemoteSession!.activeDeviceId == peer.deviceId &&
             _currentLocalSession?.trackId == null) {
@@ -1802,7 +1855,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         thumbnailUrl: thumbnailUrl ?? '',
         positionMs: positionMs,
         isPlaying: true,
+        // Marca de tiempo propia: sin ella el sondeo de la nube, que aún
+        // describe la canción anterior, borraría esta sesión en menos de 3 s
+        // y el mando volvería a mostrar la canción que ya venía sonando.
+        updatedAt: DateTime.now(),
       );
+      _beginRemoteHandover(trackId);
       notifyListeners();
       // El equipo remoto acaba de convertirse en el altavoz: que la lista y el
       // resto de dispositivos de la cuenta lo reflejen pronto.
@@ -1854,7 +1912,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
                     session.updatedAt!.isAfter(_currentRemoteSession!.updatedAt!)));
         // La LAN es más rápida; el documento en la nube sólo gana si es más
         // reciente, para no pisar el estado que acabamos de leer del par.
-        if (fresher) {
+        // Tampoco gana mientras esperamos que confirme una canción que le
+        // acabamos de transferir: aún hablaría de la anterior.
+        if (fresher && !_isAwaitingRemoteHandover(session)) {
           _currentRemoteSession = session;
           notifyListeners();
         }
