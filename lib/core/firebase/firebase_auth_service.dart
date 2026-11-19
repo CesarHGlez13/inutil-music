@@ -1032,11 +1032,24 @@ class InutilAuthService extends ChangeNotifier {
   /// limitados a [maxMonthlyPhoneSwitches] por mes natural.
   Future<void> _claimPhoneDevice() async {
     final user = _currentUser;
-    if (user == null || !_isPhoneDevice || user.isAdmin) return;
+    if (user == null || !_isPhoneDevice) return;
     final doc = await InutilFirestoreService.instance.getUserProfile(user.uid);
     if (doc == null) return;
     final holder = doc['currentPhoneDeviceId'] as String? ?? '';
     if (holder == _deviceId) return;
+
+    if (user.isAdmin) {
+      final ok = await InutilFirestoreService.instance.setDocument('users/${user.uid}', {
+        'currentPhoneDeviceId': _deviceId!,
+        'lastValidatedAt': DateTime.now(),
+      });
+      if (ok) {
+        _currentUser = user.copyWith(currentPhoneDeviceId: _deviceId);
+        await _saveSession();
+        notifyListeners();
+      }
+      return;
+    }
 
     final month = _monthKey(DateTime.now());
     var switches = doc['phoneSwitchMonth'] == month
