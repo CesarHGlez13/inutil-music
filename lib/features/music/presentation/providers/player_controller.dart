@@ -3708,6 +3708,12 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   Future<void> playNext({bool automatic = false}) {
     final sync = InutilPlaybackSyncService.instance;
     if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      if (automatic) {
+        // En modo control remoto, el altavoz activo (la PC) gestiona la cola y su
+        // avance automático al terminar una canción. El mando a distancia nunca debe
+        // disparar 'next' de forma automática por inactividad o fin de su reproductor local.
+        return Future.value();
+      }
       return sync.sendRemoteControlCommand(commandType: 'next');
     }
     final inFlight = _nextNavigationInFlight;
@@ -4614,6 +4620,12 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   void _maybeHandleCompletion(PlayerSnapshot snapshot) {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      // En modo control remoto, no procesamos completaciones de reproducción locales:
+      // el audio se reproduce y finaliza exclusivamente en el altavoz activo (PC).
+      return;
+    }
     if (_explicitlyStopped ||
         _userPaused ||
         _changingLocalTrack ||
