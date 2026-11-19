@@ -183,6 +183,42 @@ class InutilFirestoreService {
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 
+  /// Lista los documentos de una colección/subcolección (`users/{uid}/devices`).
+  ///
+  /// Cada documento llega con sus campos decodificados y el id bajo [idField],
+  /// que hace falta para borrarlo o actualizarlo después. Un 403/5xx se propaga
+  /// como [FirestoreOperationException] para que el sondeo de dispositivos
+  /// aplique el mismo backoff que la sesión en la nube en lugar de repetir la
+  /// petición cada pocos segundos.
+  Future<List<Map<String, dynamic>>> listCollection(
+    String path, {
+    int pageSize = 50,
+    String idField = 'docId',
+  }) async {
+    final url = Uri.parse(
+      '${FirebaseConfig.firestoreBaseUrl}/$path?pageSize=$pageSize',
+    );
+    final response = await http
+        .get(url, headers: _headers())
+        .timeout(const Duration(seconds: 5));
+    if (response.statusCode == 404) return const [];
+    if (response.statusCode != 200) {
+      throw FirestoreOperationException(path, response.statusCode, response.body);
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final docs = json['documents'] as List?;
+    if (docs == null) return const [];
+    final result = <Map<String, dynamic>>[];
+    for (final doc in docs) {
+      if (doc is! Map<String, dynamic>) continue;
+      final fields = _decodeDocument(doc);
+      final name = doc['name'] as String? ?? '';
+      fields[idField] = name.split('/').last;
+      result.add(fields);
+    }
+    return result;
+  }
+
   // ---------------------------------------------------------------------------
   // 3. SINCRONIZACIÓN DE FAVORITOS
   // ---------------------------------------------------------------------------

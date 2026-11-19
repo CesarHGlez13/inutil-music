@@ -90,32 +90,44 @@ final inutilPlaybackSyncProvider =
     if (snapshot == null) return;
 
     final isPlaying = snapshot.status == PlayerStatus.playing;
-    InutilWrappedService.instance.recordPlaybackTick(
-      trackId: snapshot.trackId,
-      title: snapshot.title,
-      artist: snapshot.artist,
-      thumbnailUrl: snapshot.thumbnailUrl,
-      positionMs: snapshot.position.inMilliseconds,
-      isPlaying: isPlaying,
-    );
+    final isRemote = snapshot.isRemote ||
+        (!InutilPlaybackSyncService.isDesktopHost &&
+            !syncService.isCurrentDeviceActive);
+
+    if (!isRemote) {
+      InutilWrappedService.instance.recordPlaybackTick(
+        trackId: snapshot.trackId,
+        title: snapshot.title,
+        artist: snapshot.artist,
+        thumbnailUrl: snapshot.thumbnailUrl,
+        positionMs: snapshot.position.inMilliseconds,
+        isPlaying: isPlaying,
+      );
+    }
     final forcePush = prev?.value?.status != snapshot.status ||
         prev?.value?.trackId != snapshot.trackId;
 
     if (snapshot.trackId != null && snapshot.trackId!.isNotEmpty) {
-      // Reproducción automática en la PC: si el móvil arranca una canción y hay
-      // un PC con la misma cuenta encendido, la canción suena en la PC y el
-      // móvil queda como mando a distancia.
+      // Reproducción en la PC (Spotify Connect):
+      // Si la PC ya es el altavoz activo O si está activado "Reproducir siempre en la PC",
+      // cualquier canción seleccionada o cambio de pista en el móvil se envía a la PC
+      // y el móvil queda como mando a distancia.
       final shouldRouteToPeer =
-          syncService.autoPlayOnPc &&
-          syncService.autoPairedPeer != null &&
-          !InutilPlaybackSyncService.isDesktopHost &&
-          !syncService.isPlaybackRouteSuppressed &&
-          forcePush &&
-          isPlaying &&
-          syncService.isCurrentDeviceActive;
+          InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+            autoPlayOnPc: syncService.autoPlayOnPc,
+            isCurrentDeviceActive: syncService.isCurrentDeviceActive,
+            remoteActiveDeviceId:
+                syncService.remoteSession?.activeDeviceId ?? '',
+            hasTargetPeer: syncService.autoPairedPeer != null ||
+                syncService.connectTargets.any((p) => p.isHost),
+            isDesktopHost: InutilPlaybackSyncService.isDesktopHost,
+            isPlaybackRouteSuppressed: syncService.isPlaybackRouteSuppressed,
+            forcePush: forcePush,
+            isPlaying: isPlaying,
+          );
 
       if (shouldRouteToPeer) {
-        // Enviar a la PC y pausar el reproductor del celular
+        // Enviar a la PC y pausar el reproductor del celular LOCALMENTE (sin enviar comando remoto de pausa)
         unawaited(
           syncService.playTrackOnPeer(
             trackId: snapshot.trackId!,
@@ -126,7 +138,14 @@ final inutilPlaybackSyncProvider =
             positionMs: snapshot.position.inMilliseconds,
           ),
         );
-        unawaited(ref.read(playerControllerProvider.notifier).pause());
+        unawaited(ref.read(playerControllerProvider.notifier).pause(notifyPeer: false));
+        return;
+      }
+
+      if (isRemote) {
+        // En modo control remoto, este dispositivo no reproduce el audio
+        // ni publica su estado local para evitar sobreescribir la sesión del altavoz (PC)
+        // y prevenir bucles de notificación.
         return;
       }
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.5.8+258 — 2026-11-18
+
+### Added
+
+- **Inútil Connect funciona a distancia (sin mismo Wi-Fi), como Spotify Connect:** cada equipo publica su presencia en `users/{uid}/devices` (latido cada 30 s) y el panel *Conectar* ahora enumera los dispositivos de la cuenta aunque no estén en la misma red, distinguiendo «red local» de «a distancia (por la nube)».
+- Cola de comandos en la nube `users/{uid}/commands`: play/pause/skip/seek/playTrack viajan por Firestore cuando el puerto LAN no es alcanzable, con ventana de sondeo rápido de 8 s tras enviar y expiración a los 10 min para que un comando no se ejecute fuera de tiempo.
+
+### Changed
+
+- El vinculado automático elige primero un PC (los equipos de escritorio suenan); un celular de la misma cuenta nunca se selecciona solo, se escoge desde el panel.
+- Los comandos enviados a apps 2.5.7 o anteriores usan además el puente heredado `pendingCommand*` del documento de sesión, compartiendo el mismo identificador para que la orden se ejecute una sola vez.
+- El panel de QR deja de consultar la bandera interna de pruebas de `InutilAuthService`; las pruebas de widget inyectan su propia fábrica de sesiones con `MusicQrLoginPanel.debugSessionFactory`.
+
 ## 2.5.7+257 — 2026-11-18
 
 ### Added

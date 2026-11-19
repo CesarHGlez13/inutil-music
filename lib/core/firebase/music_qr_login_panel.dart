@@ -64,10 +64,10 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
       _error = null;
       _session = null;
     });
-    final factory = MusicQrLoginPanel.debugSessionFactory ??
-        (InutilAuthService.testSkipOnlineValidation
-            ? () async => null // widget tests: nunca tocar la red
-            : null);
+    // Las pruebas de widget inyectan su propia fábrica ([debugSessionFactory]);
+    // sin ella se habla con Firestore normal y la pantalla tarda lo que tarde
+    // la red.
+    final factory = MusicQrLoginPanel.debugSessionFactory;
     if (factory == null) unawaited(_service.cleanupPcSession(previous));
     final session = await (factory ?? _service.createPcSession)();
     if (!mounted) return;

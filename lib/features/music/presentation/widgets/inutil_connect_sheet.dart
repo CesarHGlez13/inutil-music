@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/theme/inutil_icons.dart';
+import '../../domain/entities/track_info.dart';
 import '../providers/music_providers.dart';
 
 /// Modal estilo Spotify Connect para control de reproducción y cambio de dispositivos.
@@ -41,7 +42,10 @@ class InutilConnectSheet extends ConsumerWidget {
     final remoteSession = syncService.remoteSession;
     final isLocalActive = syncService.isCurrentDeviceActive;
     final autoPairedPeer = syncService.autoPairedPeer;
-    final otherPeers = syncService.discoveredPeers
+    // Destinos de la cuenta: los de la red local y los que están en línea a
+    // través de Firestore. Así la lista funciona aunque el PC esté en otra red
+    // o el firewall bloquee los puertos, igual que Spotify Connect.
+    final otherPeers = syncService.connectTargets
         .where((peer) => peer.deviceId != autoPairedPeer?.deviceId)
         .toList(growable: false);
 
@@ -182,7 +186,9 @@ class InutilConnectSheet extends ConsumerWidget {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Misma cuenta · Vinculado automático',
+                                      autoPairedPeer.isCloudOnly
+                                          ? 'Misma cuenta · Vinculado por la nube'
+                                          : 'Misma cuenta · Vinculado automático',
                                       style: theme.textTheme.labelSmall?.copyWith(
                                         color: colors.primary,
                                         fontWeight: FontWeight.w700,
@@ -225,6 +231,8 @@ class InutilConnectSheet extends ConsumerWidget {
                                 0;
 
                             if (trackId != null && trackId.isNotEmpty) {
+                              final nav = Navigator.maybeOf(context);
+                              unawaited(syncService.setAutoPlayOnPc(true));
                               await syncService.playTrackOnPeer(
                                 trackId: trackId,
                                 title: title,
@@ -236,17 +244,20 @@ class InutilConnectSheet extends ConsumerWidget {
                               unawaited(
                                 ref
                                     .read(playerControllerProvider.notifier)
-                                    .pause(),
+                                    .pause(notifyPeer: false),
                               );
+                              nav?.pop();
                             }
                           },
                           icon: const Icon(
                             Icons.speaker_group_rounded,
                             size: 19,
                           ),
-                          label: const Text(
-                            'Reproducir en la PC',
-                            style: TextStyle(fontWeight: FontWeight.w700),
+                          label: Text(
+                            'Reproducir en ${autoPairedPeer.deviceName}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
@@ -297,14 +308,14 @@ class InutilConnectSheet extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Buscando tu PC en la red local...',
+                              'Buscando tus dispositivos...',
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Abre Inútil Music en la PC con tu misma cuenta para vincular al instante.',
+                              'Abre Inútil Music en cualquier equipo con tu misma cuenta: se vinculan solos, estén en la misma red o a distancia.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),
@@ -321,7 +332,7 @@ class InutilConnectSheet extends ConsumerWidget {
               // Otros dispositivos en tu red
               if (otherPeers.isNotEmpty) ...[
                 Text(
-                  'Otros dispositivos en tu red',
+                  'Otros dispositivos de tu cuenta',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -366,7 +377,9 @@ class InutilConnectSheet extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${peer.ip}:${peer.port} · en línea',
+                                      peer.isCloudOnly
+                                          ? 'En línea · a distancia (por la nube)'
+                                          : '${peer.ip}:${peer.port} · en línea · red local',
                                       style: theme.textTheme.bodySmall
                                           ?.copyWith(
                                             color: colors.onSurfaceVariant,
@@ -449,8 +462,26 @@ class InutilConnectSheet extends ConsumerWidget {
                           ),
                           if (!isLocalActive)
                             FilledButton(
-                              onPressed: () {
-                                syncService.transferPlaybackToThisDevice(
+                              onPressed: () async {
+                                final nav = Navigator.maybeOf(context);
+                                final track = TrackInfo(
+                                  id: remoteSession.trackId,
+                                  title: remoteSession.title.isNotEmpty
+                                      ? remoteSession.title
+                                      : 'Canción activa',
+                                  artist: remoteSession.artist.isNotEmpty
+                                      ? remoteSession.artist
+                                      : 'Inútil Music',
+                                  album: remoteSession.album,
+                                  thumbnailUrl: remoteSession.thumbnailUrl,
+                                  url: remoteSession.trackId,
+                                  duration: remoteSession.durationMs > 0
+                                      ? Duration(
+                                          milliseconds: remoteSession.durationMs,
+                                        )
+                                      : null,
+                                );
+                                await syncService.transferPlaybackToThisDevice(
                                   trackId: remoteSession.trackId,
                                   title: remoteSession.title,
                                   artist: remoteSession.artist,
@@ -460,6 +491,19 @@ class InutilConnectSheet extends ConsumerWidget {
                                   durationMs: remoteSession.durationMs,
                                   isPlaying: remoteSession.isPlaying,
                                 );
+                                await ref
+                                    .read(playerControllerProvider.notifier)
+                                    .playRemote(track);
+                                if (remoteSession.positionMs > 0) {
+                                  await ref
+                                      .read(playerControllerProvider.notifier)
+                                      .seek(
+                                        Duration(
+                                          milliseconds: remoteSession.positionMs,
+                                        ),
+                                      );
+                                }
+                                nav?.pop();
                               },
                               child: const Text('Transferir aquí'),
                             ),

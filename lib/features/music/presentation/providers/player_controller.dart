@@ -190,6 +190,44 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       },
       fireImmediately: true,
     );
+    ref.listen<InutilPlaybackSyncService>(
+      inutilPlaybackSyncProvider,
+      (previous, syncService) {
+        if (InutilPlaybackSyncService.isDesktopHost ||
+            syncService.isCurrentDeviceActive) {
+          return;
+        }
+        final remote = syncService.remoteSession;
+        if (remote == null || remote.trackId.isEmpty) return;
+        final current = state.value;
+        final newStatus =
+            remote.isPlaying ? PlayerStatus.playing : PlayerStatus.paused;
+        final newPosition = Duration(milliseconds: remote.positionMs);
+        if (current != null &&
+            current.isRemote &&
+            current.trackId == remote.trackId &&
+            current.status == newStatus &&
+            (current.position - newPosition).inSeconds.abs() < 2) {
+          return;
+        }
+        state = AsyncData(
+          (current ?? service.currentSnapshot).copyWith(
+            trackId: remote.trackId,
+            title: remote.title,
+            artist: remote.artist,
+            album: remote.album,
+            thumbnailUrl: remote.thumbnailUrl,
+            status: newStatus,
+            playWhenReady: remote.isPlaying,
+            position: newPosition,
+            duration: remote.durationMs > 0
+                ? Duration(milliseconds: remote.durationMs)
+                : current?.duration,
+            isRemote: true,
+          ),
+        );
+      },
+    );
     final initialSnapshot = _decorateSnapshot(service.currentSnapshot);
     final historySink = ref.read(playbackHistorySinkProvider);
     final historyTracker = QualifiedPlaybackHistoryTracker(
@@ -3518,7 +3556,23 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _publishPlaybackQueue();
   }
 
-  Future<void> pause() async {
+  Future<void> pause({bool notifyPeer = true}) async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (notifyPeer &&
+        !InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
+      unawaited(sync.sendRemoteControlCommand(commandType: 'pause'));
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(
+          current.copyWith(
+            status: PlayerStatus.paused,
+            playWhenReady: false,
+          ),
+        );
+      }
+      return;
+    }
     final service = ref.read(playerServiceProvider);
     final current = state.value ?? service.currentSnapshot;
     final pendingRemote = _pendingRemoteSnapshot;
@@ -3547,6 +3601,20 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> resume() async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      unawaited(sync.sendRemoteControlCommand(commandType: 'play'));
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(
+          current.copyWith(
+            status: PlayerStatus.playing,
+            playWhenReady: true,
+          ),
+        );
+      }
+      return;
+    }
     final snapshot =
         state.value ?? ref.read(playerServiceProvider).currentSnapshot;
     if ((_resumeNeedsReload ||
@@ -3577,6 +3645,24 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> togglePlayPause() async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      final isRemotePlaying = sync.remoteSession?.isPlaying ?? false;
+      unawaited(sync.sendRemoteControlCommand(
+        commandType: isRemotePlaying ? 'pause' : 'play',
+      ));
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(
+          current.copyWith(
+            status:
+                isRemotePlaying ? PlayerStatus.paused : PlayerStatus.playing,
+            playWhenReady: !isRemotePlaying,
+          ),
+        );
+      }
+      return;
+    }
     final snapshot =
         state.value ?? ref.read(playerServiceProvider).currentSnapshot;
     if (snapshot.wantsToPlay) {
@@ -3587,6 +3673,11 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> playPrevious() async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      unawaited(sync.sendRemoteControlCommand(commandType: 'previous'));
+      return;
+    }
     _resetQueueNavigation();
     if (_queue.isEmpty) {
       return;
@@ -3615,6 +3706,10 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> playNext({bool automatic = false}) {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      return sync.sendRemoteControlCommand(commandType: 'next');
+    }
     final inFlight = _nextNavigationInFlight;
     if (inFlight != null) {
       final startedAt = _nextNavigationStartedAt;
@@ -3811,6 +3906,18 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> seek(Duration position) async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      unawaited(sync.sendRemoteControlCommand(
+        commandType: 'seek',
+        param: position.inMilliseconds,
+      ));
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(current.copyWith(position: position));
+      }
+      return;
+    }
     if (_resumeNeedsReload && !_playWhenReady) {
       // A paused restored queue has no native source loaded yet. Seeking must
       // update its deferred resume point, not the outgoing LIVE source.

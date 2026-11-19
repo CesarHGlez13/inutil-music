@@ -2269,7 +2269,7 @@ class _RecordingPlayerController extends PlayerController {
   }
 
   @override
-  Future<void> pause() async {
+  Future<void> pause({bool notifyPeer = true}) async {
     pauseCalls++;
     final snapshot = state.value;
     if (snapshot != null) {
@@ -2542,7 +2542,7 @@ class _LiveAppendPlayerService extends PlayerService {
   ) async {}
 
   @override
-  Future<void> pause() async {
+  Future<void> pause({bool notifyPeer = true}) async {
     _snapshot = _snapshot.copyWith(status: PlayerStatus.paused);
     _snapshots.add(_snapshot);
   }

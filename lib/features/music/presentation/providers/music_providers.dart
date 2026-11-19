@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/firebase/firebase_playback_sync_service.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';

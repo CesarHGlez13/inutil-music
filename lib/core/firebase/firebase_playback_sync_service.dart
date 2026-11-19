@@ -5,11 +5,18 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../constants/app_constants.dart';
 import '../utils/release_paths.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
 
-/// Dispositivo descubierto en la red local (Wi-Fi).
+/// Dispositivo de la misma cuenta visible para el mando a distancia.
+///
+/// Puede conocerse por la red local (anuncio UDP + `GET /api/ping`) o por su
+/// heartbeat en la nube (`users/{uid}/devices`). Un peer descubierto sólo en la
+/// nube no tiene IP útil: sus comandos viajan por Firestore, igual que hace
+/// Spotify Connect, y así funcionan aunque el PC esté en otra red o el
+/// firewall bloquee los puertos LAN.
 class LanDevicePeer {
   LanDevicePeer({
     required this.ip,
@@ -19,6 +26,9 @@ class LanDevicePeer {
     required this.platform,
     this.userEmail = '',
     this.uid = '',
+    this.isHost = false,
+    this.fromCloud = false,
+    this.appVersion = '',
     DateTime? lastSeen,
   }) : lastSeen = lastSeen ?? DateTime.now();
 
@@ -29,9 +39,30 @@ class LanDevicePeer {
   final String platform;
   final String userEmail;
   final String uid;
+
+  /// true en equipos de escritorio (suenan) frente a móviles (mandos).
+  final bool isHost;
+
+  /// true si este peer viene del registro en la nube, no de un anuncio LAN.
+  final bool fromCloud;
+
+  /// Versión de la app anunciada por el peer (puede venir vacía).
+  final String appVersion;
+
   DateTime lastSeen;
 
   String get httpBaseUrl => 'http://$ip:$port';
+
+  /// Sin IP útil: sólo se le puede hablar a través de Firestore.
+  bool get isCloudOnly => ip.isEmpty;
+
+  /// Ventana de vigencia según el canal que mantiene vivo al peer: los
+  /// anuncios UDP llegan cada 2 s, el heartbeat en la nube cada 30 s.
+  bool get isOnlineNow => fromCloud
+      ? DateTime.now().difference(lastSeen) <
+          InutilPlaybackSyncService.cloudPeerTtl
+      : DateTime.now().difference(lastSeen) <
+          InutilPlaybackSyncService.lanPeerTtl;
 
   /// Determina si el dispositivo pertenece al mismo usuario/cuenta.
   bool isSameAccount(String? myEmail, String? myUid) {
@@ -54,6 +85,9 @@ class LanDevicePeer {
     'platform': platform,
     'userEmail': userEmail,
     'uid': uid,
+    'isHost': isHost,
+    'fromCloud': fromCloud,
+    'appVersion': appVersion,
     'lastSeen': lastSeen.toUtc().toIso8601String(),
   };
 
@@ -66,6 +100,9 @@ class LanDevicePeer {
       platform: json['platform'] as String? ?? 'generic',
       userEmail: json['userEmail'] as String? ?? '',
       uid: json['uid'] as String? ?? '',
+      isHost: json['isHost'] as bool? ?? false,
+      fromCloud: json['fromCloud'] as bool? ?? false,
+      appVersion: json['appVersion'] as String? ?? '',
       lastSeen: DateTime.tryParse(json['lastSeen']?.toString() ?? '') ?? DateTime.now(),
     );
   }
@@ -153,6 +190,45 @@ class PlaybackSyncSession {
   }
 }
 
+/// Comando de reproducción en tránsito por la nube (`users/{uid}/commands`).
+///
+/// Es el equivalente al `POST /api/command` de la red local para equipos que no
+/// comparten Wi-Fi: quien manda escribe el documento y el destino lo ejecuta al
+/// leerlo, sin necesidad de puertos abiertos ni de la misma subred.
+@immutable
+class CloudCommand {
+  const CloudCommand({
+    required this.id,
+    required this.type,
+    required this.targetDeviceId,
+    required this.issuerDeviceId,
+    this.param,
+    this.issuerName = '',
+    this.createdAt,
+  });
+
+  final String id;
+  final String type;
+  final String targetDeviceId;
+  final String issuerDeviceId;
+  final dynamic param;
+  final String issuerName;
+  final DateTime? createdAt;
+
+  Map<String, dynamic> toFirestoreDoc() => {
+    'commandId': id,
+    'target': targetDeviceId,
+    'type': type,
+    // El parámetro viaja como JSON para que un mapa anidado (playTrack) no se
+    // deforme al atravesar la API REST de Firestore.
+    'paramJson': param == null ? '' : jsonEncode(param),
+    'issuer': issuerDeviceId,
+    'issuerName': issuerName,
+    'createdAtMs': (createdAt ?? DateTime.now()).millisecondsSinceEpoch,
+    'deliveredAtMs': 0,
+  };
+}
+
 /// Callback para ejecutar acciones en el reproductor local cuando llega un comando remoto.
 typedef RemotePlaybackCommandHandler = Future<void> Function(
   String commandType,
@@ -172,8 +248,36 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   static const String _autoPlayOnPcPrefKey = 'inutil_autoplay_on_pc';
   static const String _knownHostsPrefKey = 'inutil_known_lan_hosts';
 
-  /// Un peer deja de considerarse "en línea" tras este tiempo sin verse.
-  static const Duration _peerTtl = Duration(seconds: 12);
+  /// Un peer de la red local deja de considerarse "en línea" tras este tiempo
+  /// sin verse (los anuncios UDP llegan cada 2 s).
+  static const Duration lanPeerTtl = Duration(seconds: 12);
+
+  /// Idem para los peers vistos sólo a través de la nube: su heartbeat
+  /// (`users/{uid}/devices`) es más lento para no castigar la cuota de
+  /// Firestore, así que la ventana de vigencia es mayor.
+  static const Duration cloudPeerTtl = Duration(seconds: 90);
+
+  /// Cada cuánto publica este equipo su presencia en `users/{uid}/devices`.
+  static const Duration presenceInterval = Duration(seconds: 30);
+
+  /// Sondeos de la nube: lista de dispositivos de la cuenta y cola de comandos.
+  static const Duration devicesPollInterval = Duration(seconds: 15);
+  static const Duration commandsPollInterval = Duration(seconds: 3);
+
+  /// Tras enviar un comando por la nube se mira la cola más a menudo durante
+  /// esta ventana, para que el play/pause remoto responda en menos de un
+  /// segundo en lugar de esperar al sondeo lento.
+  static const Duration commandsBurstInterval = Duration(milliseconds: 700);
+  static const Duration commandsBurstWindow = Duration(seconds: 8);
+
+  /// Un comando que nadie ejecuta (el destino estaba apagado) se descarta.
+  static const Duration commandTtl = Duration(minutes: 10);
+
+  /// Subcolecciones bajo `users/{uid}/` que usa el relay en la nube. Las dos
+  /// quedan dentro de la regla `match /users/{userId}/{sub}/{item}` del
+  /// proyecto, que ya autoriza a leer y escribir al propio usuario.
+  static const String devicesCollection = 'devices';
+  static const String commandsCollection = 'commands';
 
   /// Ventana en la que no reenviamos la reproducción a otro dispositivo
   /// después de ejecutar un comando remoto (evita el bucle PC <-> móvil).
@@ -198,8 +302,23 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   RemotePlaybackCommandHandler? onRemoteCommandReceived;
 
   final Map<String, LanDevicePeer> _discoveredPeers = {};
+
+  /// Dispositivos de la cuenta vistos en `users/{uid}/devices` (puede que no
+  /// estén en esta red local, o que el firewall bloquee sus puertos).
+  final Map<String, LanDevicePeer> _cloudDevices = {};
+
+  /// Comandos de la nube ya ejecutados o descartados en esta ejecución de la
+  /// app: evita repetir un `playTrack` si el sondeo vuelve a ver el documento.
+  final Set<String> _processedCommandIds = {};
+
   LanDevicePeer? _autoPairedPeer;
   bool _autoPlayOnPc = false;
+
+  Timer? _presenceTimer;
+  Timer? _cloudDevicesTimer;
+  Timer? _cloudCommandsTimer;
+  int _lastPresencePushMs = 0;
+  DateTime _commandsBurstUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Hosts (anunciados por UDP o recordados de sesiones anteriores) que ya
   /// respondieron a /api/ping: no hace falta volver a barrerlos cada 3 s.
@@ -212,6 +331,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   LanDevicePeer? get autoPairedPeer => _autoPairedPeer;
   List<LanDevicePeer> get discoveredPeers =>
       _discoveredPeers.values.where(isPeerOnline).toList();
+
+  /// Todos los destinos posibles del mando a distancia: los equipos de la red
+  /// local y los que sólo se ven por Firestore, deduplicados y ordenados
+  /// (primero los que suenan). Así la lista funciona sin abrir puertos y
+  /// aunque el móvil esté conectado por datos y no por Wi-Fi.
+  List<LanDevicePeer> get connectTargets => mergeConnectTargets(
+        lanPeers: _discoveredPeers.values.where(isPeerOnline),
+        cloudPeers: _cloudDevices.values.where((peer) => peer.isOnlineNow),
+      );
+
   bool get autoPlayOnPc => _autoPlayOnPc;
   int get currentLanPort => _currentLanPort;
 
@@ -225,7 +354,286 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       DateTime.now().isBefore(_routeSuppressedUntil);
 
   static bool isPeerOnline(LanDevicePeer peer) =>
-      DateTime.now().difference(peer.lastSeen) < _peerTtl;
+      DateTime.now().difference(peer.lastSeen) < lanPeerTtl;
+
+  // ---------------------------------------------------------------------------
+  // Helpers puros del relay en la nube (sin red: los cubren los tests).
+  // ---------------------------------------------------------------------------
+
+  /// Une las vistas LAN y nube sin duplicar dispositivos.
+  ///
+  /// Si un mismo `deviceId` se vio por ambos canales manda la entrada LAN, que
+  /// trae la IP y el puerto reales para comandar al instante; la nube sólo
+  /// rellena lo que la LAN no sepa (nombre, versión, si el equipo es de
+  /// escritorio). El orden prioriza los equipos que suenan.
+  @visibleForTesting
+  static List<LanDevicePeer> mergeConnectTargets({
+    required Iterable<LanDevicePeer> lanPeers,
+    required Iterable<LanDevicePeer> cloudPeers,
+  }) {
+    final byId = <String, LanDevicePeer>{};
+    for (final peer in cloudPeers) {
+      if (peer.deviceId.isEmpty) continue;
+      byId[peer.deviceId] = peer;
+    }
+    for (final peer in lanPeers) {
+      if (peer.deviceId.isEmpty) continue;
+      final cloud = byId[peer.deviceId];
+      if (cloud == null) {
+        byId[peer.deviceId] = peer;
+        continue;
+      }
+      byId[peer.deviceId] = LanDevicePeer(
+        ip: peer.ip,
+        port: peer.port,
+        deviceId: peer.deviceId,
+        deviceName: peer.deviceName.isNotEmpty ? peer.deviceName : cloud.deviceName,
+        platform: peer.platform.isNotEmpty ? peer.platform : cloud.platform,
+        userEmail: peer.userEmail,
+        uid: peer.uid,
+        isHost: peer.isHost || cloud.isHost,
+        fromCloud: false,
+        appVersion: peer.appVersion.isNotEmpty ? peer.appVersion : cloud.appVersion,
+        lastSeen: peer.lastSeen.isAfter(cloud.lastSeen)
+            ? peer.lastSeen
+            : cloud.lastSeen,
+      );
+    }
+
+    final merged = byId.values.toList(growable: false)
+      ..sort((a, b) {
+        if (a.isHost != b.isHost) return a.isHost ? -1 : 1;
+        final byName = a.deviceName.compareTo(b.deviceName);
+        return byName != 0 ? byName : a.deviceId.compareTo(b.deviceId);
+      });
+    return merged;
+  }
+
+  /// Convierte un documento `users/{uid}/devices/{deviceId}` en un peer en
+  /// línea, o `null` si es este mismo equipo, está marcado como apagado o su
+  /// heartbeat caducó.
+  @visibleForTesting
+  static LanDevicePeer? peerFromCloudDoc(
+    Map<String, dynamic> doc, {
+    required String myDeviceId,
+    required DateTime now,
+  }) {
+    final deviceId = (doc['deviceId'] ?? '').toString();
+    if (deviceId.isEmpty || deviceId == myDeviceId) return null;
+    if (doc['isOnline'] == false) return null;
+
+    final lastSeen =
+        _millisToDateTime(doc['lastSeenMs']) ?? _millisToDateTime(doc['updatedAt']);
+    if (lastSeen == null) return null;
+    final age = now.difference(lastSeen);
+    if (age.isNegative || age > cloudPeerTtl) return null;
+
+    final lanPort = doc['lanPort'] is int
+        ? doc['lanPort'] as int
+        : int.tryParse(doc['lanPort']?.toString() ?? '') ?? 0;
+
+    return LanDevicePeer(
+      // La IP local se ignora a propósito: puede ser de otra red y no hay forma
+      // de comprobarla sin esperar un timeout. Los comandos viajan por
+      // Firestore hasta que un anuncio UDP confirme que sí es alcanzable.
+      ip: '',
+      port: lanPort,
+      deviceId: deviceId,
+      deviceName: (doc['name'] ?? 'Dispositivo Inútil').toString(),
+      platform: (doc['platform'] ?? 'generic').toString(),
+      isHost: doc['isHost'] as bool? ?? false,
+      fromCloud: true,
+      appVersion: (doc['appVersion'] ?? '').toString(),
+      lastSeen: lastSeen,
+    );
+  }
+
+  /// Candidato a vincularse automáticamente: un PC de la red local tiene
+  /// preferencia (responde al instante); si no hay ninguno se usa el equipo de
+  /// escritorio que la nube reporta en línea. Un móvil en la nube no se elige
+  /// solo: ahí el usuario decide el altavoz desde el panel.
+  @visibleForTesting
+  static LanDevicePeer? pickAutoPairCandidate(List<LanDevicePeer> targets) {
+    if (targets.isEmpty) return null;
+    for (final peer in targets) {
+      if (!peer.isCloudOnly && peer.isHost) return peer;
+    }
+    for (final peer in targets) {
+      if (!peer.isCloudOnly) return peer;
+    }
+    for (final peer in targets) {
+      if (peer.isHost) return peer;
+    }
+    return null;
+  }
+
+  /// Determina si un cambio de pista en el móvil debe enviarse al altavoz remoto
+  /// (PC) en lugar de sonar localmente (lógica Spotify Connect).
+  static bool shouldRoutePlaybackToPeer({
+    required bool autoPlayOnPc,
+    required bool isCurrentDeviceActive,
+    required String remoteActiveDeviceId,
+    required bool hasTargetPeer,
+    required bool isDesktopHost,
+    required bool isPlaybackRouteSuppressed,
+    required bool forcePush,
+    required bool isPlaying,
+  }) {
+    if (isDesktopHost) return false;
+    if (isPlaybackRouteSuppressed) return false;
+    if (!forcePush || !isPlaying) return false;
+    if (!hasTargetPeer) return false;
+
+    final isRemoteSpeakerActive =
+        !isCurrentDeviceActive && remoteActiveDeviceId.isNotEmpty;
+    return autoPlayOnPc || isRemoteSpeakerActive;
+  }
+
+  /// Id de documento para un comando: ordenable por tiempo y único aunque dos
+  /// equipos envíen el mismo milisegundo.
+  @visibleForTesting
+  static String commandDocumentId({
+    required int createdAtMs,
+    required String targetDeviceId,
+    required String issuerDeviceId,
+    int nonce = 0,
+  }) {
+    final targetShort = targetDeviceId.length <= 8
+        ? targetDeviceId
+        : targetDeviceId.substring(0, 8);
+    final noncePart = nonce > 0 ? '-$nonce' : '';
+    return '$createdAtMs-$targetShort-$issuerDeviceId$noncePart';
+  }
+
+  /// Documento `users/{uid}/commands/{id}` -> comando para este dispositivo.
+  /// Devuelve `null` si es para otro equipo, ya fue entregado o caducó.
+  @visibleForTesting
+  static CloudCommand? cloudCommandFromDoc(
+    Map<String, dynamic> doc, {
+    required String myDeviceId,
+    required DateTime now,
+  }) {
+    final target = (doc['target'] ?? '').toString();
+    if (target.isNotEmpty && target != myDeviceId) return null;
+
+    final id = (doc['commandId'] ?? doc['docId'] ?? '').toString();
+    if (id.isEmpty) return null;
+
+    final deliveredMs = _millisToDateTime(doc['deliveredAtMs']);
+    if (deliveredMs != null) return null;
+
+    final createdAt = _millisToDateTime(doc['createdAtMs']);
+    if (createdAt == null) return null;
+    if (now.difference(createdAt) > commandTtl) return null;
+
+    final paramJson = (doc['paramJson'] ?? '').toString();
+    return CloudCommand(
+      id: id,
+      type: (doc['type'] ?? '').toString(),
+      targetDeviceId: target,
+      issuerDeviceId: (doc['issuer'] ?? '').toString(),
+      issuerName: (doc['issuerName'] ?? '').toString(),
+      param: paramJson.isEmpty ? null : decodeCloudParam(paramJson),
+      createdAt: createdAt,
+    );
+  }
+
+  /// Decodifica el parámetro de un comando guardado como JSON.
+  @visibleForTesting
+  static dynamic decodeCloudParam(String raw) {
+    if (raw.isEmpty) return null;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return decoded.map((key, value) => MapEntry(key.toString(), value));
+      }
+      return decoded;
+    } catch (_) {
+      // Versiones anteriores escribían `param.toString()`, que no es JSON.
+      return raw;
+    }
+  }
+
+  /// Da forma al parámetro recibido por cualquier canal (LAN, documento de
+  /// sesión heredado o cola en la nube) antes de dárselo al reproductor.
+  @visibleForTesting
+  static dynamic normalizeRemoteParam(dynamic param) {
+    if (param is Map<String, dynamic>) return param;
+    if (param is Map) {
+      return param.map((key, value) => MapEntry(key.toString(), value));
+    }
+    if (param is String && param.trim().isNotEmpty) {
+      final decoded = decodeCloudParam(param);
+      if (decoded is Map<String, dynamic>) return decoded;
+    }
+    return param;
+  }
+
+  /// true si el destino aún no entiende la cola de comandos en la nube y hay
+  /// que dejarle también el `pendingCommand*` en el documento de sesión.
+  ///
+  /// Con la versión desconocida se asume «antigua» a propósito: un peer que no
+  /// anuncia `appVersion` viene de una 2.5.7 o anterior, y si no le dejamos el
+  /// puente heredado se queda sin comandos. El doble envío no repite la orden
+  /// porque ambos canales comparten el mismo id y se descarta el duplicado.
+  @visibleForTesting
+  static bool needsLegacyCommandBridge(String? peerAppVersion) {
+    final version = peerAppVersion?.trim() ?? '';
+    if (version.isEmpty) return true;
+    final parsed = parseVersionNumber(version);
+    if (parsed == null) return true;
+    return compareVersionNumbers(parsed, const <int>[2, 5, 8]) < 0;
+  }
+
+  /// `2.5.8+258` o `2.5.8` -> `[2, 5, 8]`; `null` si no se interpreta.
+  @visibleForTesting
+  static List<int>? parseVersionNumber(String version) {
+    final core = version.split('+').first.trim();
+    if (core.isEmpty) return null;
+    final parts = core.split('.');
+    final numbers = <int>[];
+    for (final part in parts) {
+      final value = int.tryParse(part.trim());
+      if (value == null) return null;
+      numbers.add(value);
+    }
+    return numbers.isEmpty ? null : numbers;
+  }
+
+  /// Comparación numérica de versiones, rellenando con ceros (`2.5` < `2.5.1`).
+  @visibleForTesting
+  static int compareVersionNumbers(List<int> a, List<int> b) {
+    final length = a.length > b.length ? a.length : b.length;
+    for (var i = 0; i < length; i++) {
+      final left = i < a.length ? a[i] : 0;
+      final right = i < b.length ? b[i] : 0;
+      if (left != right) return left < right ? -1 : 1;
+    }
+    return 0;
+  }
+
+  /// Recuerda un comando ya tramitado para no ejecutarlo dos veces (llega por
+  /// la cola de la nube y por el documento de sesión heredado a la vez). El
+  /// conjunto se recorta para que un PC encendido días no acumule ids.
+  void _rememberProcessedCommand(String id) {
+    if (id.isEmpty) return;
+    if (_processedCommandIds.length > 200) _processedCommandIds.clear();
+    _processedCommandIds.add(id);
+  }
+
+  /// Acepta milisegundos (int o string) y marcas de tiempo de Firestore.
+  static DateTime? _millisToDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+    if (value is int) {
+      return value <= 0 ? null : DateTime.fromMillisecondsSinceEpoch(value);
+    }
+    final asInt = int.tryParse(value.toString());
+    if (asInt != null && asInt > 0) {
+      return DateTime.fromMillisecondsSinceEpoch(asInt);
+    }
+    return DateTime.tryParse(value.toString());
+  }
 
   /// Si este dispositivo es el que actualmente reproduce el audio físicamente.
   bool get isCurrentDeviceActive {
@@ -244,6 +652,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     _startLanServer();
     _startUdpAnnouncer();
     _startLanDiscovery();
+    _startCloudRelay();
 
     _syncPollingTimer?.cancel();
     _syncPollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -259,6 +668,15 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     _lanDiscoveryTimer = null;
     _udpAnnounceTimer?.cancel();
     _udpAnnounceTimer = null;
+    _presenceTimer?.cancel();
+    _presenceTimer = null;
+    _cloudDevicesTimer?.cancel();
+    _cloudDevicesTimer = null;
+    _cloudCommandsTimer?.cancel();
+    _cloudCommandsTimer = null;
+    // Aviso de apagado: la lista en nube del resto de equipos deja de mostrar
+    // este dispositivo en vez de esperar a que caduque el heartbeat.
+    unawaited(_publishPresence(online: false));
     _lanHttpServer?.close(force: true);
     _lanHttpServer = null;
     _udpSocket?.close();
@@ -352,7 +770,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           'userEmail': _auth.currentUser?.email ?? '',
           'uid': _auth.currentUser?.uid ?? '',
           'port': _currentLanPort,
-          'isHost': Platform.isLinux || Platform.isWindows,
+          'isHost': isDesktopHost,
+          'appVersion': AppConstants.appVersion,
         };
         request.response
           ..statusCode = HttpStatus.ok
@@ -429,7 +848,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // La reproducción que vamos a iniciar aquí viene de otro dispositivo:
           // no debe reenviarse de vuelta (evita el ping-pong móvil <-> PC).
           _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
-          unawaited(onRemoteCommandReceived!(commandType, param));
+          unawaited(
+            onRemoteCommandReceived!(commandType, normalizeRemoteParam(param)),
+          );
         }
 
         request.response
@@ -755,20 +1176,44 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         .where((entry) => !isPeerOnline(entry.value))
         .map((entry) => entry.key)
         .toList();
-    if (stale.isEmpty) return;
 
     for (final id in stale) {
       _discoveredPeers.remove(id);
     }
-    if (_autoPairedPeer != null && stale.contains(_autoPairedPeer!.deviceId)) {
-      debugPrint('Inútil LAN: ${_autoPairedPeer!.deviceName} dejó de responder.');
+
+    final paired = _autoPairedPeer;
+    var dropped = false;
+    if (paired != null && stale.contains(paired.deviceId)) {
+      debugPrint('Inútil LAN: ${paired.deviceName} dejó de responder.');
       _autoPairedPeer = null;
-      // La reproducción vuelve a este dispositivo si el mando remoto se cayó.
-      if (_currentRemoteSession != null &&
-          _currentRemoteSession!.activeDeviceId != _auth.deviceId) {
-        _currentRemoteSession = null;
+      dropped = true;
+      // El mismo equipo puede seguir vivo en la nube (está en otra red o su
+      // firewall tapa el puerto): el mando no se queda huérfano, pasa a
+      // comandarlo por Firestore.
+      _maybeAutoPairFromCloud();
+      if (_autoPairedPeer != null) {
+        notifyListeners();
+        return;
       }
+    } else if (paired != null &&
+        paired.isCloudOnly &&
+        !_cloudDevices.containsKey(paired.deviceId)) {
+      debugPrint('Inútil Connect: ${paired.deviceName} dejó de escribir su '
+          'presencia en la nube.');
+      _autoPairedPeer = null;
+      dropped = true;
     }
+
+    // Sin un destino al que mandar los comandos, la sesión que mostrábamos del
+    // equipo remoto ya no es accionable: el reproductor local vuelve a mandar.
+    if (dropped &&
+        _currentRemoteSession != null &&
+        _currentRemoteSession!.activeDeviceId != _auth.deviceId) {
+      _currentRemoteSession = null;
+    }
+    // Sin cambios reales no hay que reconstruir el panel de dispositivos cada
+    // tres segundos.
+    if (!dropped && stale.isEmpty) return;
     notifyListeners();
   }
 
@@ -799,6 +1244,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           platform: map['platform'] as String? ?? 'generic',
           userEmail: map['userEmail'] as String? ?? '',
           uid: map['uid'] as String? ?? '',
+          isHost: map['isHost'] as bool? ?? false,
+          appVersion: map['appVersion'] as String? ?? '',
         );
 
         _discoveredPeers[deviceId] = peer;
@@ -867,6 +1314,331 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
+  // 2b. RELAY EN LA NUBE: PRESENCIA + COLA DE COMANDOS (FIRESTORE)
+  // ---------------------------------------------------------------------------
+  // Es lo que hace que «Conectar a un dispositivo» funcione como Spotify
+  // Connect: sin abrir puertos, sin depender de la misma subred y aunque el
+  // móvil vaya por datos. Cada equipo escribe su presencia en
+  // `users/{uid}/devices/{deviceId}`; quien manda un comando escribe en
+  // `users/{uid}/commands/{id}` y el destino lo ejecuta al leerlo. La red local
+  // sigue siendo la vía rápida cuando ambos equipos comparten Wi-Fi.
+
+  void _startCloudRelay() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(presenceInterval, (_) {
+      unawaited(_publishPresence());
+    });
+    _cloudDevicesTimer?.cancel();
+    _cloudDevicesTimer = Timer.periodic(devicesPollInterval, (_) {
+      unawaited(_pollCloudDevices());
+    });
+    unawaited(_publishPresence());
+    unawaited(_pollCloudDevices());
+    _scheduleCommandPoll();
+  }
+
+  /// Sondeo de la cola de comandos con cadencia adaptativa: lento mientras no
+  /// hay nada en juego y rápido durante unos segundos después de mandar uno,
+  /// para que el play/pause remoto conteste sin esperar al ciclo de 3 s.
+  void _scheduleCommandPoll() {
+    _cloudCommandsTimer?.cancel();
+    final burst = DateTime.now().isBefore(_commandsBurstUntil);
+    _cloudCommandsTimer = Timer(
+      burst ? commandsBurstInterval : commandsPollInterval,
+      () {
+        unawaited(
+          _pollCloudCommands().whenComplete(_scheduleCommandPoll),
+        );
+      },
+    );
+  }
+
+  /// Escribe el heartbeat `users/{uid}/devices/{deviceId}` de este equipo.
+  ///
+  /// Con [online] en `false` se anuncia el apagado para que el resto de la casa
+  /// deje de mostrarlo en la lista al instante. [force] salta el recorte de
+  /// frecuencia y se usa cuando cambia algo que el usuario sí ve (pasa de
+  /// «en pausa» a «sonando», por ejemplo).
+  Future<void> _publishPresence({bool online = true, bool force = false}) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    if (!online && _cloudBlocked) return;
+
+    final now = DateTime.now();
+    final sinceLastPush = now.millisecondsSinceEpoch - _lastPresencePushMs;
+    if (online &&
+        !force &&
+        sinceLastPush <
+            (presenceInterval - const Duration(seconds: 3)).inMilliseconds) {
+      return;
+    }
+    if (online) _lastPresencePushMs = now.millisecondsSinceEpoch;
+
+    final local = _currentLocalSession;
+    final remote = _currentRemoteSession;
+    final isMe = isCurrentDeviceActive;
+    final shown = isMe ? local : remote;
+
+    try {
+      final written = await _firestore.setDocument(
+        'users/$uid/$devicesCollection/${_auth.deviceId}',
+        <String, dynamic>{
+          'deviceId': _auth.deviceId,
+          'name': _auth.deviceName,
+          'platform': _auth.devicePlatform,
+          'isHost': isDesktopHost,
+          'isOnline': online,
+          'lastSeenMs': now.millisecondsSinceEpoch,
+          'appVersion': AppConstants.appVersion,
+          'lanIp': _localAddressCache ?? '',
+          'lanPort': _currentLanPort,
+          'activeDeviceId': isMe
+              ? _auth.deviceId
+              : (remote?.activeDeviceId ?? ''),
+          'activeDeviceName': isMe
+              ? _auth.deviceName
+              : (remote?.activeDeviceName ?? ''),
+          'isPlaying': shown?.isPlaying ?? false,
+          'trackId': shown?.trackId ?? '',
+          'title': shown?.title ?? '',
+          'artist': shown?.artist ?? '',
+          'updatedAt': now,
+        },
+      );
+      if (written) {
+        _cloudPollFailures = 0;
+        _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
+      } else {
+        _noteCloudUnavailable();
+      }
+    } on FirestoreOperationException catch (error) {
+      final capped = _noteCloudUnavailable();
+      if (_cloudPollFailures == 1) {
+        debugPrint('Inútil Connect: no se pudo publicar la presencia ($error). '
+            'Reintentando en $capped s.');
+      }
+    } catch (_) {
+      _noteCloudUnavailable();
+    }
+  }
+
+  /// Lee `users/{uid}/devices` y mantiene la lista de equipos en línea de la
+  /// cuenta, vengan o no de esta red local.
+  Future<void> _pollCloudDevices() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    if (_cloudBlocked) return;
+
+    try {
+      final docs = await _firestore
+          .listCollection('users/$uid/$devicesCollection');
+      _cloudPollFailures = 0;
+      _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
+      final now = DateTime.now();
+      final fresh = <String, LanDevicePeer>{};
+      for (final doc in docs) {
+        final peer = peerFromCloudDoc(
+          doc,
+          myDeviceId: _auth.deviceId,
+          now: now,
+        );
+        if (peer == null) continue;
+        fresh[peer.deviceId] = peer;
+      }
+      _cloudDevices
+        ..clear()
+        ..addAll(fresh);
+
+      _maybeAutoPairFromCloud();
+      notifyListeners();
+    } on FirestoreOperationException catch (error) {
+      final capped = _noteCloudUnavailable();
+      if (_cloudPollFailures == 1) {
+        debugPrint('Inútil Connect: no se pudo leer la lista de dispositivos '
+            '($error). Reintentando en $capped s.');
+      }
+    } catch (_) {
+      _noteCloudUnavailable();
+    }
+  }
+
+  /// Vincula el mando con el PC aunque no compartan red.
+  void _maybeAutoPairFromCloud() {
+    final current = _autoPairedPeer;
+    if (current != null && (isPeerOnline(current) || current.isOnlineNow)) {
+      return;
+    }
+    final candidate = pickAutoPairCandidate(connectTargets);
+    if (candidate == null) return;
+    _autoPairedPeer = candidate;
+    debugPrint('Inútil Connect: vinculado con ${candidate.deviceName} '
+        '${candidate.isCloudOnly ? '(vía nube)' : '(red local)'}.');
+    notifyListeners();
+  }
+
+  /// Sondea la cola `users/{uid}/commands` y ejecuta lo que vaya para este
+  /// equipo. Tras cada comando enviado el sondeo se acelera unos segundos para
+  /// que el play/pause remoto se note inmediato.
+  Future<void> _pollCloudCommands() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+    if (_cloudBlocked) return;
+
+    final now = DateTime.now();
+    try {
+      final docs = await _firestore
+          .listCollection('users/$uid/$commandsCollection', pageSize: 40);
+      _cloudPollFailures = 0;
+      _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
+      final mine = <CloudCommand>[];
+      for (final doc in docs) {
+        final command = cloudCommandFromDoc(
+          doc,
+          myDeviceId: _auth.deviceId,
+          now: now,
+        );
+        if (command == null) continue;
+        if (_processedCommandIds.contains(command.id)) continue;
+        mine.add(command);
+      }
+      // Orden cronológico: si llegaron varias canciones, se tocan en orden.
+      mine.sort((a, b) {
+        final at = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final bt = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return at.compareTo(bt);
+      });
+
+      for (final command in mine) {
+        _rememberProcessedCommand(command.id);
+        await _runCloudCommand(command);
+      }
+
+      await _cleanupCloudCommands(docs, now: now);
+    } on FirestoreOperationException catch (error) {
+      final capped = _noteCloudUnavailable();
+      if (_cloudPollFailures == 1) {
+        debugPrint('Inútil Connect: no se pudo leer la cola de comandos '
+            '($error). Reintentando en $capped s.');
+      }
+    } catch (_) {
+      _noteCloudUnavailable();
+    }
+  }
+
+  /// Marca el comando como entregado y lo pasa al reproductor local.
+  Future<void> _runCloudCommand(CloudCommand command) async {
+    try {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null && uid.isNotEmpty) {
+        await _firestore.setDocument(
+          'users/$uid/$commandsCollection/${command.id}',
+          {'deliveredAtMs': DateTime.now().millisecondsSinceEpoch},
+        );
+      }
+    } catch (_) {
+      // Si no se puede marcar, igual se ejecuta: a estas alturas mandó otro
+      // equipo y el usuario espera que suene.
+    }
+
+    if (command.type.isEmpty || onRemoteCommandReceived == null) return;
+
+    // La reproducción que arranca aquí viene de otro dispositivo: no debe
+    // reenviarse de vuelta (evita el ping-pong móvil <-> PC).
+    _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
+    unawaited(
+      onRemoteCommandReceived!(command.type, normalizeRemoteParam(command.param)),
+    );
+  }
+
+  /// Borra los comandos ya entregados y los caducados: la cola no crece y la
+  /// lectura periódica se mantiene en una o dos documentos.
+  Future<void> _cleanupCloudCommands(
+    List<Map<String, dynamic>> docs, {
+    required DateTime now,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty) return;
+
+    for (final doc in docs) {
+      final id = (doc['commandId'] ?? doc['docId'] ?? '').toString();
+      if (id.isEmpty) continue;
+      final delivered = _millisToDateTime(doc['deliveredAtMs']);
+      final createdAt = _millisToDateTime(doc['createdAtMs']);
+      final staleByAge =
+          createdAt != null && now.difference(createdAt) > commandTtl;
+      if (delivered == null && !staleByAge) continue;
+      try {
+        await _firestore.deleteDocument('users/$uid/$commandsCollection/$id');
+      } catch (_) {}
+    }
+  }
+
+  /// Escribe un comando en la cola de la nube para [targetDeviceId].
+  Future<bool> sendCloudCommand({
+    required String targetDeviceId,
+    required String commandType,
+    dynamic param,
+  }) async =>
+      await writeCloudCommand(
+        targetDeviceId: targetDeviceId,
+        commandType: commandType,
+        param: param,
+      ) !=
+      null;
+
+  /// Igual que [sendCloudCommand] pero devuelve el id del comando escrito (o
+  /// `null` si no se pudo escribir), para que el puente con versiones antiguas
+  /// use el mismo id y nadie ejecute dos veces la misma orden.
+  Future<String?> writeCloudCommand({
+    required String targetDeviceId,
+    required String commandType,
+    dynamic param,
+  }) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null || uid.isEmpty || targetDeviceId.isEmpty) return null;
+
+    final now = DateTime.now();
+    final command = CloudCommand(
+      id: commandDocumentId(
+        createdAtMs: now.millisecondsSinceEpoch,
+        targetDeviceId: targetDeviceId,
+        issuerDeviceId: _auth.deviceId,
+      ),
+      type: commandType,
+      targetDeviceId: targetDeviceId,
+      issuerDeviceId: _auth.deviceId,
+      issuerName: _auth.deviceName,
+      param: param,
+      createdAt: now,
+    );
+
+    try {
+      final written = await _firestore.setDocument(
+        'users/$uid/$commandsCollection/${command.id}',
+        command.toFirestoreDoc(),
+      );
+      if (!written) {
+        _noteCloudUnavailable();
+        return null;
+      }
+      // Aceleramos el sondeo propio unos segundos para reflejar el resultado.
+      _commandsBurstUntil = now.add(commandsBurstWindow);
+      _scheduleCommandPoll();
+      return command.id;
+    } on FirestoreOperationException catch (error) {
+      _noteCloudUnavailable();
+      debugPrint('Inútil Connect: comando $commandType no llegó a la nube '
+          '($error).');
+      return null;
+    } catch (_) {
+      _noteCloudUnavailable();
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // 3. ENVÍO DE COMANDOS EN TIEMPO REAL A LA PC / CELULAR (P2P LAN)
   // ---------------------------------------------------------------------------
 
@@ -878,6 +1650,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }) async {
     final peer = targetPeer ?? _autoPairedPeer;
     if (peer == null) return false;
+    // Un peer visto sólo en la nube no tiene IP útil: su comando viaja por
+    // Firestore, y el llamador (sendRemoteControlCommand) se encarga de ello.
+    if (peer.isCloudOnly) return false;
 
     final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 1500);
     try {
@@ -946,54 +1721,82 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     int positionMs = 0,
     LanDevicePeer? targetPeer,
   }) async {
-    final peer = targetPeer ?? _autoPairedPeer;
+    final peer = targetPeer ??
+        _autoPairedPeer ??
+        (_currentRemoteSession != null
+            ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
+                _cloudDevices[_currentRemoteSession!.activeDeviceId]
+            : null) ??
+        pickAutoPairCandidate(connectTargets);
     if (peer == null) return false;
+    _autoPairedPeer = peer;
 
-    final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 2000);
-    try {
-      final request = await client.postUrl(Uri.parse('${peer.httpBaseUrl}/api/command'));
-      request.headers.contentType = ContentType.json;
-      final payload = jsonEncode({
-        'commandType': 'playTrack',
-        'param': {
-          'trackId': trackId,
-          'title': title,
-          'artist': artist,
-          'album': album ?? '',
-          'thumbnailUrl': thumbnailUrl ?? '',
-          'positionMs': positionMs,
-        },
-        'issuerDeviceId': _auth.deviceId,
-        'issuerUid': _auth.currentUser?.uid ?? '',
-        'issuerEmail': _auth.currentUser?.email ?? '',
-      });
-      request.write(payload);
-      final response = await request.close().timeout(const Duration(milliseconds: 2500));
-      final success = response.statusCode == HttpStatus.ok;
+    final trackParam = <String, dynamic>{
+      'trackId': trackId,
+      'title': title,
+      'artist': artist,
+      'album': album ?? '',
+      'thumbnailUrl': thumbnailUrl ?? '',
+      'positionMs': positionMs,
+    };
 
-      if (success) {
-        _currentRemoteSession = PlaybackSyncSession(
-          activeDeviceId: peer.deviceId,
-          activeDeviceName: peer.deviceName,
-          activeDevicePlatform: peer.platform,
-          trackId: trackId,
-          title: title,
-          artist: artist,
-          album: album ?? '',
-          thumbnailUrl: thumbnailUrl ?? '',
-          positionMs: positionMs,
-          isPlaying: true,
+    var success = false;
+    if (peer.isCloudOnly) {
+      // El PC está en otra red (o el firewall tapa el puerto): la canción se
+      // transfiere escribiendo el comando en la nube.
+      success = await sendCloudCommand(
+        targetDeviceId: peer.deviceId,
+        commandType: 'playTrack',
+        param: trackParam,
+      );
+    } else {
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(milliseconds: 2000);
+      try {
+        final request = await client.postUrl(
+          Uri.parse('${peer.httpBaseUrl}/api/command'),
         );
-        notifyListeners();
+        request.headers.contentType = ContentType.json;
+        final payload = jsonEncode({
+          'commandType': 'playTrack',
+          'param': trackParam,
+          'issuerDeviceId': _auth.deviceId,
+          'issuerUid': _auth.currentUser?.uid ?? '',
+          'issuerEmail': _auth.currentUser?.email ?? '',
+        });
+        request.write(payload);
+        final response = await request.close().timeout(
+          const Duration(milliseconds: 2500),
+        );
+        success = response.statusCode == HttpStatus.ok;
+      } catch (e) {
+        debugPrint('Error ejecutando playTrack en peer LAN: $e');
+        success = false;
+      } finally {
+        client.close();
       }
-
-      return success;
-    } catch (e) {
-      debugPrint('Error ejecutando playTrack en peer LAN: $e');
-      return false;
-    } finally {
-      client.close();
     }
+
+    if (success) {
+      _currentRemoteSession = PlaybackSyncSession(
+        activeDeviceId: peer.deviceId,
+        activeDeviceName: peer.deviceName,
+        activeDevicePlatform: peer.platform,
+        trackId: trackId,
+        title: title,
+        artist: artist,
+        album: album ?? '',
+        thumbnailUrl: thumbnailUrl ?? '',
+        positionMs: positionMs,
+        isPlaying: true,
+      );
+      notifyListeners();
+      // El equipo remoto acaba de convertirse en el altavoz: que la lista y el
+      // resto de dispositivos de la cuenta lo reflejen pronto.
+      unawaited(_publishPresence(force: true));
+    }
+
+    return success;
   }
 
   // ---------------------------------------------------------------------------
@@ -1046,12 +1849,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         if (session.activeDeviceId == _auth.deviceId) {
           if (session.pendingCommandId.isNotEmpty &&
               session.pendingCommandId != _lastProcessedCommandId &&
+              !_processedCommandIds.contains(session.pendingCommandId) &&
               session.pendingCommandIssuerId != _auth.deviceId) {
             _lastProcessedCommandId = session.pendingCommandId;
+            _rememberProcessedCommand(session.pendingCommandId);
             if (onRemoteCommandReceived != null) {
               await onRemoteCommandReceived!(
                 session.pendingCommandType,
-                session.pendingCommandParam,
+                normalizeRemoteParam(session.pendingCommandParam),
               );
             }
           }
@@ -1130,6 +1935,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         _noteCloudUnavailable();
       }
     }
+
+    // La tarjeta de este equipo en la lista de dispositivos muestra lo que
+    // está sonando: se refresca cuando cambia algo visible (play, pause,
+    // canción nueva), no en cada tick de posición.
+    if (force && uid != null && uid.isNotEmpty) {
+      unawaited(_publishPresence(force: true));
+    }
   }
 
   Future<void> transferPlaybackToThisDevice({
@@ -1143,12 +1955,23 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required bool isPlaying,
   }) async {
     // El usuario pidió explícitamente reproducir AQUÍ: bloqueamos el reenvío
-    // automático al par remoto durante unos segundos.
+    // automático al par remoto y apagamos autoPlayOnPc para que las siguientes
+    // canciones sigan sonando en este teléfono.
     _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
+    unawaited(setAutoPlayOnPc(false));
 
-    // Si hay un peer remoto activo, pausarlo
-    if (_autoPairedPeer != null) {
-      unawaited(sendLanCommand(commandType: 'pause'));
+    // Si hay un peer remoto activo, pausarlo: por LAN si el puerto está al
+    // alcance y por la nube cuando no lo está.
+    final peer = _autoPairedPeer;
+    if (peer != null) {
+      unawaited(
+        peer.isCloudOnly
+            ? sendCloudCommand(
+                targetDeviceId: peer.deviceId,
+                commandType: 'pause',
+              )
+            : sendLanCommand(commandType: 'pause'),
+      );
     }
     _currentRemoteSession = null;
 
@@ -1169,32 +1992,83 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required String commandType,
     dynamic param,
   }) async {
-    // 1. Intentar enviar inmediatamente por LAN
-    if (_autoPairedPeer != null) {
+    final peer = _autoPairedPeer ??
+        (_currentRemoteSession != null
+            ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
+                _cloudDevices[_currentRemoteSession!.activeDeviceId]
+            : null) ??
+        pickAutoPairCandidate(connectTargets);
+    if (peer != null) {
+      _autoPairedPeer = peer;
+    }
+
+    // 1. Vía rápida por LAN: responde en milisegundos cuando el puerto 52445
+    //    del destino está alcanzable.
+    if (peer != null && !peer.isCloudOnly) {
       final ok = await sendLanCommand(commandType: commandType, param: param);
       if (ok) {
-        _markPeerAsActiveDevice(_autoPairedPeer!, playing: commandType != 'pause');
+        _markPeerAsActiveDevice(peer, playing: commandType != 'pause');
+        unawaited(_publishPresence(force: true));
         return;
       }
     }
 
-    // 2. Si falla LAN, intentar vía Firestore
     final uid = _auth.currentUser?.uid;
-    if (uid == null || _currentRemoteSession == null) return;
+    if (uid == null || uid.isEmpty) return;
 
-    final commandId = '${DateTime.now().millisecondsSinceEpoch}_${_auth.deviceId}';
-    final updated = {
-      ..._currentRemoteSession!.toJson(),
-      'pendingCommandId': commandId,
-      'pendingCommandType': commandType,
-      'pendingCommandParam': param?.toString() ?? '',
-      'pendingCommandIssuerId': _auth.deviceId,
-      'updatedAt': DateTime.now().toUtc().toIso8601String(),
-    };
+    // 2. Relay en la nube con el destino explícito (`users/{uid}/commands`).
+    //    Este es el camino normal cuando el móvil va por datos móviles, el PC
+    //    está en otra red o su firewall bloquea los puertos: no requiere ni
+    //    una sola apertura de puertos, igual que Spotify Connect.
+    final targetId =
+        peer?.deviceId ?? _currentRemoteSession?.activeDeviceId ?? '';
+    final now = DateTime.now();
+    final known =
+        peer ?? _cloudDevices[targetId] ?? _discoveredPeers[targetId];
+    String? cloudCommandId;
+    if (targetId.isNotEmpty) {
+      cloudCommandId = await writeCloudCommand(
+        targetDeviceId: targetId,
+        commandType: commandType,
+        param: param,
+      );
+      if (cloudCommandId != null) {
+        if (known != null) {
+          _markPeerAsActiveDevice(known, playing: commandType != 'pause');
+        }
+        unawaited(_publishPresence(force: true));
+      }
+    }
 
-    try {
-      await _firestore.setDocument('users/$uid/playback_session/current', updated);
-    } catch (_) {}
+    // 3. Puente con versiones anteriores (2.5.7 y previas), que sólo miran los
+    //    campos `pendingCommand*` del documento de sesión compartido. Se salta
+    //    cuando el destino ya anuncia una versión con cola de comandos, y
+    //    comparte el id de la cola para que, si los dos canales llegan, el
+    //    comando se ejecute una sola vez y no dos.
+    if (_currentRemoteSession != null &&
+        needsLegacyCommandBridge(known?.appVersion)) {
+      final legacyId = cloudCommandId ??
+          '${now.millisecondsSinceEpoch}_${_auth.deviceId}';
+      _rememberProcessedCommand(legacyId);
+      final updated = {
+        ..._currentRemoteSession!.toJson(),
+        'pendingCommandId': legacyId,
+        'pendingCommandType': commandType,
+        // Un mapa pasado por `toString()` ya no vuelve a leerse como mapa, así
+        // que el parámetro se guarda como JSON.
+        'pendingCommandParam': param == null
+            ? ''
+            : (param is String ? param : jsonEncode(param)),
+        'pendingCommandIssuerId': _auth.deviceId,
+        'updatedAt': now.toUtc().toIso8601String(),
+      };
+      try {
+        await _firestore.setDocument(
+          'users/$uid/playback_session/current',
+          updated,
+        );
+      } catch (_) {}
+    }
   }
 
   /// Marca al par remoto como el dispositivo que está sonando, de forma que la
