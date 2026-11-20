@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'inutil_update_service.dart';
 
@@ -14,6 +15,12 @@ import 'inutil_update_service.dart';
 /// [InutilForceUpdateScreen]: la versión antigua deja de ser utilizable, se
 /// muestra el letrero y la única salida es descargar e instalar desde la misma
 /// app. No se puede descartar ni volver atrás con el botón del sistema.
+///
+/// Cuando hay una versión superior que NO es obligatoria la puerta no cambia
+/// la interfaz: muestra el mismo diálogo de novedades ([showInutilUpdateDialog])
+/// como aviso descartable una sola vez por versión publicada. La versión que el
+/// usuario pospuso queda recordada en prefs, así que el cartel no vuelve a
+/// aparecer en los siguientes arranques hasta que se publique algo más nuevo.
 ///
 /// Sin red (o cuando el manifiesto no responde) [InutilUpdateService] devuelve
 /// la última versión conocida o "estás al día", así que la app nunca se
@@ -33,9 +40,15 @@ class _InutilUpdateGateState extends ConsumerState<InutilUpdateGate>
   /// kill switch mientras la app estaba en segundo plano.
   static const Duration _resumeCooldown = Duration(minutes: 5);
 
+  /// Versión que el usuario pospuso desde el aviso no bloqueante. Se guarda en
+  /// prefs para que el mismo cartel no reaparezca en cada arranque; cualquier
+  /// manifiesto con una versión distinta lo vuelve a activar.
+  static const String _snoozePrefKey = 'inutil_update_notice_snoozed_for';
+
   InutilReleaseInfo? _blocker;
   bool _checking = false;
   DateTime? _lastCheck;
+  bool _noticeInFlight = false;
 
   @override
   void initState() {
@@ -79,6 +92,47 @@ class _InutilUpdateGateState extends ConsumerState<InutilUpdateGate>
     final forced = release.belowMinSupported ||
         (release.updateAvailable && release.effectiveMandatory);
     setState(() => _blocker = forced ? release : null);
+    if (forced || !release.updateAvailable) return;
+    // El aviso opcional no bloquea nada: la app sigue usable y el usuario
+    // decide si actualiza ahora o lo pospone.
+    if (await _snoozedVersion() == release.latestVersion) return;
+    if (!mounted) return;
+    await _showNotice(release);
+  }
+
+  /// Diálogo descartable de novedades ([showInutilUpdateDialog]) para una
+  /// actualización opcional. Al cerrarse —sea por el botón, el botón físico o
+  /// tocando fuera— se recuerda la versión pospuesta en prefs, de modo que el
+  /// mismo aviso no vuelva a salir hasta que se publique una versión superior.
+  Future<void> _showNotice(InutilReleaseInfo release) async {
+    if (_noticeInFlight || !context.mounted) return;
+    _noticeInFlight = true;
+    try {
+      await showInutilUpdateDialog(context, release);
+      await _rememberSnoozedVersion(release.latestVersion);
+    } catch (e) {
+      debugPrint('Aviso OTA no bloqueante falló: $e');
+    } finally {
+      _noticeInFlight = false;
+    }
+  }
+
+  /// Última versión pospuesta desde el aviso, o cadena vacía si nunca se pospuso.
+  Future<String> _snoozedVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return (prefs.getString(_snoozePrefKey) ?? '').trim();
+    } catch (_) {
+      // Sin prefs (plataforma de prueba o fallo de canal): se muestra el aviso.
+      return '';
+    }
+  }
+
+  Future<void> _rememberSnoozedVersion(String version) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_snoozePrefKey, version.trim());
+    } catch (_) {}
   }
 
   @override

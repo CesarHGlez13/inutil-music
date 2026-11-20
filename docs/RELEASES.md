@@ -4,8 +4,13 @@
    `lib/core/constants/app_constants.dart` (`appVersion = '2.0.1'`).
 2. Escribe las novedades en `CHANGELOG.md` bajo un encabezado `## 2.0.1`.
 3. `flutter build apk --release --split-per-abi` (el flag es `--split-per-abi`, no `--split-abi`).
-   Con este flag Flutter suma un desplazamiento de ABI al `versionCode`: con
-   `2.1.0+210` quedan `2210` (arm64), `1210` (v7a) y `4210` (x86_64). Ignora
+   Con este flag Flutter suma un desplazamiento de ABI al `versionCode`.
+   Medido con `aapt` (build-tools 36.0.0) sobre Flutter 3.50 usando
+   `2.5.10+4268`: `6268` (arm64-v8a), `5268` (armeabi-v7a) y `8268` (x86_64),
+   o sea desplazamientos `+2000`, `+1000` y `+4000`. La documentación anterior
+   prometía `2210` para arm64 con `2.1.0+210` (`+1000`): ese desplazamiento subió
+   a `+2000` en Flutter moderno, así que un teléfono con `6267` instalado acepta
+   sin rechazar por downgrade un `6268` (`+4268`) o un `6269` (`+4269`). Ignora
    `app-release.apk` si no se reconstruyó: puede seguir siendo de una versión
    anterior (medido: el `app-release.apk` del árbol era `1.3.1+131`).
 4. `flutter build linux --release && bash tool/package_linux.sh` → `dist/inutil_music_linux_x64.tar.gz`.
@@ -29,8 +34,29 @@
     paso la lectura anónima de `app_config/release` da 403 y el kill switch nunca
     se entera de la versión nueva (los tests del emulador no lo detectan porque el
     emulador carga las reglas locales).
-11. Abre la app → Ajustes → Actualizaciones → «Buscar actualizaciones» y comprueba que
-    aparece `2.0.1` con su tamaño y sus notas.
+11. Desde `2.5.11+4269` la app **avisa sola**: `InutilUpdateGate` ya consultaba el
+    manifiesto al arrancar y al volver de segundo plano (cooldown 5 min), pero
+    antes sólo pintaba algo si `belowMinSupported` o si el manifiesto venía
+    `mandatory:true`; ahora, con una versión superior opcional, muestra el
+    diálogo de novedades como cartel descartable y al cerrarlo guarda la versión
+    pospuesta en `inutil_update_notice_snoozed_for`, así que no vuelve a molestar
+    hasta publicar algo superior. Verificación manual sigue igual: Ajustes →
+    Actualizaciones → «Buscar actualizaciones» → debe salir la versión nueva con
+    su tamaño y sus notas.
 12. Detalle completo (esquema del manifiesto, reglas de Firestore, reanudación
     de la descarga e instalación en Android): sección «Publicar una nueva
     versión (OTA)» de `README.md`.
+
+13. Instalación real en Android: `InutilUpdateService.downloadUpdate` baja el APK
+    a `Directory.systemTemp` y lo abre con `url_launcher`
+    (`launchUrl(Uri.file(…))`), así que es el sistema (PackageInstaller) quien
+    muestra el instalador y el usuario confirma; no existe instalación silenciosa
+    ni permiso `REQUEST_INSTALL_PACKAGES` propio. Las clases
+    `AndroidPackageInstaller`, `OtaDownloadManager` y `OtaPlaybackResumeStore`
+    de `lib/services/app_update/` están definidas pero no se instancian en ningún
+    punto de `lib/` (medido con `grep -rn` sobre `lib/**/*.dart`), así que no
+    forman parte del camino que se ejecuta al actualizar. En Linux sí hay
+    self-install completo: `_installLinuxArchiveAndRelaunch` prepara un staging,
+    lanza un script desacoplado que espera a que muera el proceso, reemplanta
+    `data/` y `lib/` en `~/.local/share/inutil-music` y relanza la app
+    (`bash tool/test_update_swap.sh` → `RESULTADO: PRUEBA SUPERADA`).

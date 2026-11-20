@@ -1206,16 +1206,22 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                // `Wrap` en lugar de `Row`: con el ancho estrecho del diálogo en
+                // el teléfono (≈306 px de contenido) los dos botones juntos
+                // desbordaban 83 px y el botón principal quedaba recortado por
+                // el `Clip.antiAlias` del Material, así que no se podía pulsar.
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     if (canDismiss)
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: Text(hasUpdate ? 'Más tarde' : 'Aceptar'),
                       ),
-                    if (hasUpdate && release.platformDownloadUrl.isNotEmpty) ...[
-                      if (canDismiss) const SizedBox(width: 8),
+                    if (hasUpdate && release.platformDownloadUrl.isNotEmpty)
                       FilledButton.icon(
                         onPressed: _downloading ? null : _startDownload,
                         icon: const Icon(Icons.download_rounded, size: 18),
@@ -1225,7 +1231,6 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                               : 'Actualizar v${release.latestVersion}',
                         ),
                       ),
-                    ],
                   ],
                 ),
               ],

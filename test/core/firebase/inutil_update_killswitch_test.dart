@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:inutil_music/core/firebase/inutil_update_gate.dart';
 import 'package:inutil_music/core/firebase/inutil_update_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manifiesto de prueba: lo que el panel de administración publica en
 /// `app_config/release`. [min] es el kill switch (minSupportedVersion).
@@ -149,12 +150,12 @@ void main() {
 
         await pumpGate(tester);
 
-        expect(find.text('⚠ LA APP QUEDÓ DESHABILITADA'), findsOneWidget);
-        expect(find.textContaining('quedó deshabilitada'), findsOneWidget);
+        expect(find.text('ACTUALIZACIÓN REQUERIDA'), findsOneWidget);
+        expect(find.text('Actualización requerida'), findsOneWidget);
         expect(find.text('APP_INTERIOR'), findsNothing);
         // Obligada: no existe botón para descartar el letrero.
-        expect(find.text('Cerrar'), findsNothing);
-        expect(find.text('Descargar e Instalar v2.1.0'), findsOneWidget);
+        expect(find.text('Más tarde'), findsNothing);
+        expect(find.text('Actualizar v2.1.0'), findsOneWidget);
       },
     );
 
@@ -187,7 +188,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
 
-      expect(find.text('⚠ LA APP QUEDÓ DESHABILITADA'), findsOneWidget);
+      expect(find.text('ACTUALIZACIÓN REQUERIDA'), findsOneWidget);
       expect(find.text('APP_INTERIOR'), findsNothing);
     });
 
@@ -203,7 +204,7 @@ void main() {
       await pumpGate(tester);
 
       expect(find.text('APP_INTERIOR'), findsOneWidget);
-      expect(find.text('⚠ LA APP QUEDÓ DESHABILITADA'), findsNothing);
+      expect(find.text('ACTUALIZACIÓN REQUERIDA'), findsNothing);
     });
 
     testWidgets('Actualización opcional no interrumpe el arranque', (
@@ -229,8 +230,9 @@ void main() {
 
       await pumpGate(tester);
 
-      expect(find.text('ACTUALIZACIÓN OBLIGATORIA'), findsOneWidget);
-      expect(find.text('Cerrar'), findsNothing);
+      expect(find.text('ACTUALIZACIÓN DISPONIBLE'), findsOneWidget);
+      // mandatory=true hace el letrero no descartable: nada de "Más tarde".
+      expect(find.text('Más tarde'), findsNothing);
       expect(find.text('APP_INTERIOR'), findsNothing);
     });
 
@@ -242,6 +244,142 @@ void main() {
 
       expect(find.text('APP_INTERIOR'), findsOneWidget);
       expect(find.byType(InutilForceUpdateScreen), findsNothing);
+    });
+  });
+
+  group('Aviso OTA no bloqueante (InutilUpdateGate)', () {
+    setUp(() {
+      InutilUpdateService.testReleaseOverride = null;
+      // prefs en memoria: aquí es donde el aviso recuerda la versión pospuesta.
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+    });
+
+    tearDown(() {
+      InutilUpdateService.testReleaseOverride = null;
+    });
+
+    Future<void> pumpGate(WidgetTester tester, {String key = 'gate'}) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: InutilUpdateGate(
+              key: ValueKey(key),
+              child: const Scaffold(body: Text('APP_INTERIOR')),
+            ),
+          ),
+        ),
+      );
+      // Deja resolver el checkForUpdate del gate y la animación del diálogo.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pump(const Duration(milliseconds: 350));
+    }
+
+    testWidgets('Con una actualización opcional la app avisa sin bloquear', (
+      tester,
+    ) async {
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.9',
+        latest: '2.5.10',
+        min: '2.5.0',
+      );
+
+      await pumpGate(tester);
+
+      // El aviso es un cartel encima de la app: el interior sigue usable.
+      expect(find.text('Actualización disponible'), findsOneWidget);
+      expect(
+        find.text('Versión 2.5.10 disponible · Tienes v2.5.9'),
+        findsOneWidget,
+      );
+      expect(find.text('Novedades'), findsOneWidget);
+      expect(find.text('Actualizar v2.5.10'), findsOneWidget);
+      expect(find.text('Más tarde'), findsOneWidget);
+      expect(find.text('APP_INTERIOR'), findsOneWidget);
+      expect(find.byType(InutilForceUpdateScreen), findsNothing);
+    });
+
+    testWidgets('Al posponerlo no vuelve a salir en el siguiente arranque', (
+      tester,
+    ) async {
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.9',
+        latest: '2.5.10',
+        min: '2.5.0',
+      );
+
+      await pumpGate(tester);
+      await tester.tap(find.text('Más tarde'));
+      await tester.pumpAndSettle();
+      expect(find.text('Actualización disponible'), findsNothing);
+
+      // La versión pospuesta quedó guardada en prefs (clave del gate).
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString('inutil_update_notice_snoozed_for'),
+        '2.5.10',
+      );
+
+      // Arranque nuevo con la misma versión publicada: ya quedó pospuesto.
+      await pumpGate(tester, key: 'gate-2');
+      expect(find.text('Actualización disponible'), findsNothing);
+      expect(find.text('APP_INTERIOR'), findsOneWidget);
+    });
+
+    testWidgets('Una versión superior publicada reactiva el aviso', (
+      tester,
+    ) async {
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.9',
+        latest: '2.5.10',
+        min: '2.5.0',
+      );
+
+      await pumpGate(tester);
+      await tester.tap(find.text('Más tarde'));
+      await tester.pumpAndSettle();
+
+      // Se publica 2.5.11: el aviso vuelve aunque se haya pospuesto 2.5.10.
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.9',
+        latest: '2.5.11',
+        min: '2.5.0',
+      );
+      await pumpGate(tester, key: 'gate-3');
+      expect(
+        find.text('Versión 2.5.11 disponible · Tienes v2.5.9'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('Estando al día no se muestra ningún aviso', (tester) async {
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.10',
+        latest: '2.5.10',
+        min: '2.5.0',
+      );
+
+      await pumpGate(tester);
+
+      expect(find.text('Actualización disponible'), findsNothing);
+      expect(find.text('APP_INTERIOR'), findsOneWidget);
+      expect(find.byType(InutilForceUpdateScreen), findsNothing);
+    });
+
+    testWidgets('El kill switch manda: obligatoria sin "Más tarde"', (
+      tester,
+    ) async {
+      InutilUpdateService.testReleaseOverride = manifest(
+        installed: '2.5.9',
+        latest: '2.5.10',
+        min: '2.5.10',
+      );
+
+      await pumpGate(tester);
+
+      expect(find.text('ACTUALIZACIÓN REQUERIDA'), findsOneWidget);
+      expect(find.text('Más tarde'), findsNothing);
+      expect(find.text('APP_INTERIOR'), findsNothing);
     });
   });
 }
