@@ -214,6 +214,12 @@
     .badge-pending { background: rgba(245, 158, 11, 0.2); color: #fde047; border: 1px solid rgba(245, 158, 11, 0.45); animation: pulse 2s infinite; }
     .badge-expired { background: rgba(244, 63, 94, 0.2); color: #fda4af; border: 1px solid rgba(244, 63, 94, 0.45); }
     .badge-perm { background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.45); }
+    .badge-solo { background: rgba(245, 158, 11, 0.14); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4); }
+    .src-notice {
+      margin-top: 14px; padding: 11px 15px; border-radius: var(--radius-md);
+      background: rgba(245, 158, 11, 0.10); border: 1px solid rgba(245, 158, 11, 0.35);
+      color: #fbbf24; font-size: 12.5px; line-height: 1.5;
+    }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
     /* =========================================================================
@@ -421,6 +427,9 @@
         <button id="logoutBtn" class="btn btn-sm btn-red">Salir</button>
       </div>
     </header>
+
+    <!-- Aviso de fuente de datos no disponible -->
+    <div id="srcNotice" class="src-notice hidden"></div>
 
     <!-- Strip de Métricas KPI -->
     <section class="kpi-grid">
@@ -644,49 +653,89 @@
       return `Hace ${diffDay} días`;
     }
 
-    // ── Resiliencia de Carga: Firestore + Auth Fallback ──────────────────────────
+    // ── Carga Combinada: Firestore + Auth, unidas por UID ───────────────────────
+    // Las dos fuentes son necesarias: hay cuentas con licencia en Firestore que no
+    // existen en Auth (registro por dispositivo) y cuentas en Auth sin documento.
+    function normalizeAuthUser(u) {
+      let custom = {};
+      try { custom = JSON.parse(u.customAttributes || "{}"); } catch (_) {}
+      const isFounder = FOUNDER_EMAILS.has((u.email || "").toLowerCase());
+      return {
+        uid: u.localId,
+        email: u.email || "",
+        displayName: u.displayName || (u.email ? u.email.split("@")[0] : "Usuario"),
+        role: custom.role || (isFounder ? "admin" : "user"),
+        status: u.disabled ? "blocked" : (custom.status || (isFounder ? "active" : "pending")),
+        isActive: !u.disabled && (custom.status === "active" || isFounder),
+        accountExpiresAt: custom.accountExpiresAt || (isFounder ? "2099-12-31T23:59:59Z" : null),
+        lastLoginAt: u.lastLoginAt ? Number(u.lastLoginAt) : null,
+        createdAt: u.createdAt ? Number(u.createdAt) : null,
+        currentSmartTvDeviceId: custom.currentSmartTvDeviceId || "",
+        currentTvDeviceId: custom.currentTvDeviceId || "",
+        currentPhoneDeviceId: custom.currentPhoneDeviceId || "",
+        _source: "solo_auth"
+      };
+    }
+
+    async function fetchAuthAccounts() {
+      const currentUser = auth.currentUser;
+      // La API de administración de Auth acepta el token OAuth de Google;
+      // si venimos de login con contraseña, se usa el ID token de Firebase.
+      const token = googleAccessToken || (currentUser ? await currentUser.getIdToken() : null);
+      if (!token) return { ok: false, users: [], why: "sin token disponible" };
+      const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${firebaseConfig.projectId}/accounts:batchGet?maxResults=300`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) return { ok: false, users: [], why: `HTTP ${res.status}` };
+      const data = await res.json();
+      return { ok: true, users: (data.users || []).map(normalizeAuthUser) };
+    }
+
+    function renderSourceNotice(fsOk, authOk, fsCount, authCount) {
+      const el = document.getElementById("srcNotice");
+      if (!el) return;
+      if (fsOk && authOk) { el.classList.add("hidden"); return; }
+      const partes = [];
+      if (!fsOk) partes.push(`Firestore sin respuesta (cuota de lecturas agotada): faltan por ver las cuentas propias de Firestore`);
+      if (!authOk) partes.push(`API de Auth sin respuesta: faltan por ver las cuentas propias de Auth`);
+      el.innerHTML = `⚠️ ${partes.join(" · ")}. Mostrando ${fsCount} de Firestore + ${authCount} de Auth.`;
+      el.classList.remove("hidden");
+    }
+
     async function loadAllAccounts() {
       try {
-        let usersList = [];
-        try {
-          const snap = await getDocs(collection(db, "users"));
-          usersList = snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-        } catch (fsErr) {
-          console.warn("[Admin Console] Firestore 429 / offline. Intentando con Auth claims...", fsErr);
-          // Fallback a Auth si Firestore está en 429
-          const currentUser = auth.currentUser;
-          if (currentUser && currentUser.getIdToken) {
-            // La API de administración de Auth acepta el token OAuth de Google;
-            // si venimos de login con contraseña, se usa el ID token de Firebase.
-            const token = googleAccessToken || await currentUser.getIdToken();
-            const res = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${firebaseConfig.projectId}/accounts:batchGet?maxResults=300`, {
-              headers: { "Authorization": `Bearer ${token}` }
-            });
-            if (res.ok) {
-              const data = await res.json();
-              usersList = (data.users || []).map(u => {
-                let custom = {};
-                try { custom = JSON.parse(u.customAttributes || "{}"); } catch(_) {}
-                const isFounder = FOUNDER_EMAILS.has((u.email || "").toLowerCase());
-                return {
-                  uid: u.localId,
-                  email: u.email,
-                  displayName: u.displayName || (u.email ? u.email.split("@")[0] : "Usuario"),
-                  role: custom.role || (isFounder ? "admin" : "user"),
-                  status: u.disabled ? "blocked" : (custom.status || (isFounder ? "active" : "pending")),
-                  isActive: !u.disabled && (custom.status === "active" || isFounder),
-                  accountExpiresAt: custom.accountExpiresAt || (isFounder ? "2099-12-31T23:59:59Z" : null),
-                  lastLoginAt: u.lastLoginAt ? Number(u.lastLoginAt) : null,
-                  createdAt: u.createdAt ? Number(u.createdAt) : null,
-                  currentSmartTvDeviceId: custom.currentSmartTvDeviceId || "",
-                  currentTvDeviceId: custom.currentTvDeviceId || "",
-                  currentPhoneDeviceId: custom.currentPhoneDeviceId || "",
-                  _source: "auth_fallback"
-                };
-              });
-            }
+        const [fsRes, authRes] = await Promise.allSettled([
+          getDocs(collection(db, "users")),
+          fetchAuthAccounts(),
+        ]);
+        const fsOk = fsRes.status === "fulfilled";
+        const authOk = authRes.status === "fulfilled" && authRes.value.ok;
+        if (!fsOk) console.warn("[Admin Console] Firestore no disponible:", fsRes.reason?.message || fsRes.reason);
+        if (!authOk) console.warn("[Admin Console] Auth no disponible:", authRes.status === "fulfilled" ? authRes.value.why : authRes.reason);
+
+        const fsList = fsOk ? fsRes.value.docs.map(d => ({ uid: d.id, ...d.data(), _source: "solo_firestore" })) : [];
+        const authList = authOk ? authRes.value.users : [];
+
+        const byUid = new Map();
+        for (const u of fsList) byUid.set(u.uid, u);
+        for (const a of authList) {
+          const ex = byUid.get(a.uid);
+          if (ex) {
+            ex._source = "ambos";
+            ex.email = ex.email || a.email;
+            ex.displayName = ex.displayName || a.displayName;
+            ex.role = ex.role || a.role;
+            ex.status = ex.status || a.status;
+            if (ex.isActive === undefined) ex.isActive = a.isActive;
+            ex.accountExpiresAt = ex.accountExpiresAt || a.accountExpiresAt;
+            ex.lastLoginAt = ex.lastLoginAt || a.lastLoginAt;
+            ex.createdAt = ex.createdAt || a.createdAt;
+          } else {
+            byUid.set(a.uid, a);
           }
         }
+
+        const usersList = [...byUid.values()];
 
         // Si la cuenta actual es de César (admin) y sus ranuras están vacías en la BD,
         // le aseguramos visibilidad de su TV y celular conectados:
@@ -700,6 +749,8 @@
             }
           }
         }
+
+        renderSourceNotice(fsOk, authOk, fsList.length, authList.length);
 
         allUsers = usersList;
         allUsers.sort((a, b) => {
@@ -789,6 +840,8 @@
       else if (!u.isActive) badges.push(`<span class="badge badge-expired">⏸️ Suspendido</span>`);
       else if (exp) badges.push(`<span class="badge badge-expired">❌ Vencido</span>`);
       else badges.push(`<span class="badge badge-active">🟢 Activo</span>`);
+      if (u._source === "solo_auth") badges.push(`<span class="badge badge-solo" title="Existe en Firebase Auth pero no tiene documento en Firestore">🔹 solo en Auth</span>`);
+      else if (u._source === "solo_firestore") badges.push(`<span class="badge badge-solo" title="Tiene documento en Firestore pero no cuenta en Firebase Auth (registro por dispositivo)">🔹 solo en Firestore</span>`);
 
       const smartTvId = u.currentSmartTvDeviceId || u._hintSmartTv || "";
       const smartTvLabel = u._hintTvName || "Smart TV / Android TV";
