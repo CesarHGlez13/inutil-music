@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import '../utils/release_paths.dart';
 import 'firebase_auth_service.dart';
+import 'firebase_config.dart';
 import 'firebase_firestore_service.dart';
 
 /// Dispositivo de la misma cuenta visible para el mando a distancia.
@@ -372,6 +373,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   DateTime _remoteHandoverUntil = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _syncPollingTimer;
   Timer? _lanDiscoveryTimer;
+  /// Última re-sonda del relay dentro del tick de 3 s, para no gastar
+  /// handshakes TCP en cada tick.
+  DateTime _lastRelayReprobe = DateTime.fromMillisecondsSinceEpoch(0);
+  static const Duration _relayReprobeInterval = Duration(seconds: 45);
   int _cloudPollFailures = 0;
   DateTime _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastPositionPushTime = DateTime.fromMillisecondsSinceEpoch(0);
@@ -875,9 +880,39 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
     _syncPollingTimer?.cancel();
     _syncPollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _maybeReprobeRelay();
       _pollPlaybackSession();
     });
     _pollPlaybackSession();
+  }
+
+  /// Re-sonda del relay del S7, colgada del tick de 3 s que ya existe.
+  ///
+  /// El problema que cierra: [FirebaseConfig.markRelayUnreachable] latchea
+  /// Google para TODA la sesión. Si se reinicia `relay.py` (o el S7, o el
+  /// WiFi) con la app abierta, las lecturas regresan a Firebase real y
+  /// siguen pagando cuota de `users/{uid}/...` hasta que el usuario cierre y
+  /// vuelva a abrir la app. Medido el 2026-11-20 justo después de reiniciar
+  /// el relay: 0 peticiones de las apps al relay en 3 minutos, mientras los
+  /// heartbeat de `users/{uid}/devices/*` aparecían escritos DIRECTO en Google
+  /// con su `updatedAt` en el mismo segundo en que Google los recibía.
+  ///
+  /// Va aquí y no en un `Timer` nuevo porque el tick de 3 s ya existe y ya
+  /// corre solo cuando hay sesión activa: no añade timers que queden pendientes
+  /// en las pruebas de arranque. Y sondea sólo cuando
+  /// [FirebaseConfig.relayRecoveryWorthy] (host horneado + declarado caído +
+  /// este equipo sí tuvo relación con el relay), a lo sumo una vez cada
+  /// [_relayReprobeInterval] para no gastar handshakes.
+  void _maybeReprobeRelay() {
+    if (!FirebaseConfig.relayRecoveryWorthy) return;
+    final now = DateTime.now();
+    if (now.difference(_lastRelayReprobe) < _relayReprobeInterval) return;
+    _lastRelayReprobe = now;
+    unawaited(FirebaseConfig.probeRelayReachability().then((ok) {
+      if (!ok) return;
+      debugPrint('Relay del S7 recuperado en caliente: las lecturas vuelven a '
+          'pasar por el telefono y dejan de pagar cuota.');
+    }));
   }
 
   void stopSync() {

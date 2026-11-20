@@ -139,8 +139,67 @@ void main() {
     });
   });
 
-  group('clasificación de errores que activan el reintento', () {
-    test('los errores de conexión sí, los códigos HTTP no', () {
+  group('re-sonda de recuperación del relay (medido 2026-11-20)', () {
+    setUp(() => FirebaseConfig.resetRelayReachability());
+    tearDown(() => FirebaseConfig.resetRelayReachability());
+
+    test('tras caerse MIENTRAS se usaba quiere re-sondear, y se recupera sola '
+        'cuando el relay vuelve', () async {
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(server.close);
+      Future<bool> ver() => FirebaseConfig.probeRelayReachability(
+            timeout: const Duration(milliseconds: 400),
+            ports: [server.port],
+            host: server.address.address,
+          );
+      expect(await ver(), isTrue);
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse,
+          reason: 'con el relay vivo no hay nada que re-sondear');
+      // El caso real: `relay.py` se reinicia en el S7 y los servicios reciben
+      // Connection refused. Sin esta marca las apps latcheaban Google para
+      // toda la sesión (medido: 0 peticiones al relay en 3 min) y sus
+      // heartbeats volvían a pagar cuota escritos directo en Google.
+      FirebaseConfig.markRelayUnreachable();
+      expect(FirebaseConfig.relayRecoveryWorthy, isTrue,
+          reason: 'se cayó estando en uso: hay que recuperarlo sin cerrar la app');
+      // `zz-relay.sh` lo levanta en ~10 s: la re-sonda lo encuentra y la
+      // puerta se apaga sola, no se sigue sondeando.
+      expect(await ver(), isTrue);
+      expect(FirebaseConfig.relayReachabilityState, isTrue);
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse,
+          reason: 'recuperado: no gastar handshakes de más');
+    });
+
+    test('un equipo que nunca usó el relay no pide re-sonda: el usuario '
+        'off-LAN no paga timeouts cada 45 s', () async {
+      final probe = await FirebaseConfig.probeRelayReachability(
+        timeout: const Duration(milliseconds: 300),
+        ports: [40001, 40002],
+        host: '192.168.100.253',
+      );
+      expect(probe, isFalse);
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse,
+          reason: 'nunca lo vio vivo: no hay relación que recuperar');
+      // Un error de red contra Google (estando `null`) tampoco la enciende:
+      // `markRelayUnreachable` sólo deja marca si estaba EN USO.
+      FirebaseConfig.markRelayUnreachable();
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse);
+    });
+
+    test('noteRelayRecoveryWanted es el caso del S7 levantándose con la app '
+        'ya abierta (cache true + sonda de arranque fallida)', () {
+      FirebaseConfig.markRelayUnreachable();
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse,
+          reason: 'sin relación previa no se sondea');
+      FirebaseConfig.noteRelayRecoveryWanted();
+      expect(FirebaseConfig.relayRecoveryWorthy, isTrue);
+      FirebaseConfig.resetRelayReachability();
+      expect(FirebaseConfig.relayRecoveryWorthy, isFalse,
+          reason: 'el reset limpia la marca, para que las pruebas arranquen limpias');
+    });
+  });
+
+  group('clasificación de errores que activan el reintento', () {    test('los errores de conexión sí, los códigos HTTP no', () {
       expect(
           InutilFirestoreService.isConnectionFailure(
               TimeoutException('sin respuesta')),

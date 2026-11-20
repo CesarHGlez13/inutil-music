@@ -1,5 +1,79 @@
 # Changelog
 
+## 2.5.12+4270 — 2026-11-20
+
+### Added
+
+- **Tier 2 de datos: el Worker cloud (`inutil_cloud_relay`) ya está conectado a la
+  app.** `lib/core/firebase/relay_tier_selector.dart` (nuevo, 174 líneas) es el
+  árbol de decisión **puro** `lanRelay → cloudRelay → google`: no toca la red ni
+  `SharedPreferences`, así se prueba entero sin levantar servidores; las sondas
+  viven en `FirebaseConfig` y le pasan el resultado como parámetro
+  (`RelayTierInputs.lanReachable` es `bool?` porque `null` — todavía sin medir —
+  NO es lo mismo que `false` para quien sí está en casa).
+- Variables de build: `FB_CLOUD_RELAY_HOST` (vacío = exactamente el
+  comportamiento de antes: relay LAN o Google), `FB_CLOUD_RELAY_SCHEME` (`https`
+  por defecto; un valor inventado se normaliza a `https` para que un
+  `--dart-define` mal escrito no inyecte texto dentro de la URL) y
+  `FB_CLOUD_RELAY_PORT` (vacío = **sin** `:puerto` en la URL). La capa cloud se
+  usa **sin sonda de TCP**: sondear `workers.dev` en cada arranque costaría
+  requests del plan gratuito del Worker (100k/día) y no aportaría nada.
+- El hueco que cierra: `relayAwareUrl` solo sabía construir `http://host:puerto`,
+  así que un build horneado con `FB_RELAY_HOST` fuera de la LAN de la casa caía
+  siempre en Google y pagaba la cuota entera (medido 2026-11-20: **94,114
+  lecturas/día = 188 %** del límite de 50,000 del plan Spark).
+- Build medido:
+  `flutter build apk --release --dart-define=FB_RELAY_HOST=192.168.100.27 --dart-define=FB_CLOUD_RELAY_HOST=inutil-cloud-relay.scada-xiaomi-server.workers.dev`
+  → `build/app/outputs/flutter-apk/app-release.apk` **71,466,623 B** (Gradle
+  237.2 s, `build_exit=0`), y `unzip -p … lib/arm64-v8a/libapp.so | strings`
+  contiene las dos cadenas horneadas (1 ocurrencia de cada) ✓. OJO: ese APK es
+  `versionCode 4270` y el Xiaomi tiene instalado `6269` (`2.5.11`), así que
+  `adb install -r` lo rechaza con `INSTALL_FAILED_VERSION_DOWNGRADE`; la
+  instalación le toca al pipeline de release (`tool/publish_release.sh` arma
+  `app-arm64-v8a-release.apk` = 38,338,609 B, no el fat APK).
+- Pruebas: `test/core/firebase/cloud_relay_tier_test.dart` (nuevo) y la corrida de
+  `test/core/firebase/` queda en **+140 verdes, 1 saltada** (antes `+116 ~1`);
+  `dart analyze --no-fatal-warnings lib test` — los 412 ficheros de `lib/` más los
+  296 de `test/` — dice **`No issues found!`** (exit 0).
+
+### Fixed
+
+- **La app vuelve sola al relay del S7 cuando el relay se levanta**, en vez de
+  quedarse toda la sesión hablando con Google. Medido el 2026-11-20 con las apps
+  abiertas y el relay reiniciado / el S7 rebooteado: 9 muestreos de `/healthz`
+  cada 60 s dieron `cache_hits` 0,0,0,0,2,2,2,2,2 aunque el teléfono estaba
+  escuchando `0.0.0.0:8080` con `oom_score_adj -1000`; `ss` de la PC y del Xiaomi
+  no tenían ni una conexión a `192.168.100.27:8080`; y el logcat del teléfono
+  registró `10:45:20 Relay del S7 sin respuesta en users/R5Le…/playback_session/current:
+  reintento directo a Google` seguido de **11 PATCH de heartbeat rechazados con
+  `401 Missing or invalid authentication`**, uno cada 30 s entre 10:58 y 11:03.
+  Con las apps enganchadas a Google se paga exactamente la cuota que el relay
+  ahorra: medido en la ventana 03:43→09:38 de ese mismo día, **94,114
+  lecturas/día y 8,100 escrituras/día** habrían pagado sin el relay (188 % y
+  40.5 % de los límites 50,000/20,000 del plan Spark).
+- Cómo queda cerrado: `markRelayUnreachable()` (`firebase_config.dart:202`) deja
+  la marca de recuperación **solo si estábamos usando el relay** — es la señal
+  exacta de "esto era mío y se acaba de caer"; `relayRecoveryWorthy` la consulta;
+  y `_maybeReprobeRelay()` (`firebase_playback_sync_service.dart:906`) re-sondea
+  a lo sumo **una vez cada 45 s**, colgado del tick de 3 s que ya existe (no
+  añade timers nuevos, así que tampoco deja pruebas de arranque pendientes).
+  Cuando encuentra el relay, las lecturas y las escrituras vuelven a pasar por el
+  teléfono sin reiniciar la app. `main.dart:95` además pide la re-sonda cuando la
+  sonda de arranque falló **pero** este equipo declaró vivo al relay en un arranque
+  anterior (`inutil_relay_reachable_v1`), que es justo el caso del S7 levantándose
+  despacio del reboot con la app ya abierta. Un build sin `FB_RELAY_HOST` o un
+  usuario fuera de la LAN que nunca lo vio vivo no dejan marca, o sea nunca se
+  sondea por sondear ni se pagan timeouts de más.
+- Pruebas: `test/core/firebase/relay_reachability_fallback_test.dart` pasa de 11 a
+  **14** pruebas. Las 3 nuevas son: `tras caerse MIENTRAS se usaba quiere
+  re-sondear, y se recupera sola cuando el relay vuelve`, `un equipo que nunca usó
+  el relay no pide re-sonda: el usuario off-LAN no paga timeouts cada 45 s` y
+  `noteRelayRecoveryWanted es el caso del S7 levantándose con la app ya abierta
+  (cache true + sonda de arranque fallida)`. La corrida de `test/core/firebase/` +
+  `test/core/constants/` queda en **123 verdes y 1 saltada** (la saltada es
+  `inutil_cloud_backup_emulator_test`, que exige `--dart-define=FB_EMULATOR=true`
+  con el emulador levantado) y `flutter analyze lib/` sin hallazgos.
+
 ## 2.5.11+4269 — 2026-11-20
 
 ### Added

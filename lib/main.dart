@@ -88,6 +88,11 @@ Future<void> _probeRelayReachabilityAndCache() async {
     } else {
       debugPrint('Relay del S7 sin respuesta: lecturas directo a Google '
           '(cacheaba ${cached == null ? "nada" : "$cached"}).');
+      // Caso medido el 2026-11-20: el S7 se está reiniciando (o el WiFi) y la
+      // app abrió primero. Este equipo SÍ vivió en la LAN del relay, así que
+      // pedimos que se re-sondee en segundo plano; si no, las lecturas se
+      // quedarían en Google todo el resto de la sesión pagando cuota.
+      if (cached == true) FirebaseConfig.noteRelayRecoveryWanted();
     }
     if (cached != reachable) {
       await prefs.setBool(FirebaseConfig.relayReachabilityCacheKey, reachable);

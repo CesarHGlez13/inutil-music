@@ -123,7 +123,13 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                     resource.data.status == 'pending' &&
                     request.resource.data.status == 'approved';
-      allow delete: if true;
+      // Cerrado el hueco DoS medido el 2026-11-20: con `delete: if true` un
+      // cliente anónimo podía borrar un código YA `approved` antes de que la
+      // TV lo leyera, y el emparejamiento se caía sin más. Ahora lo borra el
+      // dueño autenticado, o el cliente anónimo **mientras el código sigue
+      // vivo**, que es justo cuando `cleanupTvSession()` corre (inmediatamente
+      // después de leer el sobre, dentro del TTL).
+      allow delete: if isSignedIn() || request.time < resource.data.expiresAt;
     }
 
     // Vinculación temporal de la app de escritorio (PC) por código QR cifrado
@@ -139,7 +145,12 @@ service cloud.firestore {
       allow update: if isSignedIn() &&
                     resource.data.status == 'pending' &&
                     request.resource.data.status == 'approved';
-      allow delete: if true;
+      // Mismo criterio que `tv_pairing` (comentario arriba). Un detalle extra
+      // aquí: el PC escribía `expiresAt` como string de epoch-millis, así que
+      // esta comparación contra `request.time` habría dado error de tipos y
+      // denegado todo. `pc_client/main.py` lo escribe ahora como
+      // `timestampValue` real para que las dos apps hablen el mismo tipo.
+      allow delete: if isSignedIn() || request.time < resource.data.expiresAt;
     }
   }
 }

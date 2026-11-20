@@ -4,11 +4,11 @@ class AppConstants {
   static const appName = 'Inútil Music';
   /// Fuente única del número de versión mostrado en Ajustes y usado por el
   /// chequeo de actualizaciones OTA. Debe coincidir con la parte de versión de
-  /// `version:` en `pubspec.yaml` (actualmente `2.5.11+4269`); el incremento
-  /// interno (`+4269`) es el `versionCode` base de Android — Flutter le suma
+  /// `version:` en `pubspec.yaml` (actualmente `2.5.12+4270`); el incremento
+  /// interno (`+4270`) es el `versionCode` base de Android — Flutter le suma
   /// 2000 al dividir por ABI, medido con `aapt`: `+4268` produce 6268 en el
   /// APK `arm64-v8a` — y no se muestra en la interfaz.
-  static const appVersion = '2.5.11';
+  static const appVersion = '2.5.12';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 11;
   static const fileExportChannel = 'inutil_music/file_export';
