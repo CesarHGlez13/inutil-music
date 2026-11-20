@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.9+4267 — 2026-11-20
+
+### Fixed
+
+- Se acabó el micro corte que se oía al decir "mejorando calidad de sonido": el relevo entre los dos decks pasa de 250 ms a un solo tick de 20 ms, así que la grabación saliente se silencia en el mismo tick en que la entrante llega a ganancia completa y desaparece la cancelación en peine (comb filtering) entre dos copias idénticas desfasadas.
+- Arreglado el maximizado en la PC: al expandir la ventana GTK pintaba la app en un rectángulo pequeño de la esquina superior izquierda con el resto negro. El runner publicaba `PPosition 0,0` en `WM_NORMAL_HINTS`, la decoración del cliente bajo XWayland rechazaba la geometría del compositor y la ventana saltaba a la esquina; se eliminó `gtk_window_set_position(GTK_WIN_POS_CENTER)` y el round-trip 1332x819 → 1853x1048 → 1332x819 se verifica sin saltos.
+- El "reproductor colgado" en la misma canción: el documento `playback_session/current` podía decir `isPlaying:true` con la posición congelada 28 min (medido: 5611/186161 ms) y el mando seguía fingiendo que sonaba. Ahora una sesión que dejó de refrescarse más de 20 s es un fantasma (`sessionIsGhost`, `visibleSession`), el `PlayerController` descarta ese estado espejado y la barra avanza con `estimatedPositionMs` entre las escrituras de 8 s del altavoz real.
+- Sincronización sin cuota de Firebase: `firestoreBaseUrl` y `storageBaseUrl` resuelven contra `FB_RELAY_HOST`/`FB_RELAY_PORT` (`--dart-define`), el relay propio del S7 (`192.168.100.27:8080`) absorbe los `429 RESOURCE_EXHAUSTED` que frenaban la app; la autenticación sigue en Firebase real y, con `FB_RELAY_HOST` vacío, se conserva intacto el fallback a la nube de Google.
+- La app de PC deja de reabrirse sola al cerrarla: se retira el autostart (`~/.config/systemd/user/inutil-music.service` y su symlink en `default.target.wants`) y el auto-restart; no hay servicio systemd para `com.inutilmusic.app`.
+- Pruebas: 210/210 tests verdes (crossfade 15, just_audio 78, media_kit 47, upgrade de calidad 52, staleness de sesión 18) y `flutter analyze` sin hallazgos. El fixture del upgrade de calidad ya no cuelga para siempre porque levanta el ciclo real `PlayerController` ↔ `InutilPlaybackSyncService`.
+
 ## 2.5.8+258 — 2026-11-18
 
 ### Added

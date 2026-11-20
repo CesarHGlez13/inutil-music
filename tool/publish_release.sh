@@ -313,11 +313,20 @@ fi
 TOKEN="${FIREBASE_ACCESS_TOKEN:-}"
 if [ -z "$TOKEN" ] && [ -f "$HOME/.config/configstore/firebase-tools.json" ]; then
   TOKEN="$(python3 - <<'PY'
-import json, os, pathlib
+import json, os, pathlib, time
 p = pathlib.Path.home() / ".config" / "configstore" / "firebase-tools.json"
 try:
     data = json.loads(p.read_text())
-    print((data.get("tokens") or {}).get("user", "") or data.get("user", {}).get("token", ""))
+    tok = data.get("tokens") or {}
+    # El CLI guarda el OAuth access token en `tokens.access_token` (con
+    # `expires_at` en milisegundos). `tokens.user` no existe: leerlo devolvía
+    # cadena vacía y el script se saltaba app_config/release en Firestore.
+    access = tok.get("access_token", "") or ""
+    exp = tok.get("expires_at", 0)
+    if access and int(exp or 0) / 1000 - time.time() > 60:
+        print(access)
+    else:
+        print("")
 except Exception:
     print("")
 PY
