@@ -8,6 +8,12 @@
 ///
 /// Valores leídos de la app ANDROID `inutil_music_android` del proyecto
 /// `inutil-music-app` (`firebase apps:sdkconfig ANDROID`, 2026-11-17).
+library;
+
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
 class FirebaseConfig {
   const FirebaseConfig._();
 
@@ -75,6 +81,118 @@ class FirebaseConfig {
     defaultValue: '8080',
   );
 
+  // ---------------------------------------------------------------------------
+  // Fallback de alcance del relay (decidido por Cesar el 2026-11-20)
+  // ---------------------------------------------------------------------------
+
+  /// Estado de alcance del relay: `null` = todavía sin medir, `true` = vivo,
+  /// `false` = no respondió a la sonda. Arranca `null` para que un build
+  /// horneado con `FB_RELAY_HOST` no pierda el ahorro de cuota en casa: en
+  /// cuanto la sonda lo encuentra, [firestoreBaseUrl] y [storageBaseUrl]
+  /// empiezan a usarlo. Si nunca responde (usuario fuera de la LAN del S7),
+  /// se queda con Google y la app funciona igual que antes del relay.
+  static bool? _relayReachable;
+
+  /// `true` sólo cuando hay relay horneado, no estamos en emuladores y la sonda
+  /// lo declaró vivo. Es la única puerta de los endpoints redirigidos.
+  static bool get relayUsable =>
+      relayHost.trim().isNotEmpty && !useEmulator && _relayReachable == true;
+
+  /// Decisión pura de endpoint, expuesta para pruebas: el relay se usa sólo si
+  /// está configurado, fuera de emuladores y alcanzable; de lo contrario se
+  /// devuelve tal cual el endpoint de Google (o del emulador) que le pase el
+  /// llamante.
+  @visibleForTesting
+  static String relayAwareUrl({
+    required String configuredHost,
+    required String configuredPort,
+    required bool emulator,
+    required bool? reachable,
+    required String emulatorUrl,
+    required String googleUrl,
+  }) {
+    if (configuredHost.trim().isEmpty) return googleUrl;
+    if (emulator) return emulatorUrl;
+    if (reachable != true) return googleUrl;
+    return 'http://$configuredHost:$configuredPort'
+        '${Uri.parse(googleUrl).path}';
+  }
+
+  /// Cache en SharedPreferences del último estado medido, para que un arranque
+  /// no arranque de cero: `true` = lo vimos vivo alguna vez desde este equipo,
+  /// `false` = nunca respondió (el usuario no está en la LAN del S7). Lo lee
+  /// `_probeRelayReachabilityAndCache` en `main.dart`.
+  static const String relayReachabilityCacheKey = 'inutil_relay_reachable_v1';
+
+  /// Sonda de TCP al relay. Devuelve el estado medido y lo deja en el estado
+  /// de clase para que los getters lo respeten de inmediato.
+  ///
+  /// Prueba los puertos `relayPort` y `5555` en paralelo (el segundo es el
+  /// puerto TCP del ADB shell del S7, por si el `relay.py` quedó levantado
+  /// sobre otro número) y abandona al primer handshake.
+  ///
+  /// Costo medido en la LAN: ~1 ms cuando el relay vive. Para un usuario
+  /// fuera de la LAN son `timeout` segundos de espera en el arranque, y a
+  /// cambio la app nunca le falla una lectura.
+  static Future<bool> probeRelayReachability({
+    Duration timeout = const Duration(milliseconds: 1200),
+    List<int>? ports,
+    String? host,
+  }) async {
+    final target = (host ?? relayHost).trim();
+    if (useEmulator || target.isEmpty) {
+      _relayReachable = false;
+      return false;
+    }
+    final candidates = <int>{
+      int.tryParse(relayPort.trim()) ?? 8080,
+      5555,
+    }.toList(growable: false);
+    for (final port in ports ?? candidates) {
+      if (await _canOpen(target, port, timeout)) {
+        _relayReachable = true;
+        return true;
+      }
+    }
+    _relayReachable = false;
+    return false;
+  }
+
+  static Future<bool> _canOpen(
+    String host,
+    int port,
+    Duration timeout,
+  ) async {
+    Socket? socket;
+    try {
+      socket = await Socket.connect(host, port, timeout: timeout);
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      try {
+        await socket?.close();
+      } catch (_) {}
+    }
+  }
+
+  /// Lo que debe llamar cualquier servicio que reciba un `SocketException`,
+  /// `TimeoutException` o `Connection refused` del relay: marca el relay como
+  /// caído y a partir de la siguiente petición los endpoints vuelven a Google,
+  /// sin reiniciar la app.
+  static void markRelayUnreachable() {
+    if (_relayReachable == false) return;
+    _relayReachable = false;
+  }
+
+  /// Restablece la medición (pruebas y re-sondas programadas).
+  @visibleForTesting
+  static void resetRelayReachability() => _relayReachable = null;
+
+  /// Estado actual conocido, para telemetría y pruebas.
+  @visibleForTesting
+  static bool? get relayReachabilityState => _relayReachable;
+
   // Endpoints REST oficiales de Google Cloud / Firebase
   static String get authBaseUrl => useEmulator
       ? 'http://$emulatorHost:$emulatorAuthPort/identitytoolkit.googleapis.com/v1'
@@ -86,7 +204,7 @@ class FirebaseConfig {
       : 'https://securetoken.googleapis.com/v1/token';
 
   static String get firestoreBaseUrl {
-    if (relayHost.isNotEmpty) {
+    if (relayUsable) {
       return 'http://$relayHost:$relayPort/v1/projects/$projectId/databases/(default)/documents';
     }
     return useEmulator
@@ -94,7 +212,7 @@ class FirebaseConfig {
         : 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
   }
 
-  static String get storageBaseUrl => relayHost.isNotEmpty
+  static String get storageBaseUrl => relayUsable
       ? 'http://$relayHost:$relayPort/v0/b/$storageBucket/o'
       : 'https://firebasestorage.googleapis.com/v0/b/$storageBucket/o';
 

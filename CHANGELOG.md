@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.10+4268 — 2026-11-20
+
+### Fixed
+
+- La app deja de depender de estar en la red de casa: el build horneado con `--dart-define=FB_RELAY_HOST=192.168.100.27` redirigía TODAS las lecturas de Firestore y Storage a una IP privada, así que a un usuario fuera de esa LAN no le respondían ni la sincronización ni el manifiesto de OTA (que también se lee por ahí). Al arrancar, la app sondea el relay durante 1.2 s y si no responde encamina Firestore y Storage directo a Google: el mismo binario sirve dentro y fuera de la LAN, y el ahorro de cuota se conserva en casa.
+- Y si el relay se cae a media sesión, el primer error de conexión (`Connection refused`, `SocketException`, `TimeoutException`) lo marca como caído y la petición se reintenta una sola vez contra Google, sin reiniciar la app y sin volver a tocar el relay. Los errores con código HTTP (403/429/500) no se reintentan: ése sí llegó a un servidor, y reintentar un `429 RESOURCE_EXHAUSTED` a ciegas sólo gastaría más cuota.
+- Cada arranque vuelve a sondear, así que llevar el laptop de la casa a otra red se autodetecta solo: no hay que reinstalar ni reconfigurar nada. El resultado se cachea (`inutil_relay_reachable_v1`) sólo como telemetría.
+- Pruebas: 238/238 verdes y `flutter analyze` sin hallazgos. Se añadieron 11 pruebas del fallback (`test/core/firebase/relay_reachability_fallback_test.dart`) y se cerró la cadena de versión que el test `app_metadata_test` exige (`pubspec.yaml`, `README.md`, `packaging/windows/InutilMusic.iss` y `AppConstants.appVersion` estaban desalineados desde que se subió `pubspec` a 2.5.9+4267 sin tocarlos; ese test venía fallando desde entonces).
+
 ## 2.5.9+4267 — 2026-11-20
 
 ### Fixed

@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/app_constants.dart';
+import 'core/firebase/firebase_config.dart';
 import 'core/platform/app_platform.dart';
 import 'core/startup/app_startup_coordinator.dart';
 import 'core/theme/app_colors.dart';
@@ -58,6 +60,44 @@ void _scheduleStartupAfterFirstFrame(VoidCallback callback) {
   WidgetsBinding.instance.addPostFrameCallback((_) => callback());
 }
 
+/// Sondea el relay propio del S7 (`--dart-define=FB_RELAY_HOST`) y decide con
+/// qué endpoint arranca la app, sin castigar a nadie por estar fuera de la LAN
+/// de Cesar:
+///
+/// * Si el build no trae host horneado, no hace nada y todo va a Firebase
+///   real (el default de producción, intacto).
+/// * Si hay host y la IP responde, [FirebaseConfig] empieza a redirigir
+///   Firestore y Storage al relay, que es lo que ahorra la cuota de
+///   `RESOURCE_EXHAUSTED` que frenaba la app.
+/// * Si la IP no responde —el caso medido de un usuario fuera de la LAN—
+///   [FirebaseConfig] se queda con Google y la app funciona igual que antes
+///   del relay.
+///
+/// Se cachea el resultado (`inutil_relay_reachable_v1`) sólo como telemetría:
+/// cada arranque vuelve a sondear, así que llevar el laptop de la casa a otra
+/// red se autodetecta sin reinstalar ni reconfigurar nada.
+Future<void> _probeRelayReachabilityAndCache() async {
+  if (FirebaseConfig.relayHost.trim().isEmpty) return;
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final cached = prefs.getBool(FirebaseConfig.relayReachabilityCacheKey);
+    final reachable = await FirebaseConfig.probeRelayReachability();
+    if (reachable) {
+      debugPrint('Relay del S7 alcanzable: lecturas por él '
+          '(cacheaba ${cached == null ? "nada" : "$cached"}).');
+    } else {
+      debugPrint('Relay del S7 sin respuesta: lecturas directo a Google '
+          '(cacheaba ${cached == null ? "nada" : "$cached"}).');
+    }
+    if (cached != reachable) {
+      await prefs.setBool(FirebaseConfig.relayReachabilityCacheKey, reachable);
+    }
+  } catch (error) {
+    debugPrint('Sonda de relay falló (se asume Google): $error');
+    FirebaseConfig.markRelayUnreachable();
+  }
+}
+
 /// Arranca la sesión de licencia y la sincronización LAN sin propagar sus
 /// fallos al montaje de la interfaz: si faltan los plugins nativos (pruebas
 /// de widget) o no hay red, la app queda simplemente "sin sesión" hasta que
@@ -85,6 +125,11 @@ AppStartupCoordinator launchInutilMusicApp({
 }) {
   WidgetsFlutterBinding.ensureInitialized();
   configureArtworkVideoRendering();
+  // La sonda se lanza antes que los servicios que hacen peticiones, para que
+  // el endpoint elegido esté decidido en las primeras lecturas. No se espera:
+  // un usuario fuera de la LAN paga ~1.2 s de sondeo en paralelo, nunca un
+  // arranque bloqueado.
+  unawaited(_probeRelayReachabilityAndCache());
   unawaited(_startLicenceServices());
   // Keep artwork thumbnails cached cleanly across Home, Search, Library, and
   // Local tabs without hitting Flutter's default 100 MiB / 1,000-entry limit.

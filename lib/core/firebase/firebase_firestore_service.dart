@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -50,6 +51,72 @@ class InutilFirestoreService {
         'Authorization': 'Bearer $_idToken',
     };
   }
+
+  /// ¿El error es de conexión (el destino nunca respondió) o es una respuesta
+  /// HTTP con código? Sólo los de conexión activan el reintento contra Google:
+  /// un 403/429/500 sí llegó a un servidor y reintentarlo contra otro sería
+  /// ciego (y en el caso del 429 de cuota, contraproducente).
+  @visibleForTesting
+  static bool isConnectionFailure(Object error) {
+    if (error is TimeoutException) return true;
+    if (error is SocketException) return true;
+    if (error is http.ClientException) return true;
+    final text = error.toString().toLowerCase();
+    return text.contains('connection refused') ||
+        text.contains('connection reset') ||
+        text.contains('failed host lookup') ||
+        text.contains('network is unreachable') ||
+        text.contains('broken pipe') ||
+        text.contains('network unreachable');
+  }
+
+  /// Manda una petición de Firestore con red de seguridad del relay del S7.
+  ///
+  /// Si [FirebaseConfig] tenía el relay por alcanzable y la petición muere por
+  /// conexión (`Connection refused`, `SocketException`, `TimeoutException`),
+  /// se marca como caído y se reintenta UNA sola vez: en cuanto
+  /// `markRelayUnreachable()` corre, `firestoreBaseUrl` devuelve el endpoint de
+  /// Google, así que el reintento va directo a la nube sin reiniciar la app y
+  /// sin volver a tocar el relay en el resto de la sesión. Ésta es la parte de
+  /// «y deja de tocarlo» del fallback: la sonda del arranque cubre al usuario
+  /// que nunca estuvo en la LAN, y ésta cubre al `relay.py` que se cae a
+  /// media sesión.
+  ///
+  /// Reintentar es seguro porque todo lo que este servicio manda es
+  /// idempotente: los PATCH llevan `updateMask.fieldPaths`, los DELETE van por
+  /// path, y un error de conexión significa que la petición nunca recibió
+  /// respuesta. Un error con código HTTP se propaga tal cual.
+  Future<http.Response> _sendWithRelayFallback({
+    required String label,
+    required Uri Function() urlBuilder,
+    required Future<http.Response> Function(Uri url) send,
+  }) async {
+    final relayWasUsable = FirebaseConfig.relayUsable;
+    try {
+      return await send(urlBuilder());
+    } catch (error) {
+      if (!relayWasUsable || !isConnectionFailure(error)) rethrow;
+      FirebaseConfig.markRelayUnreachable();
+      debugPrint('Relay del S7 sin respuesta en $label: '
+          'reintento directo a Google.');
+      return await send(urlBuilder());
+    }
+  }
+
+  /// Misma ayuda, expuesta para pruebas (el binario de pruebas se compila sin
+  /// `--dart-define=FB_RELAY_HOST`, así que `relayUsable` es `false` y sólo se
+  /// puede ejercitar el camino de «sin relay: propaga la primera vez»).
+  @visibleForTesting
+  Future<http.Response> sendWithRelayFallbackForTest({
+    required String label,
+    required Uri Function() urlBuilder,
+    required Future<http.Response> Function(Uri url) send,
+  }) =>
+      _sendWithRelayFallback(
+        label: label,
+        urlBuilder: urlBuilder,
+        send: send,
+      );
 
   // ---------------------------------------------------------------------------
   // 1. SERIALIZACIÓN FIRESTORE REST (Dart Map <-> Firestore Value Formats)
@@ -131,8 +198,11 @@ class InutilFirestoreService {
   // 2. DOCUMENTOS Y COLECCIONES
   // ---------------------------------------------------------------------------
   Future<Map<String, dynamic>?> getDocument(String path) async {
-    final url = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path');
-    final response = await http.get(url, headers: _headers());
+    final response = await _sendWithRelayFallback(
+      label: path,
+      urlBuilder: () => Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path'),
+      send: (url) => http.get(url, headers: _headers()),
+    );
     if (response.statusCode == 404) return null;
     if (response.statusCode != 200) {
       // Un 403/500 no es «el documento no existe»: es que el proyecto o las
@@ -166,9 +236,12 @@ class InutilFirestoreService {
     Map<String, dynamic> data, {
     bool merge = true,
   }) async {
-    final url = buildPatchUri(path, data.keys, merge: merge);
     final body = jsonEncode(_encodeFields(data));
-    final response = await http.patch(url, headers: _headers(), body: body);
+    final response = await _sendWithRelayFallback(
+      label: 'PATCH $path',
+      urlBuilder: () => buildPatchUri(path, data.keys, merge: merge),
+      send: (url) => http.patch(url, headers: _headers(), body: body),
+    );
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return true;
     }
@@ -178,8 +251,11 @@ class InutilFirestoreService {
   }
 
   Future<bool> deleteDocument(String path) async {
-    final url = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path');
-    final response = await http.delete(url, headers: _headers());
+    final response = await _sendWithRelayFallback(
+      label: 'DELETE $path',
+      urlBuilder: () => Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path'),
+      send: (url) => http.delete(url, headers: _headers()),
+    );
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 
@@ -195,12 +271,15 @@ class InutilFirestoreService {
     int pageSize = 50,
     String idField = 'docId',
   }) async {
-    final url = Uri.parse(
-      '${FirebaseConfig.firestoreBaseUrl}/$path?pageSize=$pageSize',
+    final response = await _sendWithRelayFallback(
+      label: 'LIST $path',
+      urlBuilder: () => Uri.parse(
+        '${FirebaseConfig.firestoreBaseUrl}/$path?pageSize=$pageSize',
+      ),
+      send: (url) => http
+          .get(url, headers: _headers())
+          .timeout(const Duration(seconds: 5)),
     );
-    final response = await http
-        .get(url, headers: _headers())
-        .timeout(const Duration(seconds: 5));
     if (response.statusCode == 404) return const [];
     if (response.statusCode != 200) {
       throw FirestoreOperationException(path, response.statusCode, response.body);
@@ -298,9 +377,13 @@ class InutilFirestoreService {
 
   Future<List<Map<String, dynamic>>> getAllUsers() async {
     try {
-      final url = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/users?pageSize=100');
-      final response = await http.get(url, headers: _headers()).timeout(
-        const Duration(seconds: 4),
+      final response = await _sendWithRelayFallback(
+        label: 'LIST users',
+        urlBuilder: () =>
+            Uri.parse('${FirebaseConfig.firestoreBaseUrl}/users?pageSize=100'),
+        send: (url) => http
+            .get(url, headers: _headers())
+            .timeout(const Duration(seconds: 4)),
       );
       if (response.statusCode != 200) {
         debugPrint('Firestore getAllUsers info: ${response.statusCode}');
