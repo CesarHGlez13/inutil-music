@@ -277,7 +277,12 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Inútil Music");
   }
 
-  gtk_window_set_position(window, GTK_WIN_POS_CENTER);
+  // No explicit position here. GTK_WIN_POS_CENTER makes GTK publish a
+  // program-specified location in WM_NORMAL_HINTS, and a client-side-decorated
+  // window under XWayland then refuses the compositor's maximize geometry: the
+  // frame grows to the full screen while GTK keeps painting (header bar
+  // included) inside the old rectangle, leaving the rest black. Letting the
+  // window manager place the window keeps native maximize working.
   gtk_window_set_default_size(window, 1280, 720);
   gtk_widget_set_size_request(GTK_WIDGET(window), 960, 600);
 

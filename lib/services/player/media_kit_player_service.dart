@@ -658,16 +658,19 @@ class MediaKitPlayerService
         if (!isCurrent()) return false;
       }
       late final CrossfadeRamp ramp;
+      // Both decks carry the same recording, so any real overlap phase-mixes
+      // identical waveforms and produces destructive comb filtering (the
+      // audible dip). Hand off within a single tick instead: the first tick
+      // lands at full progress, muting the outgoing deck exactly when the
+      // incoming one reaches full gain.
       ramp = CrossfadeRamp(
-        duration: const Duration(milliseconds: 100),
+        duration: const Duration(milliseconds: 20),
         tickInterval: const Duration(milliseconds: 20),
         applyGains: (gains) async {
           if (!isCurrent() || !identical(_crossfadeRamp, ramp)) {
             ramp.cancel();
             return;
           }
-          // Both decks carry the same recording. Linear amplitude gains avoid
-          // the level increase an equal-power overlap would add here.
           await _writeCrossfadeVolumes(
             outgoing: outgoing,
             incoming: incoming,

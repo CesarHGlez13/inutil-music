@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:inutil_music/core/firebase/firebase_playback_sync_service.dart';
+import 'package:inutil_music/core/firebase/firebase_sync_providers.dart';
 import 'package:inutil_music/features/music/domain/entities/local_track.dart';
 import 'package:inutil_music/features/music/domain/entities/playlist.dart';
 import 'package:inutil_music/features/music/domain/entities/track_info.dart';
@@ -889,6 +891,13 @@ class _Fixture {
         ),
         playbackHistorySinkProvider.overrideWithValue(_History()),
         desktopMediaSessionFactoryProvider.overrideWithValue(() => _Session()),
+        // El grafo real PlayerController <-> InutilPlaybackSyncService cicla al
+        // montar en tests (el provider escucha el controller y el controller
+        // escucha el provider). Se rompe el ciclo con el singleton pelado.
+        inutilPlaybackSyncProvider.overrideWith(
+          (ref) => InutilPlaybackSyncService.instance,
+          disposeNotifier: false,
+        ),
       ],
     );
   }
