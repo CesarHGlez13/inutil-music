@@ -233,7 +233,7 @@ class InutilPromoPopupService {
   Future<InutilPopupCampaign?> _fetchRemoteCampaign() async {
     try {
       final uri = Uri.parse(
-        'https://firestore.googleapis.com/v1/projects/${FirebaseConfig.projectId}/databases/(default)/documents/app_config/promo_popup?key=${FirebaseConfig.apiKey}',
+        '${FirebaseConfig.firestoreBaseUrl}/app_config/promo_popup?key=${FirebaseConfig.apiKey}',
       );
       final response = await http.get(uri).timeout(const Duration(seconds: 4));
       if (response.statusCode != 200) return null;

@@ -40,7 +40,7 @@ class InutilStorageService {
       final downloadToken = json['downloadTokens'] as String?;
       final name = json['name'] as String? ?? storagePath;
       final encodedName = Uri.encodeComponent(name);
-      return 'https://firebasestorage.googleapis.com/v0/b/${FirebaseConfig.storageBucket}/o/$encodedName?alt=media${downloadToken != null ? '&token=$downloadToken' : ''}';
+      return '${FirebaseConfig.storageBaseUrl}/$encodedName?alt=media${downloadToken != null ? '&token=$downloadToken' : ''}';
     }
 
     debugPrint('Error subiendo imagen a Firebase Storage: ${response.body}');

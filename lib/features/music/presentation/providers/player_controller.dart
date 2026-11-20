@@ -200,16 +200,54 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     ref.listen<InutilPlaybackSyncService>(
       inutilPlaybackSyncProvider,
       (previous, syncService) {
+        final remote = syncService.remoteSession;
+        final current = state.value;
+
         if (InutilPlaybackSyncService.isDesktopHost ||
             syncService.isCurrentDeviceActive) {
+          // Somos el altavoz (o el PC anfitrión): lo que reporte la nube no
+          // pisa nuestro estado local. PERO un estado que antes espejó al par
+          // no puede seguir diciendo "reproduciendo" encima de un motor local
+          // silencioso: así quedaba el reproductor colgado media hora.
+          if (current != null &&
+              current.isRemote &&
+              current.status == PlayerStatus.playing &&
+              service.currentSnapshot.status != PlayerStatus.playing) {
+            state = AsyncData(
+              current.copyWith(
+                status: service.currentSnapshot.status,
+                playWhenReady: false,
+                position: service.currentSnapshot.position,
+                isRemote: false,
+              ),
+            );
+          }
           return;
         }
-        final remote = syncService.remoteSession;
-        if (remote == null || remote.trackId.isEmpty) return;
-        final current = state.value;
+
+        if (remote == null || remote.trackId.isEmpty) {
+          // Perdimos de vista la sesión del altavoz: el mando muestra la
+          // verdad de su propio motor (silencioso), no el último estado
+          // espejado que se había quedado pegado en pantalla.
+          if (current != null && current.isRemote) {
+            state = AsyncData(
+              current.copyWith(
+                status: service.currentSnapshot.status,
+                playWhenReady: false,
+                position: service.currentSnapshot.position,
+                isRemote: false,
+              ),
+            );
+          }
+          return;
+        }
+
         final newStatus =
             remote.isPlaying ? PlayerStatus.playing : PlayerStatus.paused;
-        final newPosition = Duration(milliseconds: remote.positionMs);
+        // El altavoz escribe su posición cada ~8 s; entre escrituras hay que
+        // contar el tiempo transcurrido. Sin esto la barra del mando se queda
+        // congelada aunque la PC esté avanzando.
+        final newPosition = Duration(milliseconds: remote.estimatedPositionMs);
         if (current != null &&
             current.isRemote &&
             current.trackId == remote.trackId &&

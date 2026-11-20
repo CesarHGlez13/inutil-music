@@ -147,6 +147,50 @@ class PlaybackSyncSession {
   final dynamic pendingCommandParam;
   final String pendingCommandIssuerId;
 
+  /// Posición estimada **en el instante [now]**. Así se puede probar sin depender
+  /// del reloj del equipo (el test usa un `now` fijo); ver
+  /// test/core/firebase/playback_session_staleness_test.dart.
+  int estimatedPositionMsAt(DateTime now) {
+    final stamp = updatedAt;
+    if (stamp == null || !isPlaying || durationMs <= 0) return positionMs;
+    final elapsed = now.difference(stamp).inMilliseconds;
+    if (elapsed <= 0) return positionMs;
+    final advanced = positionMs + elapsed;
+    return advanced > durationMs ? durationMs : advanced;
+  }
+
+  /// Posición estimada **en este instante** para el dispositivo que solo manda
+  /// (el mando a distancia). El altavoz escribe la sesión cada ~8 s, así que
+  /// entre escrituras hay que contar el tiempo transcurrido: sin esto la barra
+  /// se queda congelada en el último refresco y parece "colgada sin avanzar".
+  /// Se topa en la duración, nunca la rebasa.
+  int get estimatedPositionMs => estimatedPositionMsAt(DateTime.now());
+
+  PlaybackSyncSession copyWith({
+    bool? isPlaying,
+    int? positionMs,
+    DateTime? updatedAt,
+  }) {
+    return PlaybackSyncSession(
+      activeDeviceId: activeDeviceId,
+      activeDeviceName: activeDeviceName,
+      activeDevicePlatform: activeDevicePlatform,
+      trackId: trackId,
+      title: title,
+      artist: artist,
+      album: album,
+      thumbnailUrl: thumbnailUrl,
+      positionMs: positionMs ?? this.positionMs,
+      durationMs: durationMs,
+      isPlaying: isPlaying ?? this.isPlaying,
+      updatedAt: updatedAt ?? this.updatedAt,
+      pendingCommandId: pendingCommandId,
+      pendingCommandType: pendingCommandType,
+      pendingCommandParam: pendingCommandParam,
+      pendingCommandIssuerId: pendingCommandIssuerId,
+    );
+  }
+
   Map<String, dynamic> toJson() => {
     'activeDeviceId': activeDeviceId,
     'activeDeviceName': activeDeviceName,
@@ -289,6 +333,20 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   /// canción anterior y no debe pisar la sesión optimista del mando.
   static const Duration remoteHandoverGrace = Duration(seconds: 20);
 
+  /// Ventana tras la cual un estado que sigue diciendo `isPlaying` pero dejó de
+  /// refrescarse es un **fantasma**: el altavoz ya no escribe (cerró la app, se
+  /// le cayó la red o su escritura no pasó por el relay). Mostrarlo como
+  /// reproducción en curso deja el mando colgado fingiendo que suena — el bug
+  /// medido: sesión congelada 28 min en `positionMs` 5611/186161.
+  static const Duration sessionStaleAfter = Duration(seconds: 20);
+
+  /// Ventana durante la cual un dispositivo que acaba de ceder la reproducción
+  /// a otro **no** se declara altavoz activo, aunque pierda de vista al par.
+  /// Sin esto un mando silencioso se cree el que suena y pisa el documento de
+  /// la nube con su snapshot congelado (`isCurrentDeviceActive` era true solo
+  /// porque `_currentRemoteSession` se había vacío).
+  static const Duration handoffAuthorityGrace = Duration(seconds: 45);
+
   final InutilAuthService _auth = InutilAuthService.instance;
   final InutilFirestoreService _firestore = InutilFirestoreService.instance;
 
@@ -299,6 +357,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
   PlaybackSyncSession? _currentLocalSession;
   PlaybackSyncSession? _currentRemoteSession;
+
+  /// Equipo al que acabamos de ceder la reproducción y hasta cuándo seguimos
+  /// creyendo que es él quien suena, aunque perdamos su sesión de vista (LAN
+  /// barrida, firewall, presencia caducada). Es lo que evita que un mando
+  /// silencioso se declare altavoz activo y congele la pantalla.
+  String _handedOffDeviceId = '';
+  String _handedOffDeviceName = '';
+  DateTime _handedOffUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Canción transferida a un altavoz remoto que aún no la ha confirmado, y
   /// instante hasta el cual seguimos esperando su confirmación.
@@ -338,7 +404,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   DateTime _lastSubnetSweep = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _routeSuppressedUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
-  PlaybackSyncSession? get remoteSession => _currentRemoteSession ?? _currentLocalSession;
+  /// Lo que este dispositivo debe **mostrar** como "suena ahora": la sesión del
+  /// altavoz si la tenemos y, si no, la nuestra — pero solo mientras siga
+  /// fresca. [visibleSession] es lo que impide que un snapshot viejo que
+  /// todavía dice `isPlaying` siga fingiendo reproducción en curso.
+  PlaybackSyncSession? get remoteSession => visibleSession(
+    remote: _currentRemoteSession,
+    local: _currentLocalSession,
+    now: DateTime.now(),
+  );
+
   LanDevicePeer? get autoPairedPeer => _autoPairedPeer;
   List<LanDevicePeer> get discoveredPeers =>
       _discoveredPeers.values.where(isPeerOnline).toList();
@@ -654,6 +729,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (trackId.isEmpty) return;
     _remoteHandoverTrackId = trackId;
     _remoteHandoverUntil = DateTime.now().add(remoteHandoverGrace);
+    // Desde ya somos el mando, no el altavoz: si perdemos de vista al par no
+    // debemos declararnos activos y pisar su sesión con la nuestra.
+    _markHandoffToPeer();
   }
 
   /// Cierra la espera cuando el altavoz (por LAN o por la nube) reporta justo
@@ -684,15 +762,107 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     return true;
   }
 
-  /// Si este dispositivo es el que actualmente reproduce el audio físicamente.
-  bool get isCurrentDeviceActive {
-    if (_currentRemoteSession == null) return true;
-    return _currentRemoteSession!.activeDeviceId == _auth.deviceId;
+  // ── Política de "¿qué está sonando de verdad?" ─────────────────────────────
+  // Todo el estado sincronizado se apoya en `updatedAt`: si el altavoz dejó de
+  // escribir, el dato por bueno ya no describe la realidad, por muy
+  // "reproduciendo" que diga. Estas funciones puras son las que deciden y están
+  // cubiertas por test/core/firebase/playback_session_staleness_test.dart.
+
+  /// true si [s] dice estar reproduciendo pero nadie lo refresca desde hace más
+  /// de [sessionStaleAfter].
+  static bool sessionIsGhost(PlaybackSyncSession s, {required DateTime now}) {
+    final stamp = s.updatedAt;
+    if (!s.isPlaying || stamp == null) return false;
+    return now.difference(stamp) > sessionStaleAfter;
   }
 
+  /// Sesión que el dispositivo debe mostrar: manda la del altavoz ([remote]);
+  /// si no la hay, la local ([local]). Cualquiera que diga `isPlaying` sin
+  /// refrescarse se marca **terminada**: es la única forma de que el mando se
+  /// descoloque y la cola pueda avanzar.
+  static PlaybackSyncSession? visibleSession({
+    required PlaybackSyncSession? remote,
+    required PlaybackSyncSession? local,
+    required DateTime now,
+  }) {
+    final candidate = remote ?? local;
+    if (candidate == null || candidate.trackId.isEmpty) return null;
+    if (!sessionIsGhost(candidate, now: now)) return candidate;
+    final end =
+        candidate.durationMs > 0 ? candidate.durationMs : candidate.positionMs;
+    return candidate.copyWith(isPlaying: false, positionMs: end);
+  }
+
+  /// true si [deviceId] es el altavoz. Un mando que acaba de ceder la
+  /// reproducción ([awaitingRemoteSpeaker]) NO lo es aunque pierda de vista al
+  /// par; eso es lo que evita que se declare activo y congele la pantalla.
+  static bool deviceIsCurrentSpeaker({
+    required PlaybackSyncSession? remote,
+    required String deviceId,
+    required bool awaitingRemoteSpeaker,
+  }) {
+    if (remote != null) return remote.activeDeviceId == deviceId;
+    return !awaitingRemoteSpeaker;
+  }
+
+  /// true si el documento de la nube [doc] debe reemplazar lo guardado
+  /// ([stored]). Compara con `>=` y no con `>`: un documento que vuelve a
+  /// igualar el stamp ya guardado tiene que re-adoptarse, si no el mando se
+  /// queda colgado en el último valor para siempre.
+  static bool shouldAdoptDocument({
+    required PlaybackSyncSession? stored,
+    required PlaybackSyncSession doc,
+  }) {
+    if (stored == null) return true;
+    final stamp = doc.updatedAt;
+    if (stamp == null) return false;
+    final old = stored.updatedAt;
+    if (old == null) return true;
+    return !stamp.isBefore(old);
+  }
+
+  /// Registra que acabamos de pasarle la reproducción a otro equipo: durante
+  /// [handoffAuthorityGrace] no nos declaramos altavoz, aunque perdamos de
+  /// vista al par (LAN barrida por el firewall, presencia caducada, etc.).
+  void _markHandoffToPeer({String? deviceId, String? deviceName}) {
+    final peer = _autoPairedPeer;
+    final id = deviceId ?? peer?.deviceId ?? '';
+    if (id.isEmpty || id == _auth.deviceId) return;
+    _handedOffDeviceId = id;
+    _handedOffDeviceName = deviceName ?? peer?.deviceName ?? '';
+    _handedOffUntil = DateTime.now().add(handoffAuthorityGrace);
+  }
+
+  /// Este dispositivo sigue creyendo que otro es el altavoz: cedió hace menos
+  /// de [handoffAuthorityGrace] y sigue a la espera de que lo confirme.
+  bool get _awaitingRemoteSpeaker =>
+      _handedOffDeviceId.isNotEmpty &&
+      _handedOffDeviceId != _auth.deviceId &&
+      DateTime.now().isBefore(_handedOffUntil);
+
+  /// Ya no hay nadie al otro lado a quien esperar: este dispositivo recupera el
+  /// control de su propio audio (lo usa el usuario al pulsar "activar").
+  void _clearHandoffAuthority() {
+    _handedOffDeviceId = '';
+    _handedOffDeviceName = '';
+    _handedOffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  /// Si este dispositivo es el que actualmente reproduce el audio físicamente.
+  bool get isCurrentDeviceActive => deviceIsCurrentSpeaker(
+    remote: _currentRemoteSession,
+    deviceId: _auth.deviceId,
+    awaitingRemoteSpeaker: _awaitingRemoteSpeaker,
+  );
+
   String get activeDeviceDisplayName {
-    if (_currentRemoteSession == null) return _auth.deviceName;
-    return _currentRemoteSession!.activeDeviceName;
+    if (_currentRemoteSession != null) {
+      return _currentRemoteSession!.activeDeviceName;
+    }
+    if (_awaitingRemoteSpeaker && _handedOffDeviceName.isNotEmpty) {
+      return _handedOffDeviceName;
+    }
+    return _auth.deviceName;
   }
 
   /// Inicia el servidor LAN y la sincronización automática.
@@ -831,14 +1001,24 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       }
 
       if (path == '/api/session') {
-        final session = _currentLocalSession ?? _currentRemoteSession;
-        final payload = session?.toJson() ?? {
-          'activeDeviceId': _auth.deviceId,
-          'activeDeviceName': _auth.deviceName,
-          'activeDevicePlatform': _auth.devicePlatform,
-          'isPlaying': false,
-          'trackId': '',
-        };
+        // Respondemos con **lo que este equipo muestra**, no con su snapshot
+        // local congelado: si somos el mando, la sesión del altavoz. Y con la
+        // posición estimada a este instante, para que el otro mando no vea la
+        // barra quieta entre escrituras del altavoz.
+        final session = remoteSession;
+        final Map<String, dynamic> payload;
+        if (session == null) {
+          payload = {
+            'activeDeviceId': _auth.deviceId,
+            'activeDeviceName': _auth.deviceName,
+            'activeDevicePlatform': _auth.devicePlatform,
+            'isPlaying': false,
+            'trackId': '',
+          };
+        } else {
+          payload = session.toJson();
+          payload['positionMs'] = session.estimatedPositionMs;
+        }
         request.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
@@ -1038,6 +1218,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (_autoPairedPeer?.deviceId == peer.deviceId) return;
     _autoPairedPeer = peer;
     _currentRemoteSession = null;
+    // Desde ya somos el mando: no nos declararemos altavoz aunque tardemos en
+    // ver la sesión de [peer] (LAN lenta, documento caducado, etc.).
+    _markHandoffToPeer(deviceId: peer.deviceId, deviceName: peer.deviceName);
     debugPrint('Inútil LAN: destino remoto seleccionado: ${peer.deviceName} (${peer.ip}:${peer.port})');
     unawaited(_fetchSessionFromPeer(peer));
     notifyListeners();
@@ -1257,10 +1440,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     }
 
     // Sin un destino al que mandar los comandos, la sesión que mostrábamos del
-    // equipo remoto ya no es accionable: el reproductor local vuelve a mandar.
+    // equipo remoto ya no es accionable: el reproductor local vuelve a mandar
+    // — pero solo después de la gracia de cesión, para que un mando silencioso
+    // no pise con su snapshot congelado la sesión del altavoz que acaba de
+    // perder de vista.
     if (dropped &&
         _currentRemoteSession != null &&
         _currentRemoteSession!.activeDeviceId != _auth.deviceId) {
+      _markHandoffToPeer(
+        deviceId: _currentRemoteSession!.activeDeviceId,
+        deviceName: _currentRemoteSession!.activeDeviceName,
+      );
       _currentRemoteSession = null;
     }
     // Sin cambios reales no hay que reconstruir el panel de dispositivos cada
@@ -1356,12 +1546,22 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // anterior y pisaría la sesión optimista del mando.
           if (!_isAwaitingRemoteHandover(session)) {
             _currentRemoteSession = session;
+            if (session.activeDeviceId != _auth.deviceId) {
+              _markHandoffToPeer(
+                deviceId: session.activeDeviceId,
+                deviceName: session.activeDeviceName,
+              );
+            }
             notifyListeners();
           }
         } else if (_currentRemoteSession != null &&
             _currentRemoteSession!.activeDeviceId == peer.deviceId &&
-            _currentLocalSession?.trackId == null) {
+            (_currentLocalSession == null ||
+                _handedOffDeviceId == peer.deviceId)) {
           // El peer ya no tiene nada cargado: el mando deja de mostrar sesión.
+          // Antes esta rama estaba atada a que el mando no tuviera canción
+          // local, y como su snapshot local queda congelado al ceder, nunca
+          // llegaba a ejecutarse: el reproductor se quedaba "reproduciendo".
           _currentRemoteSession = null;
           notifyListeners();
         }
@@ -1906,17 +2106,36 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
       if (doc != null) {
         final session = PlaybackSyncSession.fromJson(doc);
-        final fresher = _currentRemoteSession == null ||
-            (session.updatedAt != null &&
-                (_currentRemoteSession!.updatedAt == null ||
-                    session.updatedAt!.isAfter(_currentRemoteSession!.updatedAt!)));
-        // La LAN es más rápida; el documento en la nube sólo gana si es más
-        // reciente, para no pisar el estado que acabamos de leer del par.
-        // Tampoco gana mientras esperamos que confirme una canción que le
-        // acabamos de transferir: aún hablaría de la anterior.
+        final stored = _currentRemoteSession;
+        final fresher = shouldAdoptDocument(stored: stored, doc: session);
+        // La LAN es más rápida; el documento en la nube sólo gana si es al
+        // menos igual de reciente, para no pisar el estado que acabamos de
+        // leer del par. Tampoco gana mientras esperamos que confirme una
+        // canción que le acabamos de transferir: aún hablaría de la anterior.
         if (fresher && !_isAwaitingRemoteHandover(session)) {
+          final refresh = stored == null ||
+              session.trackId != stored.trackId ||
+              session.isPlaying != stored.isPlaying ||
+              (session.updatedAt != null &&
+                  stored.updatedAt != null &&
+                  session.updatedAt!.isAfter(stored.updatedAt!));
           _currentRemoteSession = session;
-          notifyListeners();
+          // Antes solo se adoptaba cuando cambió de canción: por eso la barra
+          // del mando se quedaba quieta, la posición del altavoz nunca llegaba
+          // hasta que empezaba otra pista.
+          if (refresh) notifyListeners();
+        }
+
+        // Mientras la nube siga nombrando a otro equipo como el que suena,
+        // conservamos la autoridad de mando: un mando silencioso no debe
+        // creerse altavoz solo porque su sondeo llegue lento o vacío.
+        if (session.activeDeviceId != _auth.deviceId) {
+          _markHandoffToPeer(
+            deviceId: session.activeDeviceId,
+            deviceName: session.activeDeviceName,
+          );
+        } else {
+          _clearHandoffAuthority();
         }
 
         if (session.activeDeviceId == _auth.deviceId) {
@@ -2047,6 +2266,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
             : sendLanCommand(commandType: 'pause'),
       );
     }
+    // El usuario pidió explícitamente el audio para este equipo: ya no
+    // esperamos a ningún altavoz remoto, somos nosotros.
+    _clearHandoffAuthority();
     _currentRemoteSession = null;
 
     await notifyPlaybackProgress(

@@ -89,8 +89,7 @@ class GitHubReleaseChecker {
   /// usando siempre el manifiesto embebido.
   static Future<Map<String, Object?>?> _fetchFromFirestore() async {
     final firestoreEndpoint = Uri.parse(
-      'https://firestore.googleapis.com/v1/projects/${FirebaseConfig.projectId}'
-      '/databases/(default)/documents/app_config/release',
+      '${FirebaseConfig.firestoreBaseUrl}/app_config/release',
     );
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
     try {

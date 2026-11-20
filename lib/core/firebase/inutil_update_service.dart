@@ -362,7 +362,7 @@ class InutilUpdateService {
   /// `FirebaseConfig.projectId` para que cambiar de proyecto (o usar el
   /// emulador) no exija tocar el código.
   String get _releaseDocumentUrl =>
-      'https://firestore.googleapis.com/v1/projects/${FirebaseConfig.projectId}/databases/(default)/documents/app_config/release';
+      '${FirebaseConfig.firestoreBaseUrl}/app_config/release';
   static const String _prefsCacheKey = 'inutil_music_cached_release_v2';
 
   /// Repositorio de GitHub donde Cesar publica los APK/binarios como assets de

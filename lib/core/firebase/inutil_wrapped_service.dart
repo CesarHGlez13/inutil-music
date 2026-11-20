@@ -558,7 +558,7 @@ class InutilWrappedService {
   Future<int?> _fetchRemoteForcedWrappedYear() async {
     try {
       final uri = Uri.parse(
-        'https://firestore.googleapis.com/v1/projects/${FirebaseConfig.projectId}/databases/(default)/documents/app_config/wrapped_campaign?key=${FirebaseConfig.apiKey}',
+        '${FirebaseConfig.firestoreBaseUrl}/app_config/wrapped_campaign?key=${FirebaseConfig.apiKey}',
       );
       final resp = await http.get(uri).timeout(const Duration(seconds: 4));
       if (resp.statusCode != 200) return null;
