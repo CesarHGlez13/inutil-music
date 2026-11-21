@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.5.15+4273 — 2026-11-21
+
+### Improved — actualizaciones multiplataforma, estabilidad visual y firma de producción
+
+- **Actualizaciones directas en escritorio sin enlaces incorrectos.** Windows y
+  macOS (Apple Silicon e Intel) ahora descargan su instalador nativo (`.exe` y
+  `.pkg`) y Linux prioriza su paquete propio (`.tar.gz`, `.deb` o `.rpm`), sin
+  volver a caer al archivo `.apk` de Android. Todos los instaladores de PC
+  quedan incluidos en el mapa de verificación `checksums` de `release.json`.
+- **Efecto Liquid Glass más estable en Windows.** Se reestructuró
+  `shaders/liquid_glass_refraction.frag` eliminando los `return` tempranos junto
+  a muestreos de textura (`impellerc` compila con 0 advertencias en SkSL, Metal,
+  OpenGL ES y Vulkan, evitando fallos en Windows — flutter/190809).
+- **Mejor diagnóstico de sincronización y red.** Se instrumentaron 26 rutas de
+  error silenciosas en la capa de autenticación, sincronización LAN/nube y
+  actualizaciones para registrar fallos reales sin interrumpir el respaldo.
+- **Firma de producción definitiva en Android y pipeline 8/8 en CI.** Los APKs
+  de Android salen firmados con el certificado de producción propio válido hasta
+  2054; esta versión se publica como actualización opcional (`minSupported 2.5.14`)
+  para facilitar la reinstalación única desde builds anteriores firmados en modo
+  desarrollo.
+
 ## 2.5.14+4272 — 2026-11-20
 
 ### Fixed — la interfaz que César reportó en pantalla

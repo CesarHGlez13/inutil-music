@@ -329,8 +329,12 @@ import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
 lines = [f"# Inútil Music {m['latestVersion']}", ""]
 lines += [f"- {n}" for n in m.get("releaseNotes", [])]
-lines += ["", "Actualización obligatoria: las versiones anteriores a "
-          f"{m.get('minSupportedVersion', m['latestVersion'])} dejan de funcionar.", ""]
+if m.get("mandatory", False):
+    lines += ["", "Actualización obligatoria: las versiones anteriores a "
+              f"{m.get('minSupportedVersion', m['latestVersion'])} dejan de funcionar.", ""]
+else:
+    lines += ["", "Actualización opcional (versión mínima soportada: "
+              f"{m.get('minSupportedVersion', m['latestVersion'])}).", ""]
 open(sys.argv[2], "w", encoding="utf-8").write("\n".join(lines) + "\n")
 PY
   FILES_ARGS=()
