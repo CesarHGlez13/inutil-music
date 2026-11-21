@@ -107,16 +107,13 @@ void main() {
           Duration.zero,
         );
         expect(viewport, findsOneWidget);
-        final coverRect = tester.getRect(surface);
         final videoRect = tester.getRect(viewport);
         // `player_panel.dart` decide `canUseSpotifyFullscreenCanvas`: con UI
         // móvil en retrato suficientemente ancho (por encima del umbral de
         // `fullBleedArtwork`), sin cola lateral, con canción y un estilo que
-        // usa el lienzo de pantalla completa, el vídeo NO se recorta encima
-        // de la carátula: `_SpotifyFullscreenCanvasPlayer` lo echa a pantalla
-        // completa mientras la carátula conserva su cuadro cuadrado con
-        // márgenes. Por eso el tablet vertical de 800×1200 no puede
-        // comparar `videoRect` contra `coverRect`.
+        // usa el lienzo de pantalla completa, `_SpotifyFullscreenCanvasPlayer`
+        // se monta desde el primer cuadro sin montar `player-mode-standard` ni
+        // su `player-artwork-surface`.
         final canvasFullscreen =
             AppPlatform.isMobileTargetPlatform(scenario.platform) &&
             scenario.size.height >= scenario.size.width &&
@@ -129,6 +126,12 @@ void main() {
             reason: 'retrato ancho: el lienzo va a pantalla completa',
           );
           expect(
+            find.byKey(const ValueKey('player-mode-standard')),
+            findsNothing,
+            reason: 'no debe coexistir el layout estándar durante la apertura',
+          );
+          expect(surface, findsNothing);
+          expect(
             videoRect,
             Rect.fromLTWH(
               0,
@@ -138,9 +141,8 @@ void main() {
             ),
             reason: 'el viewport del lienzo ocupa el viewport entero',
           );
-          expect(coverRect.width, coverRect.height);
-          expect(coverRect.width, lessThan(scenario.size.width));
         } else if (scenario.expandedBleed) {
+          final coverRect = tester.getRect(surface);
           expect(videoRect.left, lessThan(coverRect.left));
           expect(videoRect.top, lessThan(coverRect.top));
           expect(videoRect.right, greaterThan(coverRect.right));
@@ -148,6 +150,7 @@ void main() {
           expect(videoRect.width / coverRect.width, lessThanOrEqualTo(1.061));
           expect(videoRect.height / coverRect.height, lessThanOrEqualTo(1.061));
         } else {
+          final coverRect = tester.getRect(surface);
           expect(videoRect, coverRect);
         }
         // El lienzo a pantalla completa monta el buscador de letras
