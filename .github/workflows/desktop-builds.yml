@@ -19,7 +19,13 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
-  FLUTTER_VERSION: "3.47.9"
+  # Alineado con el toolchain que generó `pubspec.lock` (Flutter 3.50.0 /
+  # Dart 3.14 medido con `flutter --version`). Con 3.47.9 el job quality
+  # reventaba en `flutter pub get --enforce-lockfile` porque ese SDK quiere
+  # `test_api 0.7.12` y el lock trae `0.7.14`: “Unable to satisfy
+  # pubspec.yaml using pubspec.lock … Would change 1 dependency”, medido en
+  # https://github.com/CesarHGlez13/inutil-music/actions/runs/44853194063
+  FLUTTER_VERSION: "3.50.0"
 
 jobs:
   quality:
