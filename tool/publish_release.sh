@@ -70,7 +70,8 @@ done
 [ -n "$VERSION" ] || { echo "uso: tool/publish_release.sh <version> [--upload|--local] [--notes-file NOTAS] [--dry-run]" >&2; exit 2; }
 
 # --- artefactos existentes ----------------------------------------------------
-APK_DIR="$PROY/build/app/outputs/flutter-apk"
+APK_DIR="${INUTIL_APK_DIR:-$PROY/build/app/outputs/flutter-apk}"
+DIST_DIR="${INUTIL_DIST_DIR:-$PROY/dist}"
 declare -A FILES=()          # clave -> ruta
 declare -A ABI_OF_KEY=()     # clave -> ABI legible
 add_artifact() { # clave ruta abi
@@ -78,22 +79,27 @@ add_artifact() { # clave ruta abi
   FILES["$1"]="$2"
   ABI_OF_KEY["$1"]="${3:-}"
 }
-add_artifact universal      "$APK_DIR/app-universal-release.apk"     "universal"
-add_artifact arm64_v8a      "$APK_DIR/app-arm64-v8a-release.apk"     "arm64_v8a"
-add_artifact armeabi_v7a    "$APK_DIR/app-armeabi-v7a-release.apk"   "armeabi_v7a"
-add_artifact x86_64         "$APK_DIR/app-x86_64-release.apk"        "x86_64"
-add_artifact linux          "$PROY/dist/inutil_music_linux_x64.tar.gz" ""
-add_artifact linux         "$PROY/dist/Inutil.Music-Linux-x86_64.AppImage" ""
+add_artifact universal      "$APK_DIR/app-universal-release.apk"               "universal"
+add_artifact arm64_v8a      "$APK_DIR/app-arm64-v8a-release.apk"               "arm64_v8a"
+add_artifact armeabi_v7a    "$APK_DIR/app-armeabi-v7a-release.apk"             "armeabi_v7a"
+add_artifact x86_64         "$APK_DIR/app-x86_64-release.apk"                  "x86_64"
+add_artifact linux          "$DIST_DIR/inutil_music_linux_x64.tar.gz"          ""
+add_artifact linux          "$DIST_DIR/Inutil.Music-Linux-x86_64.AppImage"     ""
+add_artifact linux_deb      "$DIST_DIR/InutilMusic-$VERSION-linux-amd64.deb"   ""
+add_artifact linux_rpm      "$DIST_DIR/InutilMusic-$VERSION-linux-x86_64.rpm"  ""
+add_artifact windows        "$DIST_DIR/InutilMusic-$VERSION-Windows-x64-Setup.exe" ""
+add_artifact macos_arm64    "$DIST_DIR/InutilMusic-$VERSION-macOS-arm64.pkg"   ""
+add_artifact macos_x64      "$DIST_DIR/InutilMusic-$VERSION-macOS-x64.pkg"     ""
 
 # El AppImage reemplaza al tar.gz como paquete Linux recomendado.
-APPIMAGE="$PROY/dist/Inutil.Music-Linux-x86_64.AppImage"
-TARGZ="$PROY/dist/inutil_music_linux_x64.tar.gz"
+APPIMAGE="$DIST_DIR/Inutil.Music-Linux-x86_64.AppImage"
+TARGZ="$DIST_DIR/inutil_music_linux_x64.tar.gz"
 if [ -f "$APPIMAGE" ] && [ -f "$TARGZ" ]; then
   FILES[linux]="$APPIMAGE"
 fi
 
 if [ ${#FILES[@]} -eq 0 ]; then
-  echo "no hay artefactos construidos (buscados en $APK_DIR y $PROY/dist)" >&2
+  echo "no hay artefactos construidos (buscados en $APK_DIR y $DIST_DIR)" >&2
   exit 3
 fi
 
@@ -229,6 +235,11 @@ downloads = {}
 sizes = {}
 checksums = {}
 linux_url = ""
+linux_deb_url = ""
+linux_rpm_url = ""
+windows_url = ""
+macos_arm64_url = ""
+macos_x64_url = ""
 for key, path, abi in artifacts:
     name = os.path.basename(path)
     size = os.path.getsize(path)
@@ -241,6 +252,16 @@ for key, path, abi in artifacts:
     ) if mode == "github" else "/api/releases/" + name
     if key == "linux":
         linux_url = url
+    elif key == "linux_deb":
+        linux_deb_url = url
+    elif key == "linux_rpm":
+        linux_rpm_url = url
+    elif key == "windows":
+        windows_url = url
+    elif key == "macos_arm64":
+        macos_arm64_url = url
+    elif key == "macos_x64":
+        macos_x64_url = url
     else:
         downloads[key] = url
         sizes[key] = size
@@ -257,6 +278,12 @@ manifest = {
     .isoformat(timespec="seconds"),
     "apkDownloadUrl": downloads.get("universal") or downloads.get("arm64_v8a") or "",
     "linuxDownloadUrl": linux_url,
+    "linuxDebDownloadUrl": linux_deb_url,
+    "linuxRpmDownloadUrl": linux_rpm_url,
+    "windowsDownloadUrl": windows_url,
+    "macosDownloadUrl": macos_arm64_url or macos_x64_url,
+    "macosArm64DownloadUrl": macos_arm64_url,
+    "macosX64DownloadUrl": macos_x64_url,
     "androidDownloads": downloads,
     "androidDownloadSizes": sizes,
     "packageSizeBytes": sizes.get("arm64_v8a") or sizes.get("universal") or 0,
@@ -373,6 +400,10 @@ if [ "$MODE" = "upload" ]; then
     case "$name" in
       *.apk) ctype="application/vnd.android.package-archive" ;;
       *.AppImage|*.tar.gz) ctype="application/gzip" ;;
+      *.deb) ctype="application/vnd.debian.binary-package" ;;
+      *.rpm) ctype="application/x-rpm" ;;
+      *.exe) ctype="application/vnd.microsoft.portable-executable" ;;
+      *.pkg) ctype="application/octet-stream" ;;
       *) ctype="application/octet-stream" ;;
     esac
     upload "$path" "$name" "$ctype"
@@ -394,6 +425,12 @@ fields = {
     },
     "apkDownloadUrl": {"stringValue": release.get("apkDownloadUrl", "")},
     "linuxDownloadUrl": {"stringValue": release.get("linuxDownloadUrl", "")},
+    "linuxDebDownloadUrl": {"stringValue": release.get("linuxDebDownloadUrl", "")},
+    "linuxRpmDownloadUrl": {"stringValue": release.get("linuxRpmDownloadUrl", "")},
+    "windowsDownloadUrl": {"stringValue": release.get("windowsDownloadUrl", "")},
+    "macosDownloadUrl": {"stringValue": release.get("macosDownloadUrl", "")},
+    "macosArm64DownloadUrl": {"stringValue": release.get("macosArm64DownloadUrl", "")},
+    "macosX64DownloadUrl": {"stringValue": release.get("macosX64DownloadUrl", "")},
     "mandatory": {"booleanValue": bool(release.get("mandatory", False))},
     "publishedAt": {"timestampValue": release["publishedAt"]},
     "releaseNotes": {"arrayValue": {"values": [{"stringValue": n} for n in release.get("releaseNotes", [])]}},

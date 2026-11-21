@@ -1242,7 +1242,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       if (decoded is! Map<String, dynamic>) return null;
       // Reescribimos las URLs relativas para que apunten a este servidor.
       final manifest = Map<String, dynamic>.from(decoded);
-      for (final key in const ['apkDownloadUrl', 'linuxDownloadUrl']) {
+      for (final key in const [
+        'apkDownloadUrl',
+        'linuxDownloadUrl',
+        'linuxDebDownloadUrl',
+        'linuxRpmDownloadUrl',
+        'windowsDownloadUrl',
+        'macosDownloadUrl',
+        'macosArm64DownloadUrl',
+        'macosX64DownloadUrl',
+      ]) {
         final value = (manifest[key] ?? '').toString().trim();
         if (value.startsWith('/')) {
           manifest[key] = 'http://$localAddressHint:$_currentLanPort$value';

@@ -73,13 +73,23 @@ void main() {
       'shaders/liquid_glass_refraction.frag',
     ).readAsStringSync();
     final main = source.substring(source.indexOf('void main()'));
-    final calmReturn = main.indexOf('return;');
+    final calmBranch = main.indexOf(
+      'if (inside_distance >= refraction_height)',
+    );
+    final calmElse = main.indexOf('} else {', calmBranch);
     final normalCalculation = main.indexOf(
       'shape_normal = rounded_rect_normal(',
     );
 
-    expect(calmReturn, greaterThanOrEqualTo(0));
-    expect(normalCalculation, greaterThan(calmReturn));
+    expect(calmBranch, greaterThanOrEqualTo(0));
+    expect(calmElse, greaterThan(calmBranch));
+    expect(
+      main.substring(calmBranch, calmElse),
+      contains(
+        'frag_color = sample_material(material_coordinate) * shape_coverage;',
+      ),
+    );
+    expect(normalCalculation, greaterThan(calmElse));
   });
 
   test('only the droplet bends the interior using the existing growth', () {
@@ -177,11 +187,32 @@ void main() {
         ),
       );
       expect(guard, contains('frag_color = vec4(0.0);'));
-      expect(guard, contains('return;'));
+      expect(guard, contains('} else {'));
       expect(source, contains('u_chromatic_aberration'));
       expect(
         source,
         contains('vec4 purple = sample_material(refracted - dispersed);'),
+      );
+    },
+  );
+
+  test(
+    'shader main avoids early return statements with samplers (flutter/190809)',
+    () {
+      final source = File(
+        'shaders/liquid_glass_refraction.frag',
+      ).readAsStringSync();
+      final main = source
+          .substring(source.indexOf('void main()'))
+          .replaceAll(RegExp(r'//.*'), '');
+      final returns = RegExp(r'\breturn\b').allMatches(main).length;
+      expect(
+        returns,
+        0,
+        reason:
+            'Multiple return statements alongside texture samplers trigger '
+            'impellerc warnings and Windows shader compilation crashes '
+            '(https://github.com/flutter/flutter/issues/190809).',
       );
     },
   );

@@ -26,12 +26,19 @@ class InutilReleaseInfo {
     required this.releaseNotes,
     this.apkDownloadUrl = '',
     this.linuxDownloadUrl = '',
+    this.linuxDebDownloadUrl = '',
+    this.linuxRpmDownloadUrl = '',
+    this.windowsDownloadUrl = '',
+    this.macosDownloadUrl = '',
+    this.macosArm64DownloadUrl = '',
+    this.macosX64DownloadUrl = '',
     this.mandatory = false,
     required this.publishedAt,
     this.androidDownloads = const <String, String>{},
     this.androidDownloadSizes = const <String, int>{},
     this.androidPackageSizeBytes = 0,
     this.minSupportedVersion = '',
+    this.checksums = const <String, String>{},
   });
 
   final String currentVersion;
@@ -39,8 +46,17 @@ class InutilReleaseInfo {
   final List<String> releaseNotes;
   final String apkDownloadUrl;
   final String linuxDownloadUrl;
+  final String linuxDebDownloadUrl;
+  final String linuxRpmDownloadUrl;
+  final String windowsDownloadUrl;
+  final String macosDownloadUrl;
+  final String macosArm64DownloadUrl;
+  final String macosX64DownloadUrl;
   final bool mandatory;
   final DateTime publishedAt;
+
+  /// Mapa opcional `nombre_archivo → sha256` publicado en `release.json`.
+  final Map<String, String> checksums;
 
   /// Versión mínima que sigue funcionando (kill switch). Cuando la versión
   /// instalada queda por debajo, la app ENTERA deja de ser utilizable: el
@@ -130,25 +146,96 @@ class InutilReleaseInfo {
   /// lo publica; por eso [deviceAbi] se pasa explícitamente en lugar de leer
   /// el channel nativo dentro de esta clase, que también se usa en pruebas.
   String downloadUrlForAbi(String deviceAbi) {
-    if (Platform.isAndroid || apkDownloadUrl.trim().isNotEmpty) {
+    if (Platform.isAndroid) {
       final forAbi = apkUrlForAbi(deviceAbi);
       if (forAbi.isNotEmpty) return forAbi;
     }
     return platformDownloadUrl;
   }
 
-  /// Devuelve el enlace de descarga correspondiente a la plataforma actual.
-  String get platformDownloadUrl {
-    if (Platform.isAndroid && apkDownloadUrl.trim().isNotEmpty) {
-      return apkDownloadUrl.trim();
-    }
-    if (Platform.isLinux && linuxDownloadUrl.trim().isNotEmpty) {
-      return linuxDownloadUrl.trim();
-    }
-    if (apkDownloadUrl.trim().isNotEmpty) return apkDownloadUrl.trim();
-    if (linuxDownloadUrl.trim().isNotEmpty) return linuxDownloadUrl.trim();
-    return '';
+  static bool get _isCurrentHostArm64 {
+    final version = Platform.version.toLowerCase();
+    return version.contains('arm64') || version.contains('aarch64');
   }
+
+  /// Devuelve el enlace de descarga para [operatingSystem] sin caer nunca a un
+  /// paquete de otra plataforma (Windows/macOS nunca reciben la URL del APK).
+  String downloadUrlForPlatform(
+    String operatingSystem, {
+    bool isArm64 = false,
+  }) {
+    switch (operatingSystem.trim().toLowerCase()) {
+      case 'android':
+        return apkUrlForAbi('');
+      case 'linux':
+        for (final candidate in <String>[
+          linuxDownloadUrl,
+          linuxDebDownloadUrl,
+          linuxRpmDownloadUrl,
+        ]) {
+          final clean = candidate.trim();
+          if (clean.isNotEmpty) return clean;
+        }
+        return '';
+      case 'windows':
+        return windowsDownloadUrl.trim();
+      case 'macos':
+        final ordered = isArm64
+            ? <String>[
+                macosArm64DownloadUrl,
+                macosDownloadUrl,
+                macosX64DownloadUrl,
+              ]
+            : <String>[
+                macosX64DownloadUrl,
+                macosDownloadUrl,
+                macosArm64DownloadUrl,
+              ];
+        for (final candidate in ordered) {
+          final clean = candidate.trim();
+          if (clean.isNotEmpty) return clean;
+        }
+        return '';
+      default:
+        return '';
+    }
+  }
+
+  /// Deduce la extensión real del instalador a partir de la URL de descarga,
+  /// con respaldo según el sistema operativo cuando la URL no trae sufijo.
+  static String extensionForDownloadUrl(String url, {String? operatingSystem}) {
+    final path = (Uri.tryParse(url)?.path ?? url).trim();
+    final lower = path.toLowerCase();
+    for (final ext in const <String>[
+      '.tar.gz',
+      '.appimage',
+      '.deb',
+      '.rpm',
+      '.exe',
+      '.pkg',
+      '.apk',
+    ]) {
+      if (lower.endsWith(ext)) {
+        return ext == '.appimage' ? '.AppImage' : ext;
+      }
+    }
+    switch ((operatingSystem ?? Platform.operatingSystem).toLowerCase()) {
+      case 'linux':
+        return '.tar.gz';
+      case 'windows':
+        return '.exe';
+      case 'macos':
+        return '.pkg';
+      default:
+        return '.apk';
+    }
+  }
+
+  /// Devuelve el enlace de descarga correspondiente a la plataforma actual.
+  String get platformDownloadUrl => downloadUrlForPlatform(
+    Platform.operatingSystem,
+    isArm64: _isCurrentHostArm64,
+  );
 
   Map<String, dynamic> toJson() => {
     'currentVersion': currentVersion,
@@ -156,12 +243,19 @@ class InutilReleaseInfo {
     'releaseNotes': releaseNotes,
     'apkDownloadUrl': apkDownloadUrl,
     'linuxDownloadUrl': linuxDownloadUrl,
+    'linuxDebDownloadUrl': linuxDebDownloadUrl,
+    'linuxRpmDownloadUrl': linuxRpmDownloadUrl,
+    'windowsDownloadUrl': windowsDownloadUrl,
+    'macosDownloadUrl': macosDownloadUrl,
+    'macosArm64DownloadUrl': macosArm64DownloadUrl,
+    'macosX64DownloadUrl': macosX64DownloadUrl,
     'mandatory': mandatory,
     'minSupportedVersion': minSupportedVersion,
     'publishedAt': publishedAt.toUtc().toIso8601String(),
     'androidDownloads': androidDownloads,
     'androidDownloadSizes': androidDownloadSizes,
     'androidPackageSizeBytes': androidPackageSizeBytes,
+    if (checksums.isNotEmpty) 'checksums': checksums,
   };
 
   factory InutilReleaseInfo.fromJson(
@@ -189,6 +283,16 @@ class InutilReleaseInfo {
       releaseNotes: notes.isEmpty ? _defaultCinemaReleaseNotes : notes,
       apkDownloadUrl: (json['apkDownloadUrl'] as String?)?.trim() ?? '',
       linuxDownloadUrl: (json['linuxDownloadUrl'] as String?)?.trim() ?? '',
+      linuxDebDownloadUrl:
+          (json['linuxDebDownloadUrl'] as String?)?.trim() ?? '',
+      linuxRpmDownloadUrl:
+          (json['linuxRpmDownloadUrl'] as String?)?.trim() ?? '',
+      windowsDownloadUrl: (json['windowsDownloadUrl'] as String?)?.trim() ?? '',
+      macosDownloadUrl: (json['macosDownloadUrl'] as String?)?.trim() ?? '',
+      macosArm64DownloadUrl:
+          (json['macosArm64DownloadUrl'] as String?)?.trim() ?? '',
+      macosX64DownloadUrl:
+          (json['macosX64DownloadUrl'] as String?)?.trim() ?? '',
       mandatory: json['mandatory'] as bool? ?? false,
       minSupportedVersion:
           (json['minSupportedVersion'] as String?)?.trim() ?? '',
@@ -201,7 +305,22 @@ class InutilReleaseInfo {
       ).sizes,
       androidPackageSizeBytes:
           (json['androidPackageSizeBytes'] as num?)?.toInt() ?? 0,
+      checksums: _parseChecksums(json['checksums']),
     );
+  }
+
+  static Map<String, String> _parseChecksums(Object? value) {
+    final plain = _plainValue(value);
+    if (plain is! Map) return const <String, String>{};
+    final result = <String, String>{};
+    for (final entry in plain.entries) {
+      final key = entry.key?.toString().trim() ?? '';
+      final digest = entry.value?.toString().trim() ?? '';
+      if (key.isNotEmpty && digest.isNotEmpty) {
+        result[key] = digest;
+      }
+    }
+    return Map<String, String>.unmodifiable(result);
   }
 
   /// Paquetes Android publicados en `androidDownloads`.
@@ -652,9 +771,7 @@ class InutilUpdateService {
     }
 
     final uri = Uri.parse(url);
-    final isLinuxArchive =
-        Platform.isLinux || url.toLowerCase().endsWith('.tar.gz');
-    final extension = isLinuxArchive ? '.tar.gz' : '.apk';
+    final extension = InutilReleaseInfo.extensionForDownloadUrl(url);
     final sanitizedVersion = release.latestVersion.replaceAll(
       RegExp(r'[^A-Za-z0-9._-]'),
       '_',
@@ -863,12 +980,19 @@ rm -rf "$STAGING"
           : notes,
       apkDownloadUrl: readString('apkDownloadUrl'),
       linuxDownloadUrl: readString('linuxDownloadUrl'),
+      linuxDebDownloadUrl: readString('linuxDebDownloadUrl'),
+      linuxRpmDownloadUrl: readString('linuxRpmDownloadUrl'),
+      windowsDownloadUrl: readString('windowsDownloadUrl'),
+      macosDownloadUrl: readString('macosDownloadUrl'),
+      macosArm64DownloadUrl: readString('macosArm64DownloadUrl'),
+      macosX64DownloadUrl: readString('macosX64DownloadUrl'),
       mandatory: readBool('mandatory'),
       minSupportedVersion: readString('minSupportedVersion'),
       publishedAt: readTimestamp('publishedAt'),
       androidDownloads: downloads.urls,
       androidDownloadSizes: downloads.sizes,
       androidPackageSizeBytes: defaultSize,
+      checksums: InutilReleaseInfo._parseChecksums(fields['checksums']),
     );
   }
 

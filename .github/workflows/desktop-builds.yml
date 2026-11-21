@@ -8,8 +8,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
+    # Sin `tags: ["v*"]`: `gh release create` crea la etiqueta y antes encolaba
+    # una segunda corrida completa de ~55 min redundante (medido en run 44941909271).
 
 permissions:
   contents: read
@@ -907,7 +907,9 @@ jobs:
     name: macOS ${{ matrix.arch }} installer
     needs: [metadata, quality]
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 45
+    # macOS x64 en `macos-26-intel` tardó 35 m 30 s solo en `flutter build macos`
+    # (run 44936852524), cerrando a ~3 min del tope de 45 min. 90 min da margen real.
+    timeout-minutes: 90
     env:
       APP_VERSION: ${{ needs.metadata.outputs.app_version }}
     strategy:
