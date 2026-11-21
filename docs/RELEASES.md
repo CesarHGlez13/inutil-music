@@ -309,14 +309,44 @@
       3 tests del mismo archivo pasaran siempre. Y por qué en local no aparece:
       en la máquina de Cesar el runner no va con ~3900 pruebas en paralelo
       saturando el backlog de `accept()` del kernel; en el runner de CI sí.
-    * Arreglo (`7063723`): `onError` en el `listen` de escucha que se traga el
-      ECONNRESET (forma parte del escenario de abort) y completa `disconnected`
-      por si el reset llega ANTES de aceptar la conexión, para que el
-      `await disconnected.future` del cuerpo no se quede colgado. Control
-      medido: `+4 All tests passed` y stress de 12 corridas seguidas
-      → `ok=12 mal=0` (`scratch/local_gate5.log`).
+    * Primer intento (`7063723`): `onError` en el `listen` de escucha, con la
+      idea de que el ECONNRESET (forma parte del escenario de abort) se trague
+      ahí y de completar `disconnected` por si el reset llega ANTES de aceptar
+      la conexión. **No funcionó.** El run siguiente, `44932442460` (master
+      `7063723`, o sea YA con el `onError` puesto), repitió el MISMO stack
+      (`dart:io _ServerSocket.listen` + `…_test.dart:28:14` +
+      `…_test.dart:12:22`) y el MISMO recuento
+      `3941 tests passed, 1 failed, 43 skipped`. Y el control local tampoco lo
+      podía mostrar: 12 corridas del archivo → `ok=12 mal=0`, y suite completa
+      con `--coverage` → `+3942 ~43: All tests passed!`
+      (`scratch/local_gate5.log`). 1 de 3941 no se ve con 12 corridas.
+    * Mecanismo real, MEDIDO (`scratch/repro_accept_error.dart` 100 corridas y
+      `scratch/repro_accept_error2.dart` 300 corridas del mismo escenario,
+      `scratch/repro_out.txt` / `repro_out2.txt`). `dart:io`
+      (`_RawServerSocket.listen`, visible en
+      `dart-sdk/lib/_internal/vm/bin/socket_patch.dart`) construye un
+      `StreamController(sync: true, onCancel: close)` y su manejador nativo de
+      error hace `controller.addError(e, st); controller.close();`. Cuando esa
+      suscripción ya no está viva, `dart:async` lo entrega a
+      `Zone.current.handleUncaughtError`: el error cae en el **ZONA**, no en la
+      suscripción. El número que lo prueba: en 300 corridas de la forma actual,
+      el `onError` de `server.listen` atrapó **0** errores de `accept()`, y
+      `STILL UNCAUGHT: 4` (`B1`).
+    * Lo que SI contiene el error es un **fork de zona** alrededor del
+      `listen`, porque el `StreamController` de `dart:io` captura
+      `Zone.current` al crearse y `handleUncaughtError` cae entonces en el
+      manejador del propio test. Medido en la misma máquina y con la misma
+      carga: `B3 … accept-error rounds: 17, caught by the forked zone guard:
+      17, STILL UNCAUGHT: 0, rounds fully clean: 300/300`. Se descartó por
+      medición la alternativa intuitiva "`await for` + `try/catch`" sobre el
+      stream de escucha: `B4 … 96 accept-errors + 162 STILL UNCAUGHT` —
+      iterar el stream hace que el error aparezca MUCHO más (96/300 vs 1/300)
+      y encima escapa, porque el `try/catch` del cuerpo no es dueño de la
+      entrega que hace `dart:async`.
     Lección: cuando el gate dice `1 failed` sobre `3941`, hay que leer los
     **frames** del stack antes de tocar un solo assert; el culpable puede ser
-    el plumbing del servidor de pruebas, no la lógica de negocio. Un
-    `ServerSocket.listen` sin `onError` es una bomba de concurrencia que sólo
-    explode bajo saturación.
+    el plumbing del servidor de pruebas, no la lógica de negocio. Y un error de
+    stream tiene **dos puertas de salida** — la suscripción (`onError`) y la
+    zona (`handleUncaughtError`) —: hay que medir por cuál sale antes de
+    tapar, porque cerrar una no cierra la otra. "12 corridas locales verdes"
+    jamás fue un control para un flake de 1/3941: la tasa se mide, no se reza.
