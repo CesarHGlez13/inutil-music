@@ -249,3 +249,74 @@
     revertido el parche, el subconjunto de los 9 archivos vuelve a su estado
     sano en Linux y el `skip` documentado hace que las 24 pruebas de canvas se
     salten aquí y se ejecuten en los runners de Windows/macOS.
+
+20. El paso `Build macOS PKG installer` perdía contra la normalización **NFD**
+    de macOS, y `set -e` + `grep -q` lo volvía una muerte sin diagnóstico.
+    Medido en el run `44903132776` (master `29fca61`), job `macOS arm64`:
+    `pkgbuild` terminó BIEN (`Wrote package to
+    dist/InutilMusic-2.5.14-macOS-arm64.pkg` a las **12:40:37.726Z**) y el paso
+    murió **0.297 s después** (**12:40:38.023Z**), o sea en el
+    `grep -Fq "Inútil Music.app/Contents/MacOS/inutil_music"` del bloque
+    heredado del import base de BStream (`640348e`) — que nunca había llegado a
+    correr en este repo, porque antes el job caía más arriba, en
+    `Build macOS release`, por las llaves simples `${ env.X }` (paso 17).
+    * macOS normaliza los nombres de archivo a **NFD** (`u` + diacrítico
+      separado, 2 code points) mientras que el literal `Inútil` escrito en el
+      YAML llega **NFC** (1 code point). Comparados byte a byte nunca hay
+      coincidencia, y `set -euo pipefail` convierte ese `grep -Fq` sin match en
+      `exit 1` **sin imprimir nada**: el log del runner sólo mostraba
+      `##[error]Process completed with exit code 1`, sin decir qué comando
+      mató el paso.
+    * Arreglo (`1541f07`): todos los anclajes pasan a texto **ASCII puro**
+      (`Music.app/Contents/MacOS/inutil_music` y
+      `-path '*/Contents/MacOS/inutil_music'`), y la `packaged_app` se deriva
+      con tres `dirname` a partir del ejecutable encontrado, así
+      `codesign --verify --deep --strict` sigue verificando el bundle entero y
+      no sólo el binario. Lo mismo amenazaba al
+      `find -type d -name "Inútil Music.app"` del `pkgutil --expand-full`.
+      Se añadieron `echo` de punto de control (`pkgbuild escribió…`,
+      `payload: N rutas`, `el ejecutable está dentro del payload`,
+      `codesign sobre: …`) para que un fallo futuro diga QUÉ comando murió.
+      YAML re-validado: 7 jobs, job macOS con 12 pasos.
+    Lección: en CI multiplataforma **nunca** se ancla una ruta del sistema de
+    archivos a un literal con caracteres no ASCII; el archivo puede existir y
+    aun así no matchear. Y dentro de un bloque `set -e`, todo `grep -q`
+    necesita un `echo` al lado, porque su silencio es indistinguible de
+    "no pasó nada".
+
+21. `ServerSocket.listen` sin `onError`: 1 de 3941 pruebas caídas en CI, y por
+    qué en la máquina de Cesar nunca se ve.
+    El run `44931298241` (master `1541f07`) tumbó el `Required quality gate` en
+    el paso 11 `Run tests` (`flutter test --coverage`) con
+    **`3941 tests passed, 1 failed, 43 skipped`**. Como el gate es
+    prerequisite de todo lo demás, los otros 6 jobs quedaron `skipped` y el
+    `DOWNLOAD_EXIT=1`: ese **1 de 3941** valía literalmente el release entero.
+    La única prueba caída fue
+    `test/services/jiosaavn/jiosaavn_http_transport_test.dart`
+    (`the total deadline aborts a body that keeps sending small chunks`) con
+    `SocketException: Connection reset by peer (OS Error: Connection reset by
+    peer, errno = 104), address = 127.0.0.1, port = 38509` y frames
+    `dart:io _ServerSocket.listen` + `…_test.dart:28:14` + `…_test.dart:12:22`.
+    * El error **no** venía de ningún `expect`: venía del `listen` del socket de
+      escucha. `dart:io` trata un `accept()` interrumpido por un ECONNRESET del
+      propio cliente como un evento de ERROR de la suscripción de escucha, y
+      sin `onError` lo entrega como **error async sin capturar**, que
+      `flutter_test` reporta como "test failed" aunque los asserts hayan pasado.
+    * Por qué sólo ese archivo de los 4 que bindean un puerto: los otros tres
+      que hacen `ServerSocket.bind` (`relay_reachability_fallback_test.dart:97`
+      y `:165`, `cloud_relay_tier_test.dart:350`) nunca llaman `listen`, y
+      `HttpServer.bind` sí maneja ese error por dentro — de ahí que los otros
+      3 tests del mismo archivo pasaran siempre. Y por qué en local no aparece:
+      en la máquina de Cesar el runner no va con ~3900 pruebas en paralelo
+      saturando el backlog de `accept()` del kernel; en el runner de CI sí.
+    * Arreglo (`7063723`): `onError` en el `listen` de escucha que se traga el
+      ECONNRESET (forma parte del escenario de abort) y completa `disconnected`
+      por si el reset llega ANTES de aceptar la conexión, para que el
+      `await disconnected.future` del cuerpo no se quede colgado. Control
+      medido: `+4 All tests passed` y stress de 12 corridas seguidas
+      → `ok=12 mal=0` (`scratch/local_gate5.log`).
+    Lección: cuando el gate dice `1 failed` sobre `3941`, hay que leer los
+    **frames** del stack antes de tocar un solo assert; el culpable puede ser
+    el plumbing del servidor de pruebas, no la lógica de negocio. Un
+    `ServerSocket.listen` sin `onError` es una bomba de concurrencia que sólo
+    explode bajo saturación.
