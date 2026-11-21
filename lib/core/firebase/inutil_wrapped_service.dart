@@ -736,7 +736,11 @@ class _YearBucket {
       if (decoded is Map<String, dynamic>) {
         return _YearBucket.fromMap(year, decoded);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'InutilWrappedService: JSON corrupto en caché del año $year: $e',
+      );
+    }
     return _YearBucket(year: year);
   }
 

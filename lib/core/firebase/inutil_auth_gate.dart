@@ -79,7 +79,11 @@ class _InutilAuthGateState extends ConsumerState<InutilAuthGate> {
         onSignOut: () async {
           try {
             await ref.read(playerControllerProvider.notifier).stop();
-          } catch (_) {}
+          } catch (e) {
+            debugPrint(
+              'InutilAuthGate: no se pudo detener reproducción al cerrar sesión: $e',
+            );
+          }
           await InutilAuthService.instance.signOut();
         },
       );
@@ -1013,7 +1017,11 @@ class _InutilLicenseExpiredScreenState
                   onPressed: () async {
                     try {
                       await ref.read(playerControllerProvider.notifier).stop();
-                    } catch (_) {}
+                    } catch (e) {
+                      debugPrint(
+                        'InutilAuthGate: no se pudo detener reproducción al cerrar sesión: $e',
+                      );
+                    }
                     await InutilAuthService.instance.signOut();
                   },
                   icon: const Icon(

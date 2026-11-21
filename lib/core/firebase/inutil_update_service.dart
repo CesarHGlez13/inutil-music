@@ -573,8 +573,9 @@ class InutilUpdateService {
         await _saveCachedRelease(release);
         return release;
       }
-    } catch (_) {
+    } catch (e) {
       // Sin nube: se intenta la red local y la caché.
+      debugPrint('InutilUpdateService: fallo al leer app_config/release: $e');
     }
 
     final lan = await _fetchLanRelease(currentVersion: effectiveCurrent);
@@ -609,7 +610,11 @@ class InutilUpdateService {
       final prefs = await SharedPreferences.getInstance();
       final custom = (prefs.getString(_manifestUrlPrefKey) ?? '').trim();
       if (custom.isNotEmpty) candidates.add(custom);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'InutilUpdateService: fallo al leer URL de manifiesto en prefs: $e',
+      );
+    }
     final override = _manifestUrlOverride;
     if (override != null) candidates.add(override);
     // GitHub Releases: asset `release.json` de la última versión publicada.
@@ -687,7 +692,9 @@ class InutilUpdateService {
       } else {
         await prefs.setString(_manifestUrlPrefKey, clean);
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilUpdateService: fallo al guardar URL de manifiesto: $e');
+    }
   }
 
   /// Permite al SuperAdmin César publicar una nueva versión en Firestore
@@ -840,10 +847,17 @@ class InutilUpdateService {
       if (!opened) {
         await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint(
+        'InutilUpdateService: no se pudo abrir el instalador local ($e); intentando enlace web',
+      );
       try {
         await launchUrl(fallbackUrl, mode: LaunchMode.externalApplication);
-      } catch (_) {}
+      } catch (fallbackError) {
+        debugPrint(
+          'InutilUpdateService: tampoco se pudo abrir el enlace de respaldo: $fallbackError',
+        );
+      }
     }
   }
 
@@ -1000,7 +1014,11 @@ rm -rf "$STAGING"
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_prefsCacheKey, jsonEncode(release.toJson()));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'InutilUpdateService: no se pudo guardar caché local de release: $e',
+      );
+    }
   }
 
   Future<InutilReleaseInfo?> _loadCachedRelease({

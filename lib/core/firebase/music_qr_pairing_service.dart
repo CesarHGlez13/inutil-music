@@ -271,7 +271,11 @@ class MusicQrPairingService {
       await InutilFirestoreService.instance.deleteDocument(
         '$collection/${session.code}',
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'MusicQrPairingService: no se pudo borrar sesión QR ${session.code}: $e',
+      );
+    }
   }
 
   // ---------------------------------------------------------------------------

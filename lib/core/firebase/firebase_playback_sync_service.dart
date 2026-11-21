@@ -1029,7 +1029,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         unawaited(_probePeer(ip, port));
       }
       notifyListeners();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilSync: no se pudieron cargar hosts LAN guardados: $e');
+    }
   }
 
   Future<void> setAutoPlayOnPc(bool value) async {
@@ -1038,7 +1040,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_autoPlayOnPcPrefKey, value);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilSync: no se pudo guardar autoPlayOnPc: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1443,7 +1447,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           );
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'InutilSync: no se pudieron listar interfaces para broadcast UDP: $e',
+      );
+    }
 
     for (final target in targets) {
       try {
@@ -1467,7 +1475,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
       // Confirmamos por HTTP (cuenta, nombre real y sesión actual).
       unawaited(_probePeer(senderIp, port));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilSync: paquete UDP de descubrimiento inválido: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1525,7 +1535,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           if (dot > 0) subnets.add(ip.substring(0, dot));
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilSync: no se pudieron listar subredes LAN: $e');
+    }
     // Red del emulador de Android.
     subnets.add('10.0.2');
 
@@ -1677,7 +1689,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       final hosts = _liveHosts.take(12).toList();
       await prefs.setStringList(_knownHostsPrefKey, hosts);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilSync: no se pudieron persistir hosts LAN: $e');
+    }
   }
 
   Future<void> _fetchSessionFromPeer(LanDevicePeer peer) async {
@@ -1736,7 +1750,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           notifyListeners();
         }
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint(
+        'InutilSync: error consultando sesión de ${peer.httpBaseUrl}: $e',
+      );
     } finally {
       client.close();
     }
@@ -1978,9 +1995,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           {'deliveredAtMs': DateTime.now().millisecondsSinceEpoch},
         );
       }
-    } catch (_) {
+    } catch (e) {
       // Si no se puede marcar, igual se ejecuta: a estas alturas mandó otro
       // equipo y el usuario espera que suene.
+      debugPrint(
+        'InutilSync: no se pudo marcar comando ${command.id} como entregado: $e',
+      );
     }
 
     if (command.type.isEmpty || onRemoteCommandReceived == null) return;
@@ -2015,7 +2035,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       if (delivered == null && !staleByAge) continue;
       try {
         await _firestore.deleteDocument('users/$uid/$commandsCollection/$id');
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('InutilSync: no se pudo purgar comando $id: $e');
+      }
     }
   }
 
@@ -2577,7 +2599,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           'users/$uid/playback_session/current',
           updated,
         );
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'InutilSync: no se pudo actualizar playback_session/current: $e',
+        );
+      }
     }
   }
 

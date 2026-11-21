@@ -98,7 +98,11 @@ class _InutilInactivityPausedScreenState
         Uri.parse(AppConstants.supportDevelopmentUrl),
         mode: LaunchMode.externalApplication,
       );
-    } catch (_) {}
+    } catch (e) {
+      debugPrint(
+        'InutilInactivityPausedScreen: no se pudo abrir enlace de soporte: $e',
+      );
+    }
   }
 
   @override

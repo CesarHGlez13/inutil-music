@@ -133,7 +133,9 @@ class _InutilUpdateGateState extends ConsumerState<InutilUpdateGate>
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_snoozePrefKey, version.trim());
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilUpdateGate: no se pudo guardar versión pospuesta: $e');
+    }
   }
 
   @override

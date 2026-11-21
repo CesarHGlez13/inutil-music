@@ -491,7 +491,9 @@ class InutilAuthService extends ChangeNotifier {
   Future<void> _deleteSecure(SharedPreferences prefs, String key) async {
     try {
       await _secure.delete(key: key).timeout(_secureTimeout);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('InutilAuthService: fallo al borrar clave segura $key: $e');
+    }
     await prefs.remove(key);
   }
 
@@ -849,7 +851,11 @@ class InutilAuthService extends ChangeNotifier {
           if (e.isNotEmpty) email = e;
           if (d.isNotEmpty) displayName = d;
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'InutilAuthService: no se pudo enriquecer perfil en lookup: $e',
+        );
+      }
 
       _currentUser = InutilUser(
         uid: uid,
@@ -886,7 +892,11 @@ class InutilAuthService extends ChangeNotifier {
         await InutilFirestoreService.instance.setDocument('users/${user.uid}', {
           'currentPhoneDeviceId': '',
         });
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'InutilAuthService: no se pudo limpiar currentPhoneDeviceId: $e',
+        );
+      }
     }
     _validateTimer?.cancel();
     _validateTimer = null;
@@ -898,7 +908,9 @@ class InutilAuthService extends ChangeNotifier {
     if (!testSkipOnlineValidation) {
       try {
         await GoogleSignIn().signOut();
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('InutilAuthService: GoogleSignIn.signOut falló: $e');
+      }
     }
     await _clearSession(prefs);
   }
@@ -1475,7 +1487,11 @@ class InutilAuthService extends ChangeNotifier {
         currentExpiry = raw is DateTime
             ? raw
             : (raw != null ? DateTime.tryParse(raw.toString()) : null);
-      } catch (_) {}
+      } catch (e) {
+        debugPrint(
+          'InutilAuthService: no se pudo leer expiración actual de $uid: $e',
+        );
+      }
       if (currentExpiry != null && currentExpiry.isAfter(DateTime.now())) {
         newExpiresAt = currentExpiry.add(Duration(days: additionalDays));
       } else {
