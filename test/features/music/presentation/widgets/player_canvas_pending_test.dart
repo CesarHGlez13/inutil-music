@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:inutil_music/core/platform/app_platform.dart';
 import 'package:inutil_music/features/music/domain/entities/local_track.dart';
 import 'package:inutil_music/features/music/domain/entities/lyrics_document.dart';
@@ -54,6 +56,15 @@ class _FlippableCanvasResolver extends SpotifyCanvasResolver {
 
   @override
   Future<Uri?> resolve(SpotifyCanvasTrack track) async => answer;
+}
+
+/// Resolver backed by a manual Completer so tests can inspect the opening frame
+/// while the network lookup is still in flight.
+class _DelayedCanvasResolver extends SpotifyCanvasResolver {
+  final Completer<Uri?> completer = Completer<Uri?>();
+
+  @override
+  Future<Uri?> resolve(SpotifyCanvasTrack track) => completer.future;
 }
 
 /// Keeps the standard layout's lyrics preview from scheduling real network
@@ -215,4 +226,39 @@ void main() {
     expect(tester.takeException(), isNull);
     await _unmount(tester);
   }, skip: AppPlatform.current == AppPlatformType.linux);
+
+  testWidgets(
+    'in-flight Canvas lookup mounts Canvas layout on frame 1 with no standard flash',
+    (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final resolver = _DelayedCanvasResolver();
+      final cache = _PendingCanvasCache();
+      final container = _pendingTestContainer(cache: cache, resolver: resolver);
+      addTearDown(container.dispose);
+      await tester.pumpWidget(
+        UncontrolledProviderScope(container: container, child: _phonePlayer()),
+      );
+      await tester.pump();
+
+      // While the Canvas lookup is still unresolved, the fullscreen Canvas
+      // shell is already mounted and the standard square-artwork layout must
+      // never flash or crossfade underneath it.
+      expect(find.byKey(const ValueKey('player-mode-canvas')), findsOneWidget);
+      expect(find.byKey(const ValueKey('player-mode-standard')), findsNothing);
+
+      resolver.completer.complete(_canvasUrl);
+      await tester.pump();
+      await tester.pump();
+
+      expect(cache.activatedVideoUrl, _canvasUrl);
+      expect(find.byKey(const ValueKey('player-mode-canvas')), findsOneWidget);
+      expect(find.byKey(const ValueKey('player-mode-standard')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await _unmount(tester);
+    },
+    skip: AppPlatform.current == AppPlatformType.linux,
+  );
 }

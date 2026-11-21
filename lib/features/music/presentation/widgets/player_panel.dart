@@ -194,6 +194,46 @@ double _expandedSpotifyCanvasOverscan(BuildContext context, double extent) {
   return math.min(12.0, extent * 0.03);
 }
 
+/// Returns `true` when the fullscreen Canvas layout should already be mounted
+/// on the opening frame: either the clip URL is resolved (still downloading) or
+/// the remote Canvas / video-preview lookup is actively in flight. Keeping the
+/// Canvas shell mounted during the network lookup prevents flashing the legacy
+/// square-artwork layout for ~400-800 ms and then ghosting it over the Canvas
+/// layout for another 850 ms.
+@visibleForTesting
+bool playerShouldHoldCanvasLayoutWhilePending({
+  required bool hasResolvedVideoUrl,
+  required bool canvasLookupLoading,
+}) {
+  return hasResolvedVideoUrl || canvasLookupLoading;
+}
+
+/// Duration for `player-canvas-mode-switcher` between standard and fullscreen
+/// Canvas layouts.
+///
+/// Suppresses the 850 ms crossfade when opening from a collapsed off-screen
+/// player (`!wasVisualActive`), starting from idle (`!hadTrack`), or before any
+/// real Canvas video has played (`!hadActiveCanvasVideo`), preventing the old
+/// square-artwork controls from double-exposing on top of the Canvas controls.
+@visibleForTesting
+Duration playerCanvasModeSwitchDuration({
+  required bool disableAnimations,
+  required bool wasVisualActive,
+  required bool hadTrack,
+  required bool hadActiveCanvasVideo,
+  required bool isEnteringCanvas,
+}) {
+  if (disableAnimations ||
+      !wasVisualActive ||
+      !hadTrack ||
+      !hadActiveCanvasVideo) {
+    return Duration.zero;
+  }
+  return isEnteringCanvas
+      ? const Duration(milliseconds: 850)
+      : const Duration(milliseconds: 650);
+}
+
 class PlayerPanel extends ConsumerStatefulWidget {
   const PlayerPanel({
     this.active = true,
@@ -237,6 +277,9 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
   bool _artistNavigationBusy = false;
   bool _albumNavigationBusy = false;
   bool _holdFullscreenCanvas = false;
+  bool _wasVisualActive = false;
+  bool _hadTrack = false;
+  bool _pendingTransitionStateCommit = false;
   Timer? _fullscreenCanvasReleaseTimer;
   final Map<String, _AlbumNavigationTarget> _albumNavigationTargets = {};
   final Set<String> _albumNavigationMisses = {};
@@ -406,9 +449,11 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
         snapshot.status != PlayerStatus.failed &&
         AppPlatform.current != AppPlatformType.linux &&
         AppPlatform.current != AppPlatformType.unsupported;
-    final spotifyCanvasUrl = widget.spotifyCanvasEnabled && remoteArtworkAllowed
-        ? ref.watch(spotifyCanvasUrlProvider(canvasTrack)).value
+    final spotifyCanvasAsync =
+        widget.spotifyCanvasEnabled && remoteArtworkAllowed
+        ? ref.watch(spotifyCanvasUrlProvider(canvasTrack))
         : null;
+    final spotifyCanvasUrl = spotifyCanvasAsync?.value;
     final appleArtworkTrack = AppleAnimatedArtworkTrack(
       title: snapshot.title ?? '',
       artist: snapshot.artist ?? '',
@@ -418,30 +463,38 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
           widget.artworkStyle == PlayerArtworkStyle.expanded &&
           widget.style != PlayerStyle.classicVinyl,
     );
+    final appleArtworkAsync =
+        widget.appleAnimatedArtworkEnabled &&
+            !widget.spotifyCanvasEnabled &&
+            remoteArtworkAllowed
+        ? ref.watch(_appleAnimatedArtworkUrlProvider(appleArtworkTrack))
+        : null;
     final resolvedCanvasUrl =
         widget.appleAnimatedArtworkEnabled &&
             !widget.spotifyCanvasEnabled &&
             remoteArtworkAllowed
-        ? ref.watch(_appleAnimatedArtworkUrlProvider(appleArtworkTrack)).value
+        ? appleArtworkAsync?.value
         : spotifyCanvasUrl;
     // Automatic official Music Video Preview fallback (Spotify Canvas style)
     // when animated artwork is enabled and neither Canvas nor Apple artwork
     // returned a clip. Streams directly via VideoPlayerController without
     // blocking audio playback or the local 10 MB visual cache budget.
-    final fallbackVideoPreviewUrl =
+    final fallbackVideoPreviewAsync =
         resolvedCanvasUrl == null &&
             widget.animatedArtworkEnabled &&
             remoteArtworkAllowed
-        ? ref
-              .watch(
-                trackVideoPreviewProvider((
-                  title: snapshot.title ?? '',
-                  artist: snapshot.artist ?? '',
-                )),
-              )
-              .value
-              ?.videoUrl
+        ? ref.watch(
+            trackVideoPreviewProvider((
+              title: snapshot.title ?? '',
+              artist: snapshot.artist ?? '',
+            )),
+          )
         : null;
+    final fallbackVideoPreviewUrl = fallbackVideoPreviewAsync?.value?.videoUrl;
+    final canvasLookupLoading =
+        (spotifyCanvasAsync?.isLoading ?? false) ||
+        (appleArtworkAsync?.isLoading ?? false) ||
+        (fallbackVideoPreviewAsync?.isLoading ?? false);
     final videoStartOffset =
         widget.appleAnimatedArtworkEnabled && !widget.spotifyCanvasEnabled
         ? animatedArtworkIntroOffset
@@ -635,7 +688,12 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                             eligible: canUseSpotifyFullscreenCanvas,
                             visualActive: visualActive,
                             hasCanvasNow: canvasUrl != null,
-                            pendingCanvas: effectiveVideoSourceUrl != null,
+                            pendingCanvas:
+                                playerShouldHoldCanvasLayoutWhilePending(
+                                  hasResolvedVideoUrl:
+                                      effectiveVideoSourceUrl != null,
+                                  canvasLookupLoading: canvasLookupLoading,
+                                ),
                           );
                       final Widget activePlayerLayout =
                           useSpotifyFullscreenCanvas
@@ -1420,14 +1478,39 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                       ],
                                     ),
                             );
+                      final modeSwitchInDuration =
+                          playerCanvasModeSwitchDuration(
+                            disableAnimations: disableAnimations,
+                            wasVisualActive: _wasVisualActive,
+                            hadTrack: _hadTrack,
+                            hadActiveCanvasVideo: _holdFullscreenCanvas,
+                            isEnteringCanvas: true,
+                          );
+                      final modeSwitchOutDuration =
+                          playerCanvasModeSwitchDuration(
+                            disableAnimations: disableAnimations,
+                            wasVisualActive: _wasVisualActive,
+                            hadTrack: _hadTrack,
+                            hadActiveCanvasVideo: _holdFullscreenCanvas,
+                            isEnteringCanvas: false,
+                          );
+                      if (!_pendingTransitionStateCommit &&
+                          (_wasVisualActive != visualActive ||
+                              _hadTrack != hasTrack)) {
+                        _pendingTransitionStateCommit = true;
+                        final nextVisualActive = visualActive;
+                        final nextHasTrack = hasTrack;
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _pendingTransitionStateCommit = false;
+                          if (!mounted) return;
+                          _wasVisualActive = nextVisualActive;
+                          _hadTrack = nextHasTrack;
+                        });
+                      }
                       return AnimatedSwitcher(
                         key: const ValueKey('player-canvas-mode-switcher'),
-                        duration: disableAnimations
-                            ? Duration.zero
-                            : const Duration(milliseconds: 850),
-                        reverseDuration: disableAnimations
-                            ? Duration.zero
-                            : const Duration(milliseconds: 650),
+                        duration: modeSwitchInDuration,
+                        reverseDuration: modeSwitchOutDuration,
                         switchInCurve: Curves.easeInOutCubic,
                         switchOutCurve: Curves.easeInOutCubic,
                         layoutBuilder: (currentChild, previousChildren) =>

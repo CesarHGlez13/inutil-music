@@ -2,8 +2,13 @@
 
 ## 2.5.15+4273 — 2026-11-21
 
-### Improved — actualizaciones multiplataforma, estabilidad visual y firma de producción
+### Improved — reproductor Canvas sin parpadeo, actualizaciones multiplataforma y firma de producción
 
+- **Reproductor Canvas sin parpadeo ni superposición al abrir canciones.** Al
+  tocar una canción o abrir el reproductor, la vista Canvas a pantalla completa
+  se monta desde el primer cuadro mientras se resuelve el video en segundo
+  plano, eliminando el salto desde la interfaz clásica de carátula cuadrada y
+  la doble exposición durante el fundido.
 - **Actualizaciones directas en escritorio sin enlaces incorrectos.** Windows y
   macOS (Apple Silicon e Intel) ahora descargan su instalador nativo (`.exe` y
   `.pkg`) y Linux prioriza su paquete propio (`.tar.gz`, `.deb` o `.rpm`), sin
