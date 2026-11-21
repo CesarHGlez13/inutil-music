@@ -23,6 +23,7 @@ import 'core/firebase/firebase_playback_sync_service.dart';
 import 'core/firebase/firebase_sync_providers.dart';
 import 'core/firebase/inutil_auth_gate.dart';
 import 'core/firebase/inutil_update_gate.dart';
+import 'core/startup/inutil_settings_hydration_gate.dart';
 
 void main() {
   launchInutilMusicApp();
@@ -435,8 +436,16 @@ class InutilMusicApp extends ConsumerWidget {
           checkForUpdatesOnStartup: checkForUpdatesOnStartup,
           enableFirstRunExperience: enforceLicenseGates,
         );
-        if (!enforceLicenseGates) return home;
-        return InutilUpdateGate(child: InutilAuthGate(child: home));
+        // `settingsControllerProvider` hace I/O real de plataforma, así que el
+        // primer frame siempre lo encuentra sin resolver y `HomePage` cae a sus
+        // defaults (reproductor "Inútil Music" clásico, artwork square, Canvas
+        // apagado). Ver esos defaults y luego lo que el usuario eligió es el
+        // salto de "primero sale la interfaz vieja y luego la correcta": el
+        // lienzo de hidratación pinta el esqueleto esos frames iniciales y
+        // entrega el shell ya con las preferencias reales.
+        final hydrated = InutilSettingsHydrationGate(child: home);
+        if (!enforceLicenseGates) return hydrated;
+        return InutilUpdateGate(child: InutilAuthGate(child: hydrated));
       }(),
     );
   }

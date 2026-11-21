@@ -97,6 +97,9 @@ class AudioServiceMediaSessionCallbackBridge {
 
   Future<void> stop() => _callbacks?.stop() ?? Future<void>.value();
 
+  Future<void> taskRemoved() =>
+      _callbacks?.taskRemoved() ?? Future<void>.value();
+
   Future<void> next() => _callbacks?.next() ?? Future<void>.value();
 
   Future<void> previous() => _callbacks?.previous() ?? Future<void>.value();
@@ -385,6 +388,18 @@ class _DesktopAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> stop() async {
     await _callbacks.stop();
     await super.stop();
+  }
+
+  /// El sistema eliminó la tarea de la app (deslizar fuera de Recientes o
+  /// "Borrar todo"). Sin esta sobreescritura `BaseAudioHandler.onTaskRemoved`
+  /// es un no-op y el FlutterEngine que posee `audio_service` sobrevive a la
+  /// Activity: la música seguía sonando con la app ya cerrada.
+  /// Detenemos la sesión y, como red de seguridad, publicamos `idle` para que
+  /// el plugin libere el servicio en primer plano y destruya ese engine.
+  @override
+  Future<void> onTaskRemoved() async {
+    await _callbacks.taskRemoved();
+    publishIdle();
   }
 
   @override

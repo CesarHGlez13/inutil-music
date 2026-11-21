@@ -247,6 +247,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
     required bool eligible,
     required bool visualActive,
     required bool hasCanvasNow,
+    required bool pendingCanvas,
   }) {
     if (!eligible) {
       _fullscreenCanvasReleaseTimer?.cancel();
@@ -266,6 +267,19 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
       _fullscreenCanvasReleaseTimer?.cancel();
       _fullscreenCanvasReleaseTimer = null;
       _holdFullscreenCanvas = true;
+      return true;
+    }
+    if (pendingCanvas) {
+      // The first frames after a Canvas is chosen have a URL but no file yet:
+      // `videoFileFor()` answers null until the clip finishes downloading.
+      // Painting the Canvas mode anyway keeps the player from opening as the
+      // classic square-artwork layout for the frames the download takes and
+      // then dissolving into the Canvas: `player-canvas-mode-switcher` fades
+      // the two layouts over 850 ms, so a wrong first frame is on screen for
+      // most of a second instead of a single frame. No `_holdFullscreenCanvas`
+      // latch: if the URL disappears before the file lands, the next frame
+      // falls back to the standard layout on its own, with no grace timer to
+      // unwind.
       return true;
     }
     if (_holdFullscreenCanvas) {
@@ -620,6 +634,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                             eligible: canUseSpotifyFullscreenCanvas,
                             visualActive: visualActive,
                             hasCanvasNow: canvasUrl != null,
+                            pendingCanvas: effectiveVideoSourceUrl != null,
                           );
                       final Widget activePlayerLayout = useSpotifyFullscreenCanvas
                           ? KeyedSubtree(

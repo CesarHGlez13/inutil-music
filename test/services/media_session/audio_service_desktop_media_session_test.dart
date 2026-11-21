@@ -194,6 +194,23 @@ void main() {
 
       expect(calls, ['active:next']);
     });
+
+    test(
+      'la eliminación de la tarea llega al reproductor y se ignora al desvincular',
+      () async {
+        final calls = <String>[];
+        final bridge = AudioServiceMediaSessionCallbackBridge();
+        final callbacks = _callbacks('active', calls);
+
+        bridge.attach(callbacks);
+        await bridge.taskRemoved();
+        expect(calls, ['active:taskRemoved']);
+
+        expect(bridge.detach(callbacks), isTrue);
+        await bridge.taskRemoved();
+        expect(calls, ['active:taskRemoved']);
+      },
+    );
   });
 }
 
@@ -234,6 +251,7 @@ DesktopMediaSessionCallbacks _callbacks(String name, List<String> calls) {
     next: () async => calls.add('$name:next'),
     previous: () async => calls.add('$name:previous'),
     stop: () async => calls.add('$name:stop'),
+    taskRemoved: () async => calls.add('$name:taskRemoved'),
     seek: (position) async =>
         calls.add('$name:seek:${position.inMilliseconds}'),
     seekBy: (position) async =>

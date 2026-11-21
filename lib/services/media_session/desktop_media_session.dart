@@ -15,6 +15,7 @@ class DesktopMediaSessionCallbacks {
     required this.next,
     required this.previous,
     required this.stop,
+    required this.taskRemoved,
     required this.seek,
     required this.seekBy,
     required this.setShuffleEnabled,
@@ -28,6 +29,12 @@ class DesktopMediaSessionCallbacks {
   final DesktopMediaAction next;
   final DesktopMediaAction previous;
   final DesktopMediaAction stop;
+
+  /// El sistema operativo eliminó la tarea de la app (deslizar fuera de
+  /// Recientes). La sesión multimedia debe detenerse por completo: sin este
+  /// callback el proceso del reproductor sobrevive a la Activity y la música
+  /// continúa sonando aunque la app ya no esté en pantalla.
+  final DesktopMediaAction taskRemoved;
   final DesktopMediaSeekAction seek;
   final DesktopMediaSeekAction seekBy;
   final DesktopMediaShuffleAction setShuffleEnabled;

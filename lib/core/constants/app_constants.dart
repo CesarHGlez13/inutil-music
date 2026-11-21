@@ -2,13 +2,14 @@ class AppConstants {
   const AppConstants._();
 
   static const appName = 'Inútil Music';
+
   /// Fuente única del número de versión mostrado en Ajustes y usado por el
   /// chequeo de actualizaciones OTA. Debe coincidir con la parte de versión de
-  /// `version:` en `pubspec.yaml` (actualmente `2.5.12+4270`); el incremento
-  /// interno (`+4270`) es el `versionCode` base de Android — Flutter le suma
+  /// `version:` en `pubspec.yaml` (actualmente `2.5.13+4271`); el incremento
+  /// interno (`+4271`) es el `versionCode` base de Android — Flutter le suma
   /// 2000 al dividir por ABI, medido con `aapt`: `+4268` produce 6268 en el
   /// APK `arm64-v8a` — y no se muestra en la interfaz.
-  static const appVersion = '2.5.12';
+  static const appVersion = '2.5.13';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 11;
   static const fileExportChannel = 'inutil_music/file_export';
@@ -19,6 +20,7 @@ class AppConstants {
   static const androidExternalAudioChannel = 'inutil_music/external_audio';
   static const androidAppActivationChannel = 'inutil_music/app_activation';
   static const defaultSearchLimit = 20;
+
   /// «Apoyar el desarrollo» abre el cliente de correo del dispositivo
   /// escribiendo a `supportEmail` (asunto prellenado); todavía no hay medio de
   /// pago propio enlazado. Se usa `mailto:` en lugar de una URL web porque el
@@ -27,15 +29,18 @@ class AppConstants {
   static const supportDevelopmentUrl =
       'mailto:cesarmaster133@gmail.com'
       '?subject=In%C3%BAtil%20Music%20-%20apoyo%20al%20desarrollo';
+
   /// Repositorio propio de Inútil Music (artefactos publicados y notas de
   /// versión). Es la fuente del manifiesto OTA `release.json`; ver §10 del
   /// informe y `docs/RELEASES.md`.
   static const githubRepositoryUrl =
       'https://github.com/CesarHGlez13/inutil-music';
+
   /// Página de descargas: la última Release publicada del repositorio propio,
   /// la misma que resuelve `checkForUpdate()`.
   static const appDownloadUrl =
       'https://github.com/CesarHGlez13/inutil-music/releases/latest';
+
   /// Contacto visible del proyecto (pie de la pantalla «Acerca de»).  La
   /// cuenta de administrador de Firebase sigue en
   /// `bootstrapAdminEmail` (`firebase_auth_service.dart`) porque está ligada al

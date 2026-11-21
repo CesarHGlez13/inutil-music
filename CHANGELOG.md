@@ -1,5 +1,130 @@
 # Changelog
 
+## 2.5.13+4271 — 2026-11-20
+
+### Added
+
+- **Los tres empaquetes publicados llevan por fin los dos servidores dentro del
+  binario.** El release `2.5.12` se construyó sin los ajustes de endpoints, así
+  que la app nunca llegó a apoyarse en el relay del S7 ni en el Worker cloud:
+  medido con `unzip -p <apk> lib/arm64-v8a/libapp.so | strings` sobre el asset
+  publicado en GitHub, `workers.dev` y `192.168.100.27` aparecían **0** veces
+  (el asset es byte-idéntico al build local, `sha256 42a81121…`). Esta versión
+  se construyó con `--dart-define=FB_RELAY_HOST=192.168.100.27` y
+  `--dart-define=FB_CLOUD_RELAY_HOST=inutil-cloud-relay.scada-xiaomi-server.workers.dev`
+  y los tres APK se verifican con la misma medición antes de subirlos.
+- **Capa 2 de datos: la app se apoya en un servidor intermedio en la nube
+  cuando el servidor de casa no está a mano**, y si el de casa se levanta a
+  mitad de la sesión vuelve a él sola, en vez de quedarse toda la sesión
+  hablando directo con Google. Pruebas:
+  `test/core/firebase/relay_reachability_fallback_test.dart` pasa de 11 a 14
+  pruebas y `test/core/firebase/cloud_relay_tier_test.dart` cubre el árbol de
+  decisión `lanRelay → cloudRelay → google` sin levantar servidores.
+
+### Fixed
+
+- **El teléfono se pausa solo porque la nube nombraba un altavoz sin presencia
+  viva.** `playback_session/current` declaraba como altavoz el id
+  `c90ec6c7…`; su documento `users/{uid}/devices/…` **sí existe** (GET a Google
+  responde `HTTP 200`, `isOnline=true`, `appVersion=2.5.12`), pero su
+  `lastSeenMs` tenía **7 559 s (≈2 h)** de viejo y ni el PC (`/api/ping` vacío)
+  ni la TV respondían; como **solo el altavoz escribe la sesión en la nube**, el
+  teléfono se quedó de mando y su reproducción local se congeló. Prueba de que
+  `isOnline` no es fiable: de los 11 documentos `devices` de la cuenta **4**
+  dicen `isOnline=true` y los cuatro tienen `lastSeenMs` de 125 s, 7 486 s,
+  7 559 s y 13 253 s. Por eso el fix valida contra `lastSeenMs`/`lanPeerTtl`,
+  no contra `isOnline`. El id además se re-propagaba solo:
+  `/api/session` del relay LAN responde con `remoteSession.toJson()` y
+  `shouldAdoptDocument` usa `>=`, así que cada equipo que lo leía lo re-adoptaba
+  y lo re-escribía, y el único escape existente se disparaba únicamente cuando
+  un par vinculado desaparece de `_cloudDevices` —el fantasma nunca estuvo ahí.
+  Ahora el altavoz nombrado se valida contra la presencia viva
+  (`declaredSpeakerIsLive`, `_liveSpeakerIds()`: documentos `devices` dentro de
+  `cloudPeerTtl` 90 s + pares LAN que respondieron dentro de `lanPeerTtl` 12 s +
+  par vinculado + id cedido dentro de la gracia). Si el nombrado no late, el
+  equipo que queda recupera el audio local en el siguiente sondeo y su propia
+  escritura de sesión sobrescribe el fantasma, sin reiniciar la app. A/B medido
+  en el Xiaomi `a586e98a` con el altavoz zombie re-inyectado cada 3 s para
+  imitar su heartbeat: con el build anterior el audio real (`dumpsys
+  media_session`) quedó clavado **75 s** en 99 476 ms y el documento en 98 067 ms,
+  y solo se soltó al forzar el revert a mano; con este build el teléfono se
+  recuperó **por sí solo en 3 s y en 6 s** en dos corridas independientes, con
+  el audio avanzando **+3 000 ms** y **+7 001 ms** y sin tocar Firestore.
+  Pruebas: 9 pruebas nuevas en
+  `test/core/firebase/playback_session_staleness_test.dart` (18 → 27),
+  `test/core/firebase/` completo **+149, All tests passed**, y `dart analyze`
+  sobre el servicio editado: No issues found.
+- Un desconocido que vea el código de emparejamiento en la misma red ya no
+  puede cancelar el emparejamiento pendiente de otro: sólo se puede borrar
+  estando firmado en la cuenta o mientras el código siga vigente. Desplegado y
+  probado en vivo el 2026-11-20: código vivo → `DELETE` anónimo `200`; código
+  vencido → `403 PERMISSION_DENIED`; el mismo `DELETE` con credencial → `200`.
+- Las notas del diálogo de actualización se escriben en lenguaje de usuario:
+  las que mencionan la nube de Google, el kill switch o los permisos de
+  administración se colaban en la tarjeta y el diálogo las descarta
+  (`_userFacingReleaseNotes`), así que el cartel salía vacío o con una sola
+  línea genérica.
+
+### Changed
+
+- **La actualización a 2.5.13 es obligatoria: todo lo anterior queda sin
+  soporte.** Se publicó `v2.5.13` en GitHub con `minSupportedVersion = 2.5.13`
+  y `mandatory = true`; antes estaban `latestVersion=2.5.12`,
+  `minSupportedVersion=2.5.0` y `mandatory=False`, o sea `belowMinSupported`
+  era falso para cualquier versión instalada ≥ 2.5.0 y **nadie** estaba
+  forzado a actualizar. El corte se puso en 2.5.13 y no en 2.5.10 porque
+  2.5.10-2.5.12 sí traían el relay del S7 pero les faltaba la capa cloud y la
+  re-sonda de recuperación, que es exactamente lo que les hace seguir
+  hablando con Google y pagar la cuota que el relay ahorra. Medido tras
+  publicar: `app_config/release` responde `2.5.13 / 2.5.13 / True`
+  (`updateTime 2026-11-20T23:43:30Z`), lo mismo vía el relay de la LAN, y
+  **anónimo sin sesión** desde la red de casa da `HTTP 200` con
+  `latest=2.5.13 min=2.5.13 mandatory=True` en 0.27 s. De las 12 identidades
+  registradas en `users/{uid}/devices`, **10** quedan por debajo del mínimo
+  (2.5.8, 2.5.10, 2.5.11, 2.5.12 y una `pc-client-1.0`), 1 está al día y 1
+  tiene `appVersion` vacío. OJO: el binario se subió **antes** de activar el
+  kill switch, porque sin descarga posible la pantalla obligatoria deja a la
+  gente atascada; medido desde la misma red del teléfono, `HEAD` del APK
+  publicado responde `200`, `content-length=38339941`,
+  `content-type=application/vnd.android.package-archive` en 0.36 s. Los tres
+  APK verificados antes de subirlos: `versionName=2.5.13` con
+  `versionCode` `6271`/`5271`/`8271` (`aapt`), y `strings` de `libapp.so`
+  contiene una ocurrencia de `workers.dev` y otra de `192.168.100.27` en cada
+  ABI. Las 6 notas publicadas pasan enteras el filtro `_userFacingReleaseNotes`
+  (simulado contra el manifiesto vivo: 6 de 6 visibles).
+
+### Fixed — interfaz que César reportó en pantalla (misma versión, build recompilado)
+
+- **El icono de recargar ya no es un garabayo asimétrico.** Se redibujó el
+  glifo `InutilGlyph.refresh` como dos arcos punto-simétricos con dos puntas
+  que llenan los cuatro cuadrantes dentro de la caja de 24 unidades; la
+  rotación de 60°/120°/180° reproduce el mismo glifo, no un borrón. Prueba
+  nueva `test/core/theme/inutil_refresh_glyph_test.dart` (44 pruebas locales
+  en verde; `flutter analyze`: 0 issues).
+- **Desaparece el salto «primero la interfaz vieja, luego la correcta».** El
+  primer frame siempre encontraba `settingsControllerProvider` sin resolver
+  porque ese proveedor hace I/O real de plataforma, así que `HomePage` caía a
+  sus defaults (reproductor «Inútil Music» clásico, artwork cuadrado, Canvas
+  apagado) y un segundo después se redibujaba con las preferencias reales. Se
+  añadió `lib/core/startup/inutil_settings_hydration_gate.dart`, que pinta el
+  esqueleto durante esos frames iniciales y entrega el shell ya hidratado; el
+  lienzo animado aparece de una vez, sin flash intermedio. Pruebas
+  `test/core/startup/settings_hydration_gate_test.dart` y
+  `test/features/music/presentation/widgets/player_canvas_pending_test.dart`.
+- **El panel Conectar ahora funciona como Spotify Connect.** Reescrito
+  `inutil_connect_sheet.dart` (439 líneas): tarjeta «Este teléfono» con el
+  título y el artista en curso, icono verde del dispositivo activo, equipos
+  agrupados en «red local» y «a distancia (por la nube)», y un mini reproductor
+  con «Transferir aquí» para mover la sesión a otro equipo sin cerrar el panel.
+  Antes el panel mostraba «Buscando tus dispositivos…» girando para siempre
+  aunque la cuenta tuviera 11 documentos `devices` publicados.
+- **Quitar la app de la vista de recientes detiene la reproducción.** Faltaba
+  la rama `taskRemoved` en `DesktopMediaSession`, así que `onTaskRemoved`
+  terminaba en un `Future.value()` de no-op y el audio seguía sonando con la
+  app ya muerta. Ahora `taskRemoved` llama a `playerController.stop()` igual
+  que el botón detener; el puente con `audio_service` queda cubierto por
+  `test/services/media_session/audio_service_desktop_media_session_test.dart`.
+
 ## 2.5.12+4270 — 2026-11-20
 
 ### Added

@@ -2,6 +2,18 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+/// Conversión grados → radianes, para los glifos descritos con ángulos.
+const double _kDegRad = math.pi / 180.0;
+
+/// Rota `v` unos `grados` en el plano del canvas, donde el eje Y crece hacia
+/// abajo: un ángulo positivo por tanto avanza en sentido horario.
+Offset _rotated(Offset v, double grados) {
+  final angle = grados * _kDegRad;
+  final c = math.cos(angle);
+  final s = math.sin(angle);
+  return Offset(v.dx * c - v.dy * s, v.dx * s + v.dy * c);
+}
+
 /// Bespoke geometric vector glyphs exclusive to Inútil Music.
 ///
 /// Each glyph renders cleanly on a 24×24 coordinate space in two distinct
@@ -401,19 +413,49 @@ class _InutilGlyphPainter extends CustomPainter {
     canvas.drawPath(shoulders, stroke);
   }
 
+  /// Glifo "recargar": dos tramos de arco simétricos respecto al centro, cada
+  /// uno rematado por una punta de flecha tangente que señala el sentido
+  /// horario. Un solo arco con una sola punta (el diseño anterior) se leería
+  /// como "deshacer/historial"; al duplicar el tramo y espejarlo 180° el
+  /// símbolo es inconfundiblemente rotativo y queda punto-simétrico.
   void _paintRefresh(Canvas canvas, Paint stroke) {
+    const center = Offset(12, 12);
+    _rotationalArc(canvas, stroke, center, 7.5, -160, -30);
+    _rotationalArc(canvas, stroke, center, 7.5, 20, 150);
+  }
+
+  /// Traza un tramo de círculo de `startGrados` a `endGrados` (sentido horario
+  /// porque en coordenadas de canvas el eje Y crece hacia abajo) y lo remata
+  /// con una punta de flecha abierta ±34° respecto al sentido del recorrido.
+  void _rotationalArc(
+    Canvas canvas,
+    Paint stroke,
+    Offset center,
+    double radius,
+    double startGrados,
+    double endGrados,
+  ) {
+    final start = startGrados * _kDegRad;
+    final end = endGrados * _kDegRad;
     canvas.drawArc(
-      Rect.fromCircle(center: const Offset(12, 12), radius: 7.4),
-      -math.pi * 0.72,
-      math.pi * 1.58,
+      Rect.fromCircle(center: center, radius: radius),
+      start,
+      end - start,
       false,
       stroke,
     );
-    final arrow = Path()
-      ..moveTo(16.6, 4.5)
-      ..lineTo(18.6, 8.0)
-      ..lineTo(14.7, 8.3);
-    canvas.drawPath(arrow, stroke);
+
+    // Tangente del recorrido hacia adelante en el extremo del arco.
+    final adelante = Offset(-math.sin(end), math.cos(end));
+    final atras = -adelante;
+    final punta = center + Offset(math.cos(end), math.sin(end)) * radius;
+    final alA = _rotated(atras, 34) * 3.2;
+    final alB = _rotated(atras, -34) * 3.2;
+    final cabeza = Path()
+      ..moveTo((punta + alA).dx, (punta + alA).dy)
+      ..lineTo(punta.dx, punta.dy)
+      ..lineTo((punta + alB).dx, (punta + alB).dy);
+    canvas.drawPath(cabeza, stroke);
   }
 
   void _paintSleepTimer(Canvas canvas, Paint stroke, Paint fill, Paint softFill) {

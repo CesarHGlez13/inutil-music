@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/firebase/firebase_sync_providers.dart';
-import '../../../../core/theme/inutil_icons.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/music_providers.dart';
 
@@ -36,6 +36,7 @@ class InutilConnectSheet extends ConsumerWidget {
           artist: snapshot?.artist,
           album: snapshot?.album,
           thumbnailUrl: snapshot?.thumbnailUrl,
+          positionMs: snapshot?.position.inMilliseconds,
         );
       }),
     );
@@ -53,6 +54,43 @@ class InutilConnectSheet extends ConsumerWidget {
     final colors = theme.colorScheme;
     final cardSurface = colors.surfaceContainerLow.withValues(alpha: 0.92);
     final cardBorder = colors.outlineVariant.withValues(alpha: 0.45);
+
+    // Nombre del equipo actual, como hace Spotify ("Este telefono" en el
+    // movil, "Esta PC"/"Este ordenador" en escritorio).
+    final thisDeviceLabel = switch (defaultTargetPlatform) {
+      TargetPlatform.android ||
+      TargetPlatform.iOS ||
+      TargetPlatform.fuchsia => 'Este teléfono',
+      TargetPlatform.windows => 'Esta PC',
+      _ => 'Este ordenador',
+    };
+    // Metadatos de la sesion visible: manda la sesion de la nube y en su
+    // defecto lo que tiene el reproductor local.
+    final sessionTitle =
+        (remoteSession != null && remoteSession.title.isNotEmpty)
+        ? remoteSession.title
+        : playerTrack.title ?? '';
+    final sessionArtist =
+        (remoteSession != null && remoteSession.artist.isNotEmpty)
+        ? remoteSession.artist
+        : playerTrack.artist ?? '';
+    final hasSession = sessionTitle.isNotEmpty;
+    final sessionLine = hasSession
+        ? (sessionArtist.isEmpty
+              ? sessionTitle
+              : '$sessionTitle — $sessionArtist')
+        : null;
+    final sessionBadge = !hasSession
+        ? null
+        : ((remoteSession?.isPlaying ?? false) ? 'Reproduciendo' : 'En pausa');
+    // Rastros de la sesion activa para poder reproducir en otro equipo desde
+    // su propio menu, sin necesitar el mini reproductor embebido.
+    final sessionTrackId =
+        (remoteSession != null && remoteSession.trackId.isNotEmpty)
+        ? remoteSession.trackId
+        : playerTrack.trackId;
+    final sessionPositionMs =
+        remoteSession?.positionMs ?? playerTrack.positionMs ?? 0;
 
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
@@ -82,33 +120,9 @@ class InutilConnectSheet extends ConsumerWidget {
               ),
               Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(13),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          colors.primary.withValues(alpha: 0.22),
-                          colors.primary.withValues(alpha: 0.07),
-                        ],
-                      ),
-                    ),
-                    child: Center(
-                      child: InutilIcon(
-                        InutilGlyph.devices,
-                        color: colors.primary,
-                        size: 21,
-                        filled: autoPairedPeer != null,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Conectar a un dispositivo',
+                      'Conectar',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.2,
@@ -139,6 +153,153 @@ class InutilConnectSheet extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 18),
+
+              // Equipo actual, como la fila destacada de Spotify Connect:
+              // nombre, estado, cancion activa en color primario y su glifo.
+              // Se quito de aqui el mini reproductor con botones de transporte
+              // (previo/play/siguiente): la app ya tiene su propio reproductor
+              // y su mini player, y repetirlo dentro de la hoja confundia.
+              if (authService.isAuthenticated)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardSurface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: colors.primary.withValues(alpha: 0.45),
+                      width: 1.2,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        thisDeviceLabel,
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w800,
+                                              letterSpacing: -0.3,
+                                            ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (sessionBadge != null) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: colors.onSurface.withValues(
+                                            alpha: 0.10,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          sessionBadge,
+                                          style: theme.textTheme.labelSmall
+                                              ?.copyWith(
+                                                color: colors.onSurfaceVariant,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  sessionLine ?? 'Nada en reproducción',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: sessionLine == null
+                                        ? colors.onSurfaceVariant
+                                        : colors.primary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            _getPlatformIcon(defaultTargetPlatform.name),
+                            color: colors.primary,
+                            size: 30,
+                          ),
+                        ],
+                      ),
+                      if (remoteSession != null &&
+                          hasSession &&
+                          !isLocalActive) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () async {
+                              final nav = Navigator.maybeOf(context);
+                              final track = TrackInfo(
+                                id: remoteSession.trackId,
+                                title: remoteSession.title.isNotEmpty
+                                    ? remoteSession.title
+                                    : 'Canción activa',
+                                artist: remoteSession.artist.isNotEmpty
+                                    ? remoteSession.artist
+                                    : 'Inútil Music',
+                                album: remoteSession.album,
+                                thumbnailUrl: remoteSession.thumbnailUrl,
+                                url: remoteSession.trackId,
+                                duration: remoteSession.durationMs > 0
+                                    ? Duration(
+                                        milliseconds: remoteSession.durationMs,
+                                      )
+                                    : null,
+                              );
+                              await syncService.transferPlaybackToThisDevice(
+                                trackId: remoteSession.trackId,
+                                title: remoteSession.title,
+                                artist: remoteSession.artist,
+                                album: remoteSession.album,
+                                thumbnailUrl: remoteSession.thumbnailUrl,
+                                positionMs: remoteSession.positionMs,
+                                durationMs: remoteSession.durationMs,
+                                isPlaying: remoteSession.isPlaying,
+                              );
+                              await ref
+                                  .read(playerControllerProvider.notifier)
+                                  .playRemote(track);
+                              if (remoteSession.positionMs > 0) {
+                                await ref
+                                    .read(playerControllerProvider.notifier)
+                                    .seek(
+                                      Duration(
+                                        milliseconds: remoteSession.positionMs,
+                                      ),
+                                    );
+                              }
+                              nav?.pop();
+                            },
+                            child: const Text('Transferir aquí'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
 
               // Vinculación automática por misma cuenta
               if (autoPairedPeer != null) ...[
@@ -189,10 +350,11 @@ class InutilConnectSheet extends ConsumerWidget {
                                       autoPairedPeer.isCloudOnly
                                           ? 'Misma cuenta · Vinculado por la nube'
                                           : 'Misma cuenta · Vinculado automático',
-                                      style: theme.textTheme.labelSmall?.copyWith(
-                                        color: colors.primary,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      style: theme.textTheme.labelSmall
+                                          ?.copyWith(
+                                            color: colors.primary,
+                                            fontWeight: FontWeight.w700,
+                                          ),
                                     ),
                                   ],
                                 ),
@@ -207,8 +369,7 @@ class InutilConnectSheet extends ConsumerWidget {
                         child: FilledButton.icon(
                           onPressed: () async {
                             final trackId =
-                                playerTrack.trackId ??
-                                remoteSession?.trackId;
+                                playerTrack.trackId ?? remoteSession?.trackId;
                             final title =
                                 playerTrack.title ??
                                 remoteSession?.title ??
@@ -255,9 +416,7 @@ class InutilConnectSheet extends ConsumerWidget {
                           ),
                           label: Text(
                             'Reproducir en ${autoPairedPeer.deviceName}',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: const TextStyle(fontWeight: FontWeight.w700),
                           ),
                         ),
                       ),
@@ -332,7 +491,7 @@ class InutilConnectSheet extends ConsumerWidget {
               // Otros dispositivos en tu red
               if (otherPeers.isNotEmpty) ...[
                 Text(
-                  'Otros dispositivos de tu cuenta',
+                  'En otras redes',
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: colors.onSurfaceVariant,
                     fontWeight: FontWeight.w700,
@@ -388,10 +547,51 @@ class InutilConnectSheet extends ConsumerWidget {
                                   ],
                                 ),
                               ),
-                              Icon(
-                                Icons.north_east_rounded,
-                                size: 17,
-                                color: colors.onSurfaceVariant,
+                              PopupMenuButton<String>(
+                                tooltip: 'Opciones para ${peer.deviceName}',
+                                color: colors.surfaceContainerHigh,
+                                icon: Icon(
+                                  Icons.more_horiz_rounded,
+                                  size: 19,
+                                  color: colors.onSurfaceVariant,
+                                ),
+                                onSelected: (value) {
+                                  if (value == 'play' &&
+                                      sessionTrackId != null) {
+                                    unawaited(
+                                      syncService.playTrackOnPeer(
+                                        trackId: sessionTrackId,
+                                        title: sessionArtist.isEmpty
+                                            ? 'Canción'
+                                            : sessionTitle,
+                                        artist: sessionArtist.isEmpty
+                                            ? 'Inútil Music'
+                                            : sessionArtist,
+                                        album:
+                                            playerTrack.album ??
+                                            remoteSession?.album,
+                                        thumbnailUrl:
+                                            playerTrack.thumbnailUrl ??
+                                            remoteSession?.thumbnailUrl,
+                                        positionMs: sessionPositionMs,
+                                        targetPeer: peer,
+                                      ),
+                                    );
+                                  } else {
+                                    syncService.selectPeer(peer);
+                                  }
+                                },
+                                itemBuilder: (menuContext) => [
+                                  if (sessionTrackId != null)
+                                    const PopupMenuItem(
+                                      value: 'play',
+                                      child: Text('Reproducir aquí'),
+                                    ),
+                                  const PopupMenuItem(
+                                    value: 'connect',
+                                    child: Text('Conectar a este dispositivo'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -400,165 +600,6 @@ class InutilConnectSheet extends ConsumerWidget {
                     ),
                   ),
                 const SizedBox(height: 16),
-              ],
-
-              // Sesión activa y controles remotos
-              if (remoteSession != null && remoteSession.trackId.isNotEmpty) ...[
-                Text(
-                  'Sesión de reproducción actual',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: cardSurface,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: colors.primary.withValues(
-                        alpha: isLocalActive ? 0.42 : 0.28,
-                      ),
-                    ),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            _getPlatformIcon(
-                              remoteSession.activeDevicePlatform,
-                            ),
-                            color: colors.primary,
-                            size: 28,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  remoteSession.title.isNotEmpty
-                                      ? remoteSession.title
-                                      : 'Canción activa',
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Sonando en: ${remoteSession.activeDeviceName}',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colors.primary,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (!isLocalActive)
-                            FilledButton(
-                              onPressed: () async {
-                                final nav = Navigator.maybeOf(context);
-                                final track = TrackInfo(
-                                  id: remoteSession.trackId,
-                                  title: remoteSession.title.isNotEmpty
-                                      ? remoteSession.title
-                                      : 'Canción activa',
-                                  artist: remoteSession.artist.isNotEmpty
-                                      ? remoteSession.artist
-                                      : 'Inútil Music',
-                                  album: remoteSession.album,
-                                  thumbnailUrl: remoteSession.thumbnailUrl,
-                                  url: remoteSession.trackId,
-                                  duration: remoteSession.durationMs > 0
-                                      ? Duration(
-                                          milliseconds: remoteSession.durationMs,
-                                        )
-                                      : null,
-                                );
-                                await syncService.transferPlaybackToThisDevice(
-                                  trackId: remoteSession.trackId,
-                                  title: remoteSession.title,
-                                  artist: remoteSession.artist,
-                                  album: remoteSession.album,
-                                  thumbnailUrl: remoteSession.thumbnailUrl,
-                                  positionMs: remoteSession.positionMs,
-                                  durationMs: remoteSession.durationMs,
-                                  isPlaying: remoteSession.isPlaying,
-                                );
-                                await ref
-                                    .read(playerControllerProvider.notifier)
-                                    .playRemote(track);
-                                if (remoteSession.positionMs > 0) {
-                                  await ref
-                                      .read(playerControllerProvider.notifier)
-                                      .seek(
-                                        Duration(
-                                          milliseconds: remoteSession.positionMs,
-                                        ),
-                                      );
-                                }
-                                nav?.pop();
-                              },
-                              child: const Text('Transferir aquí'),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        decoration: BoxDecoration(
-                          color: colors.onSurface.withValues(alpha: 0.05),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.skip_previous_rounded),
-                              color: colors.onSurface,
-                              onPressed: () {
-                                syncService.sendRemoteControlCommand(
-                                  commandType: 'previous',
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                remoteSession.isPlaying
-                                    ? Icons.pause_circle_filled_rounded
-                                    : Icons.play_circle_filled_rounded,
-                                size: 42,
-                              ),
-                              color: colors.primary,
-                              onPressed: () {
-                                syncService.sendRemoteControlCommand(
-                                  commandType: remoteSession.isPlaying
-                                      ? 'pause'
-                                      : 'play',
-                                );
-                              },
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.skip_next_rounded),
-                              color: colors.onSurface,
-                              onPressed: () {
-                                syncService.sendRemoteControlCommand(
-                                  commandType: 'next',
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ],
 
               Padding(

@@ -61,9 +61,9 @@ class LanDevicePeer {
   /// anuncios UDP llegan cada 2 s, el heartbeat en la nube cada 30 s.
   bool get isOnlineNow => fromCloud
       ? DateTime.now().difference(lastSeen) <
-          InutilPlaybackSyncService.cloudPeerTtl
+            InutilPlaybackSyncService.cloudPeerTtl
       : DateTime.now().difference(lastSeen) <
-          InutilPlaybackSyncService.lanPeerTtl;
+            InutilPlaybackSyncService.lanPeerTtl;
 
   /// Determina si el dispositivo pertenece al mismo usuario/cuenta.
   bool isSameAccount(String? myEmail, String? myUid) {
@@ -104,7 +104,9 @@ class LanDevicePeer {
       isHost: json['isHost'] as bool? ?? false,
       fromCloud: json['fromCloud'] as bool? ?? false,
       appVersion: json['appVersion'] as String? ?? '',
-      lastSeen: DateTime.tryParse(json['lastSeen']?.toString() ?? '') ?? DateTime.now(),
+      lastSeen:
+          DateTime.tryParse(json['lastSeen']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -214,7 +216,8 @@ class PlaybackSyncSession {
   factory PlaybackSyncSession.fromJson(Map<String, dynamic> map) {
     return PlaybackSyncSession(
       activeDeviceId: map['activeDeviceId'] as String? ?? '',
-      activeDeviceName: map['activeDeviceName'] as String? ?? 'Dispositivo Inútil',
+      activeDeviceName:
+          map['activeDeviceName'] as String? ?? 'Dispositivo Inútil',
       activeDevicePlatform: map['activeDevicePlatform'] as String? ?? 'generic',
       trackId: map['trackId'] as String? ?? '',
       title: map['title'] as String? ?? '',
@@ -275,10 +278,8 @@ class CloudCommand {
 }
 
 /// Callback para ejecutar acciones en el reproductor local cuando llega un comando remoto.
-typedef RemotePlaybackCommandHandler = Future<void> Function(
-  String commandType,
-  dynamic param,
-);
+typedef RemotePlaybackCommandHandler =
+    Future<void> Function(String commandType, dynamic param);
 
 /// Coordinador de Sincronización entre Android, Linux y Windows.
 /// Soporta vinculación automática y transferencia de reproducción en red local (LAN)
@@ -373,6 +374,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   DateTime _remoteHandoverUntil = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _syncPollingTimer;
   Timer? _lanDiscoveryTimer;
+
   /// Última re-sonda del relay dentro del tick de 3 s, para no gastar
   /// handshakes TCP en cada tick.
   DateTime _lastRelayReprobe = DateTime.fromMillisecondsSinceEpoch(0);
@@ -428,16 +430,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   /// (primero los que suenan). Así la lista funciona sin abrir puertos y
   /// aunque el móvil esté conectado por datos y no por Wi-Fi.
   List<LanDevicePeer> get connectTargets => mergeConnectTargets(
-        lanPeers: _discoveredPeers.values.where(isPeerOnline),
-        cloudPeers: _cloudDevices.values.where((peer) => peer.isOnlineNow),
-      );
+    lanPeers: _discoveredPeers.values.where(isPeerOnline),
+    cloudPeers: _cloudDevices.values.where((peer) => peer.isOnlineNow),
+  );
 
   bool get autoPlayOnPc => _autoPlayOnPc;
   int get currentLanPort => _currentLanPort;
 
   /// true si este dispositivo debe comportarse como "sumidero" de audio
   /// (escritorio) en lugar de como control remoto (móvil/tablet).
-  static bool get isDesktopHost => Platform.isLinux || Platform.isWindows || Platform.isMacOS;
+  static bool get isDesktopHost =>
+      Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
   /// true si acabamos de ejecutar un comando remoto: nuestra reproducción
   /// local es "heredada" y no debe reenviarse a otro dispositivo.
@@ -478,13 +481,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         ip: peer.ip,
         port: peer.port,
         deviceId: peer.deviceId,
-        deviceName: peer.deviceName.isNotEmpty ? peer.deviceName : cloud.deviceName,
+        deviceName: peer.deviceName.isNotEmpty
+            ? peer.deviceName
+            : cloud.deviceName,
         platform: peer.platform.isNotEmpty ? peer.platform : cloud.platform,
         userEmail: peer.userEmail,
         uid: peer.uid,
         isHost: peer.isHost || cloud.isHost,
         fromCloud: false,
-        appVersion: peer.appVersion.isNotEmpty ? peer.appVersion : cloud.appVersion,
+        appVersion: peer.appVersion.isNotEmpty
+            ? peer.appVersion
+            : cloud.appVersion,
         lastSeen: peer.lastSeen.isAfter(cloud.lastSeen)
             ? peer.lastSeen
             : cloud.lastSeen,
@@ -514,7 +521,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (doc['isOnline'] == false) return null;
 
     final lastSeen =
-        _millisToDateTime(doc['lastSeenMs']) ?? _millisToDateTime(doc['updatedAt']);
+        _millisToDateTime(doc['lastSeenMs']) ??
+        _millisToDateTime(doc['updatedAt']);
     if (lastSeen == null) return null;
     final age = now.difference(lastSeen);
     if (age.isNegative || age > cloudPeerTtl) return null;
@@ -793,20 +801,47 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     final candidate = remote ?? local;
     if (candidate == null || candidate.trackId.isEmpty) return null;
     if (!sessionIsGhost(candidate, now: now)) return candidate;
-    final end =
-        candidate.durationMs > 0 ? candidate.durationMs : candidate.positionMs;
+    final end = candidate.durationMs > 0
+        ? candidate.durationMs
+        : candidate.positionMs;
     return candidate.copyWith(isPlaying: false, positionMs: end);
+  }
+
+  /// true si el altavoz que [session] declara sigue existiendo: aparece en la
+  /// presencia viva ([liveDeviceIds]), es este mismo equipo, o no hay sesión
+  /// remota que nombrar. Un id que ya no escribe presencia es un **fantasma**
+  /// (el equipo se apagó, cambió de `deviceId` al reinstalar, o nos lo reenvió
+  /// otro mando que tampoco lo ve), y mientras lo creyéramos nos dejaría de
+  /// mando para siempre: la reproducción local se congela porque solo el
+  /// altavoz escribe la sesión en la nube.
+  static bool declaredSpeakerIsLive({
+    required PlaybackSyncSession? session,
+    required String myDeviceId,
+    required Set<String> liveDeviceIds,
+  }) {
+    if (session == null) return true;
+    final speaker = session.activeDeviceId;
+    if (speaker.isEmpty || speaker == myDeviceId) return true;
+    return liveDeviceIds.contains(speaker);
   }
 
   /// true si [deviceId] es el altavoz. Un mando que acaba de ceder la
   /// reproducción ([awaitingRemoteSpeaker]) NO lo es aunque pierda de vista al
   /// par; eso es lo que evita que se declare activo y congele la pantalla.
+  /// Pero si el altavoz nombrado ya no existe ([speakerIsLive] = false) y
+  /// además no estamos esperando a nadie, recuperar el audio local es lo
+  /// correcto: no hay nadie sonando de verdad al otro lado.
   static bool deviceIsCurrentSpeaker({
     required PlaybackSyncSession? remote,
     required String deviceId,
     required bool awaitingRemoteSpeaker,
+    bool speakerIsLive = true,
   }) {
-    if (remote != null) return remote.activeDeviceId == deviceId;
+    if (remote != null) {
+      if (remote.activeDeviceId == deviceId) return true;
+      if (!speakerIsLive && !awaitingRemoteSpeaker) return true;
+      return false;
+    }
     return !awaitingRemoteSpeaker;
   }
 
@@ -845,6 +880,29 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       _handedOffDeviceId != _auth.deviceId &&
       DateTime.now().isBefore(_handedOffUntil);
 
+  /// Conjunto de `deviceId` que **de verdad** están presentes ahora mismo: los
+  /// documentos de `users/{uid}/devices` que no caducaron (ya filtrados por
+  /// `cloudPeerTtl` al construir el peer), los pares de LAN que respondieron
+  /// (`lanPeerTtl`) y el par con el que estamos vinculados. Es la lista contra
+  /// la que se valida el `activeDeviceId` de la sesión compartida, igual que
+  /// Spotify solo muestra en su panel de Connect los dispositivos que están
+  /// mandando heartbeat.
+  Set<String> _liveSpeakerIds() {
+    final ids = <String>{};
+    for (final peer in _cloudDevices.values) {
+      if (peer.isOnlineNow && peer.deviceId.isNotEmpty) ids.add(peer.deviceId);
+    }
+    for (final peer in _discoveredPeers.values) {
+      if (isPeerOnline(peer) && peer.deviceId.isNotEmpty) {
+        ids.add(peer.deviceId);
+      }
+    }
+    final paired = _autoPairedPeer;
+    if (paired != null && paired.deviceId.isNotEmpty) ids.add(paired.deviceId);
+    if (_handedOffDeviceId.isNotEmpty) ids.add(_handedOffDeviceId);
+    return ids;
+  }
+
   /// Ya no hay nadie al otro lado a quien esperar: este dispositivo recupera el
   /// control de su propio audio (lo usa el usuario al pulsar "activar").
   void _clearHandoffAuthority() {
@@ -858,6 +916,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     remote: _currentRemoteSession,
     deviceId: _auth.deviceId,
     awaitingRemoteSpeaker: _awaitingRemoteSpeaker,
+    speakerIsLive: declaredSpeakerIsLive(
+      session: _currentRemoteSession,
+      myDeviceId: _auth.deviceId,
+      liveDeviceIds: _liveSpeakerIds(),
+    ),
   );
 
   String get activeDeviceDisplayName {
@@ -908,11 +971,15 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     final now = DateTime.now();
     if (now.difference(_lastRelayReprobe) < _relayReprobeInterval) return;
     _lastRelayReprobe = now;
-    unawaited(FirebaseConfig.probeRelayReachability().then((ok) {
-      if (!ok) return;
-      debugPrint('Relay del S7 recuperado en caliente: las lecturas vuelven a '
-          'pasar por el telefono y dejan de pagar cuota.');
-    }));
+    unawaited(
+      FirebaseConfig.probeRelayReachability().then((ok) {
+        if (!ok) return;
+        debugPrint(
+          'Relay del S7 recuperado en caliente: las lecturas vuelven a '
+          'pasar por el telefono y dejan de pagar cuota.',
+        );
+      }),
+    );
   }
 
   void stopSync() {
@@ -949,13 +1016,15 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
       // Hosts anunciados por UDP o visitados en sesiones anteriores: se sondean
       // primero para que la vinculación sea inmediata al abrir la app.
-      final remembered = prefs.getStringList(_knownHostsPrefKey) ?? const <String>[];
+      final remembered =
+          prefs.getStringList(_knownHostsPrefKey) ?? const <String>[];
       for (final entry in remembered) {
         final parts = entry.split(':');
         final ip = parts.first;
         if (ip.isEmpty) continue;
-        final port =
-            parts.length > 1 ? int.tryParse(parts[1]) ?? _defaultPort : _defaultPort;
+        final port = parts.length > 1
+            ? int.tryParse(parts[1]) ?? _defaultPort
+            : _defaultPort;
         _liveHosts.add('$ip:$port');
         unawaited(_probePeer(ip, port));
       }
@@ -995,16 +1064,25 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
     if (_lanHttpServer == null) return;
 
-    _lanHttpServer!.listen(_handleHttpRequest, onError: (e) {
-      debugPrint('Inútil LAN Server error: $e');
-    });
+    _lanHttpServer!.listen(
+      _handleHttpRequest,
+      onError: (e) {
+        debugPrint('Inútil LAN Server error: $e');
+      },
+    );
   }
 
   void _handleHttpRequest(HttpRequest request) async {
     // Cabeceras CORS abiertas para red local
     request.response.headers.add('Access-Control-Allow-Origin', '*');
-    request.response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    request.response.headers.add('Access-Control-Allow-Headers', 'Content-Type');
+    request.response.headers.add(
+      'Access-Control-Allow-Methods',
+      'GET, POST, OPTIONS',
+    );
+    request.response.headers.add(
+      'Access-Control-Allow-Headers',
+      'Content-Type',
+    );
 
     if (request.method == 'OPTIONS') {
       request.response.statusCode = HttpStatus.ok;
@@ -1082,7 +1160,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       if (path == '/api/command' && request.method == 'POST') {
         final bodyStr = await utf8.decodeStream(request);
         final json = jsonDecode(bodyStr) as Map<String, dynamic>;
-        final commandType = json['commandType'] as String? ?? json['command'] as String? ?? '';
+        final commandType =
+            json['commandType'] as String? ?? json['command'] as String? ?? '';
         final param = json['param'];
 
         // Control de acceso: sólo mandan dispositivos de la MISMA cuenta.
@@ -1091,13 +1170,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         final myEmail = _auth.currentUser?.email ?? '';
         final issuerUid = json['issuerUid'] as String? ?? '';
         final issuerEmail = json['issuerEmail'] as String? ?? '';
-        final sameAccount = myUid.isEmpty && myEmail.isEmpty ||
+        final sameAccount =
+            myUid.isEmpty && myEmail.isEmpty ||
             (issuerUid.isNotEmpty && issuerUid == myUid) ||
             (issuerEmail.isNotEmpty &&
                 myEmail.isNotEmpty &&
-                issuerEmail.trim().toLowerCase() == myEmail.trim().toLowerCase());
+                issuerEmail.trim().toLowerCase() ==
+                    myEmail.trim().toLowerCase());
         if (!sameAccount) {
-          debugPrint('Inútil LAN: comando $commandType descartado (otra cuenta).');
+          debugPrint(
+            'Inútil LAN: comando $commandType descartado (otra cuenta).',
+          );
           request.response
             ..statusCode = HttpStatus.forbidden
             ..headers.contentType = ContentType.json
@@ -1123,13 +1206,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         request.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
-          ..write(jsonEncode({
-            'status': 'ok',
-            'command': commandType,
-            // `executed` sólo es verdadero si hay un reproductor escuchando los
-            // comandos: así el emisor sabe si el mando hizo algo de verdad.
-            'executed': onRemoteCommandReceived != null && commandType.isNotEmpty,
-          }));
+          ..write(
+            jsonEncode({
+              'status': 'ok',
+              'command': commandType,
+              // `executed` sólo es verdadero si hay un reproductor escuchando los
+              // comandos: así el emisor sabe si el mando hizo algo de verdad.
+              'executed':
+                  onRemoteCommandReceived != null && commandType.isNotEmpty,
+            }),
+          );
         await request.response.close();
         return;
       }
@@ -1159,8 +1245,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       for (final key in const ['apkDownloadUrl', 'linuxDownloadUrl']) {
         final value = (manifest[key] ?? '').toString().trim();
         if (value.startsWith('/')) {
-          manifest[key] =
-              'http://$localAddressHint:$_currentLanPort$value';
+          manifest[key] = 'http://$localAddressHint:$_currentLanPort$value';
         }
       }
       return manifest;
@@ -1201,7 +1286,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       );
     }
 
-    request.response.headers.contentType = ContentType.parse('application/octet-stream');
+    request.response.headers.contentType = ContentType.parse(
+      'application/octet-stream',
+    );
     request.response.contentLength = end - start + 1;
     await request.response.addStream(file.openRead(start, end + 1));
     await request.response.close();
@@ -1256,7 +1343,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     // Desde ya somos el mando: no nos declararemos altavoz aunque tardemos en
     // ver la sesión de [peer] (LAN lenta, documento caducado, etc.).
     _markHandoffToPeer(deviceId: peer.deviceId, deviceName: peer.deviceName);
-    debugPrint('Inútil LAN: destino remoto seleccionado: ${peer.deviceName} (${peer.ip}:${peer.port})');
+    debugPrint(
+      'Inútil LAN: destino remoto seleccionado: ${peer.deviceName} (${peer.ip}:${peer.port})',
+    );
     unawaited(_fetchSessionFromPeer(peer));
     notifyListeners();
   }
@@ -1286,14 +1375,17 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         reusePort: true,
       );
       socket.broadcastEnabled = true;
-      socket.listen((event) {
-        if (event != RawSocketEvent.read) return;
-        final datagram = socket.receive();
-        if (datagram == null) return;
-        _handleUdpAnnouncement(datagram.address.address, datagram.data);
-      }, onError: (e) {
-        debugPrint('Inútil LAN UDP error: $e');
-      });
+      socket.listen(
+        (event) {
+          if (event != RawSocketEvent.read) return;
+          final datagram = socket.receive();
+          if (datagram == null) return;
+          _handleUdpAnnouncement(datagram.address.address, datagram.data);
+        },
+        onError: (e) {
+          debugPrint('Inútil LAN UDP error: $e');
+        },
+      );
       _udpSocket = socket;
       debugPrint('Inútil LAN: anuncios UDP activos en $_udpPort');
     } catch (e) {
@@ -1306,16 +1398,18 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (socket == null) return;
 
     final user = _auth.currentUser;
-    final payload = utf8.encode(jsonEncode({
-      'app': 'inutil_music',
-      'deviceId': _auth.deviceId,
-      'deviceName': _auth.deviceName,
-      'platform': _auth.devicePlatform,
-      'port': _currentLanPort,
-      'uid': user?.uid ?? '',
-      'email': user?.email ?? '',
-      'isHost': isDesktopHost,
-    }));
+    final payload = utf8.encode(
+      jsonEncode({
+        'app': 'inutil_music',
+        'deviceId': _auth.deviceId,
+        'deviceName': _auth.deviceName,
+        'platform': _auth.devicePlatform,
+        'port': _currentLanPort,
+        'uid': user?.uid ?? '',
+        'email': user?.email ?? '',
+        'isHost': isDesktopHost,
+      }),
+    );
 
     final targets = <InternetAddress>[
       InternetAddress('255.255.255.255', type: InternetAddressType.IPv4),
@@ -1335,7 +1429,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           if (dot <= 0) continue;
           final broadcast = '${ip.substring(0, dot)}.255';
           if (broadcast == ip) continue;
-          targets.add(InternetAddress(broadcast, type: InternetAddressType.IPv4));
+          targets.add(
+            InternetAddress(broadcast, type: InternetAddressType.IPv4),
+          );
         }
       }
     } catch (_) {}
@@ -1385,7 +1481,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
     // 2. Barrido completo de la subred /24 una vez por minuto (los hosts que ya
     //    respondieron se refrescan cada 3 s sin coste adicional).
-    if (DateTime.now().difference(_lastSubnetSweep) > const Duration(seconds: 60)) {
+    if (DateTime.now().difference(_lastSubnetSweep) >
+        const Duration(seconds: 60)) {
       _lastSubnetSweep = DateTime.now();
       unawaited(_sweepLocalSubnets());
     }
@@ -1423,7 +1520,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     // Red del emulador de Android.
     subnets.add('10.0.2');
 
-    final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 250);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(milliseconds: 250);
     try {
       for (final subnet in subnets) {
         final futures = <Future<void>>[];
@@ -1468,8 +1566,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } else if (paired != null &&
         paired.isCloudOnly &&
         !_cloudDevices.containsKey(paired.deviceId)) {
-      debugPrint('Inútil Connect: ${paired.deviceName} dejó de escribir su '
-          'presencia en la nube.');
+      debugPrint(
+        'Inútil Connect: ${paired.deviceName} dejó de escribir su '
+        'presencia en la nube.',
+      );
       _autoPairedPeer = null;
       dropped = true;
     }
@@ -1500,11 +1600,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (isSelfPort && (ip == '127.0.0.1' || ip == 'localhost')) return;
 
     final ownClient = client == null;
-    final httpClient = client ??
+    final httpClient =
+        client ??
         (HttpClient()..connectionTimeout = const Duration(milliseconds: 1200));
     try {
-      final request = await httpClient.getUrl(Uri.parse('http://$ip:$port/api/ping'));
-      final response = await request.close().timeout(const Duration(milliseconds: 1500));
+      final request = await httpClient.getUrl(
+        Uri.parse('http://$ip:$port/api/ping'),
+      );
+      final response = await request.close().timeout(
+        const Duration(milliseconds: 1500),
+      );
       if (response.statusCode == 200) {
         final bodyStr = await utf8.decodeStream(response);
         final map = jsonDecode(bodyStr) as Map<String, dynamic>;
@@ -1536,7 +1641,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
         if (isSame && _autoPairedPeer?.deviceId != peer.deviceId) {
           _autoPairedPeer = peer;
-          debugPrint('Inútil LAN: ¡Auto-vinculado con éxito con ${peer.deviceName} (${peer.ip}) por misma cuenta!');
+          debugPrint(
+            'Inútil LAN: ¡Auto-vinculado con éxito con ${peer.deviceName} (${peer.ip}) por misma cuenta!',
+          );
           notifyListeners();
           // Arrastrar la sesión que ya está sonando en el peer para que el
           // mando remoto muestre desde el primer momento "Sonando en ...".
@@ -1565,10 +1672,15 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }
 
   Future<void> _fetchSessionFromPeer(LanDevicePeer peer) async {
-    final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 1200);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(milliseconds: 1200);
     try {
-      final request = await client.getUrl(Uri.parse('${peer.httpBaseUrl}/api/session'));
-      final response = await request.close().timeout(const Duration(milliseconds: 1500));
+      final request = await client.getUrl(
+        Uri.parse('${peer.httpBaseUrl}/api/session'),
+      );
+      final response = await request.close().timeout(
+        const Duration(milliseconds: 1500),
+      );
       if (response.statusCode == 200) {
         final bodyStr = await utf8.decodeStream(response);
         final map = jsonDecode(bodyStr) as Map<String, dynamic>;
@@ -1580,12 +1692,26 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // canción que le enviamos, su respuesta todavía puede describir la
           // anterior y pisaría la sesión optimista del mando.
           if (!_isAwaitingRemoteHandover(session)) {
-            _currentRemoteSession = session;
-            if (session.activeDeviceId != _auth.deviceId) {
-              _markHandoffToPeer(
-                deviceId: session.activeDeviceId,
-                deviceName: session.activeDeviceName,
-              );
+            if (session.activeDeviceId != _auth.deviceId &&
+                !_awaitingRemoteSpeaker &&
+                !declaredSpeakerIsLive(
+                  session: session,
+                  myDeviceId: _auth.deviceId,
+                  liveDeviceIds: _liveSpeakerIds(),
+                )) {
+              // El par nos reenvía un altavoz que ya no existe (un mando que
+              // responde con la sesión heredada): no lo adoptamos, y lo que
+              // mostramos pasa a ser nuestra propia sesión, no la de un
+              // fantasma.
+              _currentRemoteSession = null;
+            } else {
+              _currentRemoteSession = session;
+              if (session.activeDeviceId != _auth.deviceId) {
+                _markHandoffToPeer(
+                  deviceId: session.activeDeviceId,
+                  deviceName: session.activeDeviceName,
+                );
+              }
             }
             notifyListeners();
           }
@@ -1601,7 +1727,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           notifyListeners();
         }
       }
-    } catch (_) {} finally {
+    } catch (_) {
+    } finally {
       client.close();
     }
   }
@@ -1639,9 +1766,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     _cloudCommandsTimer = Timer(
       burst ? commandsBurstInterval : commandsPollInterval,
       () {
-        unawaited(
-          _pollCloudCommands().whenComplete(_scheduleCommandPoll),
-        );
+        unawaited(_pollCloudCommands().whenComplete(_scheduleCommandPoll));
       },
     );
   }
@@ -1652,7 +1777,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   /// deje de mostrarlo en la lista al instante. [force] salta el recorte de
   /// frecuencia y se usa cuando cambia algo que el usuario sí ve (pasa de
   /// «en pausa» a «sonando», por ejemplo).
-  Future<void> _publishPresence({bool online = true, bool force = false}) async {
+  Future<void> _publishPresence({
+    bool online = true,
+    bool force = false,
+  }) async {
     final uid = _auth.currentUser?.uid;
     if (uid == null || uid.isEmpty) return;
     if (!online && _cloudBlocked) return;
@@ -1707,8 +1835,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } on FirestoreOperationException catch (error) {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
-        debugPrint('Inútil Connect: no se pudo publicar la presencia ($error). '
-            'Reintentando en $capped s.');
+        debugPrint(
+          'Inútil Connect: no se pudo publicar la presencia ($error). '
+          'Reintentando en $capped s.',
+        );
       }
     } catch (_) {
       _noteCloudUnavailable();
@@ -1723,8 +1853,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (_cloudBlocked) return;
 
     try {
-      final docs = await _firestore
-          .listCollection('users/$uid/$devicesCollection');
+      final docs = await _firestore.listCollection(
+        'users/$uid/$devicesCollection',
+      );
       _cloudPollFailures = 0;
       _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -1748,8 +1879,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } on FirestoreOperationException catch (error) {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
-        debugPrint('Inútil Connect: no se pudo leer la lista de dispositivos '
-            '($error). Reintentando en $capped s.');
+        debugPrint(
+          'Inútil Connect: no se pudo leer la lista de dispositivos '
+          '($error). Reintentando en $capped s.',
+        );
       }
     } catch (_) {
       _noteCloudUnavailable();
@@ -1765,8 +1898,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     final candidate = pickAutoPairCandidate(connectTargets);
     if (candidate == null) return;
     _autoPairedPeer = candidate;
-    debugPrint('Inútil Connect: vinculado con ${candidate.deviceName} '
-        '${candidate.isCloudOnly ? '(vía nube)' : '(red local)'}.');
+    debugPrint(
+      'Inútil Connect: vinculado con ${candidate.deviceName} '
+      '${candidate.isCloudOnly ? '(vía nube)' : '(red local)'}.',
+    );
     notifyListeners();
   }
 
@@ -1780,8 +1915,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
     final now = DateTime.now();
     try {
-      final docs = await _firestore
-          .listCollection('users/$uid/$commandsCollection', pageSize: 40);
+      final docs = await _firestore.listCollection(
+        'users/$uid/$commandsCollection',
+        pageSize: 40,
+      );
       _cloudPollFailures = 0;
       _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -1812,8 +1949,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } on FirestoreOperationException catch (error) {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
-        debugPrint('Inútil Connect: no se pudo leer la cola de comandos '
-            '($error). Reintentando en $capped s.');
+        debugPrint(
+          'Inútil Connect: no se pudo leer la cola de comandos '
+          '($error). Reintentando en $capped s.',
+        );
       }
     } catch (_) {
       _noteCloudUnavailable();
@@ -1841,7 +1980,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     // reenviarse de vuelta (evita el ping-pong móvil <-> PC).
     _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
     unawaited(
-      onRemoteCommandReceived!(command.type, normalizeRemoteParam(command.param)),
+      onRemoteCommandReceived!(
+        command.type,
+        normalizeRemoteParam(command.param),
+      ),
     );
   }
 
@@ -1922,8 +2064,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       return command.id;
     } on FirestoreOperationException catch (error) {
       _noteCloudUnavailable();
-      debugPrint('Inútil Connect: comando $commandType no llegó a la nube '
-          '($error).');
+      debugPrint(
+        'Inútil Connect: comando $commandType no llegó a la nube '
+        '($error).',
+      );
       return null;
     } catch (_) {
       _noteCloudUnavailable();
@@ -1947,9 +2091,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     // Firestore, y el llamador (sendRemoteControlCommand) se encarga de ello.
     if (peer.isCloudOnly) return false;
 
-    final client = HttpClient()..connectionTimeout = const Duration(milliseconds: 1500);
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(milliseconds: 1500);
     try {
-      final request = await client.postUrl(Uri.parse('${peer.httpBaseUrl}/api/command'));
+      final request = await client.postUrl(
+        Uri.parse('${peer.httpBaseUrl}/api/command'),
+      );
       request.headers.contentType = ContentType.json;
       final payload = jsonEncode({
         'commandType': commandType,
@@ -1959,7 +2106,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         'issuerEmail': _auth.currentUser?.email ?? '',
       });
       request.write(payload);
-      final response = await request.close().timeout(const Duration(milliseconds: 2000));
+      final response = await request.close().timeout(
+        const Duration(milliseconds: 2000),
+      );
       final success = response.statusCode == HttpStatus.ok;
 
       // Actualizar inmediatamente estado local para respuesta táctil instantánea
@@ -2014,11 +2163,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     int positionMs = 0,
     LanDevicePeer? targetPeer,
   }) async {
-    final peer = targetPeer ??
+    final peer =
+        targetPeer ??
         _autoPairedPeer ??
         (_currentRemoteSession != null
             ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
-                _cloudDevices[_currentRemoteSession!.activeDeviceId]
+                  _cloudDevices[_currentRemoteSession!.activeDeviceId]
             : null) ??
         pickAutoPairCandidate(connectTargets);
     if (peer == null) return false;
@@ -2136,7 +2286,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (now.isBefore(_cloudPollBlockedUntil)) return;
 
     try {
-      final doc = await _firestore.getDocument('users/$uid/playback_session/current');
+      final doc = await _firestore.getDocument(
+        'users/$uid/playback_session/current',
+      );
       _cloudPollFailures = 0;
       _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
       if (doc != null) {
@@ -2148,7 +2300,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         // leer del par. Tampoco gana mientras esperamos que confirme una
         // canción que le acabamos de transferir: aún hablaría de la anterior.
         if (fresher && !_isAwaitingRemoteHandover(session)) {
-          final refresh = stored == null ||
+          final refresh =
+              stored == null ||
               session.trackId != stored.trackId ||
               session.isPlaying != stored.isPlaying ||
               (session.updatedAt != null &&
@@ -2164,13 +2317,26 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         // Mientras la nube siga nombrando a otro equipo como el que suena,
         // conservamos la autoridad de mando: un mando silencioso no debe
         // creerse altavoz solo porque su sondeo llegue lento o vacío.
-        if (session.activeDeviceId != _auth.deviceId) {
+        if (session.activeDeviceId == _auth.deviceId) {
+          _clearHandoffAuthority();
+        } else if (declaredSpeakerIsLive(
+          session: session,
+          myDeviceId: _auth.deviceId,
+          liveDeviceIds: _liveSpeakerIds(),
+        )) {
           _markHandoffToPeer(
             deviceId: session.activeDeviceId,
             deviceName: session.activeDeviceName,
           );
-        } else {
-          _clearHandoffAuthority();
+        } else if (!_awaitingRemoteSpeaker) {
+          // La nube nombra como altavoz a un equipo que ya no escribe
+          // presencia: es un id fantasma y no hay nadie al otro lado. Soltamos
+          // la sesión remota para que `visibleSession` devuelva la nuestra y
+          // el audio local vuelva a andar; al ser otra vez el altavoz, la
+          // próxima escritura de sesión reemplaza el id fantasma y el ciclo se
+          // cierra solo, sin reiniciar la app.
+          _currentRemoteSession = null;
+          notifyListeners();
         }
 
         if (session.activeDeviceId == _auth.deviceId) {
@@ -2195,8 +2361,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       // batería con la misma petición cada tres segundos.
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
-        debugPrint('Inútil Sync: nube no disponible ($error). '
-            'Reintentando en $capped s.');
+        debugPrint(
+          'Inútil Sync: nube no disponible ($error). '
+          'Reintentando en $capped s.',
+        );
       }
     } catch (_) {
       _noteCloudUnavailable();
@@ -2254,8 +2422,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     // sincronía entre dispositivos de la misma casa.
     if (uid != null && isCurrentDeviceActive && !_cloudBlocked) {
       try {
-        final written = await _firestore
-            .setDocument('users/$uid/playback_session/current', session.toJson());
+        final written = await _firestore.setDocument(
+          'users/$uid/playback_session/current',
+          session.toJson(),
+        );
         if (!written) {
           _noteCloudUnavailable();
         }
@@ -2323,10 +2493,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required String commandType,
     dynamic param,
   }) async {
-    final peer = _autoPairedPeer ??
+    final peer =
+        _autoPairedPeer ??
         (_currentRemoteSession != null
             ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
-                _cloudDevices[_currentRemoteSession!.activeDeviceId]
+                  _cloudDevices[_currentRemoteSession!.activeDeviceId]
             : null) ??
         pickAutoPairCandidate(connectTargets);
     if (peer != null) {
@@ -2354,8 +2525,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     final targetId =
         peer?.deviceId ?? _currentRemoteSession?.activeDeviceId ?? '';
     final now = DateTime.now();
-    final known =
-        peer ?? _cloudDevices[targetId] ?? _discoveredPeers[targetId];
+    final known = peer ?? _cloudDevices[targetId] ?? _discoveredPeers[targetId];
     String? cloudCommandId;
     if (targetId.isNotEmpty) {
       cloudCommandId = await writeCloudCommand(
@@ -2378,8 +2548,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     //    comando se ejecute una sola vez y no dos.
     if (_currentRemoteSession != null &&
         needsLegacyCommandBridge(known?.appVersion)) {
-      final legacyId = cloudCommandId ??
-          '${now.millisecondsSinceEpoch}_${_auth.deviceId}';
+      final legacyId =
+          cloudCommandId ?? '${now.millisecondsSinceEpoch}_${_auth.deviceId}';
       _rememberProcessedCommand(legacyId);
       final updated = {
         ..._currentRemoteSession!.toJson(),
@@ -2408,7 +2578,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   void _markPeerAsActiveDevice(LanDevicePeer peer, {required bool playing}) {
     final base = _currentRemoteSession ?? _currentLocalSession;
     if (base == null) return;
-    if (base.activeDeviceId == peer.deviceId && base.isPlaying == playing) return;
+    if (base.activeDeviceId == peer.deviceId &&
+        base.isPlaying == playing) {
+      return;
+    }
 
     _currentRemoteSession = PlaybackSyncSession(
       activeDeviceId: peer.deviceId,

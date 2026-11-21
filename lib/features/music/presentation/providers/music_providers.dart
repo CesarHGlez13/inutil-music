@@ -419,9 +419,7 @@ final inutilTrackLinkCodecProvider = Provider<InutilTrackLinkCodec>((ref) {
 });
 
 /// Valid Inutil activations, with the occasional cold/warm duplicate removed.
-final incomingTrackLinkProvider = StreamProvider<InutilTrackLink>((
-  ref,
-) async* {
+final incomingTrackLinkProvider = StreamProvider<InutilTrackLink>((ref) async* {
   final source = ref.watch(incomingTrackLinkServiceProvider);
   final codec = ref.watch(inutilTrackLinkCodecProvider);
   String? previousIdentity;
@@ -762,6 +760,7 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
     next: () => ref.read(playerControllerProvider.notifier).playNext(),
     previous: () => ref.read(playerControllerProvider.notifier).playPrevious(),
     stop: () => ref.read(playerControllerProvider.notifier).stop(),
+    taskRemoved: () => ref.read(playerControllerProvider.notifier).stop(),
     seek: (position) =>
         ref.read(playerControllerProvider.notifier).seek(position),
     seekBy: (offset) => ref

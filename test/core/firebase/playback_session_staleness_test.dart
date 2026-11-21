@@ -230,4 +230,126 @@ void main() {
       );
     });
   });
+
+  group('declaredSpeakerIsLive: el altavoz nombrado tiene que existir', () {
+    test('sesión nula → manda lo local', () {
+      expect(
+        InutilPlaybackSyncService.declaredSpeakerIsLive(
+          session: null,
+          myDeviceId: 'telefono',
+          liveDeviceIds: {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('el altavoz nombrado somos nosotros → válido', () {
+      final own = speaker(stamp: now, activeDeviceId: 'telefono');
+      expect(
+        InutilPlaybackSyncService.declaredSpeakerIsLive(
+          session: own,
+          myDeviceId: 'telefono',
+          liveDeviceIds: {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('altavoz nombrado con presencia viva → válido', () {
+      final remote = speaker(stamp: now);
+      expect(
+        InutilPlaybackSyncService.declaredSpeakerIsLive(
+          session: remote,
+          myDeviceId: 'telefono',
+          liveDeviceIds: {'pc-de-cesar'},
+        ),
+        isTrue,
+      );
+    });
+
+    test('altavoz vacío (sesión heredada) no secuestra el audio', () {
+      final blank = speaker(stamp: now, activeDeviceId: '');
+      expect(
+        InutilPlaybackSyncService.declaredSpeakerIsLive(
+          session: blank,
+          myDeviceId: 'telefono',
+          liveDeviceIds: {},
+        ),
+        isTrue,
+      );
+    });
+
+    test('id fantasma → no es altavoz, aunque la nube lo nombre', () {
+      // Medido 2026-11-20 16:18 CST: `playback_session/current` nombraba
+      // `activeDeviceId = c90ec6c7-…`, que no estaba en `users/{uid}/devices`
+      // (los 7 documentos eran otros ids) ni respondía a `/api/ping`. El
+      // Xiaomi se quedó de mando y su reproducción local se congeló en
+      // 0:08 / 3:51, porque solo el altavoz escribe la sesión en la nube.
+      final ghost = speaker(
+        stamp: now,
+        activeDeviceId: 'c90ec6c7-7d12-4a12-879b-e236156b1f04',
+      );
+      expect(
+        InutilPlaybackSyncService.declaredSpeakerIsLive(
+          session: ghost,
+          myDeviceId: '20ebcfb7-b580-4b1b-8ea2-28a3b694c0aa',
+          liveDeviceIds: {'20ebcfb7-b580-4b1b-8ea2-28a3b694c0aa'},
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  group('altavoz fantasma: el mando recupera su propio audio', () {
+    final ghost = speaker(stamp: now, activeDeviceId: 'c90ec6c7');
+
+    test('altavoz nombrado muerto y sin cesión pendiente → manda el local', () {
+      expect(
+        InutilPlaybackSyncService.deviceIsCurrentSpeaker(
+          remote: ghost,
+          deviceId: 'telefono',
+          awaitingRemoteSpeaker: false,
+          speakerIsLive: false,
+        ),
+        isTrue,
+      );
+    });
+
+    test('mando dentro de la gracia de cesión NO se declara altavoz', () {
+      expect(
+        InutilPlaybackSyncService.deviceIsCurrentSpeaker(
+          remote: ghost,
+          deviceId: 'telefono',
+          awaitingRemoteSpeaker: true,
+          speakerIsLive: false,
+        ),
+        isFalse,
+      );
+    });
+
+    test('altavoz vivo nombrado → el altavoz sigue siendo el otro', () {
+      final remote = speaker(stamp: now);
+      expect(
+        InutilPlaybackSyncService.deviceIsCurrentSpeaker(
+          remote: remote,
+          deviceId: 'telefono',
+          awaitingRemoteSpeaker: false,
+          speakerIsLive: true,
+        ),
+        isFalse,
+      );
+    });
+
+    test('sin pasar speakerIsLive el comportamiento queda intacto', () {
+      final remote = speaker(stamp: now);
+      expect(
+        InutilPlaybackSyncService.deviceIsCurrentSpeaker(
+          remote: remote,
+          deviceId: 'telefono',
+          awaitingRemoteSpeaker: false,
+        ),
+        isFalse,
+      );
+    });
+  });
 }
