@@ -25,31 +25,53 @@ void main() {
       });
       var bytesSent = 0;
       final disconnected = Completer<void>();
-      server.listen((socket) {
-        sockets.add(socket);
-        Timer? drip;
-        void closed() {
-          drip?.cancel();
-          socket.destroy();
-          if (!disconnected.isCompleted) disconnected.complete();
-        }
+      server.listen(
+        (socket) {
+          sockets.add(socket);
+          Timer? drip;
+          void closed() {
+            drip?.cancel();
+            socket.destroy();
+            if (!disconnected.isCompleted) disconnected.complete();
+          }
 
-        socket.listen(
-          (_) {
-            if (drip != null) return;
-            socket.write(
-              'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n',
-            );
-            drip = Timer.periodic(const Duration(milliseconds: 10), (_) {
-              socket.write('1\r\nx\r\n');
-              if (++bytesSent >= 200) closed();
-            });
-            timers.add(drip!);
-          },
-          onDone: closed,
-          onError: (Object _) => closed(),
-        );
-      });
+          socket.listen(
+            (_) {
+              if (drip != null) return;
+              socket.write(
+                'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n',
+              );
+              drip = Timer.periodic(const Duration(milliseconds: 10), (_) {
+                socket.write('1\r\nx\r\n');
+                if (++bytesSent >= 200) closed();
+              });
+              timers.add(drip!);
+            },
+            onDone: closed,
+            onError: (Object _) => closed(),
+          );
+        },
+        // El `ServerSocket` de `dart:io` trata un `accept()` interrumpido por un
+        // ECONNRESET del propio cliente como un evento de ERROR de la
+        // suscripción de escucha, y SIN `onError` ese error llega como error
+        // async sin capturar que tumba el test. Medido en CI (run
+        // `44931298241`, `3941 tests passed, 1 failed, 43 skipped`):
+        // `SocketException: Connection reset by peer (OS Error: Connection reset
+        // by peer, errno = 104), address = 127.0.0.1, port = 38509` con frames
+        // `dart:io _ServerSocket.listen` + `…_test.dart:28:14` y
+        // `…_test.dart:12:22`, o sea en el `listen` del socket de escucha — NO
+        // en ninguno de los asserts del test. En la máquina de Cesar nunca
+        // aparece porque ahí el runner no va saturado de pruebas en paralelo.
+        // El enlace de escucha SI se cierra con ese evento, pero el trabajo de
+        // esta prueba ya está hecho (la conexión la aceptó y gototeaba), así que
+        // aquí solo se traga el error y se completa `disconnected` para que el
+        // `await disconnected.future` del cuerpo no se quede esperando si el
+        // reset llega antes de aceptar nada.
+        onError: (Object error) {
+          // ECONNRESET/EOF en `accept()` forman parte del escenario de abort.
+          if (!disconnected.isCompleted) disconnected.complete();
+        },
+      );
       final elapsed = Stopwatch()..start();
       await expectLater(
         client.get(
