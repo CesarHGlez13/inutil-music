@@ -25,52 +25,77 @@ void main() {
       });
       var bytesSent = 0;
       final disconnected = Completer<void>();
-      server.listen(
-        (socket) {
-          sockets.add(socket);
-          Timer? drip;
-          void closed() {
-            drip?.cancel();
-            socket.destroy();
-            if (!disconnected.isCompleted) disconnected.complete();
-          }
+      final listenerZone = Zone.current.fork(
+        specification: ZoneSpecification(
+          // Medido con `scratch/repro_accept_error2.dart` (300 corridas del
+          // mismo escenario): el ECONNRESET de un `accept()` interrumpido NO
+          // sale por el `onError` de la suscripción — salió por
+          // `Zone.current.handleUncaughtError`. `dart:io`
+          // (`_RawServerSocket.listen`, `dart-sdk/lib/_internal/vm/bin/
+          // socket_patch.dart`) construye un `StreamController(sync: true,
+          // onCancel: close)` y su manejador nativo hace
+          // `controller.addError(e, st); controller.close();`; cuando esa
+          // suscripción ya no está viva `dart:async` lo entrega a la ZONA. El
+          // `StreamController` captura `Zone.current` al crearse, así que
+          // forking la zona alrededor del `listen` sí lo contiene:
+          // `accept-error rounds: 17, caught by the forked zone guard: 17,
+          // STILL UNCAUGHT: 0, rounds fully clean: 300/300`, frente a
+          // `STILL UNCAUGHT: 4` de las mismas 300 corridas en la forma anterior
+          // (`onError` sin paraguas), que es exactamente lo que repitió el run
+          // `44932442460` con el `onError` de `7063723` ya puesto.
+          handleUncaughtError:
+              (_, parent, zone, Object error, StackTrace stackTrace) {
+                final texto = error.toString();
+                final esParteDelAbort =
+                    texto.contains('Connection reset by peer') ||
+                    texto.contains('Broken pipe') ||
+                    texto.contains('SocketException') ||
+                    texto.contains('HttpException');
+                if (!esParteDelAbort) {
+                  // Lo que no sea el abort de un cliente que ya se fue tiene que
+                  // seguir llegando a `flutter_test`: este paraguas no es un sitio
+                  // donde esconder un bug real.
+                  parent.handleUncaughtError(zone, error, stackTrace);
+                  return;
+                }
+                if (!disconnected.isCompleted) disconnected.complete();
+              },
+        ),
+      );
+      listenerZone.run(
+        () => server.listen(
+          (socket) {
+            sockets.add(socket);
+            Timer? drip;
+            void closed() {
+              drip?.cancel();
+              socket.destroy();
+              if (!disconnected.isCompleted) disconnected.complete();
+            }
 
-          socket.listen(
-            (_) {
-              if (drip != null) return;
-              socket.write(
-                'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n',
-              );
-              drip = Timer.periodic(const Duration(milliseconds: 10), (_) {
-                socket.write('1\r\nx\r\n');
-                if (++bytesSent >= 200) closed();
-              });
-              timers.add(drip!);
-            },
-            onDone: closed,
-            onError: (Object _) => closed(),
-          );
-        },
-        // El `ServerSocket` de `dart:io` trata un `accept()` interrumpido por un
-        // ECONNRESET del propio cliente como un evento de ERROR de la
-        // suscripción de escucha, y SIN `onError` ese error llega como error
-        // async sin capturar que tumba el test. Medido en CI (run
-        // `44931298241`, `3941 tests passed, 1 failed, 43 skipped`):
-        // `SocketException: Connection reset by peer (OS Error: Connection reset
-        // by peer, errno = 104), address = 127.0.0.1, port = 38509` con frames
-        // `dart:io _ServerSocket.listen` + `…_test.dart:28:14` y
-        // `…_test.dart:12:22`, o sea en el `listen` del socket de escucha — NO
-        // en ninguno de los asserts del test. En la máquina de Cesar nunca
-        // aparece porque ahí el runner no va saturado de pruebas en paralelo.
-        // El enlace de escucha SI se cierra con ese evento, pero el trabajo de
-        // esta prueba ya está hecho (la conexión la aceptó y gototeaba), así que
-        // aquí solo se traga el error y se completa `disconnected` para que el
-        // `await disconnected.future` del cuerpo no se quede esperando si el
-        // reset llega antes de aceptar nada.
-        onError: (Object error) {
-          // ECONNRESET/EOF en `accept()` forman parte del escenario de abort.
-          if (!disconnected.isCompleted) disconnected.complete();
-        },
+            socket.listen(
+              (_) {
+                if (drip != null) return;
+                socket.write(
+                  'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n',
+                );
+                drip = Timer.periodic(const Duration(milliseconds: 10), (_) {
+                  socket.write('1\r\nx\r\n');
+                  if (++bytesSent >= 200) closed();
+                });
+                timers.add(drip!);
+              },
+              onDone: closed,
+              onError: (Object _) => closed(),
+            );
+          },
+          // Se conserva: cubre la entrega por suscripción (`controller.addError`
+          // con la suscripción viva), la otra mitad del mismo evento, y
+          // completa `disconnected` si el reset llega antes de aceptar nada.
+          onError: (Object error) {
+            if (!disconnected.isCompleted) disconnected.complete();
+          },
+        ),
       );
       final elapsed = Stopwatch()..start();
       await expectLater(
