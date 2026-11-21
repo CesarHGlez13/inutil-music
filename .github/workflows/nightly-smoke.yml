@@ -1,0 +1,109 @@
+name: Nightly native smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-native-smoke
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: "3.47.9"
+
+jobs:
+  windows-native:
+    name: Windows crossfade and InnerTube playback
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Rust for Windows SMTC
+        shell: pwsh
+        run: |
+          rustup default stable
+          rustup target add x86_64-pc-windows-msvc
+
+      - name: Install pinned NuGet CLI
+        shell: pwsh
+        run: ./tool/ensure_nuget.ps1
+
+      - name: Resolve locked dependencies
+        run: |
+          flutter clean
+          flutter pub get --enforce-lockfile
+
+      - name: Run native crossfade smoke
+        run: >-
+          flutter test integration_test/crossfade_native_test.dart
+          -d windows
+          --dart-define=INUTIL_HEADLESS_AUDIO=true
+
+      - name: Run live InnerTube playback smoke
+        run: >-
+          flutter test integration_test/innertube_playback_live_test.dart
+          -d windows
+          --dart-define=INUTIL_HEADLESS_AUDIO=true
+          --dart-define=INUTIL_LIVE_INNERTUBE=true
+          --dart-define=INUTIL_ALLOW_ATTESTATION_WITHHELD=true
+
+  android-native:
+    name: Android native crossfade
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Set up Java
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve locked dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Enable KVM access
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run native playback smokes in an Android emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          emulator-options: >-
+            -no-snapshot-save -no-window -gpu swiftshader_indirect
+            -noaudio -no-boot-anim -camera-back none
+          # This action executes each script line in a separate shell.
+          script: |
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/crossfade_native_test.dart -d emulator-5554 --no-dds
+            flutter drive --driver=test_driver/integration_test.dart --target=integration_test/skip_silence_native_test.dart -d emulator-5554 --no-dds

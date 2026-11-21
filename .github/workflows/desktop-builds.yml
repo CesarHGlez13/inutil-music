@@ -26,6 +26,17 @@ env:
   # pubspec.yaml using pubspec.lock … Would change 1 dependency”, medido en
   # https://github.com/CesarHGlez13/inutil-music/actions/runs/44853194063
   FLUTTER_VERSION: "3.50.0"
+  # Endpoints horneados dentro de TODOS los binarios. Medido el 2026-11-20:
+  # los assets publicados de v2.5.12 y v2.5.13 eran byte-idénticos a un build
+  # SIN estos defines (`unzip -p <apk> lib/arm64-v8a/libapp.so | strings -a`
+  # devolvía 0 ocurrencias de `workers.dev` y 0 de `192.168.100.27`, y el
+  # `sha256 42a81121…` coincidía con el build local), o sea el relay del
+  # servidor de casa y el Worker cloud nunca funcionaron en la app instalada.
+  # Cada `flutter build` los recibe como `--dart-define` y los jobs de
+  # Android, Windows, Linux y macOS repiten la misma medición sobre su propio
+  # artefacto, así un build sin endpoints no puede salir a publicarse.
+  FB_RELAY_HOST: "192.168.100.27"
+  FB_CLOUD_RELAY_HOST: "inutil-cloud-relay.scada-xiaomi-server.workers.dev"
 
 jobs:
   quality:
@@ -157,10 +168,16 @@ jobs:
           --reporter compact
 
       - name: Build unsigned iOS simulator app
-        run: flutter build ios --simulator --no-codesign
+        run: >-
+          flutter build ios --simulator --no-codesign
+          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
+          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
 
       - name: Build unsigned iOS device app
-        run: flutter build ios --release --no-codesign
+        run: >-
+          flutter build ios --release --no-codesign
+          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
+          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
 
       - name: Package unsigned iOS IPA
         shell: bash
@@ -319,6 +336,8 @@ jobs:
           --release
           --split-per-abi
           --target-platform android-arm,android-arm64,android-x64
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Verify and name Android APKs
         shell: bash
@@ -339,6 +358,35 @@ jobs:
           "$apksigner" verify --verbose "$arm32"
           "$apksigner" verify --verbose "$arm64"
           "$apksigner" verify --verbose "$x64"
+
+          # Medición repetida del control manual que destapó el problema:
+          # `unzip -p <apk> lib/<abi>/libapp.so | grep -a -q <host>`. Sobre el
+          # build sin defines devuelve falsío (0 ocurrencias, medido también
+          # en `build/linux/x64/release/bundle/lib/libapp.so`); sobre el build
+          # con defines, 1 ocurrencia de cada host.
+          verify_endpoints() {
+            apk="$1"
+            abi="$2"
+            for host in "$FB_RELAY_HOST" "$FB_CLOUD_RELAY_HOST"; do
+              # No se usa `grep -q` dentro de la tubería: corta la entrada,
+              # `unzip` muere de SIGPIPE y con `set -o pipefail` (que este
+              # step sí lleva) la tubería devuelve 141 AUNQUE el host esté.
+              # Medido en local sobre `lib/<abi>/libapp.so` de los tres APK:
+              # `grep -a -q` sobre el .so extraído → rc 0; ese mismo
+              # `grep -a -q` recibido por tubería → rc 141. `grep -a -c` lee
+              # todo el archivo, no corta la tubería y deja el conteo.
+              hits="$(unzip -p "$apk" "lib/$abi/libapp.so" |
+                grep -a -c "$host" || true)"
+              if [ "${hits:-0}" -lt 1 ]; then
+                echo "APK $apk no lleva horneado el endpoint $host" >&2
+                exit 1
+              fi
+              echo "$abi: $host presente ($hits coincidencias)"
+            done
+          }
+          verify_endpoints "$arm32" armeabi-v7a
+          verify_endpoints "$arm64" arm64-v8a
+          verify_endpoints "$x64" x86_64
 
           verify_abi() {
             apk="$1"
@@ -477,7 +525,26 @@ jobs:
           test/services/player/playback_visual_cache_test.dart
 
       - name: Build Windows release
-        run: flutter build windows --release
+        run: >-
+          flutter build windows --release
+          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
+          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+
+      - name: Verify baked server endpoints in the Windows bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$PWD/build/windows/x64/runner/Release"
+          for host in "$FB_RELAY_HOST" "$FB_CLOUD_RELAY_HOST"; do
+            hits="$(grep -R -a -c "$host" "$bundle" |
+              awk -F: '{ total += $2 } END { print total + 0 }' ||
+              true)"
+            if [ "${hits:-0}" -lt 1 ]; then
+              echo "bundle de Windows no lleva horneado el endpoint $host" >&2
+              exit 1
+            fi
+            echo "bundle de Windows: $host presente ($hits coincidencias)"
+          done
 
       - name: Bundle Visual C++ runtime
         shell: pwsh
@@ -662,7 +729,29 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Build Linux release
-        run: flutter build linux --release
+        run: >-
+          flutter build linux --release
+          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
+          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+
+      - name: Verify baked server endpoints in the Linux bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          snapshot="$PWD/build/linux/x64/release/bundle/lib/libapp.so"
+          test -f "$snapshot"
+          # Ruta verificada en local (`find build -name libapp.so` →
+          # `build/linux/x64/release/bundle/lib/libapp.so`). Medido sobre ese
+          # archivo: 0 ocurrencias en el build anterior a los defines, 1 en el
+          # build con ellos, así que el control sí discrimina.
+          for host in "$FB_RELAY_HOST" "$FB_CLOUD_RELAY_HOST"; do
+            hits="$(grep -a -c "$host" "$snapshot" || true)"
+            if [ "${hits:-0}" -lt 1 ]; then
+              echo "Linux libapp.so no lleva horneado el endpoint $host" >&2
+              exit 1
+            fi
+            echo "Linux libapp.so: $host presente ($hits coincidencias)"
+          done
 
       - name: Verify Linux bundle
         shell: bash
@@ -798,7 +887,27 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Build macOS release
-        run: flutter build macos --release
+        run: >-
+          flutter build macos --release
+          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
+          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+
+      - name: Verify baked server endpoints in the macOS bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$PWD/build/macos/Build/Products/Release/inutil_music.app"
+          test -d "$app"
+          for host in "$FB_RELAY_HOST" "$FB_CLOUD_RELAY_HOST"; do
+            hits="$(grep -R -a -c "$host" "$app" |
+              awk -F: '{ total += $2 } END { print total + 0 }' ||
+              true)"
+            if [ "${hits:-0}" -lt 1 ]; then
+              echo "bundle de macOS no lleva horneado el endpoint $host" >&2
+              exit 1
+            fi
+            echo "bundle de macOS: $host presente ($hits coincidencias)"
+          done
 
       - name: Sign embedded macOS code consistently
         shell: bash
