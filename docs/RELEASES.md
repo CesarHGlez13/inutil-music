@@ -350,3 +350,71 @@
     zona (`handleUncaughtError`) —: hay que medir por cuál sale antes de
     tapar, porque cerrar una no cierra la otra. "12 corridas locales verdes"
     jamás fue un control para un flake de 1/3941: la tasa se mide, no se reza.
+
+22. Publicar la etiqueta **ancla donde le digas, no donde quieres**: dos trampas
+    medidas el 2026-11-21 al publicar `2.5.14+4272`.
+    * `tool/publish_release.sh` hacía `gh release create "$TAG"` **sin
+      `--target`**, y `gh` usa el **branch default** del repo. Aquí el default
+      es `main`, que no es un espejo sino una **rama huérfana** de 9 commits
+      `chore(ci): espejo … [skip ci]` creada solo para que Actions descubra el
+      workflow: `git merge-base origin/main origin/master` está **vacío** (0
+      antepasados comunes), `origin/main..origin/master` = 56 commits,
+      `origin/master..origin/main` = 9, y `git diff --stat` entre ellas son
+      **1051 archivos (+393 953 líneas)**, con `windows/runner/*` como
+      inserciones puras (a `main` le falta todo el árbol de producto). Sin el
+      flag, la etiqueta nace apuntando a un árbol **sin `lib/`** — así quedó
+      `v2.5.13`. Se añadió `RELEASE_TARGET` (default `master`) y `--target` en
+      la rama `create`. Verificado después de publicar: el API reporta
+      `target_commitish: "master"` y `GET /git/refs/tags/v2.5.14` devuelve
+      `commit 7b062ef691ff`, o sea el **mismo commit que CI construyó**.
+    * El workflow se dispara también por `push` de **tags `v*`**
+      (`.github/workflows/desktop-builds.yml:3-12`), así que `gh release
+      create` —que crea la etiqueta— mete **una segunda corrida completa** a la
+      cola (~55 min: gate + los 6 jobs) que vuelve a morir en
+      `Android release APKs` por los secrets del keystore y no produce nada
+      nuevo. Medido: `44941909271` entró a las 19:37:17Z (6 s después de
+      publicado el release) y hubo que `gh run cancel` — quedó
+      `cancelled`. Hay que cancelar esa corrida justo después de publicar, o
+      quitar `tags:` del `on:` si no se quiere construir desde etiqueta.
+    * `timeout-minutes: 45` (`desktop-builds.yml:910`) para `macOS x64` va
+      **justo**, no holgado: `Build macOS release` tardó **35 min 30 s**
+      (18:57:50Z→19:32:52Z) en el runner `macos-26-intel`, y los pasos 7-13
+      (verificar endpoints, firma, auditoría, smoke launch, PKG, budget
+      `max_mib: 140`, upload) tardaron **60 s** (19:32:52Z→19:33:52Z). El job
+      cerró a las 19:36:40Z, con ~3 min de margen sobre el tope de 45 min
+      medido desde el inicio del job (18:54:48Z). El `macOS arm64`, nativo,
+      hizo los mismos pasos 6-13 en **6 min 22 s**. Si el runner Intel amanece
+      más lento, subir el timeout a 90 antes de despachar, no después.
+    * `gh run view --log` **no sirve con el run vivo**: GitHub aún no ha
+      subido el blob del log. Medido: `GET …/actions/jobs/<id>/logs` con token
+      redirige a un blob que responde `BlobNotFound` (404), y sin token da
+      **403 `Must have admin rights to Repository`**. No hay atajo: hay que
+      esperar a que cierre el run para leer el recuento (`🎉 3942 tests
+      passed, 43 skipped.` en el `Required quality gate`) y las líneas
+      `bundle de …: <host> presente (N coincidencias)`.
+    * `gh run download` sigue roto para los instaladores: GitHub sirve el
+      artefacto **RAW** (magic `78617221` = `xar!` en el `.pkg`, `4d5a5000` =
+      `MZ` en el `.exe`, `213c6172` = `!<ar` en el `.deb`, `edabeedb` en el
+      `.rpm`) y los bytes descargados coinciden **exactamente** con
+      `size_in_bytes`, así que `gh` espera un zip y falla con
+      `error extracting zip archive`. Se bajan con
+      `curl -H "Authorization: Bearer $(gh auth token)"
+      …/actions/artifacts/<id>/zip` y se decide por magic (`PK\3\4` → unzip,
+      si no → guardar tal cual).
+    * El mapa `checksums` de `release.json` **solo cubre lo que
+      `tool/publish_release.sh` inventaría** (los 3 APK + `inutil_music_linux_x64.tar.gz`);
+      los instaladores de PC se suben como assets extra y quedan fuera. Si se
+      quiere que la app los verifique, hay que añadirlos al inventario del
+      script, no solo subirlos. Y ningún cliente lee la URL del instalador de
+      PC: `grep -rn "Setup.exe|macOS-x64|releases/download" lib/` = **0
+      coincidencias**, y `inutil_update_service.dart:141-151` solo consume
+      `apkDownloadUrl` (Android) y `linuxDownloadUrl` (Linux).
+    * El `.pkg` de macOS **no** es específico de una arquitectura:
+      `Contents/Frameworks/App.framework/Versions/A/App` es un **Mach-O
+      universal** (`0xCAFEBABE`, 2 slices: `x86_64` 23 135 264 B y `arm64`
+      22 393 472 B), y ese archivo es **idéntico byte a byte** en el `.pkg`
+      arm64 y en el x64 (mismo sha256 `146be8aa…`, 45 560 448 B en ambos).
+      Por eso la verificación de endpoints horneados reporta **2
+      coincidencias** en macOS (una por slice) y **1** en Linux y Windows. Los
+      dos `.pkg` solo difieren en la metadata del instalador: 61 300 490 B
+      (arm64) contra 61 300 716 B (x64).
