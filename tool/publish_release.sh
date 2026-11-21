@@ -41,6 +41,14 @@ PROY="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_ID="${FB_PROJECT:-inutil-music-app}"
 BUCKET="${FB_BUCKET:-inutil-music-app.firebasestorage.app}"
 RELEASE_REPO="${RELEASE_REPO:-CesarHGlez13/inutil-music}"
+# Rama donde nace la etiqueta. `gh release create` sin `--target` usa el branch
+# *default*, que en este repo es `main`: una rama espejo **huerfana** creada solo
+# para que Actions descubra el workflow, sin el codigo fuente de la app. Sin
+# este flag la etiqueta apuntaria a un arbol sin `lib/`, y quien clone el tag no
+# veria el codigo del que salio el binario. Medido 2026-11-21: `git merge-base
+# origin/main origin/master` esta vacio (0 antepasados en comun), main tiene 9
+# commits y master 56, y `git diff --stat main..master` son 1051 archivos.
+RELEASE_TARGET="${RELEASE_TARGET:-master}"
 MIN_SUPPORTED="${MIN_SUPPORTED:-}"
 MANDATORY="${MANDATORY:-1}"
 LOCAL_DIR="${INUTIL_RELEASES_DIR:-$HOME/inutil-releases}"
@@ -303,9 +311,12 @@ PY
   FILES_ARGS+=("$MANIFEST")
   if gh release view "$TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
     gh release upload "$TAG" "${FILES_ARGS[@]}" --clobber --repo "$RELEASE_REPO"
+    echo "  la etiqueta $TAG ya existe; se suben los assets sin moverla"
   else
     gh release create "$TAG" "${FILES_ARGS[@]}" --repo "$RELEASE_REPO" \
+      --target "$RELEASE_TARGET" \
       --title "Inútil Music $TAG" --notes-file "$NOTES_MD"
+    echo "  etiqueta $TAG anclada en $RELEASE_TARGET (no en el branch default)"
   fi
   echo "publicado en https://github.com/$RELEASE_REPO/releases/tag/$TAG"
 fi
