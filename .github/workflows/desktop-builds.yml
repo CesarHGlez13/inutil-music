@@ -221,14 +221,14 @@ jobs:
       - name: Build unsigned iOS simulator app
         run: >-
           flutter build ios --simulator --no-codesign
-          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
-          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Build unsigned iOS device app
         run: >-
           flutter build ios --release --no-codesign
-          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
-          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Package unsigned iOS IPA
         shell: bash
@@ -588,8 +588,8 @@ jobs:
       - name: Build Windows release
         run: >-
           flutter build windows --release
-          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
-          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the Windows bundle
         shell: bash
@@ -792,8 +792,8 @@ jobs:
       - name: Build Linux release
         run: >-
           flutter build linux --release
-          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
-          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the Linux bundle
         shell: bash
@@ -950,8 +950,8 @@ jobs:
       - name: Build macOS release
         run: >-
           flutter build macos --release
-          --dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }
-          --dart-define=FB_CLOUD_RELAY_HOST=${ env.FB_CLOUD_RELAY_HOST }
+          --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
+          --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the macOS bundle
         shell: bash

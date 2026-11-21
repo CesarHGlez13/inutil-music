@@ -171,3 +171,81 @@
     queda algún `.txt`, así que no se cuela un plugin nuevo sin que el gate lo
     vea. Si upstream migra a `proguard-android-optimize.txt`, el script deja de
     parchear solos y se puede quitar.
+18. La trampa de las llaves simples en el workflow: `--dart-define=FB_RELAY_HOST=${ env.FB_RELAY_HOST }`.
+    GitHub Actions solo expande `${{ ... }}`; con una sola llave el texto llega
+    VERBATIM al shell y bash lo interpreta como `${ env.X }`, que es
+    `bad substitution`. En el run `44897842893` eso tumbó los jobs `Linux x64
+    installers`, `macOS`, `iOS` y el build de Windows con `##[error]Process
+    completed with exit code 1` y una línea `\.sh: line 1: --dart-define=FB_RELA`
+    (el shell intentó ejecutar el `--dart-define` porque la expansión se llevó
+    el resto). Fueron 10 ocurrencias repartidas en 4 jobs, y las tres líneas de
+    cada job se escribieron juntas porque el bloque se generó con un
+    `format()` de Python donde `{{`/`}}` colapsaron a `{`/`}` — es decir: el
+    propio arreglo del `env:` anterior se comió una llave. Arreglado con
+    `sed -E 's/\$\{ env\.([A-Za-z_]+) /${{ env.\1 /g'`; controles medidos
+    después: `grep -c '${ env.'` = **0**, `grep -c '${{ env.'` = **34**,
+    `python3 -c 'import yaml; yaml.safe_load(open(...))'` = OK, y en los 6 pasos
+    de `flutter build` el log ahora imprime los dos `--dart-define` con los
+    hosts horneados. Lección: ante un `exit 1` en un paso de `run: >-`, lo
+    primero es `gh run view --log` y mirar cómo el runner ECHOEÓ el comando,
+    no solo el pie del error.
+19. `Test Windows animated artwork` en verde, y por qué se cayó 5 pruebas.
+    El paso arrancó en `44897842893` con **19 passed / 5 failed / 2 skipped**
+    (`test/features/music/presentation/widgets/player_canvas_layout_test.dart`
+    entre los 9 archivos). Las 5 fallas eran tres cosas distintas:
+    * **`ProviderException: A InutilPlaybackSyncService was used after being
+      disposed`** en `_SpotifyFullscreenCanvasPlayer.build`. El servicio de
+      sincronización es un singleton global y el primer `ProviderContainer` de
+      cada prueba lo DESMONTABA: `ChangeNotifierProvider` de riverpod 3.4.3
+      llama `value.dispose()` al cerrar el contenedor porque `disposeNotifier`
+      vale `true` por defecto (`…/flutter_riverpod-3.4.3/lib/src/providers/
+      legacy/change_notifier_provider.dart:248` lo salta si vale `false`).
+      Probado con una prueba sonda: contenedor default → `sawDispose=true` y
+      el siguiente `addListener` lanza `Bad state: A Probe was used after being
+      disposed`; con `disposeNotifier: false` → `sawDispose=false` y
+      `addListener` responde `Null: null` sin lanzar. Arreglo de producto:
+      `disposeNotifier: false` en `inutilAuthProvider` y
+      `inutilPlaybackSyncProvider` (`lib/core/firebase/
+      firebase_sync_providers.dart`), que comparten el objeto entre contenedores
+      y entre la app y las pruebas, más la prueba permanente
+      `test/core/firebase/shared_singleton_dispose_test.dart`.
+    * **Expectaciones de `Rect` viejas**: el test nació antes del modo
+      "canvas a pantalla completa" y seguía esperando que el vídeo se recortara
+      encima de la carátula. Medido en retrato ancho (800x1200): carátula
+      `164,404,636,876`, vídeo `0,0,800,1200` y `canvasmode=1`; en
+      `appleMusic` el vídeo coincide con la carátula y `canvasmode=0`. Ahora el
+      test deriva `canvasFullscreen` con la misma regla que
+      `player_panel.dart:626` (`canUseSpotifyFullscreenCanvas`) y exige
+      `player-canvas-viewport` == pantalla entera.
+    * **Regla de píxeles inalcansable por diseño**: el
+      `SpotifyFullscreenCanvasPlayer` pinta su propio scrim de legibilidad
+      (`spotify_fullscreen_canvas_player.dart:181`, LinearGradient con stops
+      `[0, .16, .36, .58, .78, 1]` y alphas de negro
+      `[.62, .14, 0, .52, .90, .96]`). Interpolado: α=.933 en yf=.9, .946 en
+      .95, .953 en .975, .957 en .99, .96 en el borde, o sea que del 90 % de la
+      pantalla al borde físico solo sobrevive el 4 %-7 % de la señal del lienzo.
+      Perfil medido (con/lienzo contra sin/lienzo, x=.5, 390x820):
+      dy 738 → [18,37,36], 656 → [47,47,61], 164 → [116,127,112],
+      123 → [52,44,57], 82 → [27,17,31], 41 → [12,2,16], 20.5 → [12,2,16],
+      8.2 → [28,16,31], 2.0/1.0 → [27,16,31] (spotifyMusic igual, 10/1/14 en
+      las filas del pill de controles). Por eso exigir `delta > 32` en las dos
+      últimas filas era imposible por principio: se muestrea la VENTANA CLARA
+      del scrim (yf .16/.26/.36/.4, donde α vale .14 → 0) y "el lienzo llega al
+      borde" lo garante el assert geométrico, no el píxel.
+      Se le sumó el drenado de reloj: el buscador de letras que monta el modo a
+      pantalla completa deja un temporizador que caduca a los **6.998 s** y
+      `flutter_test` exige `!timersPending`, y `_fullscreenCanvasGraceDuration`
+      = 1400 ms (`player_panel.dart:244`) retiene el `SpotifyCanvasVideo` después
+      de apagar el canvas, así que hay que `pump(1600 ms)` antes de exigir que
+      ya no esté.
+    Receta para ver esto en Linux sin Windows: `player_panel.dart:407` excluye
+    `AppPlatformType.linux` de `remoteArtworkAllowed` (el canvas remoto está
+    cortado en Linux por diseño), y `AppPlatform` se basa en `Platform.isWindows`
+    real, así que no se puede fingir en una prueba. Lo que sí funciona: parchar
+    temporalmente esa línea 407 a `true &&` + `skip: false` en los dos bucles,
+    y entonces el archivo reproduce EXACTAMENTE lo de Windows (medido: `+19 -5`
+    con los mismos 5 nombres y `disposed count = 0` después del arreglo). Con
+    ese parche el archivo quedó **24 passed / 0 failed** (`PROBE9_RC=0`);
+    revertido el parche, el subconjunto de los 9 archivos vuelve a su estado
+    sano en Linux y el `skip` documentado hace que las 24 pruebas de canvas se
+    salten aquí y se ejecuten en los runners de Windows/macOS.
