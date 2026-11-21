@@ -57,9 +57,14 @@ jobs:
           cache: gradle
 
       - name: Set up Gradle
+        # Sin `gradle-version`: la fuente de verdad es
+        # `android/gradle/wrapper/gradle-wrapper.properties` (9.5.0), y AGP
+        # 9.1.1 (`android/settings.gradle.kts:23`) exige Gradle >= 9.3.1. Con
+        # `gradle-version: "8.14.3"` el paso "Run Android unit tests" usaba el
+        # `gradle` del runner y reventaba con
+        # "Minimum supported Gradle version is 9.3.1. Current version is
+        # 8.14.3" (medido en el run 44879291272, 2026-11-21 07:27Z).
         uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
-        with:
-          gradle-version: "8.14.3"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -93,8 +98,10 @@ jobs:
       - name: Run Android unit tests
         working-directory: android
         run: |
-          gradle --version
-          gradle :app:testDebugUnitTest :just_audio:testDebugUnitTest --no-daemon
+          # `./gradlew`, no el `gradle` del runner: el wrapper clava 9.5.0 y AGP
+          # 9.1.1 necesita >= 9.3.1. Verificado en local con el mismo comando.
+          ./gradlew --version
+          ./gradlew :app:testDebugUnitTest :just_audio:testDebugUnitTest --no-daemon
 
       - name: Enforce self-contained media resolver
         shell: bash
