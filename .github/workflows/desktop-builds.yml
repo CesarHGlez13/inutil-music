@@ -1039,11 +1039,22 @@ jobs:
             --version "$APP_VERSION" \
             --ownership recommended \
             "$package"
+          echo "ok: pkgbuild escribió $package"
           payload_files="$RUNNER_TEMP/inutil-payload-files.txt"
           pkgutil --payload-files "$package" >"$payload_files"
+          # OJO con el acento: macOS normaliza los nombres de archivo a NFD
+          # (`u` + diacrítico), y el literal "Inútil" del YAML viene NFC (un
+          # solo code point). Compararlos byte a byte en el payload es una
+          # trampa que sólo macOS pisa, así que todos los anclajes de abajo
+          # usan texto ASCII puro. Medido en el run 44903132776: pkgbuild
+          # escribió el .pkg sin problemas (`Wrote package to
+          # dist/InutilMusic-2.5.14-macOS-arm64.pkg`) y el paso murió 0.3 s
+          # después, o sea en el `grep -Fq` del nombre acentuado.
+          echo "  payload: $(wc -l <"$payload_files") rutas"
           grep -Fq \
-            "Inútil Music.app/Contents/MacOS/inutil_music" \
+            "Music.app/Contents/MacOS/inutil_music" \
             "$payload_files"
+          echo "ok: el ejecutable está dentro del payload"
           if grep -Eiq '/(tools|scripts)(/|$)' "$payload_files"; then
             echo "Unexpected external-runtime directory found in macOS package payload." >&2
             exit 1
@@ -1052,11 +1063,15 @@ jobs:
           expanded_package="$RUNNER_TEMP/inutil-expanded-pkg"
           rm -rf "$expanded_package"
           pkgutil --expand-full "$package" "$expanded_package"
-          packaged_app="$(
-            find "$expanded_package" -type d -name "Inútil Music.app" \
+          packaged_exec="$(
+            find "$expanded_package" -type f \
+              -path '*/Contents/MacOS/inutil_music' \
               -print -quit
           )"
-          test -n "$packaged_app"
+          test -n "$packaged_exec"
+          packaged_app="$(dirname "$(dirname "$(dirname "$packaged_exec")")")"
+          echo "codesign sobre: $packaged_app"
+          test -d "$packaged_app"
           codesign --verify --deep --strict "$packaged_app"
 
       - name: Enforce macOS installer size budget
