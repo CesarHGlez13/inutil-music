@@ -85,6 +85,22 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get --enforce-lockfile
 
+      - name: Patch pub-cache plugins for AGP 9
+        shell: bash
+        # AGP 9.1.1 (`android/settings.gradle.kts:23`) rechaza
+        # `getDefaultProguardFile('proguard-android.txt')` (el archivo incluye
+        # `-dontoptimize`), y `flutter_inappwebview_android-1.1.3` lo usa en las
+        # líneas 44 y 48 de su `android/build.gradle`. Medido en el run
+        # 44895843926 (11:00:43Z): `A problem occurred evaluating project
+        # ':flutter_inappwebview_android'` / `Build file '...build.gradle'
+        # line: 44` / `BUILD FAILED in 2m 42s`; reproducido en local con el
+        # archivo pristino de pub.dev → `BUILD FAILED in 20s`, y con el
+        # parche → `BUILD SUCCESSFUL` con las 26 pruebas en verde. El script es
+        # idempotente (2a corrida: `0 archivo(s) parcheados, 0 restantes`) y
+        # sale en error si queda algún `.txt`, así que CI y las máquinas
+        # locales convergen al mismo estado del pub cache.
+        run: bash tool/patch_pub_cache_proguard.sh
+
       - name: Configure Android Gradle properties
         shell: bash
         run: |
@@ -364,6 +380,16 @@ jobs:
         run: |
           flutter clean
           flutter pub get --enforce-lockfile
+
+      - name: Patch pub-cache plugins for AGP 9
+        shell: bash
+        # Mismo parche que el job `quality`: `flutter build apk` también evalúa
+        # `:flutter_inappwebview_android` y AGP 9.1.1 rechaza
+        # `getDefaultProguardFile('proguard-android.txt')`. Este job nunca llegó
+        # a correr en los runs 44879291272 y 44891202761 porque el gate
+        # `quality` reventaba primero y lo dejaba `skipped`, así que el mismo
+        # defecto lo iba a tumbar aquí; se parchea antes de construir.
+        run: bash tool/patch_pub_cache_proguard.sh
 
       - name: Build ARMv7, ARMv8, and x86_64 APKs
         run: >-

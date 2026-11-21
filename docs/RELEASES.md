@@ -139,3 +139,35 @@
     OJO con el `sed` que lee las versiones: `s/^Gradle \([0-9.]*\)$/1/p`
     devuelve el literal `1` (no `\1`) y el control se vuelve tonto; hay que
     escribir `sed -nE 's/^Gradle ([0-9.]+)$/\1/p'`.
+17. El pub cache **no es parte del repo**, así que cualquier arreglo que viva
+    ahí produce la trampa «aquí compila, en CI no». Medido con
+    `flutter_inappwebview_android-1.1.3`: el `android/build.gradle` que publica
+    pub.dev (tarball `sha256 62557c15a5c2db5d195cb3892aab74fcaec266d7b86d59a6f0027abd672cddba`,
+    igual al `sha256` de `pubspec.lock`) llama
+    `getDefaultProguardFile('proguard-android.txt')` en las líneas 44 y 48, y
+    AGP 9.1.1 (`android/settings.gradle.kts:23`) lo rechaza porque
+    `proguard-android.txt` incluye `-dontoptimize`. La copia local del pub cache
+    estaba parcheada a `proguard-android-optimize.txt` (+18 bytes, sólo esas dos
+    líneas; mtime 14:43 vs 14:08 de sus hermanos), así que en mi máquina todo
+    salía verde y en CI no. Control A/B, con la misma forma que usará CI
+    (`cd android`, Gradle 9.5.0 en PATH, `--no-daemon`):
+    * pristino → `BUILD FAILED in 20s`, `A problem occurred evaluating project
+      ':flutter_inappwebview_android'`, `Build file '...build.gradle' line: 44`,
+      `> getDefaultProguardFile('proguard-android.txt') is no longer supported`
+      (idéntico al run `44895843926`, que en CI tardó `BUILD FAILED in 2m 42s`
+      porque el cache estaba frío).
+    * parcheado → `BUILD SUCCESSFUL in 17s` (`RC=0 ELAPSED=19s`), y tras forzar
+      la re-ejecución con `:app:cleanTestDebugUnitTest
+      :just_audio:cleanTestDebugUnitTest` (`CLEAN_RC=0`, 6 actionable tasks: 2
+      ejecutados): `BUILD SUCCESSFUL in 18s`, 326 actionable tasks: 3 ejecutados,
+      323 up-to-date, con los 4 XML regenerados → 16 + 4 + 3 + 3 = **26 pruebas,
+      0 failures, 0 errors, 0 skipped**.
+    El arreglo vive en `tool/patch_pub_cache_proguard.sh` y el workflow lo invoca
+    como paso `Patch pub-cache plugins for AGP 9` en los dos jobs que tocan
+    Gradle (`Required quality gate`, posición 6 de 15, y `Android release APKs`,
+    posición 6 de 12, antes de `Build ARMv7…`, que jamás llegó a correr porque el
+    gate reventaba y lo dejaba `skipped`). El script es idempotente —la segunda
+    corrida reporta `0 archivo(s) parcheados, 0 restantes`— y sale con exit 1 si
+    queda algún `.txt`, así que no se cuela un plugin nuevo sin que el gate lo
+    vea. Si upstream migra a `proguard-android-optimize.txt`, el script deja de
+    parchear solos y se puede quitar.
