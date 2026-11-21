@@ -89,11 +89,17 @@
     `FB_CLOUD_RELAY_HOST: "inutil-cloud-relay.scada-xiaomi-server.workers.dev"`
     en su bloque `env:` y los pasa como `--dart-define` a los **seis**
     `flutter build` (android, ios ×2, windows, linux, macos). Cada job lo
-    comprueba sobre su propio artefacto con la misma medición que se hizo a
-    mano: `unzip -p <apk> lib/<abi>/libapp.so | grep -a -q <host>` para Android,
-    `grep -a -q <host> build/linux/x64/release/bundle/lib/libapp.so` para Linux
-    (ruta verificada con `find build -name libapp.so`) y `grep -R -a -q` sobre
-    el bundle para Windows/macOS. Medido sobre los binarios locales: **0**
+    comprueba sobre su propio artefacto **contando** coincidencias
+    (`grep -a -c`), no preguntando "¿existe?" a secas: `unzip -p <apk>
+    lib/<abi>/libapp.so | grep -a -c <host>` para Android, `grep -a -c <host>
+    build/linux/x64/release/bundle/lib/libapp.so` para Linux (ruta verificada
+    con `find build -name libapp.so`) y `grep -R -a -c` sobre el bundle para
+    Windows/macOS. Por qué no `grep -a -q` dentro de la tubería: corta la
+    entrada, `unzip` muere de SIGPIPE y con `set -o pipefail` —que esos steps
+    sí llevan— la tubería devuelve **141 AUNQUE el host esté presente**, o sea
+    un falso negativo que habría roto el gate. Medido: `grep -a -q` sobre el
+    `.so` extraído rc 0; el mismo `grep -a -q` recibido por tubería rc 141;
+    `grep -a -c` por tubería da el conteo (1) y rc 0. Medido sobre los binarios locales: **0**
     ocurrencias en el build sin defines y **1** de cada host en el build con
     ellos, así el control sí discrimina. Sin esos defines el binario habla solo
     con Google y ni el relay de la LAN ni el Worker cloud funcionan — así
