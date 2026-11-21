@@ -57,14 +57,23 @@ jobs:
           cache: gradle
 
       - name: Set up Gradle
-        # Sin `gradle-version`: la fuente de verdad es
-        # `android/gradle/wrapper/gradle-wrapper.properties` (9.5.0), y AGP
-        # 9.1.1 (`android/settings.gradle.kts:23`) exige Gradle >= 9.3.1. Con
-        # `gradle-version: "8.14.3"` el paso "Run Android unit tests" usaba el
-        # `gradle` del runner y reventaba con
+        # 9.5.0 es el `distributionUrl` de
+        # `android/gradle/wrapper/gradle-wrapper.properties`; el paso
+        # `Assert Gradle matches the Android wrapper` abajo falla si los dos
+        # se separan. Se instala explícitamente porque `android/.gitignore:4`
+        # ignora `/gradlew`, así que en CI no existe un `./gradlew` hasta que
+        # Flutter lo inyecta: `gradle_utils.dart:229-246` (`getExecutable` →
+        # `injectGradleWrapperIfNeeded`) lo crea sólo cuando corres
+        # `flutter build apk`, y `flutter test` no lo crea. Medido: con
+        # `gradle-version: "8.14.3"` (runs 44879291272 y 44891202761) el paso
+        # de pruebas unitarias reventaba — primero
         # "Minimum supported Gradle version is 9.3.1. Current version is
-        # 8.14.3" (medido en el run 44879291272, 2026-11-21 07:27Z).
+        # 8.14.3" (exigencia de AGP `com.android.application` 9.1.1,
+        # `android/settings.gradle.kts:23`) y luego `./gradlew: No such file or
+        # directory` exit 127.
         uses: gradle/actions/setup-gradle@4733eaac7c1b0da527e4206b7671e0061de1ce37 # v6
+        with:
+          gradle-version: "9.5.0"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
@@ -95,13 +104,32 @@ jobs:
       - name: Smoke-test LIVE overlay layouts
         run: node tool/live_overlay_browser_smoke.mjs
 
-      - name: Run Android unit tests
-        working-directory: android
+      - name: Assert Gradle matches the Android wrapper
+        shell: bash
         run: |
-          # `./gradlew`, no el `gradle` del runner: el wrapper clava 9.5.0 y AGP
-          # 9.1.1 necesita >= 9.3.1. Verificado en local con el mismo comando.
-          ./gradlew --version
-          ./gradlew :app:testDebugUnitTest :just_audio:testDebugUnitTest --no-daemon
+          set -euo pipefail
+          want="$(sed -nE 's/^distributionUrl=.*gradle-([0-9.]+)-(bin|all)\.zip$/\1/p' \
+            android/gradle/wrapper/gradle-wrapper.properties)"
+          have="$(gradle --version | sed -nE 's/^Gradle ([0-9.]+)$/\1/p' | head -1)"
+          if [ -z "$want" ] || [ -z "$have" ]; then
+            echo "no se pudieron leer las versiones (want=$want have=$have)" >&2
+            exit 1
+          fi
+          if [ "$have" != "$want" ]; then
+            echo "Gradle en PATH es $have pero el wrapper clava $want" >&2
+            exit 1
+          fi
+          # AGP 9.1.1 (`android/settings.gradle.kts:23`) exige >= 9.3.1.
+          awk -v v="$have" 'BEGIN { split(v, p, "."); n = p[1]*10000 + p[2]*100 + p[3]; exit (n < 90301 ? 1 : 0) }'
+          echo "Gradle $have: coincide con el wrapper y satisface AGP 9.1.1"
+
+      - name: Run Android unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd android
+          gradle --version
+          gradle :app:testDebugUnitTest :just_audio:testDebugUnitTest --no-daemon
 
       - name: Enforce self-contained media resolver
         shell: bash

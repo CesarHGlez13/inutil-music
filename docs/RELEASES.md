@@ -105,3 +105,37 @@
     con Google y ni el relay de la LAN ni el Worker cloud funcionan — así
     salieron los `v2.5.12` y `v2.5.13` publicados, que eran byte-idénticos a un
     build sin endpoints (`sha256 42a81121…`).
+16. Gradle: el job `quality` **no puede** usar el `gradle` que trae el runner ni
+    un `gradle-version` al azar, y tampoco puede invocar `./gradlew` antes de
+    `flutter build apk`. Medido en dos runs seguidos (`44879291272` y
+    `44891202761`): con `gradle-version: "8.14.3"` el paso de pruebas unitarias
+    reventó con `Minimum supported Gradle version is 9.3.1. Current version is
+    8.14.3` (la exigencia la pone AGP `com.android.application` **9.1.1** en
+    `android/settings.gradle.kts:23`); al cambiarlo a `./gradlew` reventó con
+    `./gradlew: No such file or directory` exit 127, porque `android/.gitignore:4`
+    ignora `/gradlew` (y `:1` ignora `gradle-wrapper.jar`), así que en CI el
+    checkout **no trae** wrapper: Flutter lo inyecta desde su caché
+    (`gradle_utils.dart:229-246`, `getExecutable` → `injectGradleWrapperIfNeeded`)
+    sólo cuando corres `flutter build apk`, y `flutter test` no lo crea. Por eso
+    el workflow ahora instala `gradle-version: "9.5.0"` — el mismo
+    `distributionUrl` de `android/gradle/wrapper/gradle-wrapper.properties` — y
+    un paso `Assert Gradle matches the Android wrapper` compara las dos versiones
+    y exige `>= 9.3.1`; si alguien sube el wrapper sin subir el pin, el gate lo
+    ve. Verificado en local con las dos variantes (`PATH` con un `gradle` 9.5.0
+    → el paso pasa; con uno 8.14.3 → rc 1) y las pruebas unitarias con Gradle
+    9.5.0: `BUILD SUCCESSFUL in 18s` con la
+    misma forma que usará CI (`cd android`, `gradle` 9.5.0 en PATH,
+    `--no-daemon`), tras forzar la re-ejecución con
+    `:app:cleanTestDebugUnitTest :just_audio:cleanTestDebugUnitTest` (BUILD
+    SUCCESSFUL in 16s, 6 actionable tasks: 2 ejecutados): 326 actionable tasks:
+    3 ejecutados, 323 up-to-date, y los 4 XML tallyados con ElementTree dan
+    16 + 4 + 3 + 3 = **26 pruebas, 0 failures, 0 errors, 0 skipped**. Si el
+    launcher de Gradle sobrevive a `BUILD SUCCESSFUL`, no le eches la culpa a
+    Gradle: medido, `STAT=T` y `wchan=do_signal_stop` (`State: T (stopped)`), y
+    corrido con `setsid` sale `RC=0 ELAPSED=27s` sin dejar procesos — es un
+    sandbox deteniendo el grupo de procesos de una tarea mandada a segundo
+    plano. En CI el job corre en primer plano y `setup-gradle` detiene sus
+    daemons al final, así que `--no-daemon` se queda.
+    OJO con el `sed` que lee las versiones: `s/^Gradle \([0-9.]*\)$/1/p`
+    devuelve el literal `1` (no `\1`) y el control se vuelve tonto; hay que
+    escribir `sed -nE 's/^Gradle ([0-9.]+)$/\1/p'`.
