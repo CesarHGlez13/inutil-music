@@ -63,7 +63,8 @@ class OtaPlaybackSnapshot {
     final sourceUrl = (decoded['sourceUrl'] as String?)?.trim() ?? '';
     if (trackId.isEmpty && sourceUrl.isEmpty) return null;
     final savedAt =
-        DateTime.tryParse(decoded['savedAt']?.toString() ?? '') ?? DateTime.utc(2026);
+        DateTime.tryParse(decoded['savedAt']?.toString() ?? '') ??
+        DateTime.utc(2026);
     return OtaPlaybackSnapshot(
       trackId: trackId,
       title: (decoded['title'] as String?)?.trim() ?? '',

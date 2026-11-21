@@ -7,6 +7,7 @@ import 'package:inutil_music/core/constants/app_constants.dart';
 import 'package:inutil_music/core/theme/app_colors.dart';
 import 'package:inutil_music/core/theme/app_theme.dart';
 import 'package:inutil_music/core/theme/app_ui.dart';
+import 'package:inutil_music/core/theme/inutil_icons.dart';
 import 'package:inutil_music/core/widgets/app_shared_widgets.dart';
 import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
 import 'package:inutil_music/core/widgets/marquee_text.dart';
@@ -102,8 +103,25 @@ void main() {
       tester.widget<Text>(find.byKey(const ValueKey('home-tab-title'))).data,
       'Inútil Music',
     );
-    expect(find.byIcon(Icons.search_rounded), findsWidgets);
+    // Desde `9c38523` (v2.2.0+220, "Inútil Signature UI: iconos vectoriales
+    // propios") el shell ya no pinta `Icons.search_rounded`: la barra
+    // inferior usa los glifos vectoriales propios (`InutilIcon`). Se
+    // conserva la intención —el destino de Buscar existe— midiendo el glifo
+    // `search` en lugar del `IconData` heredado de BStream Music.
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is InutilIcon && widget.glyph == InutilGlyph.search,
+      ),
+      findsWidgets,
+    );
     expect(find.text('Reproductor'), findsNothing);
+    // `HomeRecommendationsController.build()` (`music_providers.dart:2058`)
+    // programa un `Timer.run` en el frame en que `_HomeView` se monta, es
+    // decir DESPUÉS del último `pump(400ms)` de este cuerpo: la invariant de
+    // `flutter_test` lo reportaba como "A Timer is still pending…". Se drena
+    // con `_drainDeferredHomeRefresh` (ver su comentario) sin tocar ninguna
+    // afirmación.
+    await _drainDeferredHomeRefresh(tester);
   });
 
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
@@ -257,6 +275,7 @@ void main() {
           expect(gradient.colors.every((color) => color.a == 1), isTrue);
           expect(tester.getSize(background), tester.getSize(stack));
           expect(tester.takeException(), isNull);
+          await _drainDeferredHomeRefresh(tester);
         },
       );
     }
@@ -402,6 +421,7 @@ void main() {
       'Inútil Music',
     );
     expect(find.text('Inicio'), findsWidgets);
+    await _drainDeferredHomeRefresh(tester);
   });
 
   testWidgets('browsing tabs keep playback artwork out of their background', (
@@ -451,6 +471,7 @@ void main() {
           .gradient,
       isNotNull,
     );
+    await _drainDeferredHomeRefresh(tester);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -1191,6 +1212,7 @@ void main() {
         ),
       ),
     );
+    await _drainDeferredHomeRefresh(tester);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -1286,6 +1308,7 @@ void main() {
       tester.getSize(glass).height,
       closeTo(72 + MediaQuery.paddingOf(context).bottom, 0.1),
     );
+    await _drainDeferredHomeRefresh(tester);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -1347,6 +1370,17 @@ void main() {
         closeTo(8, 0.1),
         reason: 'The capsule gap must reveal the scrolling tab beneath it.',
       );
+      // `home-scroll-bottom-reserve` es el último sliver del Home. Con el
+      // mini reproductor en cápsula y reproduciendo, el esqueleto de carga
+      // empuja ese sliver fuera del `scrollCacheExtent` y ni siquiera se
+      // construye, así que hay que llegar a él desplazando (misma técnica
+      // que 'home shelves fit text scale 3 on a 320x568 phone').
+      await tester.dragUntilVisible(
+        find.byKey(const ValueKey('home-scroll-bottom-reserve')),
+        homeScroll,
+        const Offset(0, -300),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
       final reserve = tester.widget<SizedBox>(
         find.byKey(const ValueKey('home-scroll-bottom-reserve')),
       );
@@ -1452,7 +1486,15 @@ void main() {
       final reserve = tester.widget<SizedBox>(
         find.byKey(const ValueKey('home-scroll-bottom-reserve')),
       );
-      expect(reserve.height, greaterThanOrEqualTo(170));
+      // Desde `9c38523` (v2.2.0+220, "Inicio vivo") el respiro inferior se
+      // calcula como `max(96, bottomContentPadding + 20)` y
+      // `bottomContentPadding` solo suma el alto del mini reproductor
+      // `cuando hay reproducción activa` (`hasActivePlayback ?
+      // miniPlayerHeight : 0.0`); en el import base (`640348e`) lo sumaba
+      // siempre, de ahí el viejo umbral de 170. Aquí no hay reproducción
+      // activa y la barra mide 72 + 24 de insets = 96, así que el piso
+      // correcto es 96 + 20 = 116.
+      expect(reserve.height, greaterThanOrEqualTo(116));
 
       await tester.tap(find.byKey(const ValueKey('bottom-navigation-item-1')));
       await tester.pump(const Duration(milliseconds: 500));
@@ -1929,13 +1971,22 @@ void main() {
         closeTo(tester.getCenter(primaryDestination(0)).dx, 0.5),
       );
       for (final index in const [0, 2, 3, 4]) {
+        // `9c38523` (v2.2.0+220) sustituyó los `Icon` de Material por los
+        // glifos vectoriales propios `InutilIcon` y definió el foreground
+        // inactivo como `colors.onSurfaceVariant.withValues(alpha: 0.72)`
+        // (`_BottomNavigationItem.build`, `home_page.dart:2860`, medido:
+        // alpha 0.72 frente al 1.0 que pedía la prueba heredada de
+        // `640348e`). La intención (primeros planos del tema, no un negro
+        // forzado) se mide igual, solo que con el valor real de hoy.
         final icon = find.descendant(
           of: primaryDestination(index),
-          matching: find.byType(Icon),
+          matching: find.byType(InutilIcon),
         );
         expect(
-          tester.widget<Icon>(icon).color,
-          index == 0 ? colors.primary : colors.onSurfaceVariant,
+          tester.widget<InutilIcon>(icon).color,
+          index == 0
+              ? colors.primary
+              : colors.onSurfaceVariant.withValues(alpha: 0.72),
           reason:
               'Liquid Glass icons should use the theme foreground and accent, '
               'not a forced pure-black foreground in light mode.',
@@ -1948,10 +1999,20 @@ void main() {
         ),
         findsOneWidget,
       );
+      // `9c38523` también vectorizó el botón de Búsqueda desmontado:
+      // `_DetachedSearchButton` pinta `InutilIcon` (`home_page.dart:2785`),
+      // no el `Icon` del import base, y ese glifo SÍ usa
+      // `Color.lerp(colors.onSurfaceVariant, colors.primary, value)` sin
+      // atenuar (`home_page.dart:2789`), así que el valor esperado se
+      // conserva. Medido en `round5.log`: `Bad state: No element` porque
+      // `find.byType(Icon)` ya no encontraba nada.
       expect(
         tester
-            .widget<Icon>(
-              find.descendant(of: detachedSearch, matching: find.byType(Icon)),
+            .widget<InutilIcon>(
+              find.descendant(
+                of: detachedSearch,
+                matching: find.byType(InutilIcon),
+              ),
             )
             .color,
         colors.onSurfaceVariant,
@@ -1992,7 +2053,20 @@ void main() {
         const ValueKey('home-youtube-music-account'),
       );
       expect(settingsShortcut, findsNothing);
-      expect(accountButton, findsOneWidget);
+      // `2f715bb` (v2.2.1+221, "tema unificado en Connect/Audio/Ajustes,
+      // tarjeta Spotify hero") eliminó
+      // `YouTubeMusicAccountButton(strings: strings)` —y su
+      // `SizedBox.square(dimension: 36)`— del encabezado de Inicio
+      // (`git show 2f715bb -- home_page.dart`); la cuenta de YouTube Music
+      // hoy se gestiona en Connect/Ajustes
+      // (`settings-youtube-music-account-card`,
+      // `youtube_music_settings_account_card.dart:68`). El botón sigue vivo
+      // en `youtube_music_account_button.dart:84` y lo cubren
+      // `youtube_music_auth_widgets_test.dart:108` y
+      // `youtube_music_playlist_sync_controller_test.dart:200`. Aquí se
+      // verifica que Inicio ya NO lo duplica (medido: `Found 0 widgets with
+      // key [<'home-youtube-music-account'>]`).
+      expect(accountButton, findsNothing);
       expect(
         find.descendant(
           of: navigation,
@@ -2749,16 +2823,23 @@ void main() {
         findsNothing,
         reason: 'Collapsed Liquid Home is an icon-only circular control.',
       );
+      // `9c38523` (v2.2.0+220, "iconos vectoriales propios"): la Home
+      // colapsada de Liquid Glass ya no monta `Icon`, monta su glifo
+      // `InutilIcon`. Se conserva la intención (control circular de un solo
+      // glifo) contando el glifo `home`.
       expect(
-        find.descendant(of: collapsedNavigation, matching: find.byType(Icon)),
+        find.descendant(
+          of: collapsedNavigation,
+          matching: find.byType(InutilIcon),
+        ),
         findsOneWidget,
       );
       expect(
         tester
-            .widget<Icon>(
+            .widget<InutilIcon>(
               find.descendant(
                 of: collapsedNavigation,
-                matching: find.byType(Icon),
+                matching: find.byType(InutilIcon),
               ),
             )
             .color,
@@ -3505,8 +3586,8 @@ void main() {
     // título de sección: superficie lisa del scroll vertical raíz.
     final verticalGestureAnchor = find
         .descendant(
-        of: find.byKey(const ValueKey('home-view')),
-        matching: find.byType(AppSectionTitle),
+          of: find.byKey(const ValueKey('home-view')),
+          matching: find.byType(AppSectionTitle),
         )
         .first;
     final initialMiniPlayerRect = tester.getRect(miniPlayer);
@@ -4098,6 +4179,21 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 600));
 
+    // El gate de hidratación de ajustes (`lib/main.dart`,
+    // `InutilSettingsHydrationGate`) pinta un esqueleto hasta que
+    // `settingsControllerProvider` resuelve, así que `_PersistentViewSlot`
+    // ('home-view') se monta un frame DESPUÉS de `pumpWidget` y su fundido de
+    // entrada de 320 ms (`_scheduleEntryAnimation`, `home_page.dart:3667` y
+    // `build` `home_page.dart:3719`) arranca recién en el frame de
+    // `pump(600 ms)`. Si se tapaba ahí, `AnimatedOpacity` heredaba
+    // `tween.begin = animation.value = 0` (`implicit_animations.dart:395-414`)
+    // y el tab saliente se quedaba transparente: medido `Expected: <1>
+    // Actual: <0.516875>`. Quemar los 320 ms de la animación de entrada antes
+    // de interactuar es lo que hace el usuario real, que ve el Home completo
+    // antes de pulsar «Letra».
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pump();
+
     double slotOpacity(Finder slot) {
       final nearestOpacity = find
           .descendant(of: slot, matching: find.byType(AnimatedOpacity))
@@ -4230,9 +4326,6 @@ void main() {
       isTrue,
     );
     await tester.pump(const Duration(milliseconds: 160));
-
-    // The complete player mirrors Lyrics: fade and 3.5% vertical travel
-    // progress together while the previous surface remains underneath.
     expect(slotOpacity(home), 1);
     expect(playerFadeOpacity(), closeTo(0.5, 0.02));
     expect(
@@ -5069,6 +5162,21 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
+    // Quema los 320 ms del fundido de entrada del slot 'home-view' que el
+    // pre-roll anterior dejó sin avanzar: `InutilSettingsHydrationGate`
+    // (`lib/main.dart`) monta el Home un frame después de `pumpWidget`, así
+    // que `_scheduleEntryAnimation` (`home_page.dart:3667`) arranca su
+    // `AnimatedOpacity` de 320 ms (`build`, `home_page.dart:3719`) justo en el
+    // frame de `pump(500 ms)`; al tapar el tab siguiente `didUpdateWidget`
+    // heredaba `tween.begin = animation.value = 0`
+    // (`implicit_animations.dart:395-414`) y el tab saliente aparecía
+    // transparente aunque su controlador ya corriera: medido
+    // `Expected: a value greater than <0.45> Actual: <0.0>` con
+    // `cv=0.406250` (= 130 ms / 320 ms) en el frame de la afirmación. El
+    // usuario real ve el Home completo antes de cambiar de pestaña.
+    await tester.pump(const Duration(milliseconds: 320));
+    await tester.pump();
+
     double slotOpacity(Finder slot) {
       final nearestOpacity = find
           .descendant(of: slot, matching: find.byType(AnimatedOpacity))
@@ -5088,24 +5196,39 @@ void main() {
     final searchScale = find.byKey(
       const ValueKey('bottom-navigation-icon-scale-$searchIndex'),
     );
+    // `9c38523` (v2.2.0+220, "iconos vectoriales propios") reemplazó el
+    // `Icons.search_rounded` heredado de `640348e` por el glifo `search` de
+    // `InutilIcon`. En 360x800 la barra inferior pinta la variante con
+    // etiqueta, cuyo glifo mide 25 (`home_page.dart:2903`); los 26
+    // (`home_page.dart:2787`/`2879`) solo aplican a la barra colapsada
+    // `iconOnly` de la navegación Líquida. Medido: `Actual: <25.0>`.
     Finder searchIcon() => find.descendant(
       of: searchItem,
-      matching: find.byIcon(Icons.search_rounded),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is InutilIcon && widget.glyph == InutilGlyph.search,
+      ),
     );
     double scale() =>
         tester.widget<Transform>(searchScale).transform.getMaxScaleOnAxis();
     final colors = Theme.of(tester.element(searchItem)).colorScheme;
 
-    expect(tester.widget<Icon>(searchIcon()).size, 28);
-    expect(tester.widget<Icon>(searchIcon()).color, colors.onSurfaceVariant);
+    expect(tester.widget<InutilIcon>(searchIcon()).size, 25);
+    // `9c38523` también definió el foreground inactivo de la barra como
+    // `colors.onSurfaceVariant.withValues(alpha: 0.72)`
+    // (`_BottomNavigationItem.build`, `home_page.dart:2860`); antes, en
+    // `640348e`, se usaba `onSurfaceVariant` sin atenuar.
+    expect(
+      tester.widget<InutilIcon>(searchIcon()).color,
+      colors.onSurfaceVariant.withValues(alpha: 0.72),
+    );
     expect(scale(), closeTo(1, 0.001));
 
     await tester.tap(searchItem);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 130));
 
-    final midColor = tester.widget<Icon>(searchIcon()).color!;
-    expect(tester.widget<Icon>(searchIcon()).size, 28);
+    final midColor = tester.widget<InutilIcon>(searchIcon()).color!;
+    expect(tester.widget<InutilIcon>(searchIcon()).size, 25);
     expect(scale(), inExclusiveRange(1, 1.12));
     expect(midColor, isNot(colors.onSurfaceVariant));
     expect(midColor, isNot(colors.primary));
@@ -5118,8 +5241,8 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 160));
 
-    expect(tester.widget<Icon>(searchIcon()).size, 28);
-    expect(tester.widget<Icon>(searchIcon()).color, colors.primary);
+    expect(tester.widget<InutilIcon>(searchIcon()).size, 25);
+    expect(tester.widget<InutilIcon>(searchIcon()).color, colors.primary);
     expect(scale(), closeTo(1.12, 0.001));
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
@@ -5317,20 +5440,28 @@ void main() {
         ),
       ),
     );
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump(const Duration(milliseconds: 300));
+    await _settleHomeFeed(tester);
+    // `MaterialApp` envuelve su tema en `AnimatedTheme`
+    // (`material/app.dart`, `kThemeAnimationDuration` = 200 ms en
+    // `material/theme.dart:20`) y `AppSurfaceTheme.lerp` devuelve
+    // `t < 0.5 ? this : other` (`app_theme.dart:184-189`): mientras la
+    // interpolación no cruza la mitad, `Theme.of(...).extension` sigue
+    // reportando el modo anterior (`accent`, medido). Se deja terminar la
+    // animación de 200 ms antes de leer la extensión.
+    await tester.pump(const Duration(milliseconds: 250));
 
-    expect(
-      tester.getSize(find.byKey(const ValueKey('home-recent-card'))).width,
-      164,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('home-recent-shelf'))).height,
-      218,
-    );
+    // `9c38523` (v2.2.0+220, "Inicio vivo") reemplazó el estante horizontal
+    // `home-recent-shelf`/`home-recent-card` (164x218 en el import base
+    // `640348e`) por la rejilla de acceso rápido `home-quick-access-grid`,
+    // dos columnas de 56 px de alto; `_HomeRecentSection` quedó como código
+    // muerto (`if (showLegacyHistory && !showQuickGrid)`, `home_page.dart:3989`).
+    // La intención —tarjetas locales grandes en móvil, sin estante de
+    // playlists— se mide ahora sobre la rejilla.
+    final grid = find.byKey(const ValueKey('home-quick-access-grid'));
+    expect(tester.getSize(grid).width, 360);
+    expect(tester.getSize(grid).height, 56);
     expect(find.byKey(const ValueKey('home-playlist-shelf')), findsNothing);
-    final recentCard = find.byKey(const ValueKey('home-recent-card'));
-    final recentContext = tester.element(recentCard);
+    final recentContext = tester.element(grid);
     expect(
       ProviderScope.containerOf(
         recentContext,
@@ -5342,13 +5473,16 @@ void main() {
       SurfaceBackgroundMode.liquidGlass,
     );
     final recentMaterial = find
-        .descendant(of: recentCard, matching: find.byType(Material))
+        .descendant(of: grid, matching: find.byType(Material))
         .first;
+    // La tarjeta de la rejilla usa `colors.onSurface` al 6.5%
+    // (`home_page.dart:4119`), ya no `AppColors.homeCardSurfaceFor` (alfa
+    // 0.68), que sigue vivo solo en las estanterías de recomendaciones.
     expect(
       tester.widget<Material>(recentMaterial).color,
-      AppColors.homeCardSurfaceFor(recentContext),
+      Theme.of(recentContext).colorScheme.onSurface.withValues(alpha: 0.065),
     );
-    expect(tester.widget<Material>(recentMaterial).color?.a, 0.68);
+    expect(tester.widget<Material>(recentMaterial).color?.a, 0.065);
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -5359,11 +5493,19 @@ void main() {
 
     await tester.pumpWidget(_testApp(libraryRepository: repository));
     await tester.pump(const Duration(seconds: 1));
-    await tester.pump();
+    await _settleHomeFeed(tester);
 
     expect(find.text('Inicio'), findsWidgets);
     expect(find.text('Cancion reciente'), findsOneWidget);
-    expect(find.byKey(const ValueKey('home-recent-card')), findsOneWidget);
+    // `9c38523` (v2.2.0+220, "Inicio vivo") sacó el estante
+    // `home-recent-card` de la pantalla de inicio: con historial ahora manda
+    // la rejilla de acceso rápido (`if (showQuickGrid)`, `home_page.dart:3975`)
+    // y `_HomeRecentSection` quedó muerto. La intención —la canción escuchada
+    // hace poco sigue visible en Inicio— la cumple `home-quick-access-grid`.
+    expect(
+      find.byKey(const ValueKey('home-quick-access-grid')),
+      findsOneWidget,
+    );
     expect(find.text('Mis playlists'), findsNothing);
     expect(find.text('Todavía no hay playlists locales.'), findsNothing);
     expect(find.byKey(const ValueKey('home-playlist-shelf')), findsNothing);
@@ -5433,6 +5575,7 @@ void main() {
       expect(find.text('Mis playlists'), findsNothing);
       expect(find.text('Viaje sincronizado'), findsNothing);
       expect(find.byKey(const ValueKey('home-playlist-card')), findsNothing);
+      await _drainDeferredHomeRefresh(tester);
       expect(tester.takeException(), isNull);
     },
   );
@@ -5454,6 +5597,7 @@ void main() {
     expect(find.byKey(const ValueKey('home-recent-card')), findsNothing);
     expect(find.text('Mis playlists'), findsNothing);
     expect(find.byKey(const ValueKey('home-playlist-card')), findsNothing);
+    await _drainDeferredHomeRefresh(tester);
     expect(tester.takeException(), isNull);
   });
 
@@ -5523,6 +5667,7 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 1));
+    await _settleHomeFeed(tester);
 
     expect(
       tester.getSize(find.byKey(const ValueKey('mini-player-surface'))).height,
@@ -5543,10 +5688,15 @@ void main() {
       matching: find.byType(InkWell),
     );
     expect(navigationItems, findsNWidgets(5));
+    // `9c38523` (v2.2.0+220) pinta el glifo vectorial `local` en el destino
+    // Local; el `Icons.folder_rounded` del import base `640348e` ya no
+    // existe en la barra. Se conserva la intención (el destino Local existe).
     expect(
       find.descendant(
         of: find.byKey(const ValueKey('bottom-navigation-content')),
-        matching: find.byIcon(Icons.folder_rounded),
+        matching: find.byWidgetPredicate(
+          (widget) => widget is InutilIcon && widget.glyph == InutilGlyph.local,
+        ),
       ),
       findsOneWidget,
     );
@@ -5564,6 +5714,10 @@ void main() {
     final homeHeaderSurface = find.byKey(
       const ValueKey('home-tab-header-surface'),
     );
+    final homeHeaderSurfaceTop = tester.getTopLeft(homeHeaderSurface).dy;
+    // Lo que permanece fijo de verdad es el desplazamiento del título dentro
+    // del header, porque el header va anclado arriba.
+    final homeHeadingOffsetFromHeader = homeHeadingTop - homeHeaderSurfaceTop;
     expect(
       tester.widget<Material>(homeHeaderSurface).color,
       AppColors.tabHeaderSurfaceFor(
@@ -5578,7 +5732,35 @@ void main() {
     // before inspecting its adaptive height.
     await tester.drag(homeScroll, const Offset(0, -360));
     await tester.pump(const Duration(milliseconds: 400));
-    expect(tester.getTopLeft(homeHeading).dy, closeTo(homeHeadingTop, 0.01));
+    // Mismo matiz que el bloque de más abajo: un solo `pump` largo solo toca
+    // una vez el resorte del overscroll Android y deja el sliver fijo todavía
+    // transformado en widget tests. Medido con un único `pump(400 ms)`:
+    // `headerTop=-7.3298878306127335` y `titleTop=49.497680150262894`.
+    for (var frame = 0; frame < 30; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+    }
+
+    // La `y` absoluta del título ya no es una constante de diseño: `9c38523`
+    // (v2.2.0+220, "Inicio vivo") añadió el saludo contextual
+    // (`_contextualGreeting`, `home_page.dart`) encima del título, y al
+    // asentarse el overscroll se va el sangrado de 5.8 px del cristal del
+    // header —medido `Rect.fromLTRB(5.8, 0.0, 325.8, 79.7)` →
+    // `Rect.fromLTRB(0.0, 0.0, 320.0, 79.8)`—, lo que estrecha el ancho
+    // disponible y re-arraenea el texto a escala 3: el saludo pasó de alto
+    // 48.0 a 48.1347 px y empujó el título 0.134673761481196 px. La prueba
+    // defiende que el header siga anclado arriba y el título siga anclado al
+    // header, no que su `y` absoluta coincida píxel a píxel.
+    final homeHeaderTopAfterScroll = tester.getTopLeft(homeHeaderSurface).dy;
+    expect(homeHeaderTopAfterScroll, closeTo(homeHeaderSurfaceTop, 1));
+    final homeHeadingTopAfterScroll = tester.getTopLeft(homeHeading).dy;
+    expect(
+      homeHeadingTopAfterScroll - homeHeaderTopAfterScroll,
+      closeTo(homeHeadingOffsetFromHeader, 1),
+    );
+    // El feed sí se desvió 275.65686843518915 px (`maxScrollExtent` medido);
+    // el título tiene que quedarse con el header, así que se le tolera como
+    // máximo 2 px de deriva absoluta.
+    expect((homeHeadingTopAfterScroll - homeHeadingTop).abs(), lessThan(2));
     expect(
       tester.widget<Material>(homeHeaderSurface).color,
       AppColors.tabHeaderSurfaceFor(
@@ -5592,8 +5774,17 @@ void main() {
       Colors.transparent,
     );
 
+    // `9c38523` (v2.2.0+220, "Inicio vivo") sacó `home-recent-shelf` del
+    // Inicio; el estante que hoy crece con la escala de texto 3x es el de
+    // recomendaciones (`home-recommendations-shelf-<título>`,
+    // `home_page.dart:4214`). La intención —que ningún estante se recorte a
+    // 3x— se mide sobre él.
     expect(
-      tester.getSize(find.byKey(const ValueKey('home-recent-shelf'))).height,
+      tester
+          .getSize(
+            find.byKey(const ValueKey('home-recommendations-shelf-Para ti')),
+          )
+          .height,
       greaterThan(200),
     );
 
@@ -5605,7 +5796,20 @@ void main() {
       await tester.pump(const Duration(milliseconds: 16));
     }
 
-    expect(tester.getTopLeft(homeHeading).dy, closeTo(homeHeadingTop, 0.01));
+    final homeHeaderTopAfterDeepScroll = tester
+        .getTopLeft(homeHeaderSurface)
+        .dy;
+    expect(homeHeaderTopAfterDeepScroll, closeTo(homeHeaderSurfaceTop, 1));
+    final homeHeadingTopAfterDeepScroll = tester.getTopLeft(homeHeading).dy;
+    expect(
+      homeHeadingTopAfterDeepScroll - homeHeaderTopAfterDeepScroll,
+      closeTo(homeHeadingOffsetFromHeader, 1),
+    );
+    expect(
+      (homeHeadingTopAfterDeepScroll - homeHeadingTop).abs(),
+      lessThan(2),
+      reason: 'El título del Home va anclado al header, no al feed.',
+    );
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -5672,7 +5876,11 @@ void main() {
     ];
 
     await tester.pumpWidget(_testApp(homeRecommendations: sections));
-    await tester.pump(const Duration(seconds: 1));
+    // Las secciones en línea solo se publican cuando se dispara el
+    // `Timer.run` diferido de `HomeRecommendationsController.build()`
+    // (`music_providers.dart:2058`), y `pump(Duration)` lo elige antes de
+    // dibujar: nunca lo dispara. `_settleHomeFeed` sí.
+    await _settleHomeFeed(tester);
 
     expect(find.text('Artistas populares'), findsOneWidget);
     expect(find.text('Artista Uno'), findsOneWidget);
@@ -5769,7 +5977,7 @@ void main() {
     ];
 
     await tester.pumpWidget(_testApp(homeRecommendations: sections));
-    await tester.pump(const Duration(seconds: 1));
+    await _settleHomeFeed(tester);
 
     expect(
       find.byKey(const ValueKey('home-recommendation-long-track')),
@@ -5883,6 +6091,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
 
       expect(
         find.byKey(const ValueKey('home-recommendations-section-Para ti')),
@@ -6001,6 +6210,10 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      // Las secciones personalizadas se publican apenas cuando se dispara el
+      // `Timer.run` diferido de `HomeRecommendationsController.build()`
+      // (`music_providers.dart:2058`); `_settleHomeFeed` lo dispara.
+      await _settleHomeFeed(tester);
 
       expect(
         find.byKey(
@@ -6093,6 +6306,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
       final selected = find.byKey(
         const ValueKey('home-recommendation-home-card-track'),
       );
@@ -6158,6 +6372,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
       expect(related.searchQueries, isEmpty);
       expect(related.nextVideoIds, isEmpty);
       final selected = find.byKey(
@@ -6218,6 +6433,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
       final selected = find.byKey(
         const ValueKey('home-recommendation-home-card-track'),
       );
@@ -6267,6 +6483,7 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
 
       // The provider de-duplicates the cached and refreshed feed, but painting
       // visible cards must not look up the whole offscreen shelf as well.
@@ -6368,6 +6585,7 @@ void main() {
         proportionalArtwork.fallbackSource,
         'https://i.ytimg.com/vi/OfflineVid1/hq720.jpg',
       );
+      await _drainDeferredHomeRefresh(tester);
       expect(tester.takeException(), isNull);
     },
   );
@@ -6918,14 +7136,19 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
 
       final refresh = find.byKey(
         const ValueKey('home-recommendations-refresh'),
       );
       expect(calls, 1);
       expect(refresh, findsOneWidget);
-      // El cromo del Home compacto usa botones de 38 pt desde el rediseño.
-      expect(tester.getSize(refresh), const Size.square(38));
+      // `2f715bb` (v2.2.1+221, "tema unificado en Connect/Audio/Ajustes")
+      // bajó la pastilla de acción del encabezado de 38 (medida en
+      // `9c38523` y en el import base `640348e`) a `dimension: 36`
+      // (`home_page.dart:3813`). La intención —pastilla táctil cuadrada— se
+      // verifica ahora en 36.
+      expect(tester.getSize(refresh), const Size.square(36));
       expect(
         tester.widget<IconButton>(refresh).tooltip,
         'Refrescar recomendaciones',
@@ -6955,7 +7178,12 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.byKey(const ValueKey('home-recent-card')), findsOneWidget);
+      // `home-recent-card` quedó muerto en `9c38523` ("Inicio vivo"): con
+      // historial el Inicio muestra la rejilla `home-quick-access-grid`.
+      expect(
+        find.byKey(const ValueKey('home-quick-access-grid')),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('home-playlist-card')), findsNothing);
       expect(find.byKey(const ValueKey('home-loading-content')), findsNothing);
 
@@ -7016,6 +7244,7 @@ void main() {
       final refresh = find.byKey(
         const ValueKey('home-recommendations-refresh'),
       );
+      await _settleHomeFeed(tester);
       await tester.tap(refresh);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 350));
@@ -7029,7 +7258,12 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('offline'), findsNothing);
-      expect(find.byKey(const ValueKey('home-recent-card')), findsOneWidget);
+      // `home-recent-card` murió en `9c38523` ("Inicio vivo"); el historial
+      // local se muestra hoy en `home-quick-access-grid`.
+      expect(
+        find.byKey(const ValueKey('home-quick-access-grid')),
+        findsOneWidget,
+      );
       expect(find.byKey(const ValueKey('home-playlist-card')), findsNothing);
       expect(tester.takeException(), isNull);
     },
@@ -7053,6 +7287,7 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 1));
+    await _settleHomeFeed(tester);
 
     _expectLocalOnlyHome(tester);
     expect(find.byKey(const ValueKey('home-loading-content')), findsOneWidget);
@@ -7080,7 +7315,12 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.byKey(const ValueKey('home-recent-card')), findsOneWidget);
+    // `home-recent-card` es código muerto desde `9c38523` ("Inicio vivo");
+    // la canción local recién escuchada vive en `home-quick-access-grid`.
+    expect(
+      find.byKey(const ValueKey('home-quick-access-grid')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -7145,11 +7385,22 @@ void main() {
         ),
       );
       await tester.pump(const Duration(seconds: 1));
+      await _settleHomeFeed(tester);
 
       _expectLocalOnlyHome(tester);
       expect(find.byKey(const ValueKey('home-loading-content')), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('home-recent-card')));
+      // `9c38523` ("Inicio vivo") quita `home-recent-card`; la tarjeta local
+      // que sigue reproduciendo desde el historial es ahora el primer
+      // azulejo de `home-quick-access-grid` (`home_page.dart:3975`).
+      await tester.tap(
+        find
+            .descendant(
+              of: find.byKey(const ValueKey('home-quick-access-grid')),
+              matching: find.byType(InkWell),
+            )
+            .first,
+      );
       await tester.pump();
 
       expect(player.historyPlayCalls, 1);
@@ -7173,6 +7424,7 @@ void main() {
       ),
     );
     await tester.pump(const Duration(seconds: 1));
+    await _settleHomeFeed(tester);
 
     _expectLocalOnlyHome(tester);
     expect(find.byKey(const ValueKey('home-loading-content')), findsNothing);
@@ -7245,9 +7497,28 @@ void main() {
             language: AppLanguage.spanish,
           ),
         ),
+        // Sin recomendaciones en línea el Inicio solo muestra la rejilla
+        // `home-quick-access-grid`, cuyo inset horizontal (4) no es el
+        // `appTabTitleHorizontalPadding` del título; se inyecta un estante
+        // para que exista la primera sección real, cuyo título sí comparte
+        // ese inset (`_HomeSection`, `home_page.dart:4548`).
+        homeRecommendations: [
+          HomeRecommendationSection(
+            title: 'Para ti',
+            tracks: [
+              TrackInfo(
+                id: 'insets-recommendation',
+                title: 'Recomendacion de insets',
+                artist: 'Artista',
+                url: 'https://www.youtube.com/watch?v=insetsreco',
+              ),
+            ],
+          ),
+        ],
       ),
     );
     await tester.pump(const Duration(seconds: 1));
+    await _settleHomeFeed(tester);
 
     void expectSharedInsets({
       required Finder header,
@@ -7267,29 +7538,33 @@ void main() {
       }
     }
 
-    // El Home abre con el estante de acciones rápidas (Spotify, Dispositivos,
-    // Admin, OTA): ese estante es el primer contenido y empuja hacia abajo el
-    // título de la primera sección. El inset horizontal sí se comparte.
+    // Desde `9c38523` (v2.2.0+220, "Inicio vivo") el Home abre con la
+    // rejilla de acceso rápido (`home-quick-access-grid`), que es el primer
+    // contenido y empuja hacia abajo el título de la primera sección. El
+    // inset horizontal sí se comparte: `_HomeSection` titula con
+    // `appTabTitleHorizontalPadding`, el mismo inset del título de la
+    // pestaña (`home_page.dart:4548`).
     expectSharedInsets(
       header: find.byKey(const ValueKey('home-tab-header-surface')),
       title: find.byKey(const ValueKey('home-tab-title')),
-      firstSection: find.byKey(
-        const ValueKey('home-section-title-Escuchado recientemente'),
-      ),
+      firstSection: find.byKey(const ValueKey('home-section-title-Para ti')),
       checkTopGap: false,
     );
     expect(
-      tester.getTopLeft(
-        find.byKey(
-          const ValueKey('home-section-title-Escuchado recientemente'),
-        ),
-      ).dy -
-          tester.getBottomLeft(
-            find.byKey(const ValueKey('home-tab-header-surface')),
-          ).dy,
+      tester
+              .getTopLeft(
+                find.byKey(const ValueKey('home-section-title-Para ti')),
+              )
+              .dy -
+          tester
+              .getBottomLeft(
+                find.byKey(const ValueKey('home-tab-header-surface')),
+              )
+              .dy,
       greaterThan(appTabFirstSectionTopGap),
-      reason: 'El estante de acciones rápidas vive entre el header y la '
-          'primera sección del Home.',
+      reason:
+          'La rejilla de acceso rápido vive entre el header y la primera '
+          'sección del Home.',
     );
 
     await tester.tap(find.text('Biblioteca').last);
@@ -7324,6 +7599,30 @@ void main() {
       closeTo(appTabFirstSectionTopGap, 0.01),
     );
     expect(tester.getTopLeft(settingsAccountCard).dx, closeTo(6, 0.01));
+    // La lista raíz de `Ajustes` se construye de forma perezosa
+    // (`SliverPadding`+`SliverList.list` dentro de `ScrolledUnderTabFrame`) y
+    // creció respecto al import base `640348e`: `2f715bb` añadió la tarjeta
+    // hero de Spotify (`settings-spotify-import-hero-card`,
+    // `storage-import-spotify`) y el popup del creador
+    // (`settings-about-creator-popup`), `de65eaf` (v2.3.0) sumó
+    // `settings-about-wrapped`, `bf6a3b0` (v2.4.0) el tour de bienvenida
+    // (`settings-about-onboarding-tour`) y `2ae9e6d` (v2.5.6+256) el visor de
+    // licencias (`settings-about-licenses*`). A esta altura el viewport
+    // `settings-card-language` queda debajo del pliegue y ni siquiera se
+    // construye (medido: `Found 0 widgets with key
+    // [<'settings-card-language'>]`). Se hace visible antes de medir; la
+    // comparación de insets no se toca.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('settings-card-language')),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('settings-root')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
     final settingsCardLeft = tester
         .getTopLeft(find.byKey(const ValueKey('settings-card-language')))
         .dx;
@@ -7581,6 +7880,26 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 200));
 
+    // `SliverList` solo construye las filas visibles (+253 px de caché) y la
+    // lista raíz de `Ajustes` creció respecto a `640348e` —`2f715bb` añadió
+    // `settings-spotify-import-hero-card` y `storage-import-spotify`,
+    // `2ae9e6d` el visor de licencias—, así que
+    // `settings-card-storage` quedaba fuera del viewport y no existía en el
+    // árbol (medido: `Found 0 widgets with key [<'settings-card-storage'>]`).
+    // Se la hace visible antes de afirmar; las pruebas de que ya NO existen
+    // tarjetas separadas de Descargas/Respaldo siguen siendo las mismas.
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('settings-card-storage')),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('settings-root')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
+
     expect(find.byKey(const ValueKey('settings-card-storage')), findsOneWidget);
     expect(find.byKey(const ValueKey('settings-card-downloads')), findsNothing);
     expect(find.byKey(const ValueKey('settings-card-backup')), findsNothing);
@@ -7667,6 +7986,22 @@ void main() {
       ),
     );
     await tester.pump(const Duration(milliseconds: 200));
+
+    // Mismo caso que la prueba anterior: `settings-card-storage` se construye
+    // de forma perezosa y a 1280x1400 queda debajo del pliegue, así que hay
+    // que hacerla visible antes de pulsarla (medido: `could not find any
+    // matching widgets` en `tap()`).
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('settings-card-storage')),
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('settings-root')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pump();
 
     await tester.tap(find.byKey(const ValueKey('settings-card-storage')));
     await tester.pumpAndSettle();
@@ -8035,10 +8370,20 @@ void main() {
         },
         releaseChecker: ({required currentVersion}) async {
           checkedVersions.add(currentVersion);
+          // `AppConstants.appVersion` (`lib/core/constants/app_constants.dart`,
+          // sincronizado con `pubspec.yaml` y `app_metadata_test.dart`) hoy va
+          // por encima de `2.2.0`, así que el `2.2.0` heredado del import
+          // base `640348e` hoy se lee como "ya estás al día" y
+          // `AppReleaseCheckResult.updateAvailable` (`compareAppVersions`,
+          // `github_release_checker.dart:23`) devuelve false: el diálogo
+          // `settings-update-available-dialog` nunca se abre (medido:
+          // `Found 0 widgets`). Se usa una versión mayor que la instalada
+          // para conservar la intención —el diálogo de actualización sin
+          // abrir una URL— sin depender del número concreto de la app.
           return AppReleaseCheckResult(
             currentVersion: currentVersion,
-            latestVersion: '2.2.0',
-            releaseTag: 'v2.2.0',
+            latestVersion: '9.9.9',
+            releaseTag: 'v9.9.9',
           );
         },
       ),
@@ -8067,7 +8412,9 @@ void main() {
     expect(find.text('Nueva versión disponible'), findsOneWidget);
     expect(
       find.text(
-        'Inútil Music 2.2.0 está disponible. Versión actual: ${AppConstants.appVersion}.',
+        // Texto real de `AppStrings.updateAvailableMessage`
+        // (`app_strings.dart:1649`) con la `latestVersion` inyectada arriba.
+        'Inútil Music 9.9.9 está disponible. Versión actual: ${AppConstants.appVersion}.',
       ),
       findsOneWidget,
     );
@@ -8533,9 +8880,22 @@ void main() {
     var decoration =
         tester.widget<AnimatedContainer>(surface).decoration! as BoxDecoration;
     final currentSurfaceColor = decoration.color!;
-    expect(currentSurfaceColor.a, greaterThan(0.68));
+    final colors = Theme.of(tester.element(surface)).colorScheme;
+    // `9c38523` (v2.2.0+220) redefinió el resaltado del resultado activo:
+    // `TrackResultTile.build` pinta `colors.primary.withValues(alpha: 0.09)`
+    // con borde `primary.withValues(alpha: 0.35)` de ancho 1
+    // (`track_result_tile.dart:104`, `111` y `131`), en lugar de la capa casi
+    // opaca (`> 0.68`) que traía el import base `640348e`. Medido en esta
+    // prueba: `Actual: <0.09>`. La intención —el resultado en reproducción
+    // se distingue y sigue siendo translúcido— se afirma con el valor real.
+    expect(currentSurfaceColor, colors.primary.withValues(alpha: 0.09));
+    expect(currentSurfaceColor.a, closeTo(0.09, 0.001));
     expect(currentSurfaceColor.a, lessThan(1));
     expect((decoration.border! as Border).top.width, 1);
+    expect(
+      (decoration.border! as Border).top.color,
+      colors.primary.withValues(alpha: 0.35),
+    );
 
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     addTearDown(mouse.removePointer);
@@ -8545,9 +8905,24 @@ void main() {
 
     decoration =
         tester.widget<AnimatedContainer>(surface).decoration! as BoxDecoration;
-    expect(decoration.color, isNot(currentSurfaceColor));
+    // Estando activo, `build` elige la rama `isCurrent` antes que la de
+    // `_hovered` (`track_result_tile.dart:100-111`), así que pasarle el
+    // puntero ya no rediseña el `AnimatedContainer`: la retroalimentación
+    // visible de hoy para el resultado en reproducción es el ecualizador
+    // `track-result-now-playing-<id>` que `_Thumbnail` monta encima
+    // (`track_result_tile.dart:158`). Se afirma que el resaltado se conserva
+    // intacto Y que ese overlay sigue visible, que es la intención original.
+    expect(decoration.color, currentSurfaceColor);
     expect(decoration.color?.a, lessThan(1));
-    expect((decoration.border! as Border).top.width, 1.4);
+    expect((decoration.border! as Border).top.width, 1);
+    expect(
+      (decoration.border! as Border).top.color,
+      colors.primary.withValues(alpha: 0.35),
+    );
+    expect(
+      find.byKey(const ValueKey('track-result-now-playing-playing-result')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('search eagerly keeps all capped result thumbnails mounted', (
@@ -8709,7 +9084,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     final decoration =
         tester.widget<AnimatedContainer>(surface).decoration! as BoxDecoration;
-    expect((decoration.border! as Border).top.width, 1.4);
+    // `9c38523` bajó el borde de `TrackResultTile` de 1.4 a 1 px
+    // (`Border.all(color: borderColor, width: 1)`, `track_result_tile.dart:131`
+    // —`git log -S'width: 1.4'` solo encuentra el snapshot `6cf559e` anterior
+    // al rename—). Medido: `Actual: <1.0>`. La intención —que la barra de
+    // descarga en curso conserve el marco de hover— se mide con el ancho real.
+    expect((decoration.border! as Border).top.width, 1);
 
     downloader.emitProgress(taskId: taskId, progress: 0.30);
     await tester.pump();
@@ -10489,6 +10869,14 @@ void main() {
     tester,
   ) async {
     await _pumpTestApp(tester);
+    // El frame inicial de `_testApp()` aún pinta el esqueleto
+    // `settings-hydration-skeleton` de `InutilSettingsHydrationGate`
+    // (`lib/main.dart` + `lib/core/startup/inutil_settings_hydration_gate.dart`),
+    // así que la barra inferior —y su etiqueta 'Biblioteca'— todavía no está
+    // en el árbol y `tap(find.text('Biblioteca').last)` reventaba con
+    // `Bad state: No element` (medido en `round4.log`). Un `pump()` resuelve
+    // el fake de ajustes y pinta el shell real.
+    await tester.pump();
 
     await tester.tap(find.text('Biblioteca').last);
     await tester.pump(const Duration(milliseconds: 500));
@@ -10510,6 +10898,14 @@ void main() {
     tester,
   ) async {
     await _pumpTestApp(tester);
+    // El frame inicial de `_testApp()` aún pinta el esqueleto
+    // `settings-hydration-skeleton` de `InutilSettingsHydrationGate`
+    // (`lib/main.dart` + `lib/core/startup/inutil_settings_hydration_gate.dart`),
+    // así que la barra inferior —y su etiqueta 'Biblioteca'— todavía no está
+    // en el árbol y `tap(find.text('Biblioteca').last)` reventaba con
+    // `Bad state: No element` (medido en `round4.log`). Un `pump()` resuelve
+    // el fake de ajustes y pinta el shell real.
+    await tester.pump();
 
     await tester.tap(find.text('Biblioteca').last);
     await tester.pump(const Duration(milliseconds: 500));
@@ -10530,6 +10926,39 @@ void main() {
 
 Future<void> _pumpTestApp(WidgetTester tester) {
   return tester.pumpWidget(_testApp());
+}
+
+/// Dispara el `Timer.run` diferido de `HomeRecommendationsController.build()`
+/// (`music_providers.dart:2058`: publicar la caché y luego recalcular una
+/// sola vez) antes de que el test se dé por terminado.
+///
+/// El timer nace en el frame en que `_HomeView` se monta por primera vez, que
+/// es posterior al último `pump(Duration)` del cuerpo: `pump(dur)` quema el
+/// reloj fake-async *antes* de dibujar, así que ese tick siempre queda
+/// pendiente y la invariant de `flutter_test` lo reporta como
+/// "A Timer is still pending even after the widget tree was disposed".
+/// `pump(Duration.zero)` no hace avanzar el reloj —no mueve animaciones ni
+/// altera nada de lo que el test ya afirmó— pero sí dispara los timers
+/// vencidos, que es exactamente lo que hace la app real al arrancar.
+Future<void> _drainDeferredHomeRefresh(WidgetTester tester) =>
+    tester.pump(Duration.zero);
+
+/// Asienta el Home bajo el reloj fake-async de `testWidgets`.
+///
+/// `pump()` suelta las microtareas pendientes —el gate de hidratación de
+/// ajustes (`InutilSettingsHydrationGate`, `lib/main.dart`) y
+/// `historyProvider`—; `pump(Duration.zero)` dispara el `Timer.run` que
+/// `HomeRecommendationsController.build()` programa en
+/// `lib/features/music/presentation/providers/music_providers.dart:2058`
+/// (`pump(Duration)` quema el reloj fake-async *antes* de dibujar, así que un
+/// timer de cero duración creado durante ese dibujo nunca se dispara con
+/// él—; el último `pump()` pinta el estado ya combinado. Medido con una sonda
+/// temporal: tras esta secuencia existe `home-quick-access-grid`, desaparece
+/// `home-loading-content` y `flutter_test` no reporta timers pendientes.
+Future<void> _settleHomeFeed(WidgetTester tester) async {
+  await tester.pump();
+  await tester.pump(Duration.zero);
+  await tester.pump();
 }
 
 void _noop() {}
@@ -10557,9 +10986,13 @@ void _expectLocalOnlyHome(WidgetTester tester) {
     }),
     findsNothing,
   );
+  // `9c38523` (v2.2.0+220, "Inicio vivo") reemplazó el estante
+  // `home-recent-card` por la rejilla de acceso rápido; la intención —el
+  // historial local visible en Inicio y sin estantes de playlists— se
+  // comprueba sobre `home-quick-access-grid` y su azulejo.
+  expect(find.byKey(const ValueKey('home-quick-access-grid')), findsOneWidget);
   expect(find.text('Cancion reciente'), findsOneWidget);
   expect(find.text('Mis playlists'), findsNothing);
-  expect(find.byKey(const ValueKey('home-recent-card')), findsOneWidget);
   expect(find.byKey(const ValueKey('home-playlist-card')), findsNothing);
 }
 
@@ -10797,8 +11230,26 @@ Widget _testApp({
         ),
       if (androidAppActivations != null)
         androidAppActivationsProvider.overrideWithValue(androidAppActivations),
-      if (settingsController != null)
-        settingsControllerProvider.overrideWith(() => settingsController),
+      // `SettingsController.build()` hace I/O real (`SharedPreferences`,
+      // `path_provider`, `File`/`Directory` de `dart:io` y `ImagePicker`), y
+      // bajo el reloj fake-async de `testWidgets` esos futures de plataforma
+      // nunca completan: `renders Inútil Music shell` se colgaba (medido con
+      // `timeout 150` → EXIT=124 sobre HEAD pristino, sin mis parches, así que
+      // la traba es preexistente). Se inyecta el fake por defecto —que ya usa
+      // el resto del archivo— y las pruebas que sí quieren el controller real
+      // lo siguen pasando explícito por `settingsController:`.
+      settingsControllerProvider.overrideWith(
+        () =>
+            settingsController ??
+            _FakeSettingsController(
+              const SettingsState(
+                downloadDirectory: '/tmp/inutil',
+                language: AppLanguage.spanish,
+                themeMode: AppThemeMode.light,
+                playerStyle: PlayerStyle.inutilMusic,
+              ),
+            ),
+      ),
       if (searchController != null)
         searchControllerProvider.overrideWith(() => searchController),
       if (deviceAudioCatalog != null)

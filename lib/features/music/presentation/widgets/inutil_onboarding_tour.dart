@@ -32,7 +32,10 @@ class InutilOnboardingTour extends StatefulWidget {
     await prefs.setBool(prefsKey, true);
   }
 
-  static Future<void> show(BuildContext context, {int inactivityDays = 15}) async {
+  static Future<void> show(
+    BuildContext context, {
+    int inactivityDays = 15,
+  }) async {
     await Navigator.of(context, rootNavigator: true).push<void>(
       PageRouteBuilder<void>(
         opaque: true,
@@ -311,7 +314,9 @@ class _InutilOnboardingTourState extends State<InutilOnboardingTour> {
                                   ),
                                   style: IconButton.styleFrom(
                                     side: BorderSide(
-                                      color: Colors.white.withValues(alpha: 0.2),
+                                      color: Colors.white.withValues(
+                                        alpha: 0.2,
+                                      ),
                                     ),
                                     minimumSize: const Size(54, 54),
                                   ),
@@ -441,7 +446,10 @@ class _TourPage extends StatelessWidget {
 // ---------------------------------------------------------------------------
 
 class _DemoCard extends StatelessWidget {
-  const _DemoCard({required this.child, this.padding = const EdgeInsets.all(16)});
+  const _DemoCard({
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+  });
 
   final Widget child;
   final EdgeInsets padding;
@@ -700,7 +708,10 @@ class _SearchDemoState extends State<_SearchDemo>
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(14),
@@ -831,13 +842,15 @@ class _PlayerDemoState extends State<_PlayerDemo>
                               width: 4,
                               height: _playing
                                   ? 6 +
-                                      14 *
-                                          ((math.sin(
-                                                    (_bars.value * 2 * math.pi) +
-                                                        i * 1.3,
-                                                  ) +
-                                                  1) /
-                                              2)
+                                        14 *
+                                            ((math.sin(
+                                                      (_bars.value *
+                                                              2 *
+                                                              math.pi) +
+                                                          i * 1.3,
+                                                    ) +
+                                                    1) /
+                                                2)
                                   : 4,
                               decoration: BoxDecoration(
                                 color: accent,
@@ -1018,10 +1031,7 @@ class _SwipeDemoState extends State<_SwipeDemo>
                                 (_hint.value.clamp(0, 0.5) / 0.5) * math.pi,
                               );
                     return Transform.translate(
-                      offset: Offset(
-                        _dragging ? _drag : hintOffset,
-                        0,
-                      ),
+                      offset: Offset(_dragging ? _drag : hintOffset, 0),
                       child: child,
                     );
                   },
@@ -1219,7 +1229,9 @@ class _OfflineDemoState extends State<_OfflineDemo>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          done ? 'Lista para escuchar sin internet' : 'Descargando…',
+                          done
+                              ? 'Lista para escuchar sin internet'
+                              : 'Descargando…',
                           style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w700,
@@ -1232,7 +1244,9 @@ class _OfflineDemoState extends State<_OfflineDemo>
                           child: LinearProgressIndicator(
                             value: value,
                             minHeight: 5,
-                            backgroundColor: Colors.white.withValues(alpha: 0.1),
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.1,
+                            ),
                             valueColor: AlwaysStoppedAnimation<Color>(accent),
                           ),
                         ),
@@ -1241,7 +1255,9 @@ class _OfflineDemoState extends State<_OfflineDemo>
                   ),
                   const SizedBox(width: 10),
                   Icon(
-                    done ? Icons.download_done_rounded : Icons.downloading_rounded,
+                    done
+                        ? Icons.download_done_rounded
+                        : Icons.downloading_rounded,
                     color: done ? const Color(0xFF34D399) : Colors.white60,
                   ),
                 ],
@@ -1321,7 +1337,10 @@ class _PersonalizeDemoState extends State<_PersonalizeDemo> {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               gradient: LinearGradient(
-                colors: [color.withValues(alpha: 0.85), const Color(0xFF111114)],
+                colors: [
+                  color.withValues(alpha: 0.85),
+                  const Color(0xFF111114),
+                ],
               ),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1409,7 +1428,8 @@ class _ActiveDemo extends StatelessWidget {
                   tween: Tween<double>(begin: 0, end: 1),
                   duration: Duration(milliseconds: 300 + i * 70),
                   curve: Curves.easeOutBack,
-                  builder: (_, v, child) => Transform.scale(scale: v, child: child),
+                  builder: (_, v, child) =>
+                      Transform.scale(scale: v, child: child),
                   child: Container(
                     width: 24,
                     height: 24,
@@ -1420,7 +1440,11 @@ class _ActiveDemo extends StatelessWidget {
                       borderRadius: BorderRadius.circular(7),
                     ),
                     child: i == 0
-                        ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                        ? const Icon(
+                            Icons.check_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          )
                         : null,
                   ),
                 ),

@@ -197,86 +197,108 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       },
       fireImmediately: true,
     );
-    ref.listen<InutilPlaybackSyncService>(
-      inutilPlaybackSyncProvider,
-      (previous, syncService) {
-        final remote = syncService.remoteSession;
-        final current = state.value;
+    // `ref.listen(inutilPlaybackSyncProvider, …)` hacía que este controller y
+    // `inutilPlaybackSyncProvider` se escucharan el uno al otro: el proveedor
+    // de sincronización escucha al reproductor (`firebase_sync_providers.dart`)
+    // y el reproductor escuchaba al proveedor. Riverpod sólo lo detecta en
+    // `kDebugMode` (`riverpod-3.4.3/lib/src/core/element.dart:1003`,
+    // `Ref._debugAssertCanDependOn`), por eso el APK de release funcionaba y
+    // las pruebas no. Medido con un `ProviderObserver`: `PlayerController`
+    // caía en `AsyncError` con `CircularDependencyError`
+    // (`ChangeNotifierProvider<InutilPlaybackSyncService>` →
+    // `AsyncNotifierProvider<PlayerController>` → el mismo proveedor) y
+    // `tester.pumpWidget(_testApp())` no retornaba nunca
+    // (`timeout 110 flutter test test/widget_test.dart --plain-name 'renders
+    // Inútil Music shell'` → EXIT=124 también sobre el commit sin mis cambios,
+    // o sea la traba era preexistente). El proveedor devuelve
+    // `InutilPlaybackSyncService.instance`, así que suscribirse al singleton
+    // notifica lo mismo en el mismo momento, pero no registra dependencia
+    // riverpod: el ciclo desaparece y el grafo queda en un solo sentido.
+    final syncService = InutilPlaybackSyncService.instance;
+    void handleSyncServiceChange() {
+      if (_disposed) {
+        return;
+      }
+      final remote = syncService.remoteSession;
+      final current = state.value;
 
-        if (InutilPlaybackSyncService.isDesktopHost ||
-            syncService.isCurrentDeviceActive) {
-          // Somos el altavoz (o el PC anfitrión): lo que reporte la nube no
-          // pisa nuestro estado local. PERO un estado que antes espejó al par
-          // no puede seguir diciendo "reproduciendo" encima de un motor local
-          // silencioso: así quedaba el reproductor colgado media hora.
-          if (current != null &&
-              current.isRemote &&
-              current.status == PlayerStatus.playing &&
-              service.currentSnapshot.status != PlayerStatus.playing) {
-            state = AsyncData(
-              current.copyWith(
-                status: service.currentSnapshot.status,
-                playWhenReady: false,
-                position: service.currentSnapshot.position,
-                isRemote: false,
-              ),
-            );
-          }
-          return;
-        }
-
-        if (remote == null || remote.trackId.isEmpty) {
-          // Perdimos de vista la sesión del altavoz: el mando muestra la
-          // verdad de su propio motor (silencioso), no el último estado
-          // espejado que se había quedado pegado en pantalla.
-          if (current != null && current.isRemote) {
-            state = AsyncData(
-              current.copyWith(
-                status: service.currentSnapshot.status,
-                playWhenReady: false,
-                position: service.currentSnapshot.position,
-                isRemote: false,
-              ),
-            );
-          }
-          return;
-        }
-
-        final newStatus =
-            remote.isPlaying ? PlayerStatus.playing : PlayerStatus.paused;
-        // El altavoz escribe su posición cada ~8 s; entre escrituras hay que
-        // contar el tiempo transcurrido. Sin esto la barra del mando se queda
-        // congelada aunque la PC esté avanzando.
-        final newPosition = Duration(milliseconds: remote.estimatedPositionMs);
+      if (InutilPlaybackSyncService.isDesktopHost ||
+          syncService.isCurrentDeviceActive) {
+        // Somos el altavoz (o el PC anfitrión): lo que reporte la nube no
+        // pisa nuestro estado local. PERO un estado que antes espejó al par
+        // no puede seguir diciendo "reproduciendo" encima de un motor local
+        // silencioso: así quedaba el reproductor colgado media hora.
         if (current != null &&
             current.isRemote &&
-            current.trackId == remote.trackId &&
-            current.status == newStatus &&
-            (current.position - newPosition).inSeconds.abs() < 2) {
-          return;
+            current.status == PlayerStatus.playing &&
+            service.currentSnapshot.status != PlayerStatus.playing) {
+          state = AsyncData(
+            current.copyWith(
+              status: service.currentSnapshot.status,
+              playWhenReady: false,
+              position: service.currentSnapshot.position,
+              isRemote: false,
+            ),
+          );
         }
-        state = AsyncData(
-          (current ?? service.currentSnapshot).copyWith(
-            trackId: remote.trackId,
-            title: remote.title,
-            artist: remote.artist,
-            album: remote.album,
-            thumbnailUrl: remote.thumbnailUrl,
-            status: newStatus,
-            playWhenReady: remote.isPlaying,
-            position: newPosition,
-            duration: remote.durationMs > 0
-                ? Duration(milliseconds: remote.durationMs)
-                : current?.duration,
-            isRemote: true,
-          ),
-        );
-        // Hecho el espejo del estado remoto, comprobamos si el altavoz terminó
-        // su canción: la cola vive en el mando, que es quien debe elegir la
-        // siguiente pista y encaminársela.
-        _maybeAdvanceForRemoteCompletion(remote);
-      },
-    );
+        return;
+      }
+
+      if (remote == null || remote.trackId.isEmpty) {
+        // Perdimos de vista la sesión del altavoz: el mando muestra la
+        // verdad de su propio motor (silencioso), no el último estado
+        // espejado que se había quedado pegado en pantalla.
+        if (current != null && current.isRemote) {
+          state = AsyncData(
+            current.copyWith(
+              status: service.currentSnapshot.status,
+              playWhenReady: false,
+              position: service.currentSnapshot.position,
+              isRemote: false,
+            ),
+          );
+        }
+        return;
+      }
+
+      final newStatus = remote.isPlaying
+          ? PlayerStatus.playing
+          : PlayerStatus.paused;
+      // El altavoz escribe su posición cada ~8 s; entre escrituras hay que
+      // contar el tiempo transcurrido. Sin esto la barra del mando se queda
+      // congelada aunque la PC esté avanzando.
+      final newPosition = Duration(milliseconds: remote.estimatedPositionMs);
+      if (current != null &&
+          current.isRemote &&
+          current.trackId == remote.trackId &&
+          current.status == newStatus &&
+          (current.position - newPosition).inSeconds.abs() < 2) {
+        return;
+      }
+      state = AsyncData(
+        (current ?? service.currentSnapshot).copyWith(
+          trackId: remote.trackId,
+          title: remote.title,
+          artist: remote.artist,
+          album: remote.album,
+          thumbnailUrl: remote.thumbnailUrl,
+          status: newStatus,
+          playWhenReady: remote.isPlaying,
+          position: newPosition,
+          duration: remote.durationMs > 0
+              ? Duration(milliseconds: remote.durationMs)
+              : current?.duration,
+          isRemote: true,
+        ),
+      );
+      // Hecho el espejo del estado remoto, comprobamos si el altavoz terminó
+      // su canción: la cola vive en el mando, que es quien debe elegir la
+      // siguiente pista y encaminársela.
+      _maybeAdvanceForRemoteCompletion(remote);
+    }
+
+    syncService.addListener(handleSyncServiceChange);
+    ref.onDispose(() => syncService.removeListener(handleSyncServiceChange));
     final initialSnapshot = _decorateSnapshot(service.currentSnapshot);
     final historySink = ref.read(playbackHistorySinkProvider);
     final historyTracker = QualifiedPlaybackHistoryTracker(
@@ -346,7 +368,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         return;
       }
       final sync = InutilPlaybackSyncService.instance;
-      if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+      if (!InutilPlaybackSyncService.isDesktopHost &&
+          !sync.isCurrentDeviceActive) {
         // En modo control remoto, este dispositivo actúa como mando a distancia (Spotify Connect).
         // El audio suena en el equipo remoto (PC) y el estado de la UI es gobernado
         // exclusivamente por InutilPlaybackSyncService. Los snapshots del reproductor local
@@ -3625,10 +3648,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       final current = state.value;
       if (current != null) {
         state = AsyncData(
-          current.copyWith(
-            status: PlayerStatus.paused,
-            playWhenReady: false,
-          ),
+          current.copyWith(status: PlayerStatus.paused, playWhenReady: false),
         );
       }
       return;
@@ -3662,15 +3682,13 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> resume() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
       unawaited(sync.sendRemoteControlCommand(commandType: 'play'));
       final current = state.value;
       if (current != null) {
         state = AsyncData(
-          current.copyWith(
-            status: PlayerStatus.playing,
-            playWhenReady: true,
-          ),
+          current.copyWith(status: PlayerStatus.playing, playWhenReady: true),
         );
       }
       return;
@@ -3706,17 +3724,21 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> togglePlayPause() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
       final isRemotePlaying = sync.remoteSession?.isPlaying ?? false;
-      unawaited(sync.sendRemoteControlCommand(
-        commandType: isRemotePlaying ? 'pause' : 'play',
-      ));
+      unawaited(
+        sync.sendRemoteControlCommand(
+          commandType: isRemotePlaying ? 'pause' : 'play',
+        ),
+      );
       final current = state.value;
       if (current != null) {
         state = AsyncData(
           current.copyWith(
-            status:
-                isRemotePlaying ? PlayerStatus.paused : PlayerStatus.playing,
+            status: isRemotePlaying
+                ? PlayerStatus.paused
+                : PlayerStatus.playing,
             playWhenReady: !isRemotePlaying,
           ),
         );
@@ -3734,7 +3756,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> playPrevious() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
       unawaited(sync.sendRemoteControlCommand(commandType: 'previous'));
       return;
     }
@@ -3787,8 +3810,10 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _lastRemoteAdvanceTrackId = remote.trackId;
     _remoteAdvanceInFlight = true;
     unawaited(
-      playNext(automatic: true, fromRemoteSpeaker: true)
-          .whenComplete(() => _remoteAdvanceInFlight = false),
+      playNext(
+        automatic: true,
+        fromRemoteSpeaker: true,
+      ).whenComplete(() => _remoteAdvanceInFlight = false),
     );
   }
 
@@ -4008,11 +4033,14 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> seek(Duration position) async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
-      unawaited(sync.sendRemoteControlCommand(
-        commandType: 'seek',
-        param: position.inMilliseconds,
-      ));
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
+      unawaited(
+        sync.sendRemoteControlCommand(
+          commandType: 'seek',
+          param: position.inMilliseconds,
+        ),
+      );
       final current = state.value;
       if (current != null) {
         state = AsyncData(current.copyWith(position: position));
@@ -4716,7 +4744,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   void _maybeHandleCompletion(PlayerSnapshot snapshot) {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost && !sync.isCurrentDeviceActive) {
+    if (!InutilPlaybackSyncService.isDesktopHost &&
+        !sync.isCurrentDeviceActive) {
       // En modo control remoto, no procesamos completaciones de reproducción locales:
       // el audio se reproduce y finaliza exclusivamente en el altavoz activo (PC).
       return;

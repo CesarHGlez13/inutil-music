@@ -35,7 +35,10 @@ void main() {
       );
 
       // Misma cuenta con diferente casing/espacios
-      expect(peer.isSameAccount('cesar@inutilmusic.com', 'admin_cesar_001'), isTrue);
+      expect(
+        peer.isSameAccount('cesar@inutilmusic.com', 'admin_cesar_001'),
+        isTrue,
+      );
       expect(peer.isSameAccount(' CESAR@INUTILMUSIC.COM ', null), isTrue);
       expect(peer.isSameAccount(null, 'admin_cesar_001'), isTrue);
 
@@ -54,33 +57,41 @@ void main() {
         uid: 'user_999',
       );
 
-      expect(peer.isSameAccount('cesar@inutilmusic.com', 'admin_cesar_001'), isFalse);
+      expect(
+        peer.isSameAccount('cesar@inutilmusic.com', 'admin_cesar_001'),
+        isFalse,
+      );
     });
   });
 
   group('InutilPlaybackSyncService LAN Server & Remote Control Tests', () {
-    test('Inicia LAN HTTP Server y responde a /api/ping con metadatos de usuario', () async {
-      final service = InutilPlaybackSyncService.instance;
-      service.startSync();
+    test(
+      'Inicia LAN HTTP Server y responde a /api/ping con metadatos de usuario',
+      () async {
+        final service = InutilPlaybackSyncService.instance;
+        service.startSync();
 
-      // Dar medio segundo para que el servidor local enlace el puerto
-      await Future<void>.delayed(const Duration(milliseconds: 600));
+        // Dar medio segundo para que el servidor local enlace el puerto
+        await Future<void>.delayed(const Duration(milliseconds: 600));
 
-      final port = service.currentLanPort;
-      expect(port, greaterThanOrEqualTo(52445));
+        final port = service.currentLanPort;
+        expect(port, greaterThanOrEqualTo(52445));
 
-      final client = HttpClient();
-      final request = await client.getUrl(Uri.parse('http://127.0.0.1:$port/api/ping'));
-      final response = await request.close();
+        final client = HttpClient();
+        final request = await client.getUrl(
+          Uri.parse('http://127.0.0.1:$port/api/ping'),
+        );
+        final response = await request.close();
 
-      expect(response.statusCode, HttpStatus.ok);
-      final bodyStr = await utf8.decodeStream(response);
-      final json = jsonDecode(bodyStr) as Map<String, dynamic>;
+        expect(response.statusCode, HttpStatus.ok);
+        final bodyStr = await utf8.decodeStream(response);
+        final json = jsonDecode(bodyStr) as Map<String, dynamic>;
 
-      expect(json['status'], equals('ok'));
-      expect(json['port'], equals(port));
-      client.close();
-    });
+        expect(json['status'], equals('ok'));
+        expect(json['port'], equals(port));
+        client.close();
+      },
+    );
 
     test('Ejecuta comandos remotos via /api/command en tiempo real', () async {
       final service = InutilPlaybackSyncService.instance;
@@ -97,17 +108,21 @@ void main() {
       };
 
       final client = HttpClient();
-      final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/api/command'));
+      final request = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$port/api/command'),
+      );
       request.headers.contentType = ContentType.json;
-      request.write(jsonEncode({
-        'commandType': 'playTrack',
-        'param': {
-          'trackId': 'test_video_123',
-          'title': 'Y Que',
-          'artist': 'Inspector',
-          'positionMs': 1500,
-        },
-      }));
+      request.write(
+        jsonEncode({
+          'commandType': 'playTrack',
+          'param': {
+            'trackId': 'test_video_123',
+            'title': 'Y Que',
+            'artist': 'Inspector',
+            'positionMs': 1500,
+          },
+        }),
+      );
       final response = await request.close();
 
       expect(response.statusCode, HttpStatus.ok);

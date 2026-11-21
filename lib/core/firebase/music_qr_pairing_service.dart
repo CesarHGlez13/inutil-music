@@ -99,15 +99,18 @@ class MusicQrPairingService {
 
   static bool isValidCode(String code) => _codePattern.hasMatch(code);
 
-  static Uint8List _randomBytes(int length) =>
-      Uint8List.fromList(List<int>.generate(length, (_) => _random.nextInt(256)));
+  static Uint8List _randomBytes(int length) => Uint8List.fromList(
+    List<int>.generate(length, (_) => _random.nextInt(256)),
+  );
 
   static Uint8List generateSecretKey() => _randomBytes(32);
 
   static Uint8List deriveManualCodeKey(String code) {
     final norm = normalizeCode(code);
     return Uint8List.fromList(
-      crypto.sha256.convert(utf8.encode('inutilmusic-manual-pair-v1:$norm')).bytes,
+      crypto.sha256
+          .convert(utf8.encode('inutilmusic-manual-pair-v1:$norm'))
+          .bytes,
     );
   }
 
@@ -137,8 +140,8 @@ class MusicQrPairingService {
 
   /// Subclaves independientes para cifrar y autenticar.
   static Uint8List _subKey(Uint8List key, String label) => Uint8List.fromList(
-        crypto.Hmac(crypto.sha256, key).convert(utf8.encode(label)).bytes,
-      );
+    crypto.Hmac(crypto.sha256, key).convert(utf8.encode(label)).bytes,
+  );
 
   static PaddedBlockCipher _cipher(bool encrypt, Uint8List key, Uint8List iv) {
     return PaddedBlockCipherImpl(PKCS7Padding(), CBCBlockCipher(AESEngine()))
@@ -157,7 +160,10 @@ class MusicQrPairingService {
     final plain = Uint8List.fromList(utf8.encode(jsonEncode(payload)));
     final ct = _cipher(true, _subKey(key, 'enc'), iv).process(plain);
     final body = Uint8List.fromList([...iv, ...ct]);
-    final mac = crypto.Hmac(crypto.sha256, _subKey(key, 'mac')).convert(body).bytes;
+    final mac = crypto.Hmac(
+      crypto.sha256,
+      _subKey(key, 'mac'),
+    ).convert(body).bytes;
     return 'v1.${_b64([...body, ...mac])}';
   }
 
@@ -168,15 +174,21 @@ class MusicQrPairingService {
       if (all.length < 16 + 16 + 32) return null;
       final body = all.sublist(0, all.length - 32);
       final mac = all.sublist(all.length - 32);
-      final expected =
-          crypto.Hmac(crypto.sha256, _subKey(key, 'mac')).convert(body).bytes;
+      final expected = crypto.Hmac(
+        crypto.sha256,
+        _subKey(key, 'mac'),
+      ).convert(body).bytes;
       var diff = 0;
       for (var i = 0; i < 32; i++) {
         diff |= mac[i] ^ expected[i];
       }
       if (diff != 0) return null;
       final iv = body.sublist(0, 16);
-      final plain = _cipher(false, _subKey(key, 'enc'), iv).process(body.sublist(16));
+      final plain = _cipher(
+        false,
+        _subKey(key, 'enc'),
+        iv,
+      ).process(body.sublist(16));
       final decoded = jsonDecode(utf8.decode(plain));
       return decoded is Map<String, dynamic> ? decoded : null;
     } catch (_) {
@@ -195,16 +207,14 @@ class MusicQrPairingService {
     final now = DateTime.now();
     final expiresAt = now.add(sessionTtl);
     try {
-      final ok = await InutilFirestoreService.instance.setDocument(
-        '$collection/$code',
-        {
-          'status': 'pending',
-          'deviceId': auth.deviceId,
-          'deviceName': auth.deviceName,
-          'createdAt': now,
-          'expiresAt': expiresAt,
-        },
-      );
+      final ok = await InutilFirestoreService.instance
+          .setDocument('$collection/$code', {
+            'status': 'pending',
+            'deviceId': auth.deviceId,
+            'deviceName': auth.deviceName,
+            'createdAt': now,
+            'expiresAt': expiresAt,
+          });
       if (!ok) return null;
       return MusicPairingSession(
         code: code,
@@ -218,13 +228,16 @@ class MusicQrPairingService {
     }
   }
 
-  Future<MusicPairingPollResult> pollPcSession(MusicPairingSession session) async {
+  Future<MusicPairingPollResult> pollPcSession(
+    MusicPairingSession session,
+  ) async {
     if (session.isExpired) {
       return const MusicPairingPollResult(MusicPairingPollState.expired);
     }
     try {
-      final doc = await InutilFirestoreService.instance
-          .getDocument('$collection/${session.code}');
+      final doc = await InutilFirestoreService.instance.getDocument(
+        '$collection/${session.code}',
+      );
       if (doc == null) {
         return const MusicPairingPollResult(MusicPairingPollState.expired);
       }
@@ -241,8 +254,10 @@ class MusicQrPairingService {
           message: 'No se pudo descifrar la sesión enviada por el celular.',
         );
       }
-      return MusicPairingPollResult(MusicPairingPollState.approved,
-          payload: payload);
+      return MusicPairingPollResult(
+        MusicPairingPollState.approved,
+        payload: payload,
+      );
     } catch (e) {
       // Sin red momentáneamente: se reintenta en el siguiente sondeo.
       debugPrint('[MusicQrPairing] Sondeo sin respuesta: $e');
@@ -253,8 +268,9 @@ class MusicQrPairingService {
   Future<void> cleanupPcSession(MusicPairingSession? session) async {
     if (session == null) return;
     try {
-      await InutilFirestoreService.instance
-          .deleteDocument('$collection/${session.code}');
+      await InutilFirestoreService.instance.deleteDocument(
+        '$collection/${session.code}',
+      );
     } catch (_) {}
   }
 
@@ -280,7 +296,11 @@ class MusicQrPairingService {
     return _approve(code, deriveManualCodeKey(code), mode: 'code');
   }
 
-  Future<String?> _approve(String code, Uint8List key, {required String mode}) async {
+  Future<String?> _approve(
+    String code,
+    Uint8List key, {
+    required String mode,
+  }) async {
     final auth = InutilAuthService.instance;
     final user = auth.currentUser;
     if (user == null || user.refreshToken.isEmpty) {
@@ -291,8 +311,9 @@ class MusicQrPairingService {
     }
     try {
       await auth.ensureFreshSession();
-      final existing =
-          await InutilFirestoreService.instance.getDocument('$collection/$code');
+      final existing = await InutilFirestoreService.instance.getDocument(
+        '$collection/$code',
+      );
       if (existing == null) {
         return 'No se encontró ese código o ya expiró. Genera uno nuevo en la PC.';
       }
@@ -310,16 +331,14 @@ class MusicQrPairingService {
         'displayName': current.displayName,
         'uid': current.uid,
       }, key);
-      final ok = await InutilFirestoreService.instance.setDocument(
-        '$collection/$code',
-        {
-          'status': 'approved',
-          'mode': mode,
-          'payload': encrypted,
-          'approvedByUid': current.uid,
-          'approvedAt': DateTime.now(),
-        },
-      );
+      final ok = await InutilFirestoreService.instance
+          .setDocument('$collection/$code', {
+            'status': 'approved',
+            'mode': mode,
+            'payload': encrypted,
+            'approvedByUid': current.uid,
+            'approvedAt': DateTime.now(),
+          });
       if (!ok) {
         return 'No se pudo autorizar la PC. Verifica tu conexión e intenta de nuevo.';
       }

@@ -81,11 +81,9 @@ class OtaDownloadException implements Exception {
 /// el mismo; si el servidor ignora el rango (responde `200`) la descarga
 /// empieza de cero en lugar de mezclar dos copias del APK.
 class OtaDownloadManager {
-  OtaDownloadManager({
-    HttpClient? client,
-    Stopwatch Function()? clock,
-  }) : _httpClient = client,
-       _clock = clock ?? Stopwatch.new;
+  OtaDownloadManager({HttpClient? client, Stopwatch Function()? clock})
+    : _httpClient = client,
+      _clock = clock ?? Stopwatch.new;
 
   static const String updatesDirectoryName = 'updates';
   static const Duration _idleTimeout = Duration(seconds: 45);
@@ -287,10 +285,7 @@ class OtaDownloadManager {
 
     void failWith(Object error, [StackTrace? stackTrace]) {
       if (completer.isCompleted) return;
-      completer.completeError(
-        error,
-        stackTrace ?? StackTrace.current,
-      );
+      completer.completeError(error, stackTrace ?? StackTrace.current);
     }
 
     void armIdleTimer() {
@@ -346,8 +341,9 @@ class OtaDownloadManager {
           await _writeMeta(partName, <String, Object?>{
             'url': url,
             'etag': response.headers.value(HttpHeaders.etagHeader),
-            'lastModified': response.headers
-                .value(HttpHeaders.lastModifiedHeader),
+            'lastModified': response.headers.value(
+              HttpHeaders.lastModifiedHeader,
+            ),
             'totalBytes': totalBytes,
             'complete': true,
           });

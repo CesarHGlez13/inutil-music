@@ -41,6 +41,7 @@ class InutilFirestoreService {
     if (flat.isEmpty) return 'sin respuesta';
     return flat.length <= 180 ? flat : '${flat.substring(0, 180)}…';
   }
+
   String? get _uid => _auth.currentUser?.uid;
 
   Map<String, String> _headers() {
@@ -97,8 +98,10 @@ class InutilFirestoreService {
     } catch (error) {
       if (!relayWasUsable || !isConnectionFailure(error)) rethrow;
       FirebaseConfig.markRelayUnreachable();
-      debugPrint('Relay del S7 sin respuesta en $label: '
-          'reintento directo a Google.');
+      debugPrint(
+        'Relay del S7 sin respuesta en $label: '
+        'reintento directo a Google.',
+      );
       return await send(urlBuilder());
     }
   }
@@ -112,11 +115,7 @@ class InutilFirestoreService {
     required Uri Function() urlBuilder,
     required Future<http.Response> Function(Uri url) send,
   }) =>
-      _sendWithRelayFallback(
-        label: label,
-        urlBuilder: urlBuilder,
-        send: send,
-      );
+      _sendWithRelayFallback(label: label, urlBuilder: urlBuilder, send: send);
 
   // ---------------------------------------------------------------------------
   // 1. SERIALIZACIÓN FIRESTORE REST (Dart Map <-> Firestore Value Formats)
@@ -144,9 +143,7 @@ class InutilFirestoreService {
       return {'timestampValue': value.toUtc().toIso8601String()};
     } else if (value is List) {
       return {
-        'arrayValue': {
-          'values': value.map(_encodeValue).toList(),
-        },
+        'arrayValue': {'values': value.map(_encodeValue).toList()},
       };
     } else if (value is Map<String, dynamic>) {
       final mapFields = <String, dynamic>{};
@@ -172,15 +169,23 @@ class InutilFirestoreService {
 
   dynamic _decodeValue(Map<String, dynamic> val) {
     if (val.containsKey('stringValue')) return val['stringValue'];
-    if (val.containsKey('integerValue')) return int.tryParse(val['integerValue']) ?? 0;
-    if (val.containsKey('doubleValue')) return (val['doubleValue'] as num).toDouble();
+    if (val.containsKey('integerValue')) {
+      return int.tryParse(val['integerValue']) ?? 0;
+    }
+    if (val.containsKey('doubleValue')) {
+      return (val['doubleValue'] as num).toDouble();
+    }
     if (val.containsKey('booleanValue')) return val['booleanValue'];
-    if (val.containsKey('timestampValue')) return DateTime.tryParse(val['timestampValue']);
+    if (val.containsKey('timestampValue')) {
+      return DateTime.tryParse(val['timestampValue']);
+    }
     if (val.containsKey('nullValue')) return null;
     if (val.containsKey('arrayValue')) {
       final values = val['arrayValue']['values'] as List?;
       if (values == null) return [];
-      return values.map((e) => _decodeValue(e as Map<String, dynamic>)).toList();
+      return values
+          .map((e) => _decodeValue(e as Map<String, dynamic>))
+          .toList();
     }
     if (val.containsKey('mapValue')) {
       final fields = val['mapValue']['fields'] as Map<String, dynamic>?;
@@ -208,7 +213,11 @@ class InutilFirestoreService {
       // Un 403/500 no es «el documento no existe»: es que el proyecto o las
       // reglas no dejan leer. Se propaga como excepción para que el sondeo
       // pueda aplicar backoff en vez de reintentar cada 3 segundos.
-      throw FirestoreOperationException(path, response.statusCode, response.body);
+      throw FirestoreOperationException(
+        path,
+        response.statusCode,
+        response.body,
+      );
     }
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     return _decodeDocument(json);
@@ -245,8 +254,10 @@ class InutilFirestoreService {
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return true;
     }
-    debugPrint('Firestore PATCH error ($path): '
-        '${briefErrorBody(response.body)}');
+    debugPrint(
+      'Firestore PATCH error ($path): '
+      '${briefErrorBody(response.body)}',
+    );
     return false;
   }
 
@@ -282,7 +293,11 @@ class InutilFirestoreService {
     );
     if (response.statusCode == 404) return const [];
     if (response.statusCode != 200) {
-      throw FirestoreOperationException(path, response.statusCode, response.body);
+      throw FirestoreOperationException(
+        path,
+        response.statusCode,
+        response.body,
+      );
     }
     final json = jsonDecode(response.body) as Map<String, dynamic>;
     final docs = json['documents'] as List?;

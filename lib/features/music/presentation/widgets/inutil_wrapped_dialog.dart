@@ -158,8 +158,8 @@ class _InutilWrappedDialogState extends State<InutilWrappedDialog>
   }
 
   Future<void> _openSupport() async {
-    final campaign =
-        await InutilPromoPopupService.instance.nextRotatingCampaign();
+    final campaign = await InutilPromoPopupService.instance
+        .nextRotatingCampaign();
     if (!mounted) return;
     await InutilSupportPopupDialog.show(context, campaign);
   }

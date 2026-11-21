@@ -109,8 +109,9 @@ void main() {
 
       // Simular dispositivo B recién reinstalado con entrada con localTrackId
       // huérfano para verificar que la clave foránea no bloquea el restore.
-      final rawEntries = cloud['users/user-1/data/backup_entries_0']!['entries']
-          as List<dynamic>;
+      final rawEntries =
+          cloud['users/user-1/data/backup_entries_0']!['entries']
+              as List<dynamic>;
       (rawEntries.first as Map<String, dynamic>)['localTrackId'] =
           'missing-local-id';
 

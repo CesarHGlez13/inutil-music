@@ -4,7 +4,8 @@ import 'dart:io';
 
 import '../visual_track_identity.dart';
 
-typedef VideoPreviewJsonFetcher = Future<Map<String, dynamic>?> Function(Uri uri);
+typedef VideoPreviewJsonFetcher =
+    Future<Map<String, dynamic>?> Function(Uri uri);
 
 /// A short official music-video preview clip used for Spotify-style Canvas
 /// backgrounds (Now Playing, Artist headers, Album headers) and the vertical
@@ -79,7 +80,8 @@ class VideoPreviewResolver {
     if (cleanTitle.isEmpty || cleanArtist.isEmpty) {
       return Future.value(null);
     }
-    final key = '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}';
+    final key =
+        '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}';
     final now = _clock();
     final cached = _trackCache[key];
     if (cached != null && cached.expiresAt.isAfter(now)) {
@@ -116,7 +118,12 @@ class VideoPreviewResolver {
       } finally {
         _trackInFlight.remove(key);
       }
-      _putCache(_trackCache, key, resolved, resolved == null ? _missTtl : _cacheTtl);
+      _putCache(
+        _trackCache,
+        key,
+        resolved,
+        resolved == null ? _missTtl : _cacheTtl,
+      );
       return resolved;
     });
   }
@@ -171,7 +178,8 @@ class VideoPreviewResolver {
     if (cleanArtist.isEmpty && cleanAlbum.isEmpty) {
       return Future.value(const <VideoPreviewClip>[]);
     }
-    final key = 'album|${normalVisualText(cleanArtist)}|${normalVisualText(cleanAlbum)}';
+    final key =
+        'album|${normalVisualText(cleanArtist)}|${normalVisualText(cleanAlbum)}';
     final now = _clock();
     final cached = _clipsCache[key];
     if (cached != null && cached.expiresAt.isAfter(now)) {

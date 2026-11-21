@@ -832,7 +832,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   void _synchronizePlayback() {
     final canvas = _canvasController;
     if (canvas != null) {
-      unawaited(canvas.setPlaying(_active && _tickerEnabled && widget.isPlaying));
+      unawaited(
+        canvas.setPlaying(_active && _tickerEnabled && widget.isPlaying),
+      );
       return;
     }
     final controller = _controller;
@@ -867,7 +869,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   Widget build(BuildContext context) {
     final canvas = _canvasController;
     final controller = _controller;
-    final size = canvas != null ? canvas.size : (controller?.value.size ?? Size.zero);
+    final size = canvas != null
+        ? canvas.size
+        : (controller?.value.size ?? Size.zero);
     final hasSurface = canvas != null || controller != null;
     final zoom = effectivePortraitArtworkZoom(size, _insetZoom);
     final frames = Stack(

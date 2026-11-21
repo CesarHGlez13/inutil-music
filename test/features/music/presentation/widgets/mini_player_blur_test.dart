@@ -1605,7 +1605,10 @@ class _TestPlayerController extends PlayerController {
   }
 
   @override
-  Future<void> playNext({bool automatic = false, bool fromRemoteSpeaker = false}) async {
+  Future<void> playNext({
+    bool automatic = false,
+    bool fromRemoteSpeaker = false,
+  }) async {
     nextCalls++;
   }
 }

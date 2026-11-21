@@ -270,7 +270,8 @@ class AppStrings {
     'Inútil Music paused these playlists to avoid repeating or overwriting '
         'uncertain changes. Choose which version to keep for each one.',
   );
-  String get keepInutilPlaylist => choose('Conservar Inútil Music', 'Keep Inútil Music');
+  String get keepInutilPlaylist =>
+      choose('Conservar Inútil Music', 'Keep Inútil Music');
   String get keepYouTubeMusicPlaylist =>
       choose('Conservar YouTube Music', 'Keep YouTube Music');
   String get noPlaylistSyncConflicts => choose(

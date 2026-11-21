@@ -46,9 +46,7 @@ void main() {
 
   setUp(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
-    sandbox = await Directory.systemTemp.createTemp(
-      'inutil-settings-startup-',
-    );
+    sandbox = await Directory.systemTemp.createTemp('inutil-settings-startup-');
     documentsPath = p.join(sandbox.path, 'documents');
     await Directory(documentsPath).create(recursive: true);
 

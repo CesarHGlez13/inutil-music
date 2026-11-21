@@ -169,10 +169,7 @@ void main() {
       expect(workflow, contains('Payload/Runner.app/Info.plist'));
       expect(workflow, contains(r'test ! -d "$app/_CodeSignature"'));
       expect(workflow, contains(r'test ! -e "$app/embedded.mobileprovision"'));
-      expect(
-        workflow,
-        contains(r'InutilMusic-$APP_VERSION-iOS-unsigned.ipa'),
-      );
+      expect(workflow, contains(r'InutilMusic-$APP_VERSION-iOS-unsigned.ipa'));
       expect(workflow, contains('- name: Upload unsigned iOS IPA'));
     });
   });

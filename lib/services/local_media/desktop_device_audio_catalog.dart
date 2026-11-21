@@ -67,8 +67,7 @@ class DesktopDeviceAudioCatalog implements DeviceAudioCatalog {
       // Another exclusion root needs its own snapshot. Recheck after waiting:
       // multiple callers waiting for it must still share that next scan.
       return active.then(
-        (_) =>
-            _rawCatalog(inutilRoot: inutilRoot, forceRefresh: forceRefresh),
+        (_) => _rawCatalog(inutilRoot: inutilRoot, forceRefresh: forceRefresh),
       );
     }
 

@@ -128,9 +128,7 @@ void main() {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: InutilUpdateGate(
-              child: Scaffold(body: Text('APP_INTERIOR')),
-            ),
+            home: InutilUpdateGate(child: Scaffold(body: Text('APP_INTERIOR'))),
           ),
         ),
       );
@@ -315,10 +313,7 @@ void main() {
 
       // La versión pospuesta quedó guardada en prefs (clave del gate).
       final prefs = await SharedPreferences.getInstance();
-      expect(
-        prefs.getString('inutil_update_notice_snoozed_for'),
-        '2.5.10',
-      );
+      expect(prefs.getString('inutil_update_notice_snoozed_for'), '2.5.10');
 
       // Arranque nuevo con la misma versión publicada: ya quedó pospuesto.
       await pumpGate(tester, key: 'gate-2');

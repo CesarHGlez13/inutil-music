@@ -17,11 +17,12 @@ enum InutilPopupKind {
   announcement,
   ad;
 
-  static InutilPopupKind fromString(String? raw) => switch (raw?.trim().toLowerCase()) {
-    'ad' || 'sponsor' => InutilPopupKind.ad,
-    'announcement' || 'news' => InutilPopupKind.announcement,
-    _ => InutilPopupKind.support,
-  };
+  static InutilPopupKind fromString(String? raw) =>
+      switch (raw?.trim().toLowerCase()) {
+        'ad' || 'sponsor' => InutilPopupKind.ad,
+        'announcement' || 'news' => InutilPopupKind.announcement,
+        _ => InutilPopupKind.support,
+      };
 }
 
 @immutable
@@ -222,7 +223,8 @@ class InutilPromoPopupService {
     final lastShownMs = prefs.getInt(_prefsLastShownMsKey) ?? 0;
     final nowMs = DateTime.now().millisecondsSinceEpoch;
     final elapsed = Duration(milliseconds: nowMs - lastShownMs);
-    final dueBySession = sessions == 2 || (sessions > 2 && sessions % sessionInterval == 0);
+    final dueBySession =
+        sessions == 2 || (sessions > 2 && sessions % sessionInterval == 0);
     if (!dueBySession) return null;
     if (lastShownMs > 0 && elapsed < minCooldown) return null;
 

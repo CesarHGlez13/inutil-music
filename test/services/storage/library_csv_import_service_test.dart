@@ -244,11 +244,7 @@ void main() {
             return const [];
           }
           return [
-            _candidate(
-              'ccccccccccc',
-              'Amor del Bueno',
-              artist: 'Reyli Barba',
-            ),
+            _candidate('ccccccccccc', 'Amor del Bueno', artist: 'Reyli Barba'),
           ];
         };
         final result = await harness.import(
@@ -267,30 +263,23 @@ void main() {
       },
     );
 
-    test(
-      'resolves multi-artist tracks regardless of artist order',
-      () async {
-        harness.search = (_) async => [
-          _candidate(
-            'ddddddddddd',
-            'PRC',
-            artist: 'Natanael Cano, Peso Pluma',
+    test('resolves multi-artist tracks regardless of artist order', () async {
+      harness.search = (_) async => [
+        _candidate('ddddddddddd', 'PRC', artist: 'Natanael Cano, Peso Pluma'),
+      ];
+      final result = await harness.import(
+        _document([
+          _track(
+            rowNumber: 12,
+            title: 'PRC',
+            artist: 'Peso Pluma',
+            artists: const ['Peso Pluma', 'Natanael Cano'],
           ),
-        ];
-        final result = await harness.import(
-          _document([
-            _track(
-              rowNumber: 12,
-              title: 'PRC',
-              artist: 'Peso Pluma',
-              artists: const ['Peso Pluma', 'Natanael Cano'],
-            ),
-          ]),
-        );
-        expect(result.imported, 1);
-        expect(result.failed, 0);
-      },
-    );
+        ]),
+      );
+      expect(result.imported, 1);
+      expect(result.failed, 0);
+    });
 
     test(
       'matches YouTube label channel videos formatted as Artist - Title',

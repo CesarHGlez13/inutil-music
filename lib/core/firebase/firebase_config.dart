@@ -214,11 +214,7 @@ class FirebaseConfig {
     return false;
   }
 
-  static Future<bool> _canOpen(
-    String host,
-    int port,
-    Duration timeout,
-  ) async {
+  static Future<bool> _canOpen(String host, int port, Duration timeout) async {
     Socket? socket;
     try {
       socket = await Socket.connect(host, port, timeout: timeout);
@@ -300,14 +296,14 @@ class FirebaseConfig {
   /// el árbol.
   @visibleForTesting
   static RelayTierInputs get relayTierInputs => RelayTierInputs(
-        lanHost: relayHost,
-        lanPort: relayPort,
-        emulator: useEmulator,
-        lanReachable: _relayReachable,
-        cloudHost: cloudRelayHost,
-        cloudScheme: cloudRelayScheme,
-        cloudPort: cloudRelayPort,
-      );
+    lanHost: relayHost,
+    lanPort: relayPort,
+    emulator: useEmulator,
+    lanReachable: _relayReachable,
+    cloudHost: cloudRelayHost,
+    cloudScheme: cloudRelayScheme,
+    cloudPort: cloudRelayPort,
+  );
 
   /// Tier de datos efectivo ahora mismo.
   static RelayTier get dataTier => RelayTierSelector.select(relayTierInputs);

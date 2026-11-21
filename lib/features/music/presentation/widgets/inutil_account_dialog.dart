@@ -144,9 +144,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     final isExpired = !user.isAdmin && user.isExpired;
     final isPermanent = user.isAdmin || user.isPermanent;
 
-    final statusColor = isExpired
-        ? colors.error
-        : colors.primary;
+    final statusColor = isExpired ? colors.error : colors.primary;
     final statusLabel = isExpired
         ? 'Vencida'
         : isPermanent
@@ -161,9 +159,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
     final displayName = user.displayName.trim().isNotEmpty
         ? user.displayName.trim()
         : user.email.split('@').first;
-    final initial = displayName.isNotEmpty
-        ? displayName[0].toUpperCase()
-        : 'U';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -349,13 +345,17 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
                 children: [
                   FilledButton.tonalIcon(
                     key: const ValueKey('account-pc-login-qr'),
-                    onPressed: _signingOut ? null : () => openPcLoginFlow(context),
+                    onPressed: _signingOut
+                        ? null
+                        : () => openPcLoginFlow(context),
                     icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
                     label: const Text('Escanear QR de la PC'),
                   ),
                   OutlinedButton.icon(
                     key: const ValueKey('account-pc-login-code'),
-                    onPressed: _signingOut ? null : () => showPcLoginCodeDialog(context),
+                    onPressed: _signingOut
+                        ? null
+                        : () => showPcLoginCodeDialog(context),
                     icon: const Icon(Icons.keyboard_rounded, size: 18),
                     label: const Text('Escribir código'),
                   ),

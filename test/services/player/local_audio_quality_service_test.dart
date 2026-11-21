@@ -14,9 +14,7 @@ const _quality = LocalAudioQuality(
 );
 
 String _path(String name) => p.normalize(
-  File(
-    p.join(Directory.systemTemp.path, 'inutil-quality-$name'),
-  ).absolute.path,
+  File(p.join(Directory.systemTemp.path, 'inutil-quality-$name')).absolute.path,
 );
 
 Future<void> _drain() async {

@@ -16,8 +16,12 @@ import 'package:flutter/widgets.dart';
 class InutilCanvasEngine {
   InutilCanvasEngine._();
 
-  static const MethodChannel _method = MethodChannel('inutil_music/canvas_video');
-  static const EventChannel _events = EventChannel('inutil_music/canvas_video/events');
+  static const MethodChannel _method = MethodChannel(
+    'inutil_music/canvas_video',
+  );
+  static const EventChannel _events = EventChannel(
+    'inutil_music/canvas_video/events',
+  );
 
   @visibleForTesting
   static bool? debugOverrideSupported;
@@ -27,14 +31,19 @@ class InutilCanvasEngine {
   /// cuando sustituyen `VideoPlayerPlatform.instance` por un doble de test.
   static bool get isSupported {
     if (debugOverrideSupported != null) return debugOverrideSupported!;
-    return !kIsWeb && defaultTargetPlatform == TargetPlatform.android && Platform.isAndroid;
+    return !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android &&
+        Platform.isAndroid;
   }
 
-  static bool shouldUseNativeAndroidEngine(Object? videoPlayerPlatformInstance) {
+  static bool shouldUseNativeAndroidEngine(
+    Object? videoPlayerPlatformInstance,
+  ) {
     if (debugOverrideSupported != null) return debugOverrideSupported!;
     if (!isSupported) return false;
     final typeName = videoPlayerPlatformInstance?.runtimeType.toString() ?? '';
-    return typeName == 'AndroidVideoPlayer' || typeName == 'MethodChannelVideoPlayer';
+    return typeName == 'AndroidVideoPlayer' ||
+        typeName == 'MethodChannelVideoPlayer';
   }
 
   static Stream<Map<dynamic, dynamic>>? _broadcastEvents;
@@ -66,10 +75,7 @@ class InutilCanvasEngine {
     }
     final playerId = (result['playerId'] as num).toInt();
     final textureId = (result['textureId'] as num).toInt();
-    return InutilCanvasController._(
-      playerId: playerId,
-      textureId: textureId,
-    );
+    return InutilCanvasController._(playerId: playerId, textureId: textureId);
   }
 
   static Future<void> setPlaying(int playerId, bool playing) async {
@@ -89,10 +95,7 @@ class InutilCanvasEngine {
 }
 
 class InutilCanvasController {
-  InutilCanvasController._({
-    required this.playerId,
-    required this.textureId,
-  }) {
+  InutilCanvasController._({required this.playerId, required this.textureId}) {
     _subscription = InutilCanvasEngine.events.listen(_handleEvent);
   }
 
@@ -162,10 +165,7 @@ class InutilCanvasController {
 }
 
 class InutilCanvasTextureView extends StatelessWidget {
-  const InutilCanvasTextureView({
-    required this.controller,
-    super.key,
-  });
+  const InutilCanvasTextureView({required this.controller, super.key});
 
   final InutilCanvasController controller;
 

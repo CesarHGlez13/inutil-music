@@ -1166,12 +1166,13 @@ class _HomePageState extends ConsumerState<HomePage>
       if (!mounted || !_appForeground || !_rootRouteVisible) return;
       // 1. En temporada de fin de año (1 dic – 15 ene o campaña remota),
       //    prioriza la experiencia animada «Inútil Wrapped».
-      final wrappedYear =
-          await InutilWrappedService.instance.evaluateAutoWrappedYear();
+      final wrappedYear = await InutilWrappedService.instance
+          .evaluateAutoWrappedYear();
       if (!mounted || !_appForeground || !_rootRouteVisible) return;
       if (wrappedYear != null) {
         final history = ref.read(historyProvider).value ?? const <LocalTrack>[];
-        final playlists = ref.read(playlistsControllerProvider).value ?? const [];
+        final playlists =
+            ref.read(playlistsControllerProvider).value ?? const [];
         final summary = await InutilWrappedService.instance.buildSummary(
           year: wrappedYear,
           fallbackHistory: history,
@@ -1189,9 +1190,12 @@ class _HomePageState extends ConsumerState<HomePage>
         }
       }
       // 2. El resto del año, evalúa los pop-ups creativos del creador / anuncios.
-      final campaign =
-          await InutilPromoPopupService.instance.evaluateScheduledPopup();
-      if (!mounted || !_appForeground || !_rootRouteVisible || campaign == null) {
+      final campaign = await InutilPromoPopupService.instance
+          .evaluateScheduledPopup();
+      if (!mounted ||
+          !_appForeground ||
+          !_rootRouteVisible ||
+          campaign == null) {
         return;
       }
       await InutilSupportPopupDialog.show(context, campaign);
@@ -3785,14 +3789,16 @@ class _HomeViewState extends ConsumerState<_HomeView> {
       _HomeFeedFilter.all => sections,
       _HomeFeedFilter.recent =>
         sections.where((s) => s.isContinueListening).toList(growable: false),
-      _HomeFeedFilter.collections => sections
-          .where(
-            (s) => s.items.any((i) => i is HomeRecommendationCollectionItem),
-          )
-          .toList(growable: false),
-      _HomeFeedFilter.artists => sections
-          .where((s) => s.items.any((i) => i is HomeRecommendationArtistItem))
-          .toList(growable: false),
+      _HomeFeedFilter.collections =>
+        sections
+            .where(
+              (s) => s.items.any((i) => i is HomeRecommendationCollectionItem),
+            )
+            .toList(growable: false),
+      _HomeFeedFilter.artists =>
+        sections
+            .where((s) => s.items.any((i) => i is HomeRecommendationArtistItem))
+            .toList(growable: false),
     };
   }
 
@@ -3852,8 +3858,7 @@ class _HomeViewState extends ConsumerState<_HomeView> {
     final localTrackIndex = ref.watch(localTrackIndexProvider);
 
     return RefreshIndicator(
-      onRefresh: () =>
-          ref.read(homeRecommendationsProvider.notifier).refresh(),
+      onRefresh: () => ref.read(homeRecommendationsProvider.notifier).refresh(),
       child: ScrolledUnderTabFrame(
         surfaceKey: const ValueKey('home-tab-header-surface'),
         header: Row(
@@ -4791,7 +4796,10 @@ class _RecommendedCollectionCard extends StatelessWidget {
                             ),
                             child: const Padding(
                               padding: EdgeInsets.all(7),
-                              child: Icon(Icons.chevron_right_rounded, size: 20),
+                              child: Icon(
+                                Icons.chevron_right_rounded,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ),

@@ -72,9 +72,7 @@ void main() {
   test(
     'delivers pending audio after the Android Activity is recreated',
     () async {
-      const methodChannel = MethodChannel(
-        'test/inutil_android_external_audio',
-      );
+      const methodChannel = MethodChannel('test/inutil_android_external_audio');
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(methodChannel, (call) async {

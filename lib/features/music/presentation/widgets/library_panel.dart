@@ -1272,7 +1272,9 @@ class _LibraryRootView extends StatelessWidget {
                           0xFF1DB954,
                         ).withValues(alpha: 0.14),
                         side: BorderSide(
-                          color: const Color(0xFF1DB954).withValues(alpha: 0.55),
+                          color: const Color(
+                            0xFF1DB954,
+                          ).withValues(alpha: 0.55),
                         ),
                         padding: const EdgeInsets.symmetric(
                           horizontal: 11,

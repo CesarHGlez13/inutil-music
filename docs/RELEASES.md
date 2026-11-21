@@ -1,7 +1,16 @@
 # Publicar una versión de Inútil Music (OTA)
 
-1. Sube la versión en `pubspec.yaml` (`version: 2.0.1+201`) y en
-   `lib/core/constants/app_constants.dart` (`appVersion = '2.0.1'`).
+1. Sube la versión en los **cinco** sitios que `test/core/constants/
+   app_metadata_test.dart` compara entre sí (si uno se queda atrás, la prueba se
+   cae): `pubspec.yaml` (`version: 2.0.1+201`),
+   `lib/core/constants/app_constants.dart` (`appVersion = '2.0.1'`),
+   `README.md` (`Current version: **2.0.1+201**`),
+   `packaging/windows/InutilMusic.iss` (`#define MyAppVersion "2.0.1"`, de ahí
+   sale el nombre `InutilMusic-2.0.1-Windows-x64-Setup.exe` que genera CI) y la
+   aserción `expect(pubspecVersion, '2.0.1+201')` de esa misma prueba.
+   OJO: `README.md` y `CHANGELOG.md` no son decorativos —el regex de la prueba
+   toma el **primer** `## X.Y.Z+BUILD` del CHANGELOG, así que la sección nueva
+   tiene que ir arriba (más nueva primero)—.
 2. Escribe las novedades en `CHANGELOG.md` bajo un encabezado `## 2.0.1`.
 3. `flutter build apk --release --split-per-abi` (el flag es `--split-per-abi`, no `--split-abi`).
    Con este flag Flutter suma un desplazamiento de ABI al `versionCode`.
@@ -60,3 +69,33 @@
     lanza un script desacoplado que espera a que muera el proceso, reemplanta
     `data/` y `lib/` en `~/.local/share/inutil-music` y relanza la app
     (`bash tool/test_update_swap.sh` → `RESULTADO: PRUEBA SUPERADA`).
+
+14. Kill switch (OTA forzosa): `tool/publish_release.sh` lee `MIN_SUPPORTED` y
+    `MANDATORY` del entorno, y **por defecto `minSupportedVersion` es la versión
+    que se publica** (`tool/publish_release.sh:29` y `:195-196`:
+    `min_supported = … or version`, `mandatory = … not in ("0","false","no")`).
+    Publicar `2.5.14` sin variables deja el manifiesto
+    `latest=2.5.14 min=2.5.14 mandatory=true` y obliga a actualizar a quien esté
+    por debajo. Medido el 2026-11-20 con `latest=2.5.13 min=2.5.13`: la lectura
+    anónima de `app_config/release` responde `mandatory=True` en 0.27 s y **10**
+    de las 12 identidades registradas en `users/{uid}/devices` quedan por debajo
+    del mínimo. OJO con el orden: sube **primero** el binario y **después** el
+    manifiesto, porque con el mínimo ya subido y sin descarga posible la pantalla
+    obligatoria deja atascada a la gente (el `HEAD` del APK publicado debe
+    responder `200` con `content-type=application/vnd.android.package-archive`).
+15. Los servidores tienen que ir **horneados en el binario**:
+    `.github/workflows/desktop-builds.yml` pasó a definir
+    `FB_RELAY_HOST: "192.168.100.27"` y
+    `FB_CLOUD_RELAY_HOST: "inutil-cloud-relay.scada-xiaomi-server.workers.dev"`
+    en su bloque `env:` y los pasa como `--dart-define` a los **seis**
+    `flutter build` (android, ios ×2, windows, linux, macos). Cada job lo
+    comprueba sobre su propio artefacto con la misma medición que se hizo a
+    mano: `unzip -p <apk> lib/<abi>/libapp.so | grep -a -q <host>` para Android,
+    `grep -a -q <host> build/linux/x64/release/bundle/lib/libapp.so` para Linux
+    (ruta verificada con `find build -name libapp.so`) y `grep -R -a -q` sobre
+    el bundle para Windows/macOS. Medido sobre los binarios locales: **0**
+    ocurrencias en el build sin defines y **1** de cada host en el build con
+    ellos, así el control sí discrimina. Sin esos defines el binario habla solo
+    con Google y ni el relay de la LAN ni el Worker cloud funcionan — así
+    salieron los `v2.5.12` y `v2.5.13` publicados, que eran byte-idénticos a un
+    build sin endpoints (`sha256 42a81121…`).

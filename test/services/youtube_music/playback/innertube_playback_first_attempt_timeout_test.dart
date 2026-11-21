@@ -128,10 +128,7 @@ final class _HangingFirstTransport implements InnerTubeTransport {
     } else {
       await operation.timeout(timeout);
     }
-    return InnerTubeHttpResponse(
-      statusCode: 200,
-      body: jsonEncode(response),
-    );
+    return InnerTubeHttpResponse(statusCode: 200, body: jsonEncode(response));
   }
 
   @override

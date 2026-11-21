@@ -56,6 +56,25 @@ class _MobileAudioOutputSheetState
     extends ConsumerState<_MobileAudioOutputSheet> {
   AudioOutputState _state = const AudioOutputState();
   StreamSubscription<AudioOutputState>? _sub;
+
+  /// Servicio capturado antes del primer `await` de `_init()`.
+  ///
+  /// No se puede leer `ref` dentro de `dispose()`: `Element.unmount()` pone
+  /// `_widget = null` (`flutter/lib/src/widgets/framework.dart:4881`) y
+  /// `mounted` es `_widget != null` (`framework.dart:3675`), y eso ocurre
+  /// **antes** de llamar `state.dispose()` (`framework.dart:6048`). Por eso
+  /// `context.mounted` ya es `false` en todo `dispose()` y Riverpod 3.4.3
+  /// (`flutter_riverpod-3.4.3/lib/src/core/consumer.dart:465`) responde
+  /// `Bad state: Using "ref" when a widget is about to or has been unmounted
+  /// is unsafe`. Medido al cerrar la hoja móvil del selector de salida de
+  /// audio: la prueba
+  /// `test/features/music/presentation/widgets/desktop_audio_output_menu_test.dart`
+  /// («mobile picker still uses the native output selector») fallaba con ese
+  /// `StateError`, y en producción significa lo mismo — `stopWatching()` nunca
+  /// se ejecutaba y la suscripción quedaba viva. Se guarda el servicio en un
+  /// campo asignado en la primera línea síncrona de `_init()` (aún en
+  /// `initState`, donde `ref` sí es válido) y `dispose()` usa ese campo.
+  late final AudioOutputService _service;
   bool _loading = true;
   bool _busy = false;
   double? _dragVolume;
@@ -67,7 +86,7 @@ class _MobileAudioOutputSheetState
   }
 
   Future<void> _init() async {
-    final service = ref.read(audioOutputServiceProvider);
+    final service = _service = ref.read(audioOutputServiceProvider);
     _sub = service.changes.listen((next) {
       if (mounted) setState(() => _state = next);
     });
@@ -83,7 +102,7 @@ class _MobileAudioOutputSheetState
   @override
   void dispose() {
     unawaited(_sub?.cancel());
-    unawaited(ref.read(audioOutputServiceProvider).stopWatching());
+    unawaited(_service.stopWatching());
     super.dispose();
   }
 
@@ -208,7 +227,9 @@ class _MobileAudioOutputSheetState
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              route.name.isEmpty ? 'Este dispositivo' : route.name,
+                              route.name.isEmpty
+                                  ? 'Este dispositivo'
+                                  : route.name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.bodyLarge?.copyWith(

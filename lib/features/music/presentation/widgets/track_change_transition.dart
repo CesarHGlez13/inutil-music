@@ -73,10 +73,7 @@ Widget smoothMetadataTrackChangeTransitionBuilder(
   Widget child,
   Animation<double> animation,
 ) {
-  return _SequencedMetadataTransition(
-    animation: animation,
-    child: child,
-  );
+  return _SequencedMetadataTransition(animation: animation, child: child);
 }
 
 class _SequencedMetadataTransition extends AnimatedWidget {

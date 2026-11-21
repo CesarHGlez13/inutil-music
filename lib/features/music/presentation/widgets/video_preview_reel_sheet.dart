@@ -164,7 +164,9 @@ class _VideoPreviewReelSheetState extends State<VideoPreviewReelSheet> {
                               for (var i = 0; i < widget.clips.length; i++)
                                 AnimatedContainer(
                                   duration: const Duration(milliseconds: 220),
-                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  margin: const EdgeInsets.symmetric(
+                                    horizontal: 3,
+                                  ),
                                   height: 4,
                                   width: i == _currentIndex ? 24 : 7,
                                   decoration: BoxDecoration(
@@ -221,11 +223,15 @@ class _VideoPreviewReelSheetState extends State<VideoPreviewReelSheet> {
                       child: SizedBox.square(
                         dimension: 40,
                         child: ProportionalArtwork(
-                          source: widget.artistAvatarUrl ?? activeClip.artworkUrl,
+                          source:
+                              widget.artistAvatarUrl ?? activeClip.artworkUrl,
                           cacheWidth: 160,
                           fallback: const ColoredBox(
                             color: Color(0xFF202530),
-                            child: Icon(Icons.person_rounded, color: Colors.white70),
+                            child: Icon(
+                              Icons.person_rounded,
+                              color: Colors.white70,
+                            ),
                           ),
                         ),
                       ),

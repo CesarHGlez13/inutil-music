@@ -1116,31 +1116,37 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
     }
 
     final progress = ValueNotifier<double?>(null);
-    unawaited(showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => ValueListenableBuilder<double?>(
-        valueListenable: progress,
-        builder: (context, value, _) => AlertDialog(
-          title: Text(strings.downloading),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              LinearProgressIndicator(value: value),
-              const SizedBox(height: 12),
-              Text(value == null ? '…' : '${(value * 100).clamp(0, 100).round()} %'),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => ValueListenableBuilder<double?>(
+          valueListenable: progress,
+          builder: (context, value, _) => AlertDialog(
+            title: Text(strings.downloading),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                LinearProgressIndicator(value: value),
+                const SizedBox(height: 12),
+                Text(
+                  value == null
+                      ? '…'
+                      : '${(value * 100).clamp(0, 100).round()} %',
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).maybePop(),
+                child: const Text('OK'),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).maybePop(),
-              child: const Text('OK'),
-            ),
-          ],
         ),
       ),
-    ));
+    );
 
     String? failure;
     try {
@@ -1690,7 +1696,8 @@ class _SettingsEntryCard extends StatelessWidget {
                   child: IconTheme.merge(
                     data: IconThemeData(color: highlight, size: 22),
                     child: Center(
-                      child: leading ??
+                      child:
+                          leading ??
                           (glyph != null
                               ? InutilIcon(
                                   glyph!,
@@ -1832,8 +1839,8 @@ class _AboutApplicationSettings extends StatelessWidget {
           title: 'Mensaje del creador',
           subtitle: 'Ver tarjeta de apoyo voluntario (rota en cada apertura)',
           onTap: () async {
-            final campaign =
-                await InutilPromoPopupService.instance.nextRotatingCampaign();
+            final campaign = await InutilPromoPopupService.instance
+                .nextRotatingCampaign();
             if (context.mounted) {
               await InutilSupportPopupDialog.show(context, campaign);
             }
@@ -5648,9 +5655,7 @@ class _InutilAccountSettingsCard extends ConsumerWidget {
     final displayName = user.displayName.trim().isNotEmpty
         ? user.displayName.trim()
         : user.email.split('@').first;
-    final initial = displayName.isNotEmpty
-        ? displayName[0].toUpperCase()
-        : 'U';
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : 'U';
 
     return Card(
       margin: EdgeInsets.zero,

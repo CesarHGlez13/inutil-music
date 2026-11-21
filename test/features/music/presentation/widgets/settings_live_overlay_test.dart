@@ -128,7 +128,21 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('settings-card-appearance')));
+      final appearanceCard = find.byKey(
+        const ValueKey('settings-card-appearance'),
+      );
+      // En un lienzo de 800x600 la tarjeta de Apariencia queda debajo de la
+      // primera pantalla de la raiz de Ajustes (que sumo la tarjeta de cuenta
+      // y el hero de Spotify en los commits 9c38523 y 2f715bb), asi que se
+      // revela con el scroll del propio archivo antes de pulsarla; lo que se
+      // comprueba sigue siendo que Movil no pinta el selector de estilos LIVE.
+      await tester.scrollUntilVisible(
+        appearanceCard,
+        240,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(appearanceCard);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('live-widget-style-selector')),

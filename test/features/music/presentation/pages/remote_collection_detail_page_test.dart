@@ -1006,8 +1006,12 @@ void main() {
 
     expect(
       find.text(
+        // El separador del subtitulo de la tarjeta de cancion paso de
+        // "  -  " a " · " en el commit 9c38523 (iconos vectoriales propios y
+        // tipografia de fila compacta); la intención sigue siendo que artista
+        // y duración vivan en UN solo subtitulo compacto, no en dos lineas.
         'Primer artista, Segundo artista, Tercer artista y Cuarto artista'
-        '  -  1:02:03',
+        ' · 1:02:03',
       ),
       findsOneWidget,
     );

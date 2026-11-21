@@ -50,10 +50,14 @@ void main() {
 
     test('parseQrUri rechaza QR ajenos o incompletos', () {
       expect(MusicQrPairingService.parseQrUri('https://example.com'), isNull);
-      expect(MusicQrPairingService.parseQrUri('inutilmusic://pair?c=ABCD2345'),
-          isNull);
-      expect(MusicQrPairingService.parseQrUri('inutilmusic://pair?c=X&k=AAAA'),
-          isNull);
+      expect(
+        MusicQrPairingService.parseQrUri('inutilmusic://pair?c=ABCD2345'),
+        isNull,
+      );
+      expect(
+        MusicQrPairingService.parseQrUri('inutilmusic://pair?c=X&k=AAAA'),
+        isNull,
+      );
       expect(MusicQrPairingService.parseQrUri('basura total'), isNull);
     });
   });
@@ -74,8 +78,10 @@ void main() {
 
     test('dos cifrados del mismo payload difieren (IV aleatorio)', () {
       final key = MusicQrPairingService.generateSecretKey();
-      expect(MusicQrPairingService.encryptPayload(payload, key),
-          isNot(MusicQrPairingService.encryptPayload(payload, key)));
+      expect(
+        MusicQrPairingService.encryptPayload(payload, key),
+        isNot(MusicQrPairingService.encryptPayload(payload, key)),
+      );
     });
 
     test('clave equivocada o MAC alterado devuelven null', () {
@@ -83,7 +89,9 @@ void main() {
       final enc = MusicQrPairingService.encryptPayload(payload, key);
       expect(
         MusicQrPairingService.decryptPayload(
-            enc, MusicQrPairingService.generateSecretKey()),
+          enc,
+          MusicQrPairingService.generateSecretKey(),
+        ),
         isNull,
       );
       final chars = enc.split('');
@@ -94,11 +102,15 @@ void main() {
     });
 
     test('la clave del código manual descifra lo cifrado con ella', () {
-      final Uint8List key = MusicQrPairingService.deriveManualCodeKey('ABCD2345');
+      final Uint8List key = MusicQrPairingService.deriveManualCodeKey(
+        'ABCD2345',
+      );
       final enc = MusicQrPairingService.encryptPayload(payload, key);
       expect(
         MusicQrPairingService.decryptPayload(
-            enc, MusicQrPairingService.deriveManualCodeKey('abcd-2345')),
+          enc,
+          MusicQrPairingService.deriveManualCodeKey('abcd-2345'),
+        ),
         payload,
       );
     });

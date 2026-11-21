@@ -74,10 +74,7 @@ class InutilDesignSystem {
     return BoxDecoration(
       color: (baseColor ?? surfaceDark).withValues(alpha: 0.72),
       borderRadius: BorderRadius.circular(radius),
-      border: Border.all(
-        color: borderColor ?? borderSubtle,
-        width: 1.0,
-      ),
+      border: Border.all(color: borderColor ?? borderSubtle, width: 1.0),
       boxShadow: const [
         BoxShadow(
           color: Color(0x33000000),

@@ -243,7 +243,9 @@ class MiniPlayer extends ConsumerWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  compactErrorText ?? presentation.artist ?? AppConstants.appName,
+                  compactErrorText ??
+                      presentation.artist ??
+                      AppConstants.appName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

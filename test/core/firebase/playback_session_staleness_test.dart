@@ -51,30 +51,42 @@ void main() {
     });
   });
 
-  group('sessionIsGhost: un "reproduciendo" que ya no se refresca es falso', () {
-    test('playing + snapshot viejo (el altavoz dejó de escribir) → fantasma', () {
-      final s = speaker(stamp: now.subtract(const Duration(minutes: 28)));
-      expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isTrue);
-    });
-
-    test('playing + snapshot fresco (el altavoz escribe cada ~8 s) → válido', () {
-      final s = speaker(stamp: now.subtract(const Duration(seconds: 6)));
-      expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isFalse);
-    });
-
-    test('justo por debajo del umbral sigue siendo válido', () {
-      final s = speaker(stamp: now.subtract(const Duration(seconds: 19)));
-      expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isFalse);
-    });
-
-    test('pausa, aunque sea vieja, es información real: no es fantasma', () {
-      final s = speaker(
-        stamp: now.subtract(const Duration(minutes: 28)),
-        isPlaying: false,
+  group(
+    'sessionIsGhost: un "reproduciendo" que ya no se refresca es falso',
+    () {
+      test(
+        'playing + snapshot viejo (el altavoz dejó de escribir) → fantasma',
+        () {
+          final s = speaker(stamp: now.subtract(const Duration(minutes: 28)));
+          expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isTrue);
+        },
       );
-      expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isFalse);
-    });
-  });
+
+      test(
+        'playing + snapshot fresco (el altavoz escribe cada ~8 s) → válido',
+        () {
+          final s = speaker(stamp: now.subtract(const Duration(seconds: 6)));
+          expect(
+            InutilPlaybackSyncService.sessionIsGhost(s, now: now),
+            isFalse,
+          );
+        },
+      );
+
+      test('justo por debajo del umbral sigue siendo válido', () {
+        final s = speaker(stamp: now.subtract(const Duration(seconds: 19)));
+        expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isFalse);
+      });
+
+      test('pausa, aunque sea vieja, es información real: no es fantasma', () {
+        final s = speaker(
+          stamp: now.subtract(const Duration(minutes: 28)),
+          isPlaying: false,
+        );
+        expect(InutilPlaybackSyncService.sessionIsGhost(s, now: now), isFalse);
+      });
+    },
+  );
 
   group('visibleSession: lo que el mando debe mostrar', () {
     test('snapshot local "reproduciendo" congelado → NO sale como playing', () {
@@ -99,8 +111,7 @@ void main() {
           remote: null,
           local: local,
           now: now,
-        )
-            ?.trackId,
+        )?.trackId,
         equals(local.trackId),
       );
     });
@@ -117,8 +128,7 @@ void main() {
           remote: remote,
           local: ghost,
           now: now,
-        )
-            ?.trackId,
+        )?.trackId,
         equals(remote.trackId),
       );
     });
@@ -200,36 +210,48 @@ void main() {
     });
   });
 
-  group('shouldAdoptDocument: el mando debe re-adoptar el estado del altavoz', () {
-    test('documento con updatedAt IGUAL al guardado se vuelve a adoptar', () {
-      // Bug medido: con `isAfter` estricto, un documento que vuelve a igualar
-      // el stamp ya guardado nunca se re-adopta y el mando se queda colgado.
-      final stored = speaker(stamp: now);
-      final doc = speaker(stamp: now);
-      expect(
-        InutilPlaybackSyncService.shouldAdoptDocument(stored: stored, doc: doc),
-        isTrue,
-      );
-    });
+  group(
+    'shouldAdoptDocument: el mando debe re-adoptar el estado del altavoz',
+    () {
+      test('documento con updatedAt IGUAL al guardado se vuelve a adoptar', () {
+        // Bug medido: con `isAfter` estricto, un documento que vuelve a igualar
+        // el stamp ya guardado nunca se re-adopta y el mando se queda colgado.
+        final stored = speaker(stamp: now);
+        final doc = speaker(stamp: now);
+        expect(
+          InutilPlaybackSyncService.shouldAdoptDocument(
+            stored: stored,
+            doc: doc,
+          ),
+          isTrue,
+        );
+      });
 
-    test('documento más viejo que lo guardado NO se adopta (no pisar)', () {
-      final stored = speaker(stamp: now);
-      final old = speaker(stamp: now.subtract(const Duration(minutes: 28)));
-      expect(
-        InutilPlaybackSyncService.shouldAdoptDocument(stored: stored, doc: old),
-        isFalse,
-      );
-    });
+      test('documento más viejo que lo guardado NO se adopta (no pisar)', () {
+        final stored = speaker(stamp: now);
+        final old = speaker(stamp: now.subtract(const Duration(minutes: 28)));
+        expect(
+          InutilPlaybackSyncService.shouldAdoptDocument(
+            stored: stored,
+            doc: old,
+          ),
+          isFalse,
+        );
+      });
 
-    test('documento más nuevo siempre se adopta', () {
-      final stored = speaker(stamp: now.subtract(const Duration(seconds: 9)));
-      final fresh = speaker(stamp: now);
-      expect(
-        InutilPlaybackSyncService.shouldAdoptDocument(stored: stored, doc: fresh),
-        isTrue,
-      );
-    });
-  });
+      test('documento más nuevo siempre se adopta', () {
+        final stored = speaker(stamp: now.subtract(const Duration(seconds: 9)));
+        final fresh = speaker(stamp: now);
+        expect(
+          InutilPlaybackSyncService.shouldAdoptDocument(
+            stored: stored,
+            doc: fresh,
+          ),
+          isTrue,
+        );
+      });
+    },
+  );
 
   group('declaredSpeakerIsLive: el altavoz nombrado tiene que existir', () {
     test('sesión nula → manda lo local', () {

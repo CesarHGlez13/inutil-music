@@ -19,14 +19,16 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('muestra el QR y el código XXXX-XXXX de la sesión', (tester) async {
+  testWidgets('muestra el QR y el código XXXX-XXXX de la sesión', (
+    tester,
+  ) async {
     final key = Uint8List(32);
     MusicQrLoginPanel.debugSessionFactory = () async => MusicPairingSession(
-          code: 'ABCD2345',
-          secretKey: key,
-          qrUri: MusicQrPairingService.buildQrUri('ABCD2345', key),
-          expiresAt: DateTime.now().add(const Duration(minutes: 3)),
-        );
+      code: 'ABCD2345',
+      secretKey: key,
+      qrUri: MusicQrPairingService.buildQrUri('ABCD2345', key),
+      expiresAt: DateTime.now().add(const Duration(minutes: 3)),
+    );
     await pump(tester);
 
     expect(find.text('Entrar con tu celular'), findsOneWidget);

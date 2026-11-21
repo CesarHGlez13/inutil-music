@@ -24,9 +24,7 @@ class InutilStorageService {
     String contentType = 'image/jpeg',
   }) async {
     final encodedPath = Uri.encodeComponent(storagePath);
-    final url = Uri.parse(
-      '${FirebaseConfig.storageBaseUrl}?name=$encodedPath',
-    );
+    final url = Uri.parse('${FirebaseConfig.storageBaseUrl}?name=$encodedPath');
 
     final headers = {
       'Content-Type': contentType,

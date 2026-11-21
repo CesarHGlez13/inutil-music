@@ -89,7 +89,8 @@ class _InutilUpdateGateState extends ConsumerState<InutilUpdateGate>
       _lastCheck = DateTime.now();
     }
     if (!mounted || release == null) return;
-    final forced = release.belowMinSupported ||
+    final forced =
+        release.belowMinSupported ||
         (release.updateAvailable && release.effectiveMandatory);
     setState(() => _blocker = forced ? release : null);
     if (forced || !release.updateAvailable) return;
@@ -145,8 +146,10 @@ class _InutilUpdateGateState extends ConsumerState<InutilUpdateGate>
       // de la app: la versión inservible no ofrece otra pantalla.
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop && blocker.belowMinSupported) {
-          debugPrint('Bloqueado por kill switch: v${blocker.currentVersion} '
-              'requiere v${blocker.latestVersion}.');
+          debugPrint(
+            'Bloqueado por kill switch: v${blocker.currentVersion} '
+            'requiere v${blocker.latestVersion}.',
+          );
         }
       },
       child: InutilForceUpdateScreen(release: blocker, onRetry: _check),

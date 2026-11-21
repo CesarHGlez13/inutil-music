@@ -1206,9 +1206,7 @@ void main() {
   });
 
   test('SQLite sync store commits base and rejects stale revisions', () async {
-    final sandbox = await Directory.systemTemp.createTemp(
-      'inutil-store-sync-',
-    );
+    final sandbox = await Directory.systemTemp.createTemp('inutil-store-sync-');
     final service = _TestDatabase(p.join(sandbox.path, 'library.db'));
     addTearDown(() async {
       await service.close();

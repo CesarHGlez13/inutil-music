@@ -18,17 +18,16 @@ void main() {
     bool isHost = true,
     String appVersion = '2.5.8+258',
     DateTime? lastSeen,
-  }) =>
-      LanDevicePeer(
-        ip: ip,
-        port: 52445,
-        deviceId: deviceId,
-        deviceName: name,
-        platform: 'linux',
-        isHost: isHost,
-        appVersion: appVersion,
-        lastSeen: lastSeen ?? now,
-      );
+  }) => LanDevicePeer(
+    ip: ip,
+    port: 52445,
+    deviceId: deviceId,
+    deviceName: name,
+    platform: 'linux',
+    isHost: isHost,
+    appVersion: appVersion,
+    lastSeen: lastSeen ?? now,
+  );
 
   LanDevicePeer cloudPeer({
     required String deviceId,
@@ -36,84 +35,91 @@ void main() {
     bool isHost = true,
     String appVersion = '',
     DateTime? lastSeen,
-  }) =>
-      LanDevicePeer(
-        ip: '',
-        port: 52445,
-        deviceId: deviceId,
-        deviceName: name,
-        platform: 'linux',
-        isHost: isHost,
-        fromCloud: true,
-        appVersion: appVersion,
-        lastSeen: lastSeen ?? now,
-      );
+  }) => LanDevicePeer(
+    ip: '',
+    port: 52445,
+    deviceId: deviceId,
+    deviceName: name,
+    platform: 'linux',
+    isHost: isHost,
+    fromCloud: true,
+    appVersion: appVersion,
+    lastSeen: lastSeen ?? now,
+  );
 
   group('peerFromCloudDoc', () {
-    test('acepta un PC en línea y lo marca como destino alcanzable sólo por la nube', () {
-      final peer = InutilPlaybackSyncService.peerFromCloudDoc(
-        {
-          'deviceId': 'pc_linux_1',
-          'name': 'Torre de César',
-          'platform': 'linux',
-          'isHost': true,
-          'isOnline': true,
-          'lanPort': 52445,
-          'appVersion': '2.5.8+258',
-          'lastSeenMs': now.millisecondsSinceEpoch,
-        },
-        myDeviceId: 'phone_honor_1',
-        now: now,
-      );
+    test(
+      'acepta un PC en línea y lo marca como destino alcanzable sólo por la nube',
+      () {
+        final peer = InutilPlaybackSyncService.peerFromCloudDoc(
+          {
+            'deviceId': 'pc_linux_1',
+            'name': 'Torre de César',
+            'platform': 'linux',
+            'isHost': true,
+            'isOnline': true,
+            'lanPort': 52445,
+            'appVersion': '2.5.8+258',
+            'lastSeenMs': now.millisecondsSinceEpoch,
+          },
+          myDeviceId: 'phone_honor_1',
+          now: now,
+        );
 
-      expect(peer, isNotNull);
-      expect(peer!.deviceId, 'pc_linux_1');
-      expect(peer.deviceName, 'Torre de César');
-      expect(peer.isHost, isTrue);
-      expect(peer.fromCloud, isTrue);
-      // La IP local nunca se fía: sin anuncio UDP no hay forma de alcanzarla.
-      expect(peer.isCloudOnly, isTrue);
-      expect(peer.isOnlineNow, isTrue);
-    });
+        expect(peer, isNotNull);
+        expect(peer!.deviceId, 'pc_linux_1');
+        expect(peer.deviceName, 'Torre de César');
+        expect(peer.isHost, isTrue);
+        expect(peer.fromCloud, isTrue);
+        // La IP local nunca se fía: sin anuncio UDP no hay forma de alcanzarla.
+        expect(peer.isCloudOnly, isTrue);
+        expect(peer.isOnlineNow, isTrue);
+      },
+    );
 
-    test('ignora este mismo equipo, los apagados y los heartbeat caducados', () {
-      LanDevicePeer? parse(Map<String, dynamic> doc) =>
-          InutilPlaybackSyncService.peerFromCloudDoc(
-            doc,
-            myDeviceId: 'phone_honor_1',
-            now: now,
-          );
+    test(
+      'ignora este mismo equipo, los apagados y los heartbeat caducados',
+      () {
+        LanDevicePeer? parse(Map<String, dynamic> doc) =>
+            InutilPlaybackSyncService.peerFromCloudDoc(
+              doc,
+              myDeviceId: 'phone_honor_1',
+              now: now,
+            );
 
-      expect(
-        parse({
-          'deviceId': 'phone_honor_1',
-          'isOnline': true,
-          'lastSeenMs': now.millisecondsSinceEpoch,
-        }),
-        isNull,
-      );
-      expect(
-        parse({
-          'deviceId': 'pc_linux_1',
-          'isOnline': false,
-          'lastSeenMs': now.millisecondsSinceEpoch,
-        }),
-        isNull,
-      );
-      expect(
-        parse({
-          'deviceId': 'pc_linux_1',
-          'isOnline': true,
-          'lastSeenMs': now
-              .subtract(InutilPlaybackSyncService.cloudPeerTtl +
-                  const Duration(seconds: 1))
-              .millisecondsSinceEpoch,
-        }),
-        isNull,
-      );
-      // Sin marca de tiempo no hay forma de saber si sigue vivo.
-      expect(parse({'deviceId': 'pc_linux_1', 'isOnline': true}), isNull);
-    });
+        expect(
+          parse({
+            'deviceId': 'phone_honor_1',
+            'isOnline': true,
+            'lastSeenMs': now.millisecondsSinceEpoch,
+          }),
+          isNull,
+        );
+        expect(
+          parse({
+            'deviceId': 'pc_linux_1',
+            'isOnline': false,
+            'lastSeenMs': now.millisecondsSinceEpoch,
+          }),
+          isNull,
+        );
+        expect(
+          parse({
+            'deviceId': 'pc_linux_1',
+            'isOnline': true,
+            'lastSeenMs': now
+                .subtract(
+                  InutilPlaybackSyncService.cloudPeerTtl +
+                      const Duration(seconds: 1),
+                )
+                .millisecondsSinceEpoch,
+          }),
+          isNull,
+        );
+        // Sin marca de tiempo no hay forma de saber si sigue vivo.
+        expect(parse({'deviceId': 'pc_linux_1', 'isOnline': true}), isNull);
+      },
+    );
 
     test('un heartbeat de 60 s sigue siendo válido (TTL de la nube)', () {
       final peer = InutilPlaybackSyncService.peerFromCloudDoc(
@@ -134,42 +140,50 @@ void main() {
   });
 
   group('mergeConnectTargets', () {
-    test('no duplica: la entrada LAN aporta la IP y la nube rellena lo que falta', () {
-      final merged = InutilPlaybackSyncService.mergeConnectTargets(
-        lanPeers: [
-          lanPeer(deviceId: 'pc_linux_1', name: '', appVersion: ''),
-        ],
-        cloudPeers: [
-          cloudPeer(
-            deviceId: 'pc_linux_1',
-            name: 'Torre de César',
-            appVersion: '2.5.8+258',
-          ),
-        ],
-      );
+    test(
+      'no duplica: la entrada LAN aporta la IP y la nube rellena lo que falta',
+      () {
+        final merged = InutilPlaybackSyncService.mergeConnectTargets(
+          lanPeers: [lanPeer(deviceId: 'pc_linux_1', name: '', appVersion: '')],
+          cloudPeers: [
+            cloudPeer(
+              deviceId: 'pc_linux_1',
+              name: 'Torre de César',
+              appVersion: '2.5.8+258',
+            ),
+          ],
+        );
 
-      expect(merged, hasLength(1));
-      final peer = merged.single;
-      expect(peer.ip, '192.168.100.24');
-      expect(peer.isCloudOnly, isFalse);
-      expect(peer.deviceName, 'Torre de César');
-      expect(peer.appVersion, '2.5.8+258');
-      expect(peer.isHost, isTrue);
-    });
+        expect(merged, hasLength(1));
+        final peer = merged.single;
+        expect(peer.ip, '192.168.100.24');
+        expect(peer.isCloudOnly, isFalse);
+        expect(peer.deviceName, 'Torre de César');
+        expect(peer.appVersion, '2.5.8+258');
+        expect(peer.isHost, isTrue);
+      },
+    );
 
-    test('los equipos que suenan van primero y cada dispositivo aparece una vez', () {
-      final merged = InutilPlaybackSyncService.mergeConnectTargets(
-        lanPeers: [
-          lanPeer(deviceId: 'zz_phone', name: 'Zeta', isHost: false),
-        ],
-        cloudPeers: [
-          cloudPeer(deviceId: 'aa_pc', name: 'Alpha'),
-          cloudPeer(deviceId: 'bb_tablet', name: 'Beta', isHost: false),
-        ],
-      );
+    test(
+      'los equipos que suenan van primero y cada dispositivo aparece una vez',
+      () {
+        final merged = InutilPlaybackSyncService.mergeConnectTargets(
+          lanPeers: [
+            lanPeer(deviceId: 'zz_phone', name: 'Zeta', isHost: false),
+          ],
+          cloudPeers: [
+            cloudPeer(deviceId: 'aa_pc', name: 'Alpha'),
+            cloudPeer(deviceId: 'bb_tablet', name: 'Beta', isHost: false),
+          ],
+        );
 
-      expect(merged.map((p) => p.deviceId), ['aa_pc', 'bb_tablet', 'zz_phone']);
-    });
+        expect(merged.map((p) => p.deviceId), [
+          'aa_pc',
+          'bb_tablet',
+          'zz_phone',
+        ]);
+      },
+    );
   });
 
   group('pickAutoPairCandidate', () {
@@ -248,12 +262,12 @@ void main() {
 
     test('descarta comandos de otro equipo, ya entregados o caducados', () {
       Map<String, dynamic> base({String target = 'pc_linux_1'}) => {
-            'commandId': 'cmd-1',
-            'target': target,
-            'type': 'pause',
-            'createdAtMs': now.millisecondsSinceEpoch,
-            'deliveredAtMs': 0,
-          };
+        'commandId': 'cmd-1',
+        'target': target,
+        'type': 'pause',
+        'createdAtMs': now.millisecondsSinceEpoch,
+        'deliveredAtMs': 0,
+      };
 
       CloudCommand? parse(Map<String, dynamic> doc, {DateTime? at}) =>
           InutilPlaybackSyncService.cloudCommandFromDoc(
@@ -270,8 +284,9 @@ void main() {
       expect(
         parse(
           base(),
-          at: now.add(InutilPlaybackSyncService.commandTtl +
-              const Duration(seconds: 1)),
+          at: now.add(
+            InutilPlaybackSyncService.commandTtl + const Duration(seconds: 1),
+          ),
         ),
         isNull,
       );
@@ -303,20 +318,26 @@ void main() {
       expect(InutilPlaybackSyncService.decodeCloudParam('pause'), 'pause');
       expect(InutilPlaybackSyncService.decodeCloudParam('{"a":1}'), {'a': 1});
       // `{'a': 1}.toString()` de Dart viejo: no es JSON, se devuelve tal cual.
-      expect(InutilPlaybackSyncService.decodeCloudParam("{a: '1'}"), "{a: '1'}");
+      expect(
+        InutilPlaybackSyncService.decodeCloudParam("{a: '1'}"),
+        "{a: '1'}",
+      );
     });
 
-    test('normalizeRemoteParam reconstruye el mapa venga en el formato que venga', () {
-      expect(
-        InutilPlaybackSyncService.normalizeRemoteParam('{"trackId":"t9"}'),
-        {'trackId': 't9'},
-      );
-      expect(
-        InutilPlaybackSyncService.normalizeRemoteParam({'trackId': 't9'}),
-        {'trackId': 't9'},
-      );
-      expect(InutilPlaybackSyncService.normalizeRemoteParam(null), isNull);
-    });
+    test(
+      'normalizeRemoteParam reconstruye el mapa venga en el formato que venga',
+      () {
+        expect(
+          InutilPlaybackSyncService.normalizeRemoteParam('{"trackId":"t9"}'),
+          {'trackId': 't9'},
+        );
+        expect(
+          InutilPlaybackSyncService.normalizeRemoteParam({'trackId': 't9'}),
+          {'trackId': 't9'},
+        );
+        expect(InutilPlaybackSyncService.normalizeRemoteParam(null), isNull);
+      },
+    );
 
     test('el puente heredado sólo hace falta con apps anteriores a 2.5.8', () {
       expect(InutilPlaybackSyncService.needsLegacyCommandBridge(null), isTrue);
@@ -329,13 +350,22 @@ void main() {
         InutilPlaybackSyncService.needsLegacyCommandBridge('2.5.8+258'),
         isFalse,
       );
-      expect(InutilPlaybackSyncService.needsLegacyCommandBridge('2.6.0'), isFalse);
-      expect(InutilPlaybackSyncService.needsLegacyCommandBridge('2.6'), isFalse);
+      expect(
+        InutilPlaybackSyncService.needsLegacyCommandBridge('2.6.0'),
+        isFalse,
+      );
+      expect(
+        InutilPlaybackSyncService.needsLegacyCommandBridge('2.6'),
+        isFalse,
+      );
     });
 
     test('parseVersionNumber / compareVersionNumbers rellenan con ceros', () {
-      expect(InutilPlaybackSyncService.parseVersionNumber('2.5.8+258'),
-          [2, 5, 8]);
+      expect(InutilPlaybackSyncService.parseVersionNumber('2.5.8+258'), [
+        2,
+        5,
+        8,
+      ]);
       expect(InutilPlaybackSyncService.parseVersionNumber('beta'), isNull);
       expect(
         InutilPlaybackSyncService.compareVersionNumbers([2, 5], [2, 5, 1]),
@@ -360,90 +390,104 @@ void main() {
       );
 
       // 20 s sin anuncios UDP: ya no está en la red local...
-      expect(
-        InutilPlaybackSyncService.isPeerOnline(lanOld),
-        isFalse,
-      );
+      expect(InutilPlaybackSyncService.isPeerOnline(lanOld), isFalse);
       // ...pero 20 s de heartbeat en la nube siguen siendo frescos.
       expect(cloudOld.isOnlineNow, isTrue);
     });
   });
 
   group('lógica de enrutamiento Spotify Connect (shouldRoutePlaybackToPeer)', () {
-    test('cuando la PC ya es el altavoz activo, el cambio de canción se envía a la PC', () {
-      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
-        autoPlayOnPc: false, // aunque no esté activado autoPlayOnPc
-        isCurrentDeviceActive: false, // el móvil NO es el altavoz activo (la PC lo es)
-        remoteActiveDeviceId: 'pc_linux_1',
-        hasTargetPeer: true,
-        isDesktopHost: false, // es un móvil
-        isPlaybackRouteSuppressed: false,
-        forcePush: true,
-        isPlaying: true,
-      );
+    test(
+      'cuando la PC ya es el altavoz activo, el cambio de canción se envía a la PC',
+      () {
+        final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+          autoPlayOnPc: false, // aunque no esté activado autoPlayOnPc
+          isCurrentDeviceActive:
+              false, // el móvil NO es el altavoz activo (la PC lo es)
+          remoteActiveDeviceId: 'pc_linux_1',
+          hasTargetPeer: true,
+          isDesktopHost: false, // es un móvil
+          isPlaybackRouteSuppressed: false,
+          forcePush: true,
+          isPlaying: true,
+        );
 
-      expect(shouldRoute, isTrue);
-    });
+        expect(shouldRoute, isTrue);
+      },
+    );
 
-    test('con autoPlayOnPc activado, cualquier play se envía a la PC aunque el móvil fuera el activo', () {
-      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
-        autoPlayOnPc: true,
-        isCurrentDeviceActive: true, // el móvil era el activo
-        remoteActiveDeviceId: '',
-        hasTargetPeer: true,
-        isDesktopHost: false,
-        isPlaybackRouteSuppressed: false,
-        forcePush: true,
-        isPlaying: true,
-      );
+    test(
+      'con autoPlayOnPc activado, cualquier play se envía a la PC aunque el móvil fuera el activo',
+      () {
+        final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+          autoPlayOnPc: true,
+          isCurrentDeviceActive: true, // el móvil era el activo
+          remoteActiveDeviceId: '',
+          hasTargetPeer: true,
+          isDesktopHost: false,
+          isPlaybackRouteSuppressed: false,
+          forcePush: true,
+          isPlaying: true,
+        );
 
-      expect(shouldRoute, isTrue);
-    });
+        expect(shouldRoute, isTrue);
+      },
+    );
 
-    test('si el usuario transfirió explícitamente la reproducción al móvil, no se reenvía a la PC', () {
-      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
-        autoPlayOnPc: true,
-        isCurrentDeviceActive: true,
-        remoteActiveDeviceId: '',
-        hasTargetPeer: true,
-        isDesktopHost: false,
-        isPlaybackRouteSuppressed: true, // supresión activa (ej. botón "Transferir aquí")
-        forcePush: true,
-        isPlaying: true,
-      );
+    test(
+      'si el usuario transfirió explícitamente la reproducción al móvil, no se reenvía a la PC',
+      () {
+        final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+          autoPlayOnPc: true,
+          isCurrentDeviceActive: true,
+          remoteActiveDeviceId: '',
+          hasTargetPeer: true,
+          isDesktopHost: false,
+          isPlaybackRouteSuppressed:
+              true, // supresión activa (ej. botón "Transferir aquí")
+          forcePush: true,
+          isPlaying: true,
+        );
 
-      expect(shouldRoute, isFalse);
-    });
+        expect(shouldRoute, isFalse);
+      },
+    );
 
-    test('un snapshot remoto (isRemoteSnapshot) nunca se reenvía a la PC para evitar bucles', () {
-      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
-        autoPlayOnPc: true,
-        isCurrentDeviceActive: false,
-        remoteActiveDeviceId: 'pc_linux_1',
-        hasTargetPeer: true,
-        isDesktopHost: false,
-        isPlaybackRouteSuppressed: false,
-        forcePush: true,
-        isPlaying: true,
-        isRemoteSnapshot: true,
-      );
+    test(
+      'un snapshot remoto (isRemoteSnapshot) nunca se reenvía a la PC para evitar bucles',
+      () {
+        final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+          autoPlayOnPc: true,
+          isCurrentDeviceActive: false,
+          remoteActiveDeviceId: 'pc_linux_1',
+          hasTargetPeer: true,
+          isDesktopHost: false,
+          isPlaybackRouteSuppressed: false,
+          forcePush: true,
+          isPlaying: true,
+          isRemoteSnapshot: true,
+        );
 
-      expect(shouldRoute, isFalse);
-    });
+        expect(shouldRoute, isFalse);
+      },
+    );
 
-    test('en la PC (desktop host) nunca se reenvía a otro equipo (evita bucle)', () {
-      final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
-        autoPlayOnPc: true,
-        isCurrentDeviceActive: false,
-        remoteActiveDeviceId: 'phone_1',
-        hasTargetPeer: true,
-        isDesktopHost: true, // es una PC
-        isPlaybackRouteSuppressed: false,
-        forcePush: true,
-        isPlaying: true,
-      );
+    test(
+      'en la PC (desktop host) nunca se reenvía a otro equipo (evita bucle)',
+      () {
+        final shouldRoute = InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
+          autoPlayOnPc: true,
+          isCurrentDeviceActive: false,
+          remoteActiveDeviceId: 'phone_1',
+          hasTargetPeer: true,
+          isDesktopHost: true, // es una PC
+          isPlaybackRouteSuppressed: false,
+          forcePush: true,
+          isPlaying: true,
+        );
 
-      expect(shouldRoute, isFalse);
-    });
+        expect(shouldRoute, isFalse);
+      },
+    );
   });
 }

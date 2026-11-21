@@ -104,11 +104,12 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
           setState(() => _signingIn = true);
           final payload = result.payload!;
           unawaited(_service.cleanupPcSession(session));
-          final error = await InutilAuthService.instance.signInWithPairedRefreshToken(
-            payload['refreshToken'] as String? ?? '',
-            emailHint: payload['email'] as String? ?? '',
-            displayNameHint: payload['displayName'] as String? ?? '',
-          );
+          final error = await InutilAuthService.instance
+              .signInWithPairedRefreshToken(
+                payload['refreshToken'] as String? ?? '',
+                emailHint: payload['email'] as String? ?? '',
+                displayNameHint: payload['displayName'] as String? ?? '',
+              );
           if (!mounted) return;
           setState(() {
             _signingIn = false;
@@ -137,7 +138,11 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.qr_code_2_rounded, color: InutilDesignSystem.accentCyan, size: 22),
+              Icon(
+                Icons.qr_code_2_rounded,
+                color: InutilDesignSystem.accentCyan,
+                size: 22,
+              ),
               SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -156,7 +161,11 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
           const Text(
             'En la app del celular abre Mi cuenta → «Iniciar sesión en PC» y escanea este código.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: InutilDesignSystem.textSecondary, fontSize: 12, height: 1.35),
+            style: TextStyle(
+              color: InutilDesignSystem.textSecondary,
+              fontSize: 12,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 16),
           _buildQrArea(),
@@ -174,11 +183,18 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
       child = Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(color: InutilDesignSystem.primaryNeon),
+          const CircularProgressIndicator(
+            color: InutilDesignSystem.primaryNeon,
+          ),
           if (_signingIn) ...[
             const SizedBox(height: 12),
-            const Text('Iniciando sesión…',
-                style: TextStyle(color: Colors.black87, fontWeight: FontWeight.w700)),
+            const Text(
+              'Iniciando sesión…',
+              style: TextStyle(
+                color: Colors.black87,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ],
         ],
       );
@@ -186,18 +202,26 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
       child = Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(_expired ? Icons.timer_off_rounded : Icons.wifi_off_rounded,
-              color: Colors.black54, size: 40),
+          Icon(
+            _expired ? Icons.timer_off_rounded : Icons.wifi_off_rounded,
+            color: Colors.black54,
+            size: 40,
+          ),
           const SizedBox(height: 10),
           Text(
             _expired ? 'El código expiró' : 'Sin código',
-            style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              color: Colors.black87,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 10),
           FilledButton.icon(
             key: const ValueKey('pc-qr-refresh'),
             onPressed: _start,
-            style: FilledButton.styleFrom(backgroundColor: InutilDesignSystem.primaryNeon),
+            style: FilledButton.styleFrom(
+              backgroundColor: InutilDesignSystem.primaryNeon,
+            ),
             icon: const Icon(Icons.refresh_rounded, size: 18),
             label: const Text('Generar nuevo'),
           ),
@@ -233,7 +257,11 @@ class _MusicQrLoginPanelState extends State<MusicQrLoginPanel> {
           Text(
             _error!,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600),
+            style: const TextStyle(
+              color: Colors.redAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           TextButton(onPressed: _start, child: const Text('Reintentar')),
         ],

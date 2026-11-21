@@ -151,8 +151,7 @@ class RelayTierSelector {
       raw.trim().toLowerCase() == 'http' ? 'http' : 'https';
 
   /// Puerto LAN: fallback conservador a 8080 si el horneado no parsea.
-  static String _port(String raw) =>
-      raw.trim().isEmpty ? '8080' : raw.trim();
+  static String _port(String raw) => raw.trim().isEmpty ? '8080' : raw.trim();
 
   /// Ruta de la URL de referencia, con `%PROJECT%`/`%BUCKET%` sustituidos si
   /// el llamante los pasa. Si la referencia ya trae su ruta, se usa tal cual.

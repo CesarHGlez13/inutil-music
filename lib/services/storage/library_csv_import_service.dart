@@ -568,10 +568,12 @@ class LibraryCsvImportService {
       final second = ranked[1];
       if (best.score < 0.90 && best.score - second.score < 0.06) {
         final sourceQualifiers = _qualifiers(entry.title);
-        final bestUnrequested =
-            _qualifiers(best.candidate.title).difference(sourceQualifiers);
-        final secondUnrequested =
-            _qualifiers(second.candidate.title).difference(sourceQualifiers);
+        final bestUnrequested = _qualifiers(
+          best.candidate.title,
+        ).difference(sourceQualifiers);
+        final secondUnrequested = _qualifiers(
+          second.candidate.title,
+        ).difference(sourceQualifiers);
         final bothAreSameCleanSong =
             best.score >= 0.74 &&
             bestUnrequested.isEmpty &&
@@ -649,7 +651,9 @@ class LibraryCsvImportService {
     final seen = <String>{};
     final result = <String>[];
     void addAllSplit(String raw) {
-      for (final part in raw.split(RegExp(r'\s*(?:,|;|/|•|&|\bx\b)\s*', caseSensitive: false))) {
+      for (final part in raw.split(
+        RegExp(r'\s*(?:,|;|/|•|&|\bx\b)\s*', caseSensitive: false),
+      )) {
         final trimmed = part.trim();
         if (trimmed.isNotEmpty && seen.add(trimmed.toLowerCase())) {
           result.add(trimmed);
@@ -683,10 +687,7 @@ class LibraryCsvImportService {
     final combinedEntry = entryArtists.join(' ');
     final combinedCandidate = candidateArtistPool.join(' ');
     if (combinedCandidate.isNotEmpty) {
-      best = math.max(
-        best,
-        _tokenSimilarity(combinedEntry, combinedCandidate),
-      );
+      best = math.max(best, _tokenSimilarity(combinedEntry, combinedCandidate));
     }
     for (final entryArtist in entryArtists) {
       for (final candidateArtist in candidateArtistPool) {
@@ -712,13 +713,11 @@ class LibraryCsvImportService {
   }
 
   String _stripArtistTokens(String title, List<String> artists) {
-    final artistTokens = <String>{
-      for (final a in artists) ..._tokens(a),
-    };
+    final artistTokens = <String>{for (final a in artists) ..._tokens(a)};
     if (artistTokens.isEmpty) return title;
-    final kept = _tokens(title)
-        .where((token) => !artistTokens.contains(token))
-        .toList(growable: false);
+    final kept = _tokens(
+      title,
+    ).where((token) => !artistTokens.contains(token)).toList(growable: false);
     return kept.join(' ');
   }
 
@@ -775,9 +774,7 @@ class LibraryCsvImportService {
   }
 
   List<String> _tokens(String input) {
-    var normalized = input
-        .toLowerCase()
-        .replaceAll(RegExp(r"['’`]"), '');
+    var normalized = input.toLowerCase().replaceAll(RegExp(r"['’`]"), '');
     const accents = {
       'á': 'a',
       'à': 'a',

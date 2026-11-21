@@ -2337,10 +2337,9 @@ class LocalDatabaseService {
               <Object?>[targetId, oldId],
             );
           } else {
-            await txn.execute(
-              'DELETE FROM playlists WHERE id = ?',
-              <Object?>[oldId],
-            );
+            await txn.execute('DELETE FROM playlists WHERE id = ?', <Object?>[
+              oldId,
+            ]);
           }
           await txn.execute(
             'UPDATE playlist_items SET playlist_id = ? WHERE playlist_id = ?',

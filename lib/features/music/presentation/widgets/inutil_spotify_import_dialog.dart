@@ -35,7 +35,10 @@ Future<void> showInutilSpotifyImportDialog(
             horizontal: InutilDesignSystem.spaceMd,
             vertical: InutilDesignSystem.spaceLg,
           ),
-          child: _InutilSpotifyImportModal(parentContext: context, parentRef: ref),
+          child: _InutilSpotifyImportModal(
+            parentContext: context,
+            parentRef: ref,
+          ),
         ),
       );
     },
@@ -158,10 +161,7 @@ class _InutilSpotifyImportModalState
       caseSensitive: false,
     ).firstMatch(input);
     if (uriMatch != null) {
-      return (
-        type: uriMatch.group(1)!.toLowerCase(),
-        id: uriMatch.group(2)!,
-      );
+      return (type: uriMatch.group(1)!.toLowerCase(), id: uriMatch.group(2)!);
     }
 
     // Formato URL: https://open.spotify.com/(intl-xx/)?(embed/)?(playlist|album)/{id}
@@ -170,10 +170,7 @@ class _InutilSpotifyImportModalState
       caseSensitive: false,
     ).firstMatch(input);
     if (urlMatch != null) {
-      return (
-        type: urlMatch.group(1)!.toLowerCase(),
-        id: urlMatch.group(2)!,
-      );
+      return (type: urlMatch.group(1)!.toLowerCase(), id: urlMatch.group(2)!);
     }
 
     return null;
@@ -212,9 +209,14 @@ class _InutilSpotifyImportModalState
         HttpHeaders.acceptHeader,
         'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       );
-      request.headers.set(HttpHeaders.acceptLanguageHeader, 'es-ES,es;q=0.9,en;q=0.8');
+      request.headers.set(
+        HttpHeaders.acceptLanguageHeader,
+        'es-ES,es;q=0.9,en;q=0.8',
+      );
 
-      final response = await request.close().timeout(const Duration(seconds: 15));
+      final response = await request.close().timeout(
+        const Duration(seconds: 15),
+      );
       if (response.statusCode != 200) {
         throw FormatException(
           'Spotify respondió con código HTTP ${response.statusCode}. '
@@ -330,8 +332,9 @@ class _InutilSpotifyImportModalState
           coverUrl: coverUrl,
           tracks: parsedTracks,
         );
-        _spotifyPlaylistNameController.text =
-            rawTitle.isEmpty ? 'Playlist de Spotify' : rawTitle;
+        _spotifyPlaylistNameController.text = rawTitle.isEmpty
+            ? 'Playlist de Spotify'
+            : rawTitle;
         _analyzingSpotify = false;
       });
     } catch (e) {
@@ -370,12 +373,7 @@ class _InutilSpotifyImportModalState
               : null,
           thumbnailUrl: parsed.coverUrl,
           sourceUri: t.uri.isEmpty ? null : t.uri,
-          memberships: [
-            LibraryCsvMembership(
-              name: playlistName,
-              position: i,
-            ),
-          ],
+          memberships: [LibraryCsvMembership(name: playlistName, position: i)],
         ),
       );
     }
@@ -450,12 +448,7 @@ class _InutilSpotifyImportModalState
           title: title,
           artist: artists.isNotEmpty ? artists.first : artist,
           artists: artists,
-          memberships: [
-            LibraryCsvMembership(
-              name: playlistName,
-              position: i,
-            ),
-          ],
+          memberships: [LibraryCsvMembership(name: playlistName, position: i)],
         ),
       );
     }
@@ -678,7 +671,10 @@ class _InutilSpotifyImportModalState
   Widget _buildModeTabs() {
     final tabs = [
       (icon: Icons.link_rounded, label: 'Enlace de Spotify'),
-      (icon: Icons.table_chart_rounded, label: 'Archivo CSV (Exportify / Soundiiz)'),
+      (
+        icon: Icons.table_chart_rounded,
+        label: 'Archivo CSV (Exportify / Soundiiz)',
+      ),
       (icon: Icons.notes_rounded, label: 'Texto Libre (Artista - Canción)'),
     ];
 
@@ -1045,7 +1041,9 @@ class _InutilSpotifyImportModalState
           Container(
             constraints: const BoxConstraints(maxHeight: 210),
             decoration: BoxDecoration(
-              color: InutilDesignSystem.backgroundCarbon.withValues(alpha: 0.75),
+              color: InutilDesignSystem.backgroundCarbon.withValues(
+                alpha: 0.75,
+              ),
               borderRadius: InutilDesignSystem.borderMd,
               border: Border.all(color: InutilDesignSystem.borderSubtle),
             ),
@@ -1132,10 +1130,7 @@ class _InutilSpotifyImportModalState
             icon: const Icon(Icons.bolt_rounded, size: 20),
             label: Text(
               'Importar Playlist Ahora (${entity.tracks.length} canciones)',
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ],
@@ -1155,11 +1150,7 @@ class _InutilSpotifyImportModalState
         ),
         borderRadius: InutilDesignSystem.borderMd,
       ),
-      child: const Icon(
-        Icons.album_rounded,
-        color: Colors.white,
-        size: 38,
-      ),
+      child: const Icon(Icons.album_rounded, color: Colors.white, size: 38),
     );
   }
 
@@ -1233,9 +1224,18 @@ class _InutilSpotifyImportModalState
             runSpacing: 8,
             children: [
               _buildFormatBadge('Exportify (Spotify CSV)', _spotifyNeonGreen),
-              _buildFormatBadge('Soundiiz / TuneMyMusic', InutilDesignSystem.accentCyan),
-              _buildFormatBadge('Inútil Music Backup', InutilDesignSystem.primaryNeon),
-              _buildFormatBadge('Harmony / MetroList', InutilDesignSystem.secondaryGlow),
+              _buildFormatBadge(
+                'Soundiiz / TuneMyMusic',
+                InutilDesignSystem.accentCyan,
+              ),
+              _buildFormatBadge(
+                'Inútil Music Backup',
+                InutilDesignSystem.primaryNeon,
+              ),
+              _buildFormatBadge(
+                'Harmony / MetroList',
+                InutilDesignSystem.secondaryGlow,
+              ),
             ],
           ),
           if (_csvError != null) ...[
@@ -1265,10 +1265,7 @@ class _InutilSpotifyImportModalState
                 : const Icon(Icons.upload_file_rounded, size: 20),
             label: const Text(
               'Seleccionar Archivo .CSV',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ],
@@ -1403,10 +1400,7 @@ class _InutilSpotifyImportModalState
             icon: const Icon(Icons.rocket_launch_rounded, size: 19),
             label: const Text(
               'Importar Lista de Canciones',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 14,
-              ),
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
             ),
           ),
         ],
@@ -1670,7 +1664,9 @@ class _InutilSpotifyImportModalState
                 color: InutilDesignSystem.backgroundCarbon,
                 borderRadius: InutilDesignSystem.borderMd,
                 border: Border.all(
-                  color: InutilDesignSystem.secondaryGlow.withValues(alpha: 0.32),
+                  color: InutilDesignSystem.secondaryGlow.withValues(
+                    alpha: 0.32,
+                  ),
                 ),
               ),
               child: Column(
@@ -1730,10 +1726,7 @@ class _InutilSpotifyImportModalState
               icon: const Icon(Icons.done_all_rounded, size: 20),
               label: const Text(
                 'Listo, ir a mis Playlists',
-                style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 14,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
               ),
             ),
           ),

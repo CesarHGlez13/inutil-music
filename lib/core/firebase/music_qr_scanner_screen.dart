@@ -30,7 +30,9 @@ Future<bool> showPcLoginCodeDialog(BuildContext context) async {
   );
   if (ok == true && context.mounted) {
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      const SnackBar(content: Text('PC autorizada. Iniciará sesión en unos segundos.')),
+      const SnackBar(
+        content: Text('PC autorizada. Iniciará sesión en unos segundos.'),
+      ),
     );
   }
   return ok == true;
@@ -59,7 +61,9 @@ class _PcCodeDialogState extends State<_PcCodeDialog> {
       _busy = true;
       _error = null;
     });
-    final error = await MusicQrPairingService.instance.approveWithCode(_controller.text);
+    final error = await MusicQrPairingService.instance.approveWithCode(
+      _controller.text,
+    );
     if (!mounted) return;
     if (error == null) {
       Navigator.of(context).pop(true);
@@ -79,7 +83,9 @@ class _PcCodeDialogState extends State<_PcCodeDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Escribe el código de 8 caracteres que aparece debajo del QR en tu PC.'),
+          const Text(
+            'Escribe el código de 8 caracteres que aparece debajo del QR en tu PC.',
+          ),
           const SizedBox(height: 12),
           TextField(
             key: const ValueKey('pc-code-field'),
@@ -204,11 +210,19 @@ class _MusicQrScannerScreenState extends State<MusicQrScannerScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.videocam_off_rounded, color: Colors.white60, size: 46),
+                    const Icon(
+                      Icons.videocam_off_rounded,
+                      color: Colors.white60,
+                      size: 46,
+                    ),
                     const SizedBox(height: 12),
                     const Text(
                       'No se pudo abrir la cámara',
-                      style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -256,7 +270,11 @@ class _MusicQrScannerScreenState extends State<MusicQrScannerScreen> {
   }
 
   Widget _buildStatus(Color accent) {
-    const title = TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800);
+    const title = TextStyle(
+      color: Colors.white,
+      fontSize: 15,
+      fontWeight: FontWeight.w800,
+    );
     const body = TextStyle(color: Colors.white70, fontSize: 12.5);
     if (_done) {
       return const Column(
@@ -266,8 +284,11 @@ class _MusicQrScannerScreenState extends State<MusicQrScannerScreen> {
           SizedBox(height: 8),
           Text('¡PC autorizada!', style: title),
           SizedBox(height: 4),
-          Text('Tu PC iniciará sesión automáticamente en unos segundos.',
-              textAlign: TextAlign.center, style: body),
+          Text(
+            'Tu PC iniciará sesión automáticamente en unos segundos.',
+            textAlign: TextAlign.center,
+            style: body,
+          ),
         ],
       );
     }
@@ -286,13 +307,22 @@ class _MusicQrScannerScreenState extends State<MusicQrScannerScreen> {
       children: [
         const Text('Apunta al código QR de tu PC', style: title),
         const SizedBox(height: 4),
-        const Text('O toca «Usar código» para escribir las 8 letras.',
-            textAlign: TextAlign.center, style: body),
+        const Text(
+          'O toca «Usar código» para escribir las 8 letras.',
+          textAlign: TextAlign.center,
+          style: body,
+        ),
         if (_error != null) ...[
           const SizedBox(height: 10),
-          Text(_error!,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            _error!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Colors.redAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 8),
           FilledButton(
             onPressed: () => setState(() => _error = null),

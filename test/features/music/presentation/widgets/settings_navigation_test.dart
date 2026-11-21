@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:inutil_music/core/theme/app_colors.dart';
 import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/core/theme/inutil_icons.dart';
 import 'package:inutil_music/core/widgets/liquid_glass_surface.dart';
 import 'package:inutil_music/core/widgets/app_shared_widgets.dart';
 import 'package:inutil_music/features/music/domain/entities/local_track.dart';
@@ -1528,6 +1529,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      // La raíz de Ajustes sumó la tarjeta de cuenta y el hero de Spotify
+      // (commits 9c38523 y 2f715bb), así que la tarjeta LIVE de guardar
+      // peticiones ya no se construye en la primera pantalla de un lienzo
+      // de 1100x1600: se revela en el scroll antes de medir su geometría.
+      await _ensureSettingsVisible(
+        tester,
+        find.byKey(const ValueKey('settings-card-live-request-storage')),
+      );
       final crossfadeRect = tester.getRect(
         find.byKey(const ValueKey('settings-inline-crossfade')),
       );
@@ -1952,6 +1961,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final card = find.byKey(const ValueKey('settings-card-lyrics-appearance'));
+    // A 430x900 la tarjeta de Letras cae debajo de la primera pantalla
+    // porque la raíz sumó la tarjeta de cuenta y el hero de Spotify; se
+    // revela con el helper del archivo para que el tap aterrice en ella.
+    await _ensureSettingsVisible(tester, card);
     expect(card, findsOneWidget);
     await tester.tap(card);
     await tester.pumpAndSettle();
@@ -2525,6 +2538,15 @@ void main() {
       _settingsHarness(navigationController: navigationController),
     );
     await tester.pumpAndSettle();
+    // La raiz de Ajustes construye sus slivers de forma pereziva y, desde los
+    // commits 9c38523 y 2f715bb (tarjeta de cuenta + hero de Spotify), la
+    // tarjeta de Apariencia cae debajo de la primera pantalla de un movil de
+    // 320x720: medida tras el scroll ocupa (12,64)-(308,151). Se revela con
+    // el helper del archivo; se sigue comprobando que el detalle quepa en 320.
+    await _ensureSettingsVisible(
+      tester,
+      find.byKey(const ValueKey('settings-card-appearance')),
+    );
     await tester.tap(find.byKey(const ValueKey('settings-card-appearance')));
     await tester.pumpAndSettle();
 
@@ -3135,6 +3157,16 @@ void main() {
 
     await tester.tap(find.text('Ajustes').last);
     await tester.pumpAndSettle();
+    // A 430x900 la tarjeta de Apariencia queda debajo de la primera pantalla
+    // de la raiz de Ajustes (medida en (12,912)-(418,999)) porque la raiz
+    // sumo la tarjeta de cuenta y el hero de Spotify en los commits 9c38523
+    // y 2f715bb; se revela con el helper del archivo antes de pulsarla. Lo
+    // que se comprueba no cambia: el Back del sistema cierra el detalle antes
+    // de salir de la pestana.
+    await _ensureSettingsVisible(
+      tester,
+      find.byKey(const ValueKey('settings-card-appearance')),
+    );
     await tester.tap(find.byKey(const ValueKey('settings-card-appearance')));
     await tester.pumpAndSettle();
 
@@ -3143,7 +3175,7 @@ void main() {
       findsOneWidget,
     );
     expect(
-      _navigationIcon(tester, Icons.settings_rounded).color,
+      _navigationIcon(tester, InutilGlyph.settings).color,
       _activeColor(tester),
     );
 
@@ -3156,7 +3188,7 @@ void main() {
       findsNothing,
     );
     expect(
-      _navigationIcon(tester, Icons.settings_rounded).color,
+      _navigationIcon(tester, InutilGlyph.settings).color,
       _activeColor(tester),
     );
 
@@ -3164,7 +3196,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      _navigationIcon(tester, Icons.home_rounded).color,
+      _navigationIcon(tester, InutilGlyph.home).color,
       _activeColor(tester),
     );
     expect(tester.takeException(), isNull);
@@ -3394,10 +3426,22 @@ List<Override> _providerOverrides({
   ];
 }
 
-Icon _navigationIcon(WidgetTester tester, IconData icon) {
+/// Icono del selector inferior. Desde el commit 9c38523 el selector pinta
+/// glifos vectoriales propios con `InutilIcon`, y medido en este harness
+/// `find.byIcon(Icons.settings_rounded)` encuentra 0 widgets: se busca el
+/// glifo por su `InutilGlyph`. La comprobacion sigue siendo la misma, el
+/// item activo se pinta con `colorScheme.primary` (el selector interpola
+/// `Color.lerp(inactivo, primary, valor)`), asi que la retroalimentacion de
+/// seleccion no se afloja.
+InutilIcon _navigationIcon(WidgetTester tester, InutilGlyph glyph) {
   final navigation = find.byKey(const ValueKey('bottom-navigation-content'));
-  return tester.widget<Icon>(
-    find.descendant(of: navigation, matching: find.byIcon(icon)),
+  return tester.widget<InutilIcon>(
+    find.descendant(
+      of: navigation,
+      matching: find.byWidgetPredicate(
+        (widget) => widget is InutilIcon && widget.glyph == glyph,
+      ),
+    ),
   );
 }
 

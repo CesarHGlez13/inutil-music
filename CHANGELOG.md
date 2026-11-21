@@ -1,5 +1,137 @@
 # Changelog
 
+## 2.5.14+4272 — 2026-11-20
+
+### Fixed — la interfaz que César reportó en pantalla
+
+- **El icono de recargar ya no es un garabayo asimétrico.** Se redibujó el
+  glifo `InutilGlyph.refresh` como dos arcos punto-simétricos con dos puntas
+  que llenan los cuatro cuadrantes dentro de la caja de 24 unidades; la
+  rotación de 60°/120°/180° reproduce el mismo glifo, no un borrón. Prueba
+  nueva `test/core/theme/inutil_refresh_glyph_test.dart` (44 pruebas locales
+  en verde; `flutter analyze`: 0 issues).
+- **Desaparece el salto «primero la interfaz vieja, luego la correcta».** El
+  primer frame siempre encontraba `settingsControllerProvider` sin resolver
+  porque ese proveedor hace I/O real de plataforma, así que `HomePage` caía a
+  sus defaults (reproductor «Inútil Music» clásico, artwork cuadrado, Canvas
+  apagado) y un segundo después se redibujaba con las preferencias reales. Se
+  añadió `lib/core/startup/inutil_settings_hydration_gate.dart`, que pinta el
+  esqueleto durante esos frames iniciales y entrega el shell ya hidratado; el
+  lienzo animado aparece de una vez, sin flash intermedio. Pruebas
+  `test/core/startup/settings_hydration_gate_test.dart` y
+  `test/features/music/presentation/widgets/player_canvas_pending_test.dart`.
+- **El panel Conectar ahora funciona como Spotify Connect.** Reescrito
+  `inutil_connect_sheet.dart` (439 líneas): fila destacada «Este teléfono» con
+  el título y el artista en curso en color de acento, insignia
+  «Reproduciendo»/«En pausa» y el icono de plataforma (teléfono/PC/TV) a la
+  derecha; equipos agrupados con sección «En otras redes» y subtitulo
+  «en línea · red local» o «en línea · a distancia (por la nube)»; botón ancho
+  «Transferir aquí» para traer la sesión a este equipo sin cerrar el panel.
+  **Se quitó el mini reproductor embebido** —la tarjeta «Sesión de reproducción
+  actual» con sus botones de anterior/reproducir/siguiente— porque en Spotify
+  esa hoja solo lista dispositivos y Cesar pidió justo eso. Antes el panel
+  mostraba «Buscando tus dispositivos…» girando para siempre aunque la cuenta
+  tuviera 11 documentos `devices` publicados.
+- **Quitar la app de la vista de recientes detiene la reproducción.** Faltaba
+  la rama `taskRemoved` en `DesktopMediaSession`, así que `onTaskRemoved`
+  terminaba en un `Future.value()` de no-op y el audio seguía sonando con la
+  app ya muerta. Ahora `taskRemoved` llama a `playerController.stop()` igual
+  que el botón detener; el puente con `audio_service` queda cubierto por
+  `test/services/media_session/audio_service_desktop_media_session_test.dart`.
+- **Las pruebas ya no se cuelgan: se rompió un ciclo de dependencias que sólo
+  se veía en modo debug.** `playerControllerProvider` y
+  `inutilPlaybackSyncProvider` se escuchaban mutuamente con `ref.listen`, y
+  Riverpod sólo lo detecta en `kDebugMode`
+  (`riverpod-3.4.3/lib/src/core/element.dart:1003`,
+  `Ref._debugAssertCanDependOn`): por eso el APK de release funcionaba en el
+  teléfono y `flutter test` nunca terminaba. Medido con un `ProviderObserver`,
+  `PlayerController` caía en `AsyncError` con `CircularDependencyError` y
+  `tester.pumpWidget(_testApp())` no retornaba (`timeout 110` → EXIT=124
+  también sobre el commit sin mis cambios, o sea la traba venía del commit
+  `6cf559ea` del 2026-11-17, no de mis cuatro ajustes). Como el proveedor de
+  sincronización devuelve el singleton `InutilPlaybackSyncService.instance`, el
+  controller ahora se suscribe a ese mismo objeto con `addListener` +
+  `ref.onDispose(...)`: notifica lo mismo en el mismo momento y el grafo queda
+  en un solo sentido. Medido: `timeout 110 flutter test test/widget_test.dart
+  --plain-name 'renders Inútil Music shell'` pasó de EXIT=124 (sin retorno) a
+  completarse en `00:01`, y `flutter test
+  test/features/music/presentation/providers/audio_quality_upgrade_controller_test.dart`
+  —el único prueba que depende del override de ese proveedor— sigue verde:
+  **+52, All tests passed!**.
+- **La tubería de Windows existía pero nunca había corrido.** En GitHub Actions
+  `gh run list` devolvía `[]` (0 ejecuciones históricas) porque la rama por
+  defecto `main` era un commit huérfano de documentación (`082848e`, sólo
+  `README` del canal OTA) sin código ni workflows, y Actions sólo descubre
+  workflows en la rama por defecto. Se añadió `desktop-builds.yml` a `main`
+  (`2ab83db`, `[skip ci]`) y se alineó `FLUTTER_VERSION` a `3.50.0` (`865bdd2`)
+  porque la primera ejecución dispatchada (run `44853194063`) falló con exit 65
+  en «Required quality gate / Resolve dependencies»: `pub get
+  --enforce-lockfile` reportaba `Would change 1 dependency … test_api 0.7.12
+  (was 0.7.14)`, es decir el `pubspec.lock` lo generó un SDK más nuevo que el
+  3.47.9 que pedía el workflow. El local coincide con el de CI: `flutter
+  --version` → 3.50.0 / `dart --version` → 3.14.0.
+- **El menú móvil de salida de audio ya no lanza una excepción al cerrarse.**
+  `audio_routing_menus.dart` llamaba `ref.read(...)` dentro de `dispose()`,
+  o sea después de que Flutter desmontara el widget, y Riverpod 3 lo castiga
+  con `Bad state: Using "ref" when a widget is about to or has been unmounted
+  is unsafe`. El servicio se captura ahora en la primera línea síncrona de
+  `_init()` (`final service = _service = ref.read(...)`) y `dispose()` cierra
+  la sonda con `unawaited(_service.stopWatching())`. Medido: la prueba
+  `test/features/music/presentation/widgets/desktop_audio_output_menu_test.dart`
+  pasó de **+8 -1** a **+9, All tests passed!** (EXIT=0).
+- **En apaisado el reproductor ya no se recorta un píxel contra la barra del
+  sistema.** La columna de controles medía **237 dp** contra los **236 dp** que
+  le daban al marco 537×268 con inset inferior de 24, y Flutter lo avisaba con
+  `A RenderFlex overflowed by 1.00 pixels on the bottom` — un corte de 1 px en
+  la fila de utilidades del reproductor. Se rompió en `9c38523`, cuando la
+  píldora `PlayerControlsCapsule` sumó `vertical: 2` de padding y
+  `Border.all(width: 0.85)` a esa fila (+5.7 dp de alto); en el commit base del
+  fork (`640348e`) la prueba estaba verde. Se recortaron 2 dp del hueco entre
+  las etiquetas de tiempo y la barra de progreso **solo en apaisado**
+  (`_Timeline`): la columna mide 235 y cabe con holgura, la barra conserva sus
+  48 dp de objetivo táctil y en vertical la curva de huecos no se tocó. Medido:
+  `player_controls_favorites_test.dart` pasó de **+226 -1** a **+227, All tests
+  passed!** (EXIT=0 en 00:28).
+
+- **Las 42 pruebas de `test/widget_test.dart` que el cuelgue tenía escondidas
+  vuelven a pasar: `+127 ~11, All tests passed!` (EXIT=0).** Aparecieron cuando
+  se rompió el ciclo de dependencias, porque hasta entonces `flutter test`
+  nunca llegaba a evaluarlas. No se borró ni una aserción:
+  `grep -c 'testWidgets('` = **112** en `HEAD` y **112** ahora, con los mismos
+  nombres y sin duplicados. Cada una se re-afirmó contra el producto real y
+  quedó documentada fila por fila en `docs/widget_test_root_causes_2026-11-21.md`
+  con el `Actual:` medido y el commit que cambió la interfaz: `9c38523` (glifos
+  `InutilGlyph`/`InutilIcon` en la barra de navegación, la píldora
+  `PlayerControlsCapsule`, `TrackResultTile` rediseñada con `primary` al 0.09 +
+  borde 0.35/1 px y el mini reproductor con alto condicional
+  `max(96, pad+20)` = 116 en vez de 170, `_contextualGreeting`), `2f715bb`
+  (pastilla 38→36 dp y la tarjeta `settings-spotify-import-hero-card` que
+  agrandó la lista de Ajustes), `2ae9e6d`/`de65eaf`/`bf6a3b0` (secciones nuevas
+  de Ajustes que empujaron fuera del viewport las tarjetas `settings-card-*`,
+  que existen desde la base `640348e`), `6cf559e` y el esqueleto
+  `settings-hydration-skeleton` de esta misma versión. Los arreglos son de
+  **prueba**, no de producto: se asentaron los timers diferidos (`Timer.run` de
+  `HomeRecommendationsController`, `music_providers.dart:2058`) y el fundido de
+  entrada del slot de 320 ms antes del `tap`, y se añadieron dos ayudantes de
+  harness (`_settleHomeFeed`, `_drainDeferredHomeRefresh`).
+
+### Changed
+
+- **La versión subió a `2.5.14+4272` porque, si no, estos arreglos nunca
+  llegarían por OTA.** `lib/core/firebase/inutil_update_service.dart:69-73`
+  define `updateAvailable = _compareSemver(latestVersion, instalada) > 0 ||
+  belowMinSupported`: con un teléfono ya en `2.5.13` y un manifiesto
+  `latest=2.5.13` la comparación da `0`, así que la app **nunca** ofrece el
+  build que contiene estos arreglos y el `versionCode` (`+4271`) tampoco
+  cambiaría. Se subieron al unísono —lo exige
+  `test/core/constants/app_metadata_test.dart`, que compara los cinco números
+  y pasó **+7, All tests passed!** (EXIT=0)— `pubspec.yaml` (`2.5.14+4272`),
+  `lib/core/constants/app_constants.dart` (`appVersion = '2.5.14'`),
+  `README.md` (`Current version: **2.5.14+4272**`),
+  `packaging/windows/InutilMusic.iss` (`MyAppVersion "2.5.14"`, de ahí sale el
+  nombre `InutilMusic-2.5.14-Windows-x64-Setup.exe` que genera CI) y la propia
+  prueba de metadatos.
+
 ## 2.5.13+4271 — 2026-11-20
 
 ### Added
@@ -92,38 +224,6 @@
   contiene una ocurrencia de `workers.dev` y otra de `192.168.100.27` en cada
   ABI. Las 6 notas publicadas pasan enteras el filtro `_userFacingReleaseNotes`
   (simulado contra el manifiesto vivo: 6 de 6 visibles).
-
-### Fixed — interfaz que César reportó en pantalla (misma versión, build recompilado)
-
-- **El icono de recargar ya no es un garabayo asimétrico.** Se redibujó el
-  glifo `InutilGlyph.refresh` como dos arcos punto-simétricos con dos puntas
-  que llenan los cuatro cuadrantes dentro de la caja de 24 unidades; la
-  rotación de 60°/120°/180° reproduce el mismo glifo, no un borrón. Prueba
-  nueva `test/core/theme/inutil_refresh_glyph_test.dart` (44 pruebas locales
-  en verde; `flutter analyze`: 0 issues).
-- **Desaparece el salto «primero la interfaz vieja, luego la correcta».** El
-  primer frame siempre encontraba `settingsControllerProvider` sin resolver
-  porque ese proveedor hace I/O real de plataforma, así que `HomePage` caía a
-  sus defaults (reproductor «Inútil Music» clásico, artwork cuadrado, Canvas
-  apagado) y un segundo después se redibujaba con las preferencias reales. Se
-  añadió `lib/core/startup/inutil_settings_hydration_gate.dart`, que pinta el
-  esqueleto durante esos frames iniciales y entrega el shell ya hidratado; el
-  lienzo animado aparece de una vez, sin flash intermedio. Pruebas
-  `test/core/startup/settings_hydration_gate_test.dart` y
-  `test/features/music/presentation/widgets/player_canvas_pending_test.dart`.
-- **El panel Conectar ahora funciona como Spotify Connect.** Reescrito
-  `inutil_connect_sheet.dart` (439 líneas): tarjeta «Este teléfono» con el
-  título y el artista en curso, icono verde del dispositivo activo, equipos
-  agrupados en «red local» y «a distancia (por la nube)», y un mini reproductor
-  con «Transferir aquí» para mover la sesión a otro equipo sin cerrar el panel.
-  Antes el panel mostraba «Buscando tus dispositivos…» girando para siempre
-  aunque la cuenta tuviera 11 documentos `devices` publicados.
-- **Quitar la app de la vista de recientes detiene la reproducción.** Faltaba
-  la rama `taskRemoved` en `DesktopMediaSession`, así que `onTaskRemoved`
-  terminaba en un `Future.value()` de no-op y el audio seguía sonando con la
-  app ya muerta. Ahora `taskRemoved` llama a `playerController.stop()` igual
-  que el botón detener; el puente con `audio_service` queda cubierto por
-  `test/services/media_session/audio_service_desktop_media_session_test.dart`.
 
 ## 2.5.12+4270 — 2026-11-20
 

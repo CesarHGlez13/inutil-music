@@ -1693,10 +1693,7 @@ void main() {
   // Artwork presentation modes belong to the two cover-based layouts. The
   // Classic Vinyl layout renders the cover as the record label and has its
   // own responsive/animation contract below.
-  for (final style in const [
-    PlayerStyle.inutilMusic,
-    PlayerStyle.appleMusic,
-  ]) {
+  for (final style in const [PlayerStyle.inutilMusic, PlayerStyle.appleMusic]) {
     for (final viewport in const [Size(320, 568), Size(390, 820)]) {
       testWidgets(
         '${style.name} reflects the actual expanded cover crop at ${viewport.width.toInt()}px',
@@ -2718,6 +2715,13 @@ void main() {
             );
           }
         }
+        // Desbordamiento real de 1.00 px: la columna `player_panel.dart`
+        // (`inutil-player-controls-inset`, 537×268 con inset inferior de 24)
+        // medía 237 dp contra 236 dp de hueco disponible. Se reprodujo desde
+        // `9c38523` (la píldora `PlayerControlsCapsule` añadió `vertical: 2` +
+        // `Border.all(width: 0.85)` a la fila de utilidades) y estaba verde en
+        // el commit base `640348e`. Reparado en el panel recortando 2 dp el
+        // hueco etiquetas↔barra solo en apaisado: ahora la columna mide 235.
         expect(tester.takeException(), isNull);
       },
     );
@@ -3927,7 +3931,15 @@ void main() {
       }
       expect(capsule.color!.a, lessThan(.2));
       expect(capsule.gradient, isNull);
-      expect(capsule.border, isNull);
+      // La píldora de utilidades (commit 9c38523, release v2.2.0+220) define
+      // su propio hairline neutro de 0.85 px. Lo que este test vela es que la
+      // píldora no tiña su surface con el arte de portada, así que se
+      // comprueba el borde fijo del tema oscuro en lugar de un borde ausente.
+      expect(
+        capsule.border,
+        Border.all(color: Colors.white.withValues(alpha: 0.11), width: 0.85),
+        reason: 'neutral hairline, never artwork ink',
+      );
       await tester.tap(find.byKey(const ValueKey('player-menu-control')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 500));
@@ -4399,7 +4411,23 @@ void main() {
           tester.getRect(volume),
           rectMoreOrLessEquals(classicVolumeRect.shift(controlsOffset)),
         );
-        expect(size.height - tester.getRect(volume).bottom, closeTo(16, 0.1));
+        // La píldora `player-utility-capsule` (release v2.2.0+220, commit
+        // 9c38523) envolvió la fila de utilidades con su propio padding
+        // vertical de 2 px: el grupo de controles sigue anclado a 16 px del
+        // borde inferior y cada botón queda 2 px más arriba dentro de la
+        // píldora, así que se mide el borde exterior de la píldora.
+        final utilityCapsule = find.byKey(
+          const ValueKey('player-utility-capsule'),
+        );
+        expect(utilityCapsule, findsOneWidget);
+        expect(
+          size.height - tester.getRect(utilityCapsule).bottom,
+          closeTo(16, 0.1),
+        );
+        expect(
+          tester.getRect(utilityCapsule).bottom - tester.getRect(volume).bottom,
+          closeTo(2, 0.1),
+        );
         expect(tester.takeException(), isNull);
       },
     );
@@ -8387,7 +8415,10 @@ class _TestPlayerController extends PlayerController {
   }
 
   @override
-  Future<void> playNext({bool automatic = false, bool fromRemoteSpeaker = false}) async {
+  Future<void> playNext({
+    bool automatic = false,
+    bool fromRemoteSpeaker = false,
+  }) async {
     playNextCalls++;
   }
 

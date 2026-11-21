@@ -28,7 +28,7 @@ void main() {
       r'#define MyAppVersion "([0-9]+\.[0-9]+\.[0-9]+)"',
     ).firstMatch(windowsInstaller)?.group(1);
 
-    expect(pubspecVersion, '2.5.13+4271');
+    expect(pubspecVersion, '2.5.14+4272');
     expect(readmeVersion, pubspecVersion);
     expect(changelogVersion, pubspecVersion);
     expect(runtimeVersion, AppConstants.appVersion);
@@ -63,8 +63,9 @@ void main() {
   });
 
   test('brand strings point at Inútil Music, not the upstream project', () {
-    final constants = File('lib/core/constants/app_constants.dart')
-        .readAsStringSync();
+    final constants = File(
+      'lib/core/constants/app_constants.dart',
+    ).readAsStringSync();
     final settingsPanel = File(
       'lib/features/music/presentation/widgets/settings_panel.dart',
     ).readAsStringSync();
@@ -86,7 +87,10 @@ void main() {
       expect(constants, isNot(contains(stale)), reason: '$stale must be gone');
     }
     // El pie de Ajustes muestra unicamente la marca y soporte propios.
-    expect(settingsPanel, contains("'Inútil Music v\${AppConstants.appVersion} · '"));
+    expect(
+      settingsPanel,
+      contains("'Inútil Music v\${AppConstants.appVersion} · '"),
+    );
     expect(settingsPanel, contains('AppConstants.supportEmail'));
     // El nombre del widget visible en el launcher debe ser el nuestro.
     for (final xml in <String>[widgetEs, widgetEn]) {
@@ -113,7 +117,9 @@ void main() {
       ];
       final unexpected = <String>[];
       for (final root in roots) {
-        for (final entry in Directory(root).listSync(recursive: true, followLinks: false)) {
+        for (final entry in Directory(
+          root,
+        ).listSync(recursive: true, followLinks: false)) {
           if (entry is! File) continue;
           final path = entry.path;
           if (!path.endsWith('.dart') &&
@@ -141,7 +147,11 @@ void main() {
           }
         }
       }
-      expect(unexpected, isEmpty, reason: 'referencias residuales: $unexpected');
+      expect(
+        unexpected,
+        isEmpty,
+        reason: 'referencias residuales: $unexpected',
+      );
 
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final license = File('LICENSE').readAsStringSync();
@@ -156,7 +166,10 @@ void main() {
       expect(license.toLowerCase(), isNot(contains('bstream')));
       expect(notices.toLowerCase(), isNot(contains('bstream')));
       expect(settingsPanel, contains("ValueKey('settings-about-licenses')"));
-      expect(settingsPanel, contains("rootBundle.loadString('THIRD_PARTY_NOTICES.md')"));
+      expect(
+        settingsPanel,
+        contains("rootBundle.loadString('THIRD_PARTY_NOTICES.md')"),
+      );
       expect(settingsPanel, contains('showLicensePage('));
     },
   );

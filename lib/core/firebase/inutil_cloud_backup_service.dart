@@ -14,7 +14,8 @@ import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
 import 'inutil_wrapped_service.dart';
 
-typedef CloudDocumentGetter = Future<Map<String, dynamic>?> Function(String path);
+typedef CloudDocumentGetter =
+    Future<Map<String, dynamic>?> Function(String path);
 typedef CloudDocumentSetter =
     Future<bool> Function(String path, Map<String, dynamic> data);
 typedef CloudDocumentDeleter = Future<bool> Function(String path);
@@ -517,9 +518,7 @@ class InutilCloudBackupService {
               item.localTrackId != null &&
                   knownLocalIds.contains(item.localTrackId)
               ? item.localTrackId
-              : (item.videoId != null
-                    ? localIdByVideoId[item.videoId!]
-                    : null);
+              : (item.videoId != null ? localIdByVideoId[item.videoId!] : null);
           normalized.add(
             item.copyWith(
               position: idx,
@@ -623,7 +622,9 @@ class InutilCloudBackupService {
             const <String>[],
         artistBrowseIds: browseRaw ?? const <String?>[],
         album: trackMap['album'] as String?,
-        duration: durationMs != null ? Duration(milliseconds: durationMs) : null,
+        duration: durationMs != null
+            ? Duration(milliseconds: durationMs)
+            : null,
         thumbnailUrl: trackMap['thumbnailUrl'] as String?,
         sourceUrl: trackMap['sourceUrl'] as String?,
       ),

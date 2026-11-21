@@ -26,8 +26,9 @@ final inutilCloudBackupProvider = Provider<InutilCloudBackupService>((ref) {
   return service;
 });
 
-final inutilPlaybackSyncProvider =
-    ChangeNotifierProvider<InutilPlaybackSyncService>((ref) {
+final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncService>((
+  ref,
+) {
   final syncService = InutilPlaybackSyncService.instance;
 
   // Registrar callback para ejecutar comandos remotos que vengan de otro dispositivo (PC o celular)
@@ -101,24 +102,27 @@ final inutilPlaybackSyncProvider =
     );
     if (!routed) return;
     if (!ref.mounted) return;
-    await ref
-        .read(playerControllerProvider.notifier)
-        .pause(notifyPeer: false);
+    await ref.read(playerControllerProvider.notifier).pause(notifyPeer: false);
   }
 
   // Escuchar cambios del reproductor local para sincronizarlos en LAN y la nube
-  ref.listen<AsyncValue<PlayerSnapshot>>(playerControllerProvider, (prev, next) {
+  ref.listen<AsyncValue<PlayerSnapshot>>(playerControllerProvider, (
+    prev,
+    next,
+  ) {
     final snapshot = next.value;
     if (snapshot == null) return;
 
     final isPlaying = snapshot.status == PlayerStatus.playing;
-    final isRemoteController = !InutilPlaybackSyncService.isDesktopHost &&
+    final isRemoteController =
+        !InutilPlaybackSyncService.isDesktopHost &&
         !syncService.isCurrentDeviceActive;
 
     // Si el móvil está en modo control remoto y el track que tiene coincide con el
     // que la PC ya está reproduciendo, este evento es sólo un reflejo de UI del par:
     // no se procesa localmente ni se reenvía a la PC (rompe completamente el ping-pong).
-    final isMirroringRemoteTrack = isRemoteController &&
+    final isMirroringRemoteTrack =
+        isRemoteController &&
         snapshot.trackId != null &&
         snapshot.trackId == syncService.remoteSession?.trackId;
 
@@ -136,7 +140,8 @@ final inutilPlaybackSyncProvider =
         isPlaying: isPlaying,
       );
     }
-    final forcePush = prev?.value?.status != snapshot.status ||
+    final forcePush =
+        prev?.value?.status != snapshot.status ||
         prev?.value?.trackId != snapshot.trackId;
 
     if (snapshot.trackId != null && snapshot.trackId!.isNotEmpty) {
@@ -150,7 +155,8 @@ final inutilPlaybackSyncProvider =
             isCurrentDeviceActive: syncService.isCurrentDeviceActive,
             remoteActiveDeviceId:
                 syncService.remoteSession?.activeDeviceId ?? '',
-            hasTargetPeer: syncService.autoPairedPeer != null ||
+            hasTargetPeer:
+                syncService.autoPairedPeer != null ||
                 syncService.connectTargets.any((p) => p.isHost),
             isDesktopHost: InutilPlaybackSyncService.isDesktopHost,
             isPlaybackRouteSuppressed: syncService.isPlaybackRouteSuppressed,

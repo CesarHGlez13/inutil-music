@@ -105,11 +105,7 @@ class InutilReleaseInfo {
   /// [apkDownloadUrl] cuando el manifiesto no publica variantes divididas.
   String apkUrlForAbi(String abi) {
     final normalized = normalizeAbiKey(abi);
-    for (final key in <String>[
-      normalized,
-      'universal',
-      'split_universal',
-    ]) {
+    for (final key in <String>[normalized, 'universal', 'split_universal']) {
       if (key.isEmpty) continue;
       final url = androidDownloads[key]?.trim() ?? '';
       if (url.isNotEmpty) return url;
@@ -186,7 +182,8 @@ class InutilReleaseInfo {
           currentVersionOverride ??
           (json['currentVersion'] as String?) ??
           AppConstants.appVersion,
-      latestVersion: (json['latestVersion'] as String?)?.trim().isNotEmpty == true
+      latestVersion:
+          (json['latestVersion'] as String?)?.trim().isNotEmpty == true
           ? (json['latestVersion'] as String).trim()
           : '2.0.0',
       releaseNotes: notes.isEmpty ? _defaultCinemaReleaseNotes : notes,
@@ -199,8 +196,9 @@ class InutilReleaseInfo {
           DateTime.tryParse(json['publishedAt']?.toString() ?? '') ??
           DateTime.utc(2026, 11, 16),
       androidDownloads: _parseAndroidDownloads(json['androidDownloads']).urls,
-      androidDownloadSizes:
-          _parseAndroidDownloads(json['androidDownloadSizes']).sizes,
+      androidDownloadSizes: _parseAndroidDownloads(
+        json['androidDownloadSizes'],
+      ).sizes,
       androidPackageSizeBytes:
           (json['androidPackageSizeBytes'] as num?)?.toInt() ?? 0,
     );
@@ -216,10 +214,7 @@ class InutilReleaseInfo {
   _parseAndroidDownloads(Object? value) {
     final entries = _downloadEntries(value);
     if (entries.isEmpty) {
-      return (
-        urls: const <String, String>{},
-        sizes: const <String, int>{},
-      );
+      return (urls: const <String, String>{}, sizes: const <String, int>{});
     }
     final urls = <String, String>{};
     final sizes = <String, int>{};
@@ -256,8 +251,8 @@ class InutilReleaseInfo {
       final result = <String, Object?>{};
       for (final item in plain) {
         if (item is! Map) continue;
-        final abi =
-            (item['abi'] ?? item['key'] ?? item['name'] ?? '').toString();
+        final abi = (item['abi'] ?? item['key'] ?? item['name'] ?? '')
+            .toString();
         if (abi.trim().isEmpty) continue;
         result[abi] = item;
       }
@@ -334,7 +329,9 @@ class InutilReleaseInfo {
   static int _compareSemver(String a, String b) {
     final partsA = _parseVersionParts(a);
     final partsB = _parseVersionParts(b);
-    final length = partsA.length > partsB.length ? partsA.length : partsB.length;
+    final length = partsA.length > partsB.length
+        ? partsA.length
+        : partsB.length;
     for (var i = 0; i < length; i++) {
       final valA = i < partsA.length ? partsA[i] : 0;
       final valB = i < partsB.length ? partsB[i] : 0;
@@ -388,8 +385,8 @@ class InutilUpdateService {
 
   /// Manifiesto forzado por el entorno (`INUTIL_RELEASE_MANIFEST_URL`).
   static String? get _manifestUrlOverride {
-    final value =
-        (Platform.environment['INUTIL_RELEASE_MANIFEST_URL'] ?? '').trim();
+    final value = (Platform.environment['INUTIL_RELEASE_MANIFEST_URL'] ?? '')
+        .trim();
     return value.isEmpty ? null : value;
   }
 
@@ -434,7 +431,9 @@ class InutilUpdateService {
     final pinned = testReleaseOverride;
     if (pinned != null) return pinned;
 
-    final manifest = await _fetchManifestRelease(currentVersion: effectiveCurrent);
+    final manifest = await _fetchManifestRelease(
+      currentVersion: effectiveCurrent,
+    );
     if (manifest != null) {
       await _saveCachedRelease(manifest);
       return manifest;
@@ -499,7 +498,10 @@ class InutilUpdateService {
     candidates.add(_defaultManifestUrl);
 
     for (final url in candidates) {
-      final release = await _fetchReleaseFromUrl(url, currentVersion: currentVersion);
+      final release = await _fetchReleaseFromUrl(
+        url,
+        currentVersion: currentVersion,
+      );
       if (release != null) return release;
     }
     return null;
@@ -526,8 +528,8 @@ class InutilUpdateService {
   Future<InutilReleaseInfo?> _fetchLanRelease({
     required String currentVersion,
   }) async {
-    final manifest =
-        await InutilPlaybackSyncService.instance.fetchReleaseManifestFromPeers();
+    final manifest = await InutilPlaybackSyncService.instance
+        .fetchReleaseManifestFromPeers();
     if (manifest == null) return null;
     return _releaseFromRaw(manifest, currentVersion: currentVersion);
   }
@@ -541,7 +543,10 @@ class InutilUpdateService {
     if (raw['fields'] is Map<String, dynamic>) {
       return _decodeFirestoreRelease(raw, currentVersion: currentVersion);
     }
-    return InutilReleaseInfo.fromJson(raw, currentVersionOverride: currentVersion);
+    return InutilReleaseInfo.fromJson(
+      raw,
+      currentVersionOverride: currentVersion,
+    );
   }
 
   /// URL de manifiesto configurada por el usuario (vacía = la por defecto).
@@ -755,8 +760,7 @@ class InutilUpdateService {
 
     final launcher = File(p.join(installRoot.path, executableName));
     final helper = File(p.join(staging.path, 'inutil_update_apply.sh'));
-    await helper.writeAsString(
-      r'''#!/bin/sh
+    await helper.writeAsString(r'''#!/bin/sh
 # Aplicación diferida de la actualización de Inútil Music.
 # argv: <pid que debe terminar> <staging> <directorio de instalación> <ejecutable>
 set -u
@@ -781,15 +785,16 @@ rm -f "$DEST/inutil_update_apply.sh"
 chmod +x "$EXEC"
 rm -rf "$STAGING"
 "$EXEC" >/dev/null 2>&1 &
-''',
-    );
+''');
     await Process.run('chmod', ['+x', helper.path]);
 
-    await Process.start(
-      '/bin/sh',
-      [helper.path, '$pid', staging.path, installRoot.path, launcher.path],
-      mode: ProcessStartMode.detached,
-    );
+    await Process.start('/bin/sh', [
+      helper.path,
+      '$pid',
+      staging.path,
+      installRoot.path,
+      launcher.path,
+    ], mode: ProcessStartMode.detached);
     return true;
   }
 
@@ -1090,7 +1095,9 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: AppColors.cardSurfaceFor(context),
-                              borderRadius: BorderRadius.circular(appCardRadius),
+                              borderRadius: BorderRadius.circular(
+                                appCardRadius,
+                              ),
                               border: Border.all(
                                 color: colors.outlineVariant.withValues(
                                   alpha: 0.35,
@@ -1116,7 +1123,9 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                                           CrossAxisAlignment.start,
                                       children: [
                                         Padding(
-                                          padding: const EdgeInsets.only(top: 3),
+                                          padding: const EdgeInsets.only(
+                                            top: 3,
+                                          ),
                                           child: Icon(
                                             Icons.check_rounded,
                                             color: colors.primary,
@@ -1402,7 +1411,8 @@ class _InutilAdminPublishUpdateModalState
                   _buildField(
                     controller: _minVersionController,
                     label: 'Versión mínima soportada (kill switch)',
-                    hint: 'ej. 2.1.0 — deja inoperables las versiones anteriores',
+                    hint:
+                        'ej. 2.1.0 — deja inoperables las versiones anteriores',
                   ),
                   const SizedBox(height: InutilDesignSystem.spaceSm),
                   _buildField(
@@ -1437,10 +1447,11 @@ class _InutilAdminPublishUpdateModalState
                     Container(
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: (_publishedSuccess
-                                ? InutilDesignSystem.accentCyan
-                                : InutilDesignSystem.secondaryGlow)
-                            .withValues(alpha: 0.15),
+                        color:
+                            (_publishedSuccess
+                                    ? InutilDesignSystem.accentCyan
+                                    : InutilDesignSystem.secondaryGlow)
+                                .withValues(alpha: 0.15),
                         borderRadius: InutilDesignSystem.borderMd,
                       ),
                       child: Text(
@@ -1515,9 +1526,7 @@ class _InutilAdminPublishUpdateModalState
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: InutilDesignSystem.borderMd,
-          borderSide: const BorderSide(
-            color: InutilDesignSystem.secondaryGlow,
-          ),
+          borderSide: const BorderSide(color: InutilDesignSystem.secondaryGlow),
         ),
       ),
     );

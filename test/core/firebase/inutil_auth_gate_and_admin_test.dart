@@ -34,12 +34,15 @@ Future<void> seedSession({
     'currentPhoneDeviceId': currentPhoneDeviceId,
   };
   await prefs.setString('inutil_music_auth_user_v3', jsonEncode(user));
-  await prefs.setString('inutil_music_auth_session_v3', jsonEncode({
-    'uid': uid,
-    'email': email,
-    'idToken': 'expired-test-token',
-    'refreshToken': 'test-refresh',
-  }));
+  await prefs.setString(
+    'inutil_music_auth_session_v3',
+    jsonEncode({
+      'uid': uid,
+      'email': email,
+      'idToken': 'expired-test-token',
+      'refreshToken': 'test-refresh',
+    }),
+  );
 }
 
 void main() {
@@ -149,7 +152,8 @@ void main() {
     test('No existen contraseñas hardcodeadas en el servicio', () async {
       // La única fuente de la contraseña es Firebase Auth; la app no debe
       // contener la palabra 'cesar123' ni accesos rápidos administrativos.
-      const source = '''
+      const source =
+          '''
         ${InutilAuthService.bootstrapAdminEmail}
       ''';
       expect(source.contains('cesar123'), isFalse);
@@ -187,12 +191,15 @@ void main() {
       expect(auth.isAccessAllowed, isTrue);
     });
 
-    test('El id de dispositivo sobrevive a reinicios (emparejamiento LAN)', () async {
-      final first = InutilAuthService.instance.deviceId;
-      expect(first, isNot('unknown_device'));
-      await InutilAuthService.instance.initialize();
-      expect(InutilAuthService.instance.deviceId, first);
-    });
+    test(
+      'El id de dispositivo sobrevive a reinicios (emparejamiento LAN)',
+      () async {
+        final first = InutilAuthService.instance.deviceId;
+        expect(first, isNot('unknown_device'));
+        await InutilAuthService.instance.initialize();
+        expect(InutilAuthService.instance.deviceId, first);
+      },
+    );
 
     test('signOut limpia la sesión local', () async {
       await seedSession(uid: 'uid_x', email: 'x@inutil.com');
@@ -206,67 +213,75 @@ void main() {
   group('Una cuenta, un solo teléfono (licencia por dispositivo)', () {
     final vigenciaFutura = DateTime.now().add(const Duration(days: 10));
 
-    test('El teléfono que tiene el reclamo de la cuenta sí reproduce', () async {
-      final ownedDevice = InutilAuthService.instance.deviceId;
-      await seedSession(
-        uid: 'uid_phone_ok',
-        email: 'telefono@inutil.com',
-        status: 'active',
-        isActive: true,
-        expiresAt: vigenciaFutura.toIso8601String(),
-        currentPhoneDeviceId: ownedDevice,
-      );
-      await InutilAuthService.instance.initialize();
+    test(
+      'El teléfono que tiene el reclamo de la cuenta sí reproduce',
+      () async {
+        final ownedDevice = InutilAuthService.instance.deviceId;
+        await seedSession(
+          uid: 'uid_phone_ok',
+          email: 'telefono@inutil.com',
+          status: 'active',
+          isActive: true,
+          expiresAt: vigenciaFutura.toIso8601String(),
+          currentPhoneDeviceId: ownedDevice,
+        );
+        await InutilAuthService.instance.initialize();
 
-      final auth = InutilAuthService.instance;
-      auth.testAsPhoneDevice(true);
-      auth.testSeedLicenseValidation(
-        DateTime.now().subtract(const Duration(hours: 1)),
-      );
+        final auth = InutilAuthService.instance;
+        auth.testAsPhoneDevice(true);
+        auth.testSeedLicenseValidation(
+          DateTime.now().subtract(const Duration(hours: 1)),
+        );
 
-      expect(auth.isAccessAllowed, isTrue);
-      expect(auth.canPlay, isTrue);
-      expect(auth.blockedReason, isEmpty);
-    });
+        expect(auth.isAccessAllowed, isTrue);
+        expect(auth.canPlay, isTrue);
+        expect(auth.blockedReason, isEmpty);
+      },
+    );
 
-    test('Un segundo teléfono queda bloqueado mientras el otro conserve el reclamo',
-        () async {
-      await seedSession(
-        uid: 'uid_phone_other',
-        email: 'otro@inutil.com',
-        status: 'active',
-        isActive: true,
-        expiresAt: vigenciaFutura.toIso8601String(),
-        currentPhoneDeviceId: 'otro_telefono_de_cesar',
-      );
-      await InutilAuthService.instance.initialize();
+    test(
+      'Un segundo teléfono queda bloqueado mientras el otro conserve el reclamo',
+      () async {
+        await seedSession(
+          uid: 'uid_phone_other',
+          email: 'otro@inutil.com',
+          status: 'active',
+          isActive: true,
+          expiresAt: vigenciaFutura.toIso8601String(),
+          currentPhoneDeviceId: 'otro_telefono_de_cesar',
+        );
+        await InutilAuthService.instance.initialize();
 
-      final auth = InutilAuthService.instance;
-      auth.testAsPhoneDevice(true);
-      auth.testSeedLicenseValidation(DateTime.now());
+        final auth = InutilAuthService.instance;
+        auth.testAsPhoneDevice(true);
+        auth.testSeedLicenseValidation(DateTime.now());
 
-      expect(auth.canPlay, isFalse);
-      expect(auth.blockedReason, contains('Otro teléfono'));
-    });
+        expect(auth.canPlay, isFalse);
+        expect(auth.blockedReason, contains('Otro teléfono'));
+      },
+    );
 
-    test('La PC no reproduce el conflicto: es altavoz/mando, no teléfono', () async {
-      await seedSession(
-        uid: 'uid_pc',
-        email: 'pc@inutil.com',
-        status: 'active',
-        isActive: true,
-        expiresAt: vigenciaFutura.toIso8601String(),
-        currentPhoneDeviceId: 'otro_telefono_de_cesar',
-      );
-      await InutilAuthService.instance.initialize();
+    test(
+      'La PC no reproduce el conflicto: es altavoz/mando, no teléfono',
+      () async {
+        await seedSession(
+          uid: 'uid_pc',
+          email: 'pc@inutil.com',
+          status: 'active',
+          isActive: true,
+          expiresAt: vigenciaFutura.toIso8601String(),
+          currentPhoneDeviceId: 'otro_telefono_de_cesar',
+        );
+        await InutilAuthService.instance.initialize();
 
-      final auth = InutilAuthService.instance;
-      auth.testSeedLicenseValidation(DateTime.now());
+        final auth = InutilAuthService.instance;
+        auth.testSeedLicenseValidation(DateTime.now());
 
-      // En Linux/macOS/Windows `devicePlatform` no es 'android', así que la
-      // licencia del teléfono no interfiere con el PC.
-      expect(auth.canPlay, isTrue);
-    });
+        // En Linux/macOS/Windows `devicePlatform` no es 'android', así que la
+        // licencia del teléfono no interfiere con el PC.
+        expect(auth.canPlay, isTrue);
+      },
+    );
 
     test('Sin validar en más de 72 h la app deja de reproducir', () async {
       await seedSession(
@@ -290,15 +305,15 @@ void main() {
   });
 
   group('InutilAuthGate Widget Tests', () {
-    testWidgets('Muestra InutilAuthScreen cuando no hay usuario autenticado', (tester) async {
+    testWidgets('Muestra InutilAuthScreen cuando no hay usuario autenticado', (
+      tester,
+    ) async {
       await InutilAuthService.instance.signOut();
 
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: InutilAuthGate(
-              child: Scaffold(body: Text('APP_INTERIOR')),
-            ),
+            home: InutilAuthGate(child: Scaffold(body: Text('APP_INTERIOR'))),
           ),
         ),
       );
@@ -315,7 +330,9 @@ void main() {
       expect(find.text('Acceso Administrador César'), findsNothing);
     });
 
-    testWidgets('Muestra CUENTA PENDIENTE para un registro sin vigencia', (tester) async {
+    testWidgets('Muestra CUENTA PENDIENTE para un registro sin vigencia', (
+      tester,
+    ) async {
       await seedSession(
         uid: 'uid_pend2',
         email: 'nuevo@inutil.com',
@@ -327,9 +344,7 @@ void main() {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: InutilAuthGate(
-              child: Scaffold(body: Text('APP_INTERIOR')),
-            ),
+            home: InutilAuthGate(child: Scaffold(body: Text('APP_INTERIOR'))),
           ),
         ),
       );
@@ -341,7 +356,9 @@ void main() {
       expect(find.text('APP_INTERIOR'), findsNothing);
     });
 
-    testWidgets('Muestra InutilLicenseExpiredScreen cuando la cuenta expiró', (tester) async {
+    testWidgets('Muestra InutilLicenseExpiredScreen cuando la cuenta expiró', (
+      tester,
+    ) async {
       final pastDate = DateTime.now().subtract(const Duration(days: 5));
       await seedSession(
         uid: 'user_exp',
@@ -353,9 +370,7 @@ void main() {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: InutilAuthGate(
-              child: Scaffold(body: Text('APP_INTERIOR')),
-            ),
+            home: InutilAuthGate(child: Scaffold(body: Text('APP_INTERIOR'))),
           ),
         ),
       );
@@ -367,7 +382,9 @@ void main() {
       expect(find.text('APP_INTERIOR'), findsNothing);
     });
 
-    testWidgets('Permite acceso a la APP cuando el rol es Administrador', (tester) async {
+    testWidgets('Permite acceso a la APP cuando el rol es Administrador', (
+      tester,
+    ) async {
       await seedSession(
         uid: 'uid_admin2',
         email: 'cesar@inutilmusic.com',
@@ -380,9 +397,7 @@ void main() {
       await tester.pumpWidget(
         const ProviderScope(
           child: MaterialApp(
-            home: InutilAuthGate(
-              child: Scaffold(body: Text('APP_INTERIOR')),
-            ),
+            home: InutilAuthGate(child: Scaffold(body: Text('APP_INTERIOR'))),
           ),
         ),
       );
@@ -394,7 +409,9 @@ void main() {
       expect(find.byType(InutilLicenseExpiredScreen), findsNothing);
     });
 
-    testWidgets('InutilAdminPanel se renderiza con la sesión admin', (tester) async {
+    testWidgets('InutilAdminPanel se renderiza con la sesión admin', (
+      tester,
+    ) async {
       await seedSession(
         uid: 'uid_admin3',
         email: 'cesar@inutilmusic.com',
@@ -406,11 +423,7 @@ void main() {
 
       await tester.pumpWidget(
         const ProviderScope(
-          child: MaterialApp(
-            home: Scaffold(
-              body: InutilAdminPanel(),
-            ),
-          ),
+          child: MaterialApp(home: Scaffold(body: InutilAdminPanel())),
         ),
       );
 

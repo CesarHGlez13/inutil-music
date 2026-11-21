@@ -2578,8 +2578,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   void _markPeerAsActiveDevice(LanDevicePeer peer, {required bool playing}) {
     final base = _currentRemoteSession ?? _currentLocalSession;
     if (base == null) return;
-    if (base.activeDeviceId == peer.deviceId &&
-        base.isPlaying == playing) {
+    if (base.activeDeviceId == peer.deviceId && base.isPlaying == playing) {
       return;
     }
 

@@ -28,10 +28,8 @@ class InutilSupportPopupDialog extends StatelessWidget {
       barrierLabel: 'Cerrar',
       barrierColor: Colors.black.withValues(alpha: 0.62),
       transitionDuration: const Duration(milliseconds: 320),
-      pageBuilder: (context, _, _) => InutilSupportPopupDialog(
-        campaign: campaign,
-        onOpenUrl: onOpenUrl,
-      ),
+      pageBuilder: (context, _, _) =>
+          InutilSupportPopupDialog(campaign: campaign, onOpenUrl: onOpenUrl),
       transitionBuilder: (context, animation, _, child) {
         final curved = CurvedAnimation(
           parent: animation,

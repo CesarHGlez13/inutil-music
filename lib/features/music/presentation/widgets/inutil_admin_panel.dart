@@ -55,7 +55,8 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
     return _users.where((u) {
       // 1. Filtro de búsqueda
       final query = _searchQuery.trim().toLowerCase();
-      final matchSearch = query.isEmpty ||
+      final matchSearch =
+          query.isEmpty ||
           u.email.toLowerCase().contains(query) ||
           u.displayName.toLowerCase().contains(query) ||
           u.uid.toLowerCase().contains(query);
@@ -115,7 +116,12 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
     return '$day/$month/$year';
   }
 
-  Future<void> _grantVigencia(String uid, int days, {bool isPermanent = false, String? email}) async {
+  Future<void> _grantVigencia(
+    String uid,
+    int days, {
+    bool isPermanent = false,
+    String? email,
+  }) async {
     final auth = ref.read(inutilAuthProvider);
     await auth.adminGrantVigencia(
       uid: uid,
@@ -137,7 +143,11 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
     }
   }
 
-  Future<void> _pickCustomDate(String uid, String email, DateTime? currentDate) async {
+  Future<void> _pickCustomDate(
+    String uid,
+    String email,
+    DateTime? currentDate,
+  ) async {
     final now = DateTime.now();
     final initialDate = (currentDate != null && currentDate.isAfter(now))
         ? currentDate
@@ -168,7 +178,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Vencimiento de $email fijado al ${_formatDate(picked)}'),
+            content: Text(
+              'Vencimiento de $email fijado al ${_formatDate(picked)}',
+            ),
             backgroundColor: InutilDesignSystem.primaryNeon,
           ),
         );
@@ -176,7 +188,11 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
     }
   }
 
-  Future<void> _toggleActive(String uid, bool currentActive, String email) async {
+  Future<void> _toggleActive(
+    String uid,
+    bool currentActive,
+    String email,
+  ) async {
     final auth = ref.read(inutilAuthProvider);
     await auth.adminToggleUserActive(uid: uid, isActive: !currentActive);
     await _loadUsers();
@@ -212,7 +228,10 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
       builder: (ctx) => AlertDialog(
         backgroundColor: InutilDesignSystem.surfaceElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('¿Eliminar Usuario?', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          '¿Eliminar Usuario?',
+          style: TextStyle(color: Colors.white),
+        ),
         content: Text(
           '¿Estás seguro de que deseas eliminar permanentemente la cuenta de $email?',
           style: const TextStyle(color: Colors.white70),
@@ -220,12 +239,18 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: Colors.white60),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Eliminar', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -264,9 +289,15 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
           ),
           title: const Row(
             children: [
-              Icon(Icons.person_add_rounded, color: InutilDesignSystem.primaryNeon),
+              Icon(
+                Icons.person_add_rounded,
+                color: InutilDesignSystem.primaryNeon,
+              ),
               SizedBox(width: 10),
-              Text('Registrar Nuevo Usuario', style: TextStyle(color: Colors.white, fontSize: 18)),
+              Text(
+                'Registrar Nuevo Usuario',
+                style: TextStyle(color: Colors.white, fontSize: 18),
+              ),
             ],
           ),
           content: SingleChildScrollView(
@@ -280,7 +311,10 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                   decoration: const InputDecoration(
                     labelText: 'Correo Electrónico',
                     labelStyle: TextStyle(color: Colors.white60),
-                    prefixIcon: Icon(Icons.email_outlined, color: Colors.white54),
+                    prefixIcon: Icon(
+                      Icons.email_outlined,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -290,7 +324,10 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                   decoration: const InputDecoration(
                     labelText: 'Contraseña Inicial',
                     labelStyle: TextStyle(color: Colors.white60),
-                    prefixIcon: Icon(Icons.lock_outline_rounded, color: Colors.white54),
+                    prefixIcon: Icon(
+                      Icons.lock_outline_rounded,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -300,13 +337,20 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                   decoration: const InputDecoration(
                     labelText: 'Nombre o Alias',
                     labelStyle: TextStyle(color: Colors.white60),
-                    prefixIcon: Icon(Icons.badge_outlined, color: Colors.white54),
+                    prefixIcon: Icon(
+                      Icons.badge_outlined,
+                      color: Colors.white54,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
                 const Text(
                   'Vigencia Inicial:',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Wrap(
@@ -352,7 +396,10 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancelar', style: TextStyle(color: Colors.white60)),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.white60),
+              ),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -382,7 +429,10 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                   } catch (e) {
                     if (ctx.mounted) {
                       ScaffoldMessenger.of(ctx).showSnackBar(
-                        SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+                        SnackBar(
+                          content: Text(e.toString()),
+                          backgroundColor: Colors.red,
+                        ),
                       );
                     }
                   }
@@ -431,7 +481,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
             decoration: const BoxDecoration(
               color: InutilDesignSystem.surfaceElevated,
               borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-              border: Border(bottom: BorderSide(color: InutilDesignSystem.borderSubtle)),
+              border: Border(
+                bottom: BorderSide(color: InutilDesignSystem.borderSubtle),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -464,12 +516,20 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     IconButton(
                       tooltip: 'Actualizar Lista',
                       onPressed: _loadUsers,
-                      icon: const Icon(Icons.refresh_rounded, color: Colors.white70, size: 20),
+                      icon: const Icon(
+                        Icons.refresh_rounded,
+                        color: Colors.white70,
+                        size: 20,
+                      ),
                     ),
                     IconButton(
                       tooltip: 'Cerrar Panel',
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded, color: Colors.white60, size: 20),
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Colors.white60,
+                        size: 20,
+                      ),
                     ),
                   ],
                 ),
@@ -490,7 +550,8 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     ),
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
-                      onPressed: () => showInutilAdminPublishUpdateDialog(context),
+                      onPressed: () =>
+                          showInutilAdminPublishUpdateDialog(context),
                       icon: const Icon(
                         Icons.cloud_upload_rounded,
                         size: 14,
@@ -505,9 +566,14 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                       ),
                       style: OutlinedButton.styleFrom(
                         side: BorderSide(
-                          color: InutilDesignSystem.accentCyan.withValues(alpha: 0.5),
+                          color: InutilDesignSystem.accentCyan.withValues(
+                            alpha: 0.5,
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -517,12 +583,20 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     ElevatedButton.icon(
                       onPressed: _showCreateUserDialog,
                       icon: const Icon(Icons.person_add_rounded, size: 14),
-                      label: const Text('Nuevo Usuario', style: TextStyle(fontSize: 12)),
+                      label: const Text(
+                        'Nuevo Usuario',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: InutilDesignSystem.primaryNeon,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ],
@@ -539,13 +613,29 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildStatBadge('Total', totalUsers.toString(), Colors.blueAccent),
+                  _buildStatBadge(
+                    'Total',
+                    totalUsers.toString(),
+                    Colors.blueAccent,
+                  ),
                   const SizedBox(width: 12),
-                  _buildStatBadge('Activos', activeUsers.toString(), Colors.greenAccent),
+                  _buildStatBadge(
+                    'Activos',
+                    activeUsers.toString(),
+                    Colors.greenAccent,
+                  ),
                   const SizedBox(width: 12),
-                  _buildStatBadge('Vencidos / Inactivos', expiredUsers.toString(), Colors.redAccent),
+                  _buildStatBadge(
+                    'Vencidos / Inactivos',
+                    expiredUsers.toString(),
+                    Colors.redAccent,
+                  ),
                   const SizedBox(width: 12),
-                  _buildStatBadge('Admins', adminUsers.toString(), Colors.amberAccent),
+                  _buildStatBadge(
+                    'Admins',
+                    adminUsers.toString(),
+                    Colors.amberAccent,
+                  ),
                 ],
               ),
             ),
@@ -561,8 +651,15 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     style: const TextStyle(color: Colors.white, fontSize: 13.5),
                     decoration: InputDecoration(
                       hintText: 'Buscar por correo, nombre o UID...',
-                      hintStyle: const TextStyle(color: Colors.white38, fontSize: 13),
-                      prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54, size: 20),
+                      hintStyle: const TextStyle(
+                        color: Colors.white38,
+                        fontSize: 13,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        color: Colors.white54,
+                        size: 20,
+                      ),
                       filled: true,
                       fillColor: InutilDesignSystem.surfaceElevated,
                       isDense: true,
@@ -608,31 +705,43 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: InutilDesignSystem.primaryNeon),
+                    child: CircularProgressIndicator(
+                      color: InutilDesignSystem.primaryNeon,
+                    ),
                   )
                 : filtered.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.search_off_rounded, size: 48, color: Colors.white.withValues(alpha: 0.3)),
-                            const SizedBox(height: 12),
-                            const Text(
-                              'No se encontraron usuarios con este criterio.',
-                              style: TextStyle(color: InutilDesignSystem.textSecondary, fontSize: 14),
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.search_off_rounded,
+                          size: 48,
+                          color: Colors.white.withValues(alpha: 0.3),
                         ),
-                      )
-                    : ListView.separated(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        itemCount: filtered.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final user = filtered[index];
-                          return _buildUserCard(user);
-                        },
-                      ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'No se encontraron usuarios con este criterio.',
+                          style: TextStyle(
+                            color: InutilDesignSystem.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    itemCount: filtered.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final user = filtered[index];
+                      return _buildUserCard(user);
+                    },
+                  ),
           ),
         ],
       ),
@@ -650,9 +759,23 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(width: 8),
-          Text(value, style: TextStyle(color: color, fontSize: 15, fontWeight: FontWeight.w900)),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );
@@ -671,7 +794,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
               : InutilDesignSystem.surfaceElevated,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: isSelected ? Colors.transparent : InutilDesignSystem.borderSubtle,
+            color: isSelected
+                ? Colors.transparent
+                : InutilDesignSystem.borderSubtle,
           ),
         ),
         child: Text(
@@ -723,8 +848,8 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
           color: user.isAdmin
               ? Colors.amberAccent.withValues(alpha: 0.3)
               : (isExpired || isSuspended)
-                  ? Colors.redAccent.withValues(alpha: 0.25)
-                  : InutilDesignSystem.borderSubtle,
+              ? Colors.redAccent.withValues(alpha: 0.25)
+              : InutilDesignSystem.borderSubtle,
         ),
       ),
       child: Column(
@@ -756,7 +881,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     Row(
                       children: [
                         Text(
-                          user.displayName.isNotEmpty ? user.displayName : user.email.split('@').first,
+                          user.displayName.isNotEmpty
+                              ? user.displayName
+                              : user.email.split('@').first,
                           style: const TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.bold,
@@ -765,11 +892,16 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: statusColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: statusColor.withValues(alpha: 0.4)),
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.4),
+                            ),
                           ),
                           child: Text(
                             statusText,
@@ -810,15 +942,23 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                             const SizedBox(width: 6),
                             InkWell(
                               onTap: () {
-                                Clipboard.setData(ClipboardData(text: user.uid));
+                                Clipboard.setData(
+                                  ClipboardData(text: user.uid),
+                                );
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
-                                    content: Text('UID copiado al portapapeles'),
+                                    content: Text(
+                                      'UID copiado al portapapeles',
+                                    ),
                                     duration: Duration(seconds: 1),
                                   ),
                                 );
                               },
-                              child: const Icon(Icons.copy_rounded, size: 12, color: Colors.white38),
+                              child: const Icon(
+                                Icons.copy_rounded,
+                                size: 12,
+                                color: Colors.white38,
+                              ),
                             ),
                           ],
                         ),
@@ -827,7 +967,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                           style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w600,
-                            color: isExpired ? Colors.redAccent : Colors.white70,
+                            color: isExpired
+                                ? Colors.redAccent
+                                : Colors.white70,
                           ),
                         ),
                         if (!user.isAdmin) ...[
@@ -838,9 +980,9 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                             user.currentPhoneDeviceId.isEmpty
                                 ? '📱 sin teléfono registrado'
                                 : '📱 ${user.currentPhoneDeviceId} · '
-                                  'cambios ${user.phoneSwitchCount}/'
-                                  '${InutilAuthService.maxMonthlyPhoneSwitches} '
-                                  '(${user.phoneSwitchMonth})',
+                                      'cambios ${user.phoneSwitchCount}/'
+                                      '${InutilAuthService.maxMonthlyPhoneSwitches} '
+                                      '(${user.phoneSwitchMonth})',
                             style: const TextStyle(
                               fontSize: 11,
                               color: Colors.white38,
@@ -859,22 +1001,30 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: user.isActive ? 'Suspender Cuenta' : 'Activar Cuenta',
+                    tooltip: user.isActive
+                        ? 'Suspender Cuenta'
+                        : 'Activar Cuenta',
                     icon: Icon(
-                      user.isActive ? Icons.toggle_on_rounded : Icons.toggle_off_rounded,
+                      user.isActive
+                          ? Icons.toggle_on_rounded
+                          : Icons.toggle_off_rounded,
                       color: user.isActive ? Colors.greenAccent : Colors.grey,
                       size: 28,
                     ),
-                    onPressed: () => _toggleActive(user.uid, user.isActive, user.email),
+                    onPressed: () =>
+                        _toggleActive(user.uid, user.isActive, user.email),
                   ),
                   IconButton(
-                    tooltip: user.isAdmin ? 'Degradar a Usuario' : 'Ascender a Administrador',
+                    tooltip: user.isAdmin
+                        ? 'Degradar a Usuario'
+                        : 'Ascender a Administrador',
                     icon: Icon(
                       Icons.shield_rounded,
                       color: user.isAdmin ? Colors.amberAccent : Colors.white24,
                       size: 20,
                     ),
-                    onPressed: () => _toggleRole(user.uid, user.role, user.email),
+                    onPressed: () =>
+                        _toggleRole(user.uid, user.role, user.email),
                   ),
                   if (isPending)
                     IconButton(
@@ -899,7 +1049,11 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                     ),
                   IconButton(
                     tooltip: 'Eliminar Cuenta',
-                    icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
                     onPressed: () => _deleteUserConfirm(user.uid, user.email),
                   ),
                 ],
@@ -925,24 +1079,50 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
                   ),
                 ),
                 const SizedBox(width: 10),
-                _buildVigenciaChip('+7 Días', () => _grantVigencia(user.uid, 7, email: user.email)),
+                _buildVigenciaChip(
+                  '+7 Días',
+                  () => _grantVigencia(user.uid, 7, email: user.email),
+                ),
                 const SizedBox(width: 6),
-                _buildVigenciaChip('+30 Días (1 Mes)', () => _grantVigencia(user.uid, 30, email: user.email), highlight: true),
+                _buildVigenciaChip(
+                  '+30 Días (1 Mes)',
+                  () => _grantVigencia(user.uid, 30, email: user.email),
+                  highlight: true,
+                ),
                 const SizedBox(width: 6),
-                _buildVigenciaChip('+90 Días (3 Meses)', () => _grantVigencia(user.uid, 90, email: user.email)),
+                _buildVigenciaChip(
+                  '+90 Días (3 Meses)',
+                  () => _grantVigencia(user.uid, 90, email: user.email),
+                ),
                 const SizedBox(width: 6),
-                _buildVigenciaChip('+1 Año', () => _grantVigencia(user.uid, 365, email: user.email)),
+                _buildVigenciaChip(
+                  '+1 Año',
+                  () => _grantVigencia(user.uid, 365, email: user.email),
+                ),
                 const SizedBox(width: 6),
                 _buildVigenciaChip(
                   '💎 Permanente',
-                  () => _grantVigencia(user.uid, 9999, isPermanent: true, email: user.email),
+                  () => _grantVigencia(
+                    user.uid,
+                    9999,
+                    isPermanent: true,
+                    email: user.email,
+                  ),
                   color: Colors.amberAccent,
                 ),
                 const SizedBox(width: 6),
                 IconButton(
                   tooltip: 'Elegir fecha de vencimiento en calendario',
-                  icon: const Icon(Icons.calendar_month_rounded, size: 18, color: InutilDesignSystem.accentCyan),
-                  onPressed: () => _pickCustomDate(user.uid, user.email, user.accountExpiresAt),
+                  icon: const Icon(
+                    Icons.calendar_month_rounded,
+                    size: 18,
+                    color: InutilDesignSystem.accentCyan,
+                  ),
+                  onPressed: () => _pickCustomDate(
+                    user.uid,
+                    user.email,
+                    user.accountExpiresAt,
+                  ),
                 ),
               ],
             ),
@@ -952,8 +1132,14 @@ class _InutilAdminPanelState extends ConsumerState<InutilAdminPanel> {
     );
   }
 
-  Widget _buildVigenciaChip(String label, VoidCallback onTap, {bool highlight = false, Color? color}) {
-    final chipColor = color ?? (highlight ? InutilDesignSystem.primaryNeon : Colors.white70);
+  Widget _buildVigenciaChip(
+    String label,
+    VoidCallback onTap, {
+    bool highlight = false,
+    Color? color,
+  }) {
+    final chipColor =
+        color ?? (highlight ? InutilDesignSystem.primaryNeon : Colors.white70);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),

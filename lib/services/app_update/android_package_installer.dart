@@ -16,9 +16,7 @@ import 'package:flutter/services.dart';
 class AndroidPackageInstaller {
   const AndroidPackageInstaller._();
 
-  static const MethodChannel channel = MethodChannel(
-    'inutil_music/app_update',
-  );
+  static const MethodChannel channel = MethodChannel('inutil_music/app_update');
 
   static bool get isSupported => Platform.isAndroid;
 

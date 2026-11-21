@@ -63,8 +63,9 @@ class _InutilInactivityPausedScreenState
       _requesting = true;
       _feedback = null;
     });
-    final ok = await (widget.onRequestReactivation ??
-        InutilAuthService.instance.requestReactivation)();
+    final ok =
+        await (widget.onRequestReactivation ??
+            InutilAuthService.instance.requestReactivation)();
     if (!mounted) return;
     setState(() {
       _requesting = false;
@@ -213,7 +214,8 @@ class _InutilInactivityPausedScreenState
                           SizedBox(height: 12),
                           _SafeRow(
                             glyph: InutilGlyph.library,
-                            text: 'Playlists y Favoritos respaldados en la nube',
+                            text:
+                                'Playlists y Favoritos respaldados en la nube',
                           ),
                           SizedBox(height: 10),
                           _SafeRow(
@@ -231,8 +233,9 @@ class _InutilInactivityPausedScreenState
                     const SizedBox(height: 22),
                     FilledButton.icon(
                       key: const ValueKey('inactivity-request-reactivation'),
-                      onPressed:
-                          _requesting || _requested ? null : _requestReactivation,
+                      onPressed: _requesting || _requested
+                          ? null
+                          : _requestReactivation,
                       icon: _requesting
                           ? const SizedBox.square(
                               dimension: 16,

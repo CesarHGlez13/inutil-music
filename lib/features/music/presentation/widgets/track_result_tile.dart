@@ -128,9 +128,7 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
         decoration: BoxDecoration(
           color: surfaceColor,
           borderRadius: borderRadius,
-          border: highlighted
-              ? Border.all(color: borderColor, width: 1)
-              : null,
+          border: highlighted ? Border.all(color: borderColor, width: 1) : null,
         ),
         child: Material(
           color: Colors.transparent,
@@ -148,10 +146,7 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
                       : () => selection.toggle(track)
                 : () => _play(ref, openPlayer: true),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 8,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               child: Row(
                 children: [
                   Stack(
@@ -216,9 +211,7 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
                               overflow: TextOverflow.ellipsis,
                               style: Theme.of(context).textTheme.bodySmall
                                   ?.copyWith(
-                                    color: Theme.of(
-                                      context,
-                                    ).colorScheme.error,
+                                    color: Theme.of(context).colorScheme.error,
                                   ),
                             ),
                           ],
@@ -226,36 +219,37 @@ class _TrackResultTileState extends ConsumerState<TrackResultTile> {
                       ],
                     ),
                   ),
-                    const SizedBox(width: 8),
-                    if (selecting)
-                      Checkbox(
-                        key: ValueKey('track-result-selection-$identity'),
-                        value: selected,
-                        onChanged: selection!.busy
-                            ? null
-                            : (_) => selection.toggle(track),
-                      )
-                    else ...[
-                      TrackPlayButton(
-                        key: ValueKey('track-result-play-$identity'),
-                        tooltip: isPlaying ? strings.pause : strings.play,
-                        isPlaying: isPlaying,
-                        onPressed: () => _togglePlayback(ref),
-                      ),
-                      _TrackResultMenu(
-                        key: ValueKey('track-result-menu-$identity'),
-                        track: track,
-                        strings: strings,
-                      ),
-                    ],
+                  const SizedBox(width: 8),
+                  if (selecting)
+                    Checkbox(
+                      key: ValueKey('track-result-selection-$identity'),
+                      value: selected,
+                      onChanged: selection!.busy
+                          ? null
+                          : (_) => selection.toggle(track),
+                    )
+                  else ...[
+                    TrackPlayButton(
+                      key: ValueKey('track-result-play-$identity'),
+                      tooltip: isPlaying ? strings.pause : strings.play,
+                      isPlaying: isPlaying,
+                      onPressed: () => _togglePlayback(ref),
+                    ),
+                    _TrackResultMenu(
+                      key: ValueKey('track-result-menu-$identity'),
+                      track: track,
+                      strings: strings,
+                    ),
                   ],
-                ),
+                ],
               ),
             ),
           ),
         ),
-      );
-    if (selecting || !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform)) {
+      ),
+    );
+    if (selecting ||
+        !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform)) {
       return tile;
     }
     return Dismissible(

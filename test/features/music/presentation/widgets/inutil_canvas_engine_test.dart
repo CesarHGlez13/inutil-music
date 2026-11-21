@@ -69,7 +69,10 @@ void main() {
       expect(createCalls.first.arguments, containsPair('playing', true));
       expect(
         createCalls.first.arguments,
-        containsPair('startOffsetMs', animatedArtworkIntroOffset.inMilliseconds),
+        containsPair(
+          'startOffsetMs',
+          animatedArtworkIntroOffset.inMilliseconds,
+        ),
       );
 
       // Antes del primer frame nativo, el video sigue oculto sobre la carátula.
@@ -77,10 +80,12 @@ void main() {
       expect(
         tester
             .widget<AnimatedOpacity>(
-              find.descendant(
-                of: find.byType(SpotifyCanvasVideo),
-                matching: find.byType(AnimatedOpacity),
-              ).first,
+              find
+                  .descendant(
+                    of: find.byType(SpotifyCanvasVideo),
+                    matching: find.byType(AnimatedOpacity),
+                  )
+                  .first,
             )
             .opacity,
         0,
@@ -98,18 +103,17 @@ void main() {
       await tester.pump(const Duration(milliseconds: 250));
 
       expect(find.byType(Texture), findsOneWidget);
-      expect(
-        tester.widget<Texture>(find.byType(Texture)).textureId,
-        42,
-      );
+      expect(tester.widget<Texture>(find.byType(Texture)).textureId, 42);
 
       expect(
         tester
             .widget<AnimatedOpacity>(
-              find.descendant(
-                of: find.byType(SpotifyCanvasVideo),
-                matching: find.byType(AnimatedOpacity),
-              ).first,
+              find
+                  .descendant(
+                    of: find.byType(SpotifyCanvasVideo),
+                    matching: find.byType(AnimatedOpacity),
+                  )
+                  .first,
             )
             .opacity,
         1,
@@ -133,9 +137,7 @@ void main() {
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
       expect(
-        calls.any(
-          (c) => c.method == 'dispose' && c.arguments['playerId'] == 7,
-        ),
+        calls.any((c) => c.method == 'dispose' && c.arguments['playerId'] == 7),
         isTrue,
       );
       expect(tester.takeException(), isNull);

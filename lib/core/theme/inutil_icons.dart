@@ -71,7 +71,9 @@ class InutilIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final resolvedColor =
-        color ?? IconTheme.of(context).color ?? Theme.of(context).colorScheme.onSurface;
+        color ??
+        IconTheme.of(context).color ??
+        Theme.of(context).colorScheme.onSurface;
     return RepaintBoundary(
       child: SizedBox.square(
         dimension: size,
@@ -216,7 +218,11 @@ class _InutilGlyphPainter extends CustomPainter {
       canvas.drawPath(combined, fill);
     } else {
       canvas.drawPath(house, stroke);
-      canvas.drawLine(const Offset(9.5, 16.0), const Offset(14.5, 16.0), stroke);
+      canvas.drawLine(
+        const Offset(9.5, 16.0),
+        const Offset(14.5, 16.0),
+        stroke,
+      );
     }
   }
 
@@ -298,8 +304,16 @@ class _InutilGlyphPainter extends CustomPainter {
     } else {
       canvas.drawPath(folder, stroke);
       canvas.drawLine(const Offset(9.0, 15.8), const Offset(9.0, 13.0), stroke);
-      canvas.drawLine(const Offset(12.0, 15.8), const Offset(12.0, 11.2), stroke);
-      canvas.drawLine(const Offset(15.0, 15.8), const Offset(15.0, 12.6), stroke);
+      canvas.drawLine(
+        const Offset(12.0, 15.8),
+        const Offset(12.0, 11.2),
+        stroke,
+      );
+      canvas.drawLine(
+        const Offset(15.0, 15.8),
+        const Offset(15.0, 12.6),
+        stroke,
+      );
     }
   }
 
@@ -338,8 +352,16 @@ class _InutilGlyphPainter extends CustomPainter {
         stroke,
       );
       canvas.drawCircle(const Offset(17.3, 12.0), 1.25, fill);
-      canvas.drawLine(const Offset(6.8, 10.2), const Offset(11.8, 10.2), stroke);
-      canvas.drawLine(const Offset(6.8, 13.8), const Offset(10.4, 13.8), stroke);
+      canvas.drawLine(
+        const Offset(6.8, 10.2),
+        const Offset(11.8, 10.2),
+        stroke,
+      );
+      canvas.drawLine(
+        const Offset(6.8, 13.8),
+        const Offset(10.4, 13.8),
+        stroke,
+      );
     }
   }
 
@@ -458,7 +480,12 @@ class _InutilGlyphPainter extends CustomPainter {
     canvas.drawPath(cabeza, stroke);
   }
 
-  void _paintSleepTimer(Canvas canvas, Paint stroke, Paint fill, Paint softFill) {
+  void _paintSleepTimer(
+    Canvas canvas,
+    Paint stroke,
+    Paint fill,
+    Paint softFill,
+  ) {
     // Sleek moon-crescent + precision timer top stem
     final moon = Path()
       ..moveTo(13.6, 4.6)
@@ -579,7 +606,12 @@ class _InutilGlyphPainter extends CustomPainter {
     canvas.drawLine(const Offset(13.8, 10.6), const Offset(13.8, 16.0), stroke);
   }
 
-  void _paintDataSaver(Canvas canvas, Paint stroke, Paint fill, Paint softFill) {
+  void _paintDataSaver(
+    Canvas canvas,
+    Paint stroke,
+    Paint fill,
+    Paint softFill,
+  ) {
     canvas.drawCircle(const Offset(12, 12), 8.6, softFill);
     canvas.drawArc(
       Rect.fromCircle(center: const Offset(12, 12), radius: 8.4),

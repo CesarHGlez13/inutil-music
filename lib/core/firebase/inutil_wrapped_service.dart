@@ -146,8 +146,9 @@ class InutilWrappedSummary {
   }
 
   ({String emoji, String title, String description}) get personalityArchetype {
-    final topTrackShare =
-        totalPlays > 0 && topTrack != null ? topTrack!.plays / totalPlays : 0.0;
+    final topTrackShare = totalPlays > 0 && topTrack != null
+        ? topTrack!.plays / totalPlays
+        : 0.0;
     if (topTrackShare >= 0.18 && (topTrack?.plays ?? 0) >= 5) {
       return (
         emoji: '🔁',
@@ -288,7 +289,8 @@ class InutilWrappedService {
     required DateTime now,
   }) {
     bucket.totalSeconds += deltaSec;
-    bucket.hourBuckets[now.hour] = (bucket.hourBuckets[now.hour] ?? 0) + deltaSec;
+    bucket.hourBuckets[now.hour] =
+        (bucket.hourBuckets[now.hour] ?? 0) + deltaSec;
     final dayKey =
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     bucket.activeDays.add(dayKey);
@@ -340,7 +342,9 @@ class InutilWrappedService {
   String _primaryArtistName(String raw) {
     final cleaned = raw.trim();
     if (cleaned.isEmpty) return 'Inútil Music';
-    final split = cleaned.split(RegExp(r'\s*(?:,|&|feat\.|ft\.|x|•)\s*', caseSensitive: false));
+    final split = cleaned.split(
+      RegExp(r'\s*(?:,|&|feat\.|ft\.|x|•)\s*', caseSensitive: false),
+    );
     final first = split.first.trim();
     return first.isEmpty ? cleaned : first;
   }
@@ -352,7 +356,9 @@ class InutilWrappedService {
   void _schedulePersist({bool immediate = false}) {
     _persistTimer?.cancel();
     _persistTimer = Timer(
-      immediate ? const Duration(milliseconds: 400) : const Duration(seconds: 15),
+      immediate
+          ? const Duration(milliseconds: 400)
+          : const Duration(seconds: 15),
       () => unawaited(persistNow()),
     );
     _cloudPushTimer?.cancel();

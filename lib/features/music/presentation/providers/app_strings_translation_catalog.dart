@@ -925,13 +925,14 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '允许访问您的音乐',
     '音楽へのアクセスを許可する',
   ],
-  'Inútil Music needs permission to show and play audio files on this device.': <String>[
-    'Inútil Music precisa de permissão para mostrar e reproduzir arquivos de áudio neste dispositivo.',
-    'Inútil Music a besoin d\'une autorisation pour afficher et lire des fichiers audio sur cet appareil.',
-    'Inútil Music에 이 기기에서 오디오 파일을 표시하고 재생하려면 권한이 필요합니다.',
-    'Inútil Music 需要权限才能在此设备上显示和播放音频文件设备。',
-    'Inútil Music には、このデバイスでオーディオ ファイルを表示および再生する権限が必要です。',
-  ],
+  'Inútil Music needs permission to show and play audio files on this device.':
+      <String>[
+        'Inútil Music precisa de permissão para mostrar e reproduzir arquivos de áudio neste dispositivo.',
+        'Inútil Music a besoin d\'une autorisation pour afficher et lire des fichiers audio sur cet appareil.',
+        'Inútil Music에 이 기기에서 오디오 파일을 표시하고 재생하려면 권한이 필요합니다.',
+        'Inútil Music 需要权限才能在此设备上显示和播放音频文件设备。',
+        'Inútil Music には、このデバイスでオーディオ ファイルを表示および再生する権限が必要です。',
+      ],
   'Allow access': <String>[
     'Permitir acesso',
     'Autoriser l\'accès',
@@ -2651,13 +2652,14 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '推荐历史',
     '推奨履歴',
   ],
-  'Inútil Music learns from the songs you listen to in order to personalize Home.': <String>[
-    'Inútil Music aprende com as músicas que você ouve para personalizar a página inicial.',
-    'Inútil Music apprend à partir des chansons que vous écoutez afin de personnaliser la maison.',
-    'Inútil Music은 홈을 개인화하기 위해 사용자가 듣는 노래를 학습합니다.',
-    'Inútil Music 从您收听的歌曲中学习，以便对主页进行个性化设置。',
-    'Inútil Musicは、ホームをカスタマイズするために、あなたが聞いた曲から学習します。',
-  ],
+  'Inútil Music learns from the songs you listen to in order to personalize Home.':
+      <String>[
+        'Inútil Music aprende com as músicas que você ouve para personalizar a página inicial.',
+        'Inútil Music apprend à partir des chansons que vous écoutez afin de personnaliser la maison.',
+        'Inútil Music은 홈을 개인화하기 위해 사용자가 듣는 노래를 학습합니다.',
+        'Inútil Music 从您收听的歌曲中学习，以便对主页进行个性化设置。',
+        'Inútil Musicは、ホームをカスタマイズするために、あなたが聞いた曲から学習します。',
+      ],
   'New plays will not be used to personalize Home.': <String>[
     'Novas peças não será usado para personalizar a página inicial.',
     'Nouvelles pièces ne sera pas utilisé pour personnaliser l\'accueil.',
@@ -2687,14 +2689,13 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '清除历史记录和推荐？',
     '履歴と推奨事項を消去しますか?',
   ],
-  'Inútil Music will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.':
-      <String>[
-        'O Inútil Music esquecerá o que aprendeu ao ouvir. Downloads, favoritos e listas de reprodução permanecerão intactos.',
-        'Inútil Music oubliera ce qu\'il a appris de votre écoute. Les téléchargements, les favoris et les listes de lecture resteront intacts.',
-        'Inútil Music은 귀하의 청취를 통해 배운 내용을 잊어버릴 것입니다. 다운로드, 즐겨찾기 및 재생 목록은 그대로 유지됩니다.',
-        'Inútil Music 会忘记它从您的聆听中学到的内容。下载、收藏夹和播放列表将保持不变。',
-        'Inútil Musicは、聞いて学んだことを忘れてしまいます。ダウンロード、お気に入り、プレイリストはそのまま残ります。',
-      ],
+  'Inútil Music will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.': <String>[
+    'O Inútil Music esquecerá o que aprendeu ao ouvir. Downloads, favoritos e listas de reprodução permanecerão intactos.',
+    'Inútil Music oubliera ce qu\'il a appris de votre écoute. Les téléchargements, les favoris et les listes de lecture resteront intacts.',
+    'Inútil Music은 귀하의 청취를 통해 배운 내용을 잊어버릴 것입니다. 다운로드, 즐겨찾기 및 재생 목록은 그대로 유지됩니다.',
+    'Inútil Music 会忘记它从您的聆听中学到的内容。下载、收藏夹和播放列表将保持不变。',
+    'Inútil Musicは、聞いて学んだことを忘れてしまいます。ダウンロード、お気に入り、プレイリストはそのまま残ります。',
+  ],
   'History and recommendations cleared.': <String>[
     'Histórico e recomendações apagados.',
     'Historique et recommandations effacés.',
@@ -3101,13 +3102,14 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
         '覆盖配置与主机文件冲突。更正 ZXQPH0X 条目并重试。',
         'オーバーレイ構成はホスト ファイルと競合します。 ZXQPH0X エントリを修正して、再試行してください。',
       ],
-  'Windows could not verify the local domain. Restart Inútil Music and try again.': <String>[
-    'O Windows não conseguiu verificar o domínio local. Reinicie o Inútil Music e tente novamente.',
-    'Windows n\'a pas pu vérifier le domaine local. Redémarrez Inútil Music et réessayez.',
-    'Windows에서 로컬 도메인을 확인할 수 없습니다. Inútil Music을 다시 시작하고 다시 시도하세요.',
-    'Windows 无法验证本地域。重新启动 Inútil Music 并重试。',
-    'Windows はローカル ドメインを確認できませんでした。 Inútil Music を再起動して、もう一度お試しください。',
-  ],
+  'Windows could not verify the local domain. Restart Inútil Music and try again.':
+      <String>[
+        'O Windows não conseguiu verificar o domínio local. Reinicie o Inútil Music e tente novamente.',
+        'Windows n\'a pas pu vérifier le domaine local. Redémarrez Inútil Music et réessayez.',
+        'Windows에서 로컬 도메인을 확인할 수 없습니다. Inútil Music을 다시 시작하고 다시 시도하세요.',
+        'Windows 无法验证本地域。重新启动 Inútil Music 并重试。',
+        'Windows はローカル ドメインを確認できませんでした。 Inútil Music を再起動して、もう一度お試しください。',
+      ],
   'The domain was configured, but Inútil Music could not open the overlay through DNS or HTTP. Check the proxy, VPN, or antivirus and try again.': <String>[
     'O domínio foi configurado, mas o Inútil Music não conseguiu abrir a sobreposição por meio de DNS ou HTTP. Verifique o proxy, VPN ou antivírus e tente novamente.',
     'Le domaine a été configuré, mais Inútil Music n\'a pas pu ouvrir la superposition via DNS ou HTTP. Vérifiez le proxy, le VPN ou l\'antivirus et réessayez.',

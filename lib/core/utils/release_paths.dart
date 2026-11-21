@@ -19,7 +19,8 @@ class InutilReleasePaths {
   static Directory dir() {
     final override = (Platform.environment['INUTIL_RELEASES_DIR'] ?? '').trim();
     if (override.isNotEmpty) return Directory(override);
-    final home = Platform.environment['HOME'] ??
+    final home =
+        Platform.environment['HOME'] ??
         Platform.environment['USERPROFILE'] ??
         Directory.current.path;
     return Directory(p.join(home, 'inutil-releases'));

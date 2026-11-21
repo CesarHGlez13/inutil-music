@@ -110,7 +110,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
               ),
               child: artworkSource?.trim().isNotEmpty == true
                   ? RepaintBoundary(
-                      key: ValueKey('canvas-backdrop-${artworkSource ?? visualIdentity}'),
+                      key: ValueKey(
+                        'canvas-backdrop-${artworkSource ?? visualIdentity}',
+                      ),
                       child: ImageFiltered(
                         imageFilter: ImageFilter.blur(
                           sigmaX: 18,
@@ -126,7 +128,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                             source: artworkSource,
                             fallbackSource: artworkFallbackSource,
                             cacheWidth: 256,
-                            fallback: const ColoredBox(color: Color(0xFF0A0C10)),
+                            fallback: const ColoredBox(
+                              color: Color(0xFF0A0C10),
+                            ),
                           ),
                         ),
                       ),
@@ -198,12 +202,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
 
         // 4. Foreground Spotify layout.
         Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            topInset + 4,
-            20,
-            bottomInset + 10,
-          ),
+          padding: EdgeInsets.fromLTRB(20, topInset + 4, 20, bottomInset + 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -296,12 +295,15 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         duration: miniArtFadeDuration,
                         switchInCurve: Curves.easeInOutCubic,
                         switchOutCurve: Curves.easeInOutCubic,
-                        layoutBuilder: (currentChild, previousChildren) => Stack(
-                          fit: StackFit.expand,
-                          children: [...previousChildren, ?currentChild],
-                        ),
+                        layoutBuilder: (currentChild, previousChildren) =>
+                            Stack(
+                              fit: StackFit.expand,
+                              children: [...previousChildren, ?currentChild],
+                            ),
                         child: KeyedSubtree(
-                          key: ValueKey('canvas-mini-art-${artworkSource ?? visualIdentity}'),
+                          key: ValueKey(
+                            'canvas-mini-art-${artworkSource ?? visualIdentity}',
+                          ),
                           child: ProportionalArtwork(
                             source: artworkSource,
                             fallbackSource: artworkFallbackSource,
@@ -429,8 +431,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                             ? Icons.pause_rounded
                             : Icons.play_arrow_rounded,
                       ),
-                      onPressed:
-                          hasTrack ? () => player.togglePlayPause() : null,
+                      onPressed: hasTrack
+                          ? () => player.togglePlayPause()
+                          : null,
                     ),
                   ),
                   IconButton(
@@ -454,8 +457,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         : Icons.repeat_rounded,
                     active: snapshot.repeatMode != PlaybackRepeatMode.off,
                     activeColor: _spotifyGreen,
-                    onPressed:
-                        hasTrack ? () => player.cycleRepeatMode() : null,
+                    onPressed: hasTrack ? () => player.cycleRepeatMode() : null,
                   ),
                 ],
               ),

@@ -85,79 +85,95 @@ void main() {
     expect(container.read(sleepTimerControllerProvider).isActive, isFalse);
   });
 
-  test('InutilPromoPopupService rotates through all creative campaigns without repeating', () async {
-    SharedPreferences.setMockInitialValues({});
-    final seenIds = <String>[];
-    for (var i = 0; i < InutilPromoPopupService.creatorCampaigns.length; i++) {
-      final campaign =
-          await InutilPromoPopupService.instance.nextRotatingCampaign();
-      seenIds.add(campaign.id);
-    }
-    expect(
-      seenIds.toSet().length,
-      InutilPromoPopupService.creatorCampaigns.length,
-    );
-  });
+  test(
+    'InutilPromoPopupService rotates through all creative campaigns without repeating',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final seenIds = <String>[];
+      for (
+        var i = 0;
+        i < InutilPromoPopupService.creatorCampaigns.length;
+        i++
+      ) {
+        final campaign = await InutilPromoPopupService.instance
+            .nextRotatingCampaign();
+        seenIds.add(campaign.id);
+      }
+      expect(
+        seenIds.toSet().length,
+        InutilPromoPopupService.creatorCampaigns.length,
+      );
+    },
+  );
 
-  testWidgets('InutilSupportPopupDialog displays campaign and launches CTA cleanly', (
-    tester,
-  ) async {
-    Uri? launchedUri;
-    final campaign = InutilPromoPopupService.creatorCampaigns.first;
+  testWidgets(
+    'InutilSupportPopupDialog displays campaign and launches CTA cleanly',
+    (tester) async {
+      Uri? launchedUri;
+      final campaign = InutilPromoPopupService.creatorCampaigns.first;
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: ThemeData.dark(),
-        home: Builder(
-          builder: (context) => Scaffold(
-            body: Center(
-              child: ElevatedButton(
-                onPressed: () => InutilSupportPopupDialog.show(
-                  context,
-                  campaign,
-                  onOpenUrl: (uri) async => launchedUri = uri,
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData.dark(),
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: ElevatedButton(
+                  onPressed: () => InutilSupportPopupDialog.show(
+                    context,
+                    campaign,
+                    onOpenUrl: (uri) async => launchedUri = uri,
+                  ),
+                  child: const Text('Popup'),
                 ),
-                child: const Text('Popup'),
               ),
             ),
           ),
         ),
-      ),
-    );
-
-    await tester.tap(find.text('Popup'));
-    await tester.pumpAndSettle();
-    expect(find.text(campaign.headline), findsOneWidget);
-    expect(find.text(campaign.primaryCta), findsOneWidget);
-
-    await tester.tap(find.byKey(const ValueKey('inutil-support-popup-primary')));
-    await tester.pumpAndSettle();
-    expect(launchedUri, isNotNull);
-    expect(find.byKey(const ValueKey('inutil-support-popup-card')), findsNothing);
-  });
-
-  test('InutilWrappedService accumulates listening seconds, plays, top artist and song', () async {
-    SharedPreferences.setMockInitialValues({});
-    final service = InutilWrappedService.instance..resetForTesting();
-
-    // Simula 25 segundos de reproducción continua de una canción.
-    for (var sec = 0; sec <= 25; sec += 5) {
-      service.recordPlaybackTick(
-        trackId: 'track-nodal-1',
-        title: 'Adiós Amor',
-        artist: 'Christian Nodal',
-        thumbnailUrl: null,
-        positionMs: sec * 1000,
-        isPlaying: true,
       );
-    }
-    final summary = await service.buildSummary();
-    expect(summary.totalSeconds, greaterThanOrEqualTo(20));
-    expect(summary.totalPlays, 1);
-    expect(summary.topArtist?.name, 'Christian Nodal');
-    expect(summary.topTrack?.title, 'Adiós Amor');
-    service.resetForTesting();
-  });
+
+      await tester.tap(find.text('Popup'));
+      await tester.pumpAndSettle();
+      expect(find.text(campaign.headline), findsOneWidget);
+      expect(find.text(campaign.primaryCta), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const ValueKey('inutil-support-popup-primary')),
+      );
+      await tester.pumpAndSettle();
+      expect(launchedUri, isNotNull);
+      expect(
+        find.byKey(const ValueKey('inutil-support-popup-card')),
+        findsNothing,
+      );
+    },
+  );
+
+  test(
+    'InutilWrappedService accumulates listening seconds, plays, top artist and song',
+    () async {
+      SharedPreferences.setMockInitialValues({});
+      final service = InutilWrappedService.instance..resetForTesting();
+
+      // Simula 25 segundos de reproducción continua de una canción.
+      for (var sec = 0; sec <= 25; sec += 5) {
+        service.recordPlaybackTick(
+          trackId: 'track-nodal-1',
+          title: 'Adiós Amor',
+          artist: 'Christian Nodal',
+          thumbnailUrl: null,
+          positionMs: sec * 1000,
+          isPlaying: true,
+        );
+      }
+      final summary = await service.buildSummary();
+      expect(summary.totalSeconds, greaterThanOrEqualTo(20));
+      expect(summary.totalPlays, 1);
+      expect(summary.topArtist?.name, 'Christian Nodal');
+      expect(summary.topTrack?.title, 'Adiós Amor');
+      service.resetForTesting();
+    },
+  );
 
   testWidgets('InutilWrappedDialog renders all 6 slides and closes cleanly', (
     tester,
@@ -176,11 +192,7 @@ void main() {
         ),
       ],
       topArtists: [
-        WrappedArtistStat(
-          name: 'Reyli Barba',
-          plays: 31,
-          seconds: 7400,
-        ),
+        WrappedArtistStat(name: 'Reyli Barba', plays: 31, seconds: 7400),
       ],
       uniqueTrackCount: 42,
       uniqueArtistCount: 15,

@@ -273,7 +273,10 @@ class InutilAuthService extends ChangeNotifier {
   }
 
   static const FlutterSecureStorage _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(resetOnError: true, migrateOnAlgorithmChange: true),
+    aOptions: AndroidOptions(
+      resetOnError: true,
+      migrateOnAlgorithmChange: true,
+    ),
     wOptions: WindowsOptions(useBackwardCompatibility: false),
   );
 
@@ -400,7 +403,10 @@ class InutilAuthService extends ChangeNotifier {
         final snap = prefs.getString(_storageUserKey);
         var user = snap != null
             ? InutilUser.fromJson(jsonDecode(snap) as Map<String, dynamic>)
-            : InutilUser.fromJson({'uid': map['uid'] ?? '', 'email': map['email'] ?? ''});
+            : InutilUser.fromJson({
+                'uid': map['uid'] ?? '',
+                'email': map['email'] ?? '',
+              });
         user = user.copyWith(
           idToken: map['idToken'] as String? ?? user.idToken,
           refreshToken: map['refreshToken'] as String? ?? user.refreshToken,
@@ -449,7 +455,8 @@ class InutilAuthService extends ChangeNotifier {
   /// Migración desde el registro local antiguo (contraseñas en claro): se
   /// elimina por completo; la sesión solo puede renacer de Firebase Auth.
   Future<void> _migrateLegacy(SharedPreferences prefs) async {
-    final hadLegacy = prefs.containsKey(_storageLegacyUserKey) ||
+    final hadLegacy =
+        prefs.containsKey(_storageLegacyUserKey) ||
         prefs.containsKey(_storageRegistryKey);
     if (!hadLegacy) return;
     await prefs.remove(_storageLegacyUserKey);
@@ -466,7 +473,11 @@ class InutilAuthService extends ChangeNotifier {
     return prefs.getString(key);
   }
 
-  Future<void> _writeSecure(SharedPreferences prefs, String key, String value) async {
+  Future<void> _writeSecure(
+    SharedPreferences prefs,
+    String key,
+    String value,
+  ) async {
     try {
       await _secure.write(key: key, value: value).timeout(_secureTimeout);
       // Borrado del espejo en prefs cuando el backend seguro funciona.
@@ -496,30 +507,44 @@ class InutilAuthService extends ChangeNotifier {
     if (user == null) return;
     final prefs = await SharedPreferences.getInstance();
     // Tokens → almacenamiento seguro; snapshot de identidad/licencia → prefs.
-    await _writeSecure(prefs, _storageSessionKey, jsonEncode({
-      'uid': user.uid,
-      'email': user.email,
-      'idToken': user.idToken,
-      'refreshToken': user.refreshToken,
-      'savedAt': DateTime.now().toIso8601String(),
-    }));
+    await _writeSecure(
+      prefs,
+      _storageSessionKey,
+      jsonEncode({
+        'uid': user.uid,
+        'email': user.email,
+        'idToken': user.idToken,
+        'refreshToken': user.refreshToken,
+        'savedAt': DateTime.now().toIso8601String(),
+      }),
+    );
     await prefs.setString(_storageUserKey, jsonEncode(user.toJson()));
   }
 
   // ---------------------------------------------------------------------------
   // 2. FIREBASE AUTH REST (Identity Toolkit v1) — única fuente de verdad
   // ---------------------------------------------------------------------------
-  Future<Map<String, dynamic>> _authPost(String path, Map<String, dynamic> body) async {
-    final url = Uri.parse('${FirebaseConfig.authBaseUrl}/$path?${FirebaseConfig.keyParam}');
+  Future<Map<String, dynamic>> _authPost(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final url = Uri.parse(
+      '${FirebaseConfig.authBaseUrl}/$path?${FirebaseConfig.keyParam}',
+    );
     final response = await http
-        .post(url, headers: {'Content-Type': 'application/json'}, body: jsonEncode(body))
+        .post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode(body),
+        )
         .timeout(const Duration(seconds: 10));
     final data = response.statusCode == 200
         ? jsonDecode(response.body) as Map<String, dynamic>
         : null;
     if (data == null) {
       final decoded = _tryDecode(response.body);
-      final message = decoded['error']?['message']?.toString() ?? 'Error de autenticación';
+      final message =
+          decoded['error']?['message']?.toString() ?? 'Error de autenticación';
       throw Exception(_mapAuthError(message));
     }
     return data;
@@ -576,9 +601,11 @@ class InutilAuthService extends ChangeNotifier {
     try {
       final parts = idToken.split('.');
       if (parts.length < 2) return false;
-      final payload = jsonDecode(
-        utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
-      ) as Map<String, dynamic>;
+      final payload =
+          jsonDecode(
+                utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))),
+              )
+              as Map<String, dynamic>;
       final exp = (payload['exp'] as num?)?.toInt() ?? 0;
       return exp - DateTime.now().millisecondsSinceEpoch ~/ 1000 > 60;
     } catch (_) {
@@ -598,7 +625,9 @@ class InutilAuthService extends ChangeNotifier {
   }) async {
     final trimmedEmail = email.trim().toLowerCase();
     if (trimmedEmail.isEmpty || password.length < 6) {
-      throw Exception('El correo y la contraseña (mínimo 6 caracteres) son obligatorios.');
+      throw Exception(
+        'El correo y la contraseña (mínimo 6 caracteres) son obligatorios.',
+      );
     }
 
     final data = await _authPost('accounts:signUp', {
@@ -647,7 +676,8 @@ class InutilAuthService extends ChangeNotifier {
     final user = InutilUser(
       uid: data['localId'] as String,
       email: trimmedEmail,
-      displayName: data['displayName'] as String? ?? trimmedEmail.split('@').first,
+      displayName:
+          data['displayName'] as String? ?? trimmedEmail.split('@').first,
       idToken: data['idToken'] as String? ?? '',
       refreshToken: data['refreshToken'] as String? ?? '',
       createdAt: DateTime.now(),
@@ -685,7 +715,9 @@ class InutilAuthService extends ChangeNotifier {
         );
       }
       if (msg.contains('ApiException: 7') || msg.contains('network')) {
-        throw Exception('Sin conexión a internet para iniciar sesión con Google.');
+        throw Exception(
+          'Sin conexión a internet para iniciar sesión con Google.',
+        );
       }
       if (msg.contains('MissingPluginException') ||
           msg.contains('not available')) {
@@ -719,13 +751,14 @@ class InutilAuthService extends ChangeNotifier {
       'returnSecureToken': true,
     });
 
-    final email =
-        (data['email'] as String? ?? account.email).trim().toLowerCase();
+    final email = (data['email'] as String? ?? account.email)
+        .trim()
+        .toLowerCase();
     final displayName = (data['displayName'] as String?)?.isNotEmpty == true
         ? data['displayName'] as String
         : ((account.displayName?.isNotEmpty == true)
-            ? account.displayName!
-            : email.split('@').first);
+              ? account.displayName!
+              : email.split('@').first);
 
     final user = InutilUser(
       uid: data['localId'] as String,
@@ -783,7 +816,9 @@ class InutilAuthService extends ChangeNotifier {
     try {
       final tokenRes = await http
           .post(
-            Uri.parse('${FirebaseConfig.secureTokenUrl}?${FirebaseConfig.keyParam}'),
+            Uri.parse(
+              '${FirebaseConfig.secureTokenUrl}?${FirebaseConfig.keyParam}',
+            ),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'grant_type': 'refresh_token',
@@ -901,7 +936,9 @@ class InutilAuthService extends ChangeNotifier {
     final user = _currentUser;
     if (user == null || user.uid.isEmpty || user.idToken.isEmpty) return;
     try {
-      final remote = await InutilFirestoreService.instance.getUserProfile(user.uid);
+      final remote = await InutilFirestoreService.instance.getUserProfile(
+        user.uid,
+      );
       if (remote == null || remote.isEmpty) {
         if (!createIfMissing) return;
         final isAdminSeed = isBootstrapAdminEmail(user.email);
@@ -948,16 +985,13 @@ class InutilAuthService extends ChangeNotifier {
       // correos (la identidad ya la validó Firebase Auth / Google Sign-In).
       final me = _currentUser;
       if (me != null && isBootstrapAdminEmail(me.email) && !me.isAdmin) {
-        final upgraded = await InutilFirestoreService.instance.setDocument(
-          'users/${me.uid}',
-          {
-            'role': 'admin',
-            'status': 'active',
-            'isActive': true,
-            'accountExpiresAt': DateTime(2099, 12, 31),
-          },
-          merge: true,
-        );
+        final upgraded = await InutilFirestoreService.instance
+            .setDocument('users/${me.uid}', {
+              'role': 'admin',
+              'status': 'active',
+              'isActive': true,
+              'accountExpiresAt': DateTime(2099, 12, 31),
+            }, merge: true);
         if (upgraded) {
           _currentUser = me.copyWith(
             role: 'admin',
@@ -1005,10 +1039,11 @@ class InutilAuthService extends ChangeNotifier {
     final expiresAt = remote['accountExpiresAt'] is DateTime
         ? remote['accountExpiresAt'] as DateTime
         : (remote['accountExpiresAt'] != null
-            ? DateTime.tryParse(remote['accountExpiresAt'].toString())
-            : user.accountExpiresAt);
+              ? DateTime.tryParse(remote['accountExpiresAt'].toString())
+              : user.accountExpiresAt);
     final role = remote['role'] as String? ?? user.role;
-    final status = remote['status'] as String? ??
+    final status =
+        remote['status'] as String? ??
         ((remote['isActive'] as bool?) == false ? 'blocked' : user.status);
     _currentUser = user.copyWith(
       accountExpiresAt: expiresAt,
@@ -1018,9 +1053,14 @@ class InutilAuthService extends ChangeNotifier {
       displayName: (remote['displayName'] as String?)?.isNotEmpty == true
           ? remote['displayName'] as String
           : user.displayName,
-      currentPhoneDeviceId: remote['currentPhoneDeviceId'] as String? ?? user.currentPhoneDeviceId,
-      phoneSwitchCount: (remote['phoneSwitchCount'] as num?)?.toInt() ?? user.phoneSwitchCount,
-      phoneSwitchMonth: remote['phoneSwitchMonth'] as String? ?? user.phoneSwitchMonth,
+      currentPhoneDeviceId:
+          remote['currentPhoneDeviceId'] as String? ??
+          user.currentPhoneDeviceId,
+      phoneSwitchCount:
+          (remote['phoneSwitchCount'] as num?)?.toInt() ??
+          user.phoneSwitchCount,
+      phoneSwitchMonth:
+          remote['phoneSwitchMonth'] as String? ?? user.phoneSwitchMonth,
     );
     _lastValidatedAt = DateTime.now();
     await _saveSession();
@@ -1039,10 +1079,10 @@ class InutilAuthService extends ChangeNotifier {
     if (holder == _deviceId) return;
 
     if (user.isAdmin) {
-      final ok = await InutilFirestoreService.instance.setDocument('users/${user.uid}', {
-        'currentPhoneDeviceId': _deviceId!,
-        'lastValidatedAt': DateTime.now(),
-      });
+      final ok = await InutilFirestoreService.instance.setDocument(
+        'users/${user.uid}',
+        {'currentPhoneDeviceId': _deviceId!, 'lastValidatedAt': DateTime.now()},
+      );
       if (ok) {
         _currentUser = user.copyWith(currentPhoneDeviceId: _deviceId);
         await _saveSession();
@@ -1067,12 +1107,13 @@ class InutilAuthService extends ChangeNotifier {
       switches += 1;
     }
 
-    final ok = await InutilFirestoreService.instance.setDocument('users/${user.uid}', {
-      'currentPhoneDeviceId': _deviceId!,
-      'phoneSwitchCount': switches,
-      'phoneSwitchMonth': month,
-      'lastValidatedAt': DateTime.now(),
-    });
+    final ok = await InutilFirestoreService.instance
+        .setDocument('users/${user.uid}', {
+          'currentPhoneDeviceId': _deviceId!,
+          'phoneSwitchCount': switches,
+          'phoneSwitchMonth': month,
+          'lastValidatedAt': DateTime.now(),
+        });
     if (ok) {
       _currentUser = user.copyWith(
         currentPhoneDeviceId: _deviceId,
@@ -1096,18 +1137,22 @@ class InutilAuthService extends ChangeNotifier {
     _validating = true;
     try {
       await _ensureFreshIdToken();
-      final remote = await InutilFirestoreService.instance.getUserProfile(user.uid);
+      final remote = await InutilFirestoreService.instance.getUserProfile(
+        user.uid,
+      );
       if (remote == null) {
         // Documento eliminado por el administrador o cuenta borrada en Auth.
         if (_kickedOutReason.isEmpty) {
-          _kickedOutReason = 'Tu cuenta ya no existe. Contacta al administrador.';
+          _kickedOutReason =
+              'Tu cuenta ya no existe. Contacta al administrador.';
         }
         notifyListeners();
         return;
       }
       await _applyRemoteDoc(remote);
       if (_isPhoneDevice && !_phoneSessionOk(_currentUser!)) {
-        _kickedOutReason = 'Otro teléfono tomó el control de esta cuenta. '
+        _kickedOutReason =
+            'Otro teléfono tomó el control de esta cuenta. '
             'Esta sesión quedó bloqueada.';
         notifyListeners();
         return;
@@ -1131,7 +1176,9 @@ class InutilAuthService extends ChangeNotifier {
     if (testSkipOnlineValidation) return;
     try {
       await _ensureFreshIdToken();
-      final remoteDoc = await InutilFirestoreService.instance.getUserProfile(_currentUser!.uid);
+      final remoteDoc = await InutilFirestoreService.instance.getUserProfile(
+        _currentUser!.uid,
+      );
       if (remoteDoc != null && remoteDoc.isNotEmpty) {
         await _applyRemoteDoc(remoteDoc);
         if (_currentUser?.licenseValid == true) {
@@ -1157,16 +1204,20 @@ class InutilAuthService extends ChangeNotifier {
   /// no hay red se conserva la última conocida (por defecto 15 días).
   Future<void> _loadInactivityPolicy() async {
     try {
-      final doc = await InutilFirestoreService.instance
-          .getDocument('app_config/inactivity_policy');
+      final doc = await InutilFirestoreService.instance.getDocument(
+        'app_config/inactivity_policy',
+      );
       if (doc == null) return;
       final enabled = doc['enabled'];
       if (enabled is bool) _inactivityPolicyEnabled = enabled;
-      final days = (doc['days'] as num?)?.toInt() ??
+      final days =
+          (doc['days'] as num?)?.toInt() ??
           int.tryParse(doc['days']?.toString() ?? '');
       if (days != null) {
-        _inactivityPolicyDays =
-            days.clamp(_minInactivityDays, _maxInactivityDays);
+        _inactivityPolicyDays = days.clamp(
+          _minInactivityDays,
+          _maxInactivityDays,
+        );
       }
     } catch (e) {
       debugPrint('Política de inactividad no disponible: $e');
@@ -1182,9 +1233,8 @@ class InutilAuthService extends ChangeNotifier {
     if (user == null) return;
     await _loadInactivityPolicy();
     final lastActiveAt = _parseRemoteDate(remote['lastActiveAt']);
-    final exempt = user.isAdmin ||
-        user.isPermanent ||
-        remote['inactivityExempt'] == true;
+    final exempt =
+        user.isAdmin || user.isPermanent || remote['inactivityExempt'] == true;
     final days = inactivityPauseDays(
       lastActiveAt: lastActiveAt,
       exempt: exempt,
@@ -1215,14 +1265,12 @@ class InutilAuthService extends ChangeNotifier {
     if (!force && last != null && now.difference(last) < _heartbeatThrottle) {
       return;
     }
-    final ok = await InutilFirestoreService.instance.setDocument(
-      'users/${user.uid}',
-      {
-        'lastActiveAt': now,
-        'lastActivePlatform': devicePlatform,
-        'lastActiveAppVersion': AppConstants.appVersion,
-      },
-    );
+    final ok = await InutilFirestoreService.instance
+        .setDocument('users/${user.uid}', {
+          'lastActiveAt': now,
+          'lastActivePlatform': devicePlatform,
+          'lastActiveAppVersion': AppConstants.appVersion,
+        });
     if (ok) _lastHeartbeatAt = now;
   }
 
@@ -1291,19 +1339,21 @@ class InutilAuthService extends ChangeNotifier {
           displayName: doc['displayName'] as String? ?? '',
           role: doc['role'] as String? ?? 'user',
           isActive: doc['isActive'] as bool? ?? true,
-          status: doc['status'] as String? ??
+          status:
+              doc['status'] as String? ??
               ((doc['isActive'] as bool?) == false ? 'blocked' : 'active'),
           accountExpiresAt: doc['accountExpiresAt'] is DateTime
               ? doc['accountExpiresAt'] as DateTime
               : (doc['accountExpiresAt'] != null
-                  ? DateTime.tryParse(doc['accountExpiresAt'].toString())
-                  : null),
-          accountDurationDays: (doc['accountDurationDays'] as num?)?.toInt() ?? 30,
+                    ? DateTime.tryParse(doc['accountExpiresAt'].toString())
+                    : null),
+          accountDurationDays:
+              (doc['accountDurationDays'] as num?)?.toInt() ?? 30,
           lastLoginAt: doc['lastLoginAt'] is DateTime
               ? doc['lastLoginAt'] as DateTime
               : (doc['lastLoginAt'] != null
-                  ? DateTime.tryParse(doc['lastLoginAt'].toString())
-                  : null),
+                    ? DateTime.tryParse(doc['lastLoginAt'].toString())
+                    : null),
           currentPhoneDeviceId: doc['currentPhoneDeviceId'] as String? ?? '',
           phoneSwitchCount: (doc['phoneSwitchCount'] as num?)?.toInt() ?? 0,
           phoneSwitchMonth: doc['phoneSwitchMonth'] as String? ?? '',
@@ -1366,28 +1416,25 @@ class InutilAuthService extends ChangeNotifier {
         : DateTime.now().add(Duration(days: initialDays));
     final durationDays = isPermanent ? 9999 : initialDays;
 
-    final ok = await InutilFirestoreService.instance.setDocument(
-      'users/$newUid',
-      {
-        'uid': newUid,
-        'email': trimmedEmail,
-        'displayName': cleanName,
-        'role': 'user',
-        'status': 'active',
-        'isActive': true,
-        'accountExpiresAt': expiresAt,
-        'accountDurationDays': durationDays,
-        'currentPhoneDeviceId': '',
-        'currentTvDeviceId': '',
-        'phoneSwitchCount': 0,
-        'phoneSwitchMonth': '',
-        'createdAt': DateTime.now(),
-        'lastLoginAt': DateTime.now(),
-        'lastValidatedAt': DateTime.now(),
-        'schemaVersion': 3,
-      },
-      merge: false,
-    );
+    final ok = await InutilFirestoreService.instance
+        .setDocument('users/$newUid', {
+          'uid': newUid,
+          'email': trimmedEmail,
+          'displayName': cleanName,
+          'role': 'user',
+          'status': 'active',
+          'isActive': true,
+          'accountExpiresAt': expiresAt,
+          'accountDurationDays': durationDays,
+          'currentPhoneDeviceId': '',
+          'currentTvDeviceId': '',
+          'phoneSwitchCount': 0,
+          'phoneSwitchMonth': '',
+          'createdAt': DateTime.now(),
+          'lastLoginAt': DateTime.now(),
+          'lastValidatedAt': DateTime.now(),
+          'schemaVersion': 3,
+        }, merge: false);
     if (!ok) {
       throw Exception(
         'La cuenta se creó en Auth, pero falló al guardar su licencia en Firestore.',
@@ -1445,7 +1492,9 @@ class InutilAuthService extends ChangeNotifier {
       'lastActiveAt': DateTime.now(),
     });
     if (!ok) {
-      throw Exception('No se pudo guardar la vigencia en la nube. Revisa la conexión.');
+      throw Exception(
+        'No se pudo guardar la vigencia en la nube. Revisa la conexión.',
+      );
     }
 
     // Si el usuario modificado es el usuario actualmente activo en esta sesión
@@ -1565,16 +1614,24 @@ class InutilAuthService extends ChangeNotifier {
   }
 
   String _mapAuthError(String error) {
-    if (error.contains('EMAIL_EXISTS')) return 'Este correo ya está registrado.';
-    if (error.contains('EMAIL_NOT_FOUND')) return 'No existe ninguna cuenta con este correo.';
-    if (error.contains('INVALID_PASSWORD') || error.contains('INVALID_LOGIN_CREDENTIALS')) {
+    if (error.contains('EMAIL_EXISTS')) {
+      return 'Este correo ya está registrado.';
+    }
+    if (error.contains('EMAIL_NOT_FOUND')) {
+      return 'No existe ninguna cuenta con este correo.';
+    }
+    if (error.contains('INVALID_PASSWORD') ||
+        error.contains('INVALID_LOGIN_CREDENTIALS')) {
       return 'Contraseña o credenciales incorrectas.';
     }
-    if (error.contains('USER_DISABLED')) return 'Esta cuenta ha sido desactivada por el administrador.';
+    if (error.contains('USER_DISABLED')) {
+      return 'Esta cuenta ha sido desactivada por el administrador.';
+    }
     if (error.contains('TOO_MANY_ATTEMPTS_TRY_LATER')) {
       return 'Demasiados intentos fallidos. Inténtalo más tarde.';
     }
-    if (error.contains('CONFIGURATION_NOT_FOUND') || error.contains('OPERATION_NOT_ALLOWED')) {
+    if (error.contains('CONFIGURATION_NOT_FOUND') ||
+        error.contains('OPERATION_NOT_ALLOWED')) {
       return 'El servicio de cuentas no está disponible. Inténtalo más tarde.';
     }
     if (error.contains('NETWORK_ERROR') || error.contains('SocketException')) {

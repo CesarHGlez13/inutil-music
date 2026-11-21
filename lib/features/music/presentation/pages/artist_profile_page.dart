@@ -910,7 +910,9 @@ class _ArtistHeader extends StatelessWidget {
                               key: const ValueKey('artist-video-preview'),
                               style: actionStyle,
                               onPressed: onOpenVideoPreview,
-                              icon: const Icon(Icons.play_circle_outline_rounded),
+                              icon: const Icon(
+                                Icons.play_circle_outline_rounded,
+                              ),
                               label: const Text('Video Preview'),
                             ),
                         ],
@@ -973,7 +975,9 @@ class _ArtistHeader extends StatelessWidget {
                           stops: [0.0, 0.65, 1.0],
                         ).createShader(bounds),
                         child: SpotifyCanvasVideo(
-                          key: ValueKey('artist-video-${profile.artist.browseId}'),
+                          key: ValueKey(
+                            'artist-video-${profile.artist.browseId}',
+                          ),
                           url: headerVideoUrl!,
                           isPlaying: true,
                           identity: 'artist:${profile.artist.browseId}',

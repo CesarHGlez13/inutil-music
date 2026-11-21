@@ -41,10 +41,7 @@ void main() {
       ),
       _track('unknown-duration', path: r'C:\Music\unknown.m4a'),
       _track('managed', path: r'C:\Downloads\Inutil-Music\audio\managed.m4a'),
-      _track(
-        'similar-root',
-        path: r'C:\Downloads\Inutil-Music-Other\kept.m4a',
-      ),
+      _track('similar-root', path: r'C:\Downloads\Inutil-Music-Other\kept.m4a'),
     ];
 
     final filtered = filterDeviceAudioTracks(

@@ -198,8 +198,9 @@ void main() {
       expect(backup.lastError, isEmpty);
       expect(backup.lastPushAt, isNotNull);
 
-      final remoteMeta = await InutilFirestoreService.instance
-          .getDocument('users/$uid/data/backup_meta');
+      final remoteMeta = await InutilFirestoreService.instance.getDocument(
+        'users/$uid/data/backup_meta',
+      );
       expect(remoteMeta, isNotNull);
       final remotePlaylists = remoteMeta!['playlists'];
       expect(remotePlaylists, isA<List>());

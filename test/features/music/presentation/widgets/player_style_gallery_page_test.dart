@@ -67,10 +67,7 @@ void main() {
         ValueKey('player-style-preview-${style.code}'),
       );
       expect(
-        find.descendant(
-          of: previewFinder,
-          matching: find.text('Inútil Music'),
-        ),
+        find.descendant(of: previewFinder, matching: find.text('Inútil Music')),
         findsNWidgets(2),
       );
       final preview = tester.getRect(previewFinder);
