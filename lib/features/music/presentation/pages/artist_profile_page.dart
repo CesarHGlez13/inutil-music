@@ -260,12 +260,16 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
           artistSubtitle:
               profile.monthlyListenerCount ?? profile.subscriberCount,
           initialIndex: initialIndex,
-          onPlayClip: (clip) {
-            if (tracks.isEmpty) return;
-            final matched = tracks.cast<TrackInfo?>().firstWhere(
-              (t) => t != null && sameVisualTitle(clip.title, t.title),
-              orElse: () => tracks.first,
-            );
+          onPlayClip: (clip) async {
+            // 1. Try local match in tracks
+            TrackInfo? matched;
+            for (final t in tracks) {
+              if (sameVisualTitle(clip.title, t.title)) {
+                matched = t;
+                break;
+              }
+            }
+
             if (matched != null) {
               unawaited(
                 ref
@@ -277,6 +281,59 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
                     ),
               );
               _returnToPlayer();
+              return;
+            }
+
+            // 2. If not found in popular songs, search for the song on YouTube Music
+            try {
+              final search = ref.read(searchTracksProvider);
+              final cleanTitle = withoutFeaturedTitle(
+                cleanVisualTrackTitle(clip.title),
+              ).trim();
+              final cleanArtist = primaryVisualArtist(clip.artist).trim();
+              final query = cleanTitle.isNotEmpty && cleanArtist.isNotEmpty
+                  ? '$cleanTitle $cleanArtist'
+                  : '${clip.title} ${clip.artist}'.trim();
+
+              final searchResults = await search(query);
+              if (searchResults.isNotEmpty) {
+                final bestMatch = searchResults.firstWhere(
+                  (t) => sameVisualTitle(clip.title, t.title),
+                  orElse: () => searchResults.first,
+                );
+                unawaited(
+                  ref
+                      .read(playerControllerProvider.notifier)
+                      .playRemote(
+                        bestMatch,
+                        queue: searchResults,
+                        queueSourceId:
+                            'artist:${widget.artistBrowseId}:preview:${bestMatch.id}',
+                      ),
+                );
+                if (mounted) {
+                  _returnToPlayer();
+                }
+                return;
+              }
+            } catch (error) {
+              debugPrint('Error searching video preview track ($clip): $error');
+            }
+
+            // 3. Fallback only if search failed completely and tracks are present
+            if (tracks.isNotEmpty) {
+              unawaited(
+                ref
+                    .read(playerControllerProvider.notifier)
+                    .playRemote(
+                      tracks.first,
+                      queue: tracks,
+                      queueSourceId: 'artist:${widget.artistBrowseId}:preview',
+                    ),
+              );
+              if (mounted) {
+                _returnToPlayer();
+              }
             }
           },
         ),

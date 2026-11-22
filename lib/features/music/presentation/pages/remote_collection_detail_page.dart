@@ -163,14 +163,50 @@ class _RemoteCollectionDetailPageState
           artistAvatarUrl: resolvedArtworkSource,
           artistSubtitle: resolvedTitle,
           initialIndex: initialIndex,
-          onPlayClip: (clip) {
-            if (visibleTracks.isEmpty) return;
-            final matched = visibleTracks.cast<TrackInfo?>().firstWhere(
-              (t) => t != null && sameVisualTitle(clip.title, t.title),
-              orElse: () => visibleTracks.first,
-            );
-            if (matched != null) {
-              _play(context, matched, visibleTracks);
+          onPlayClip: (clip) async {
+            if (visibleTracks.isNotEmpty) {
+              TrackInfo? matched;
+              for (final t in visibleTracks) {
+                if (sameVisualTitle(clip.title, t.title)) {
+                  matched = t;
+                  break;
+                }
+              }
+              if (matched != null) {
+                _play(context, matched, visibleTracks);
+                return;
+              }
+            }
+
+            try {
+              final search = ref.read(searchTracksProvider);
+              final cleanTitle = withoutFeaturedTitle(
+                cleanVisualTrackTitle(clip.title),
+              ).trim();
+              final cleanArtist = primaryVisualArtist(clip.artist).trim();
+              final query = cleanTitle.isNotEmpty && cleanArtist.isNotEmpty
+                  ? '$cleanTitle $cleanArtist'
+                  : '${clip.title} ${clip.artist}'.trim();
+
+              final searchResults = await search(query);
+              if (searchResults.isNotEmpty) {
+                final bestMatch = searchResults.firstWhere(
+                  (t) => sameVisualTitle(clip.title, t.title),
+                  orElse: () => searchResults.first,
+                );
+                if (context.mounted) {
+                  _play(context, bestMatch, searchResults);
+                }
+                return;
+              }
+            } catch (error) {
+              debugPrint(
+                'Error searching video preview track in collection ($clip): $error',
+              );
+            }
+
+            if (visibleTracks.isNotEmpty && context.mounted) {
+              _play(context, visibleTracks.first, visibleTracks);
             }
           },
         ),

@@ -36,7 +36,7 @@ String normalVisualText(String value) => value
     .trim()
     .replaceAll(RegExp(r'\s+'), ' ');
 
-String _withoutFeaturedTitle(String title) => title.replaceFirst(
+String withoutFeaturedTitle(String title) => title.replaceFirst(
   RegExp(
     r'\s*[\[(]\s*(?:feat\.?|ft\.?|featuring|con)\s+[^\])]+[\])]\s*$',
     caseSensitive: false,
@@ -46,10 +46,10 @@ String _withoutFeaturedTitle(String title) => title.replaceFirst(
 
 bool sameVisualTitle(String requested, String found) {
   final a = normalVisualText(
-    _withoutFeaturedTitle(cleanVisualTrackTitle(requested)),
+    withoutFeaturedTitle(cleanVisualTrackTitle(requested)),
   );
   final b = normalVisualText(
-    _withoutFeaturedTitle(cleanVisualTrackTitle(found)),
+    withoutFeaturedTitle(cleanVisualTrackTitle(found)),
   );
   return a.isNotEmpty && a == b;
 }

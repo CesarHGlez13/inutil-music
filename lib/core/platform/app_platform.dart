@@ -7,7 +7,13 @@ enum AppPlatformType { android, ios, windows, linux, macos, unsupported }
 class AppPlatform {
   const AppPlatform._();
 
+  @visibleForTesting
+  static AppPlatformType? overrideType;
+
   static AppPlatformType get current {
+    if (overrideType != null) {
+      return overrideType!;
+    }
     if (Platform.isAndroid) {
       return AppPlatformType.android;
     }

@@ -1,14 +1,21 @@
 import 'dart:async';
 
+import 'package:inutil_music/core/platform/app_platform.dart';
 import 'package:inutil_music/core/theme/app_theme.dart';
+import 'package:inutil_music/features/music/domain/entities/download_options.dart';
+import 'package:inutil_music/features/music/domain/entities/download_result.dart';
 import 'package:inutil_music/features/music/domain/entities/track_info.dart';
+import 'package:inutil_music/features/music/domain/repositories/music_repository.dart';
+import 'package:inutil_music/features/music/domain/usecases/search_tracks.dart';
 import 'package:inutil_music/features/music/presentation/pages/artist_profile_page.dart';
 import 'package:inutil_music/features/music/presentation/providers/music_providers.dart';
+import 'package:inutil_music/features/music/presentation/providers/video_preview_provider.dart';
 import 'package:inutil_music/features/music/presentation/widgets/artwork_detail_scaffold.dart';
 import 'package:inutil_music/features/music/presentation/widgets/expanded_artwork_header_background.dart';
 import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
 import 'package:inutil_music/features/music/presentation/widgets/source_image.dart';
 import 'package:inutil_music/services/player/player_service.dart';
+import 'package:inutil_music/services/video_preview/video_preview_resolver.dart';
 import 'package:inutil_music/services/youtube_music/account/youtube_music_account.dart';
 import 'package:inutil_music/services/youtube_music/innertube_search_service.dart';
 import 'package:flutter/material.dart';
@@ -1509,6 +1516,107 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'playing a video preview clip not in popular songs searches and plays the exact track',
+    (tester) async {
+      AppPlatform.overrideType = AppPlatformType.android;
+      addTearDown(() => AppPlatform.overrideType = null);
+
+      final service = _ArtistProfileService()
+        ..profilePopularSongs = [
+          InnerTubeSong(
+            videoId: 'popular01',
+            title: 'Ojos Marrones',
+            artists: const ['Artista de prueba'],
+          ),
+        ];
+      final player = _RecordingPlayerController();
+      final searchedTrack = TrackInfo(
+        id: 'searchedPorPerro',
+        title: 'Por Perro (feat. Luis Figueroa)',
+        artist: 'Artista de prueba',
+        url: 'https://youtube.com/watch?v=searchedPorPerro',
+      );
+      final clip = VideoPreviewClip(
+        videoUrl: Uri.parse('https://example.com/clip.mp4'),
+        title: 'Por Perro (feat. Luis Figueroa)',
+        artist: 'Artista de prueba',
+      );
+      var playerOpens = 0;
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            youtubeMusicSearchProvider.overrideWithValue(service),
+            artistVideoPreviewsProvider('Artista de prueba').overrideWith(
+              (ref) async => [clip],
+            ),
+            searchTracksProvider.overrideWith(
+              (ref) => SearchTracks(_MockSearchRepository([searchedTrack])),
+            ),
+            playerControllerProvider.overrideWith(() => player),
+            favoriteTrackIdsProvider.overrideWithValue(const <String>{}),
+            appStringsProvider.overrideWithValue(
+              const AppStrings(AppLanguage.spanish),
+            ),
+          ],
+          child: MaterialApp(
+            home: ArtistProfilePage(
+              artistBrowseId: 'UCartist123',
+              artistName: 'Artista de prueba',
+              seedVideoId: 'fallback001',
+              onOpenPlayer: () => playerOpens++,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final previewButton = find.byKey(
+        const ValueKey('artist-video-preview'),
+      );
+      expect(previewButton, findsOneWidget);
+      await tester.tap(previewButton);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(
+        find.byKey(const ValueKey('video-preview-reel-sheet')),
+        findsOneWidget,
+      );
+      expect(find.text('Por Perro (feat. Luis Figueroa)'), findsOneWidget);
+
+      final playCard = find.byIcon(Icons.play_arrow_rounded);
+      expect(playCard, findsOneWidget);
+      await tester.tap(playCard);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(player.playCalls, 1);
+      expect(player.lastTrack?.id, 'searchedPorPerro');
+      expect(player.lastTrack?.title, 'Por Perro (feat. Luis Figueroa)');
+      expect(playerOpens, 1);
+    },
+  );
+}
+
+class _MockSearchRepository implements MusicRepository {
+  _MockSearchRepository(this.tracks);
+  final List<TrackInfo> tracks;
+
+  @override
+  Future<List<TrackInfo>> search(String query) async => tracks;
+
+  @override
+  Future<TrackInfo> getInfo(String url) => throw UnimplementedError();
+
+  @override
+  Future<TrackInfo> getPlaybackInfo(String url) => throw UnimplementedError();
+
+  @override
+  Future<DownloadResult> downloadAudio(String url, DownloadOptions options) =>
+      throw UnimplementedError();
 }
 
 const _allSongsTarget = InnerTubeBrowseTarget(
