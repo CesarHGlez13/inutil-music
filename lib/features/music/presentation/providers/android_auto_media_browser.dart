@@ -515,7 +515,7 @@ class AndroidAutoMediaBrowser {
     var includedSections = 0;
 
     for (var sIndex = 0; sIndex < remoteSections.length; sIndex++) {
-      if (includedSections >= 6) break;
+      if (includedSections >= 9) break;
       final section = remoteSections[sIndex];
       final title = section.title.trim();
       if (title.isEmpty || section.items.isEmpty) continue;

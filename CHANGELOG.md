@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.5.16+4274 — 2026-11-22
+
+### Improved — Android Auto Coolwalk con recomendaciones, Explorar y soporte multimedia nativo, Canvas cinemático sin desfase y audio HQ pre-resuelto sin micro-cortes
+
+- **Android Auto Coolwalk nativo y navegación completa estilo Spotify.**
+  Integrado servicio `MediaBrowserService` con 4 pestañas principales: **Inicio** (combinando recomendaciones personalizadas, *Seguir escuchando*, *Tus playlists*, *Porque escuchaste...*, *Nuevos para ti*, *Descubrimiento*, *Artistas populares* y *Mixes* en cuadrícula HD 640×640), **Explorar** (catálogo completo por estados de ánimo y géneros con playlists y canciones), **Playlists** (tus listas guardadas) y **Biblioteca** (favoritos y pistas descargadas sin conexión). Controles personalizados en pantalla de auto: Favorito (`♡` ↔ `♥`), Aleatorio (`🔀`) y Repetir (`🔁`), cola completa de reproducción y compatibilidad total con pantalla dividida Google Maps (Coolwalk).
+- **Audio HQ pre-resuelto sin micro-cortes.**
+  Pre-resolución asíncrona y en paralelo de flujos JioSaavn 320 kbps antes de iniciar la reproducción para arrancar directamente en alta fidelidad y eliminar micro-cortes causados por intercambios de reproductor en caliente. Calidad alta reactiva desactivada por defecto para máxima estabilidad.
+- **Spotify Canvas cinemático y respaldo visual animado inteligente.**
+  Validación estricta de título y artista para evitar clips incorrectos en canciones no identificadas; cuando no hay clip disponible se expande la carátula con efecto de movimiento cinemático Ken Burns y aura reactiva ambiental.
+- **Actualización obligatoria.**
+  Esta versión se publica como **actualización obligatoria** (`minSupportedVersion 2.5.16`).
+
 ## 2.5.15+4273 — 2026-11-21
 
 ### Improved — Spotify Connect sin congelamientos, Canvas a pantalla completa en escritorio/letras, motor Linux optimizado y OTA obligatoria multiplataforma

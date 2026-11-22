@@ -765,15 +765,44 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
     searchSongs: (query, {limit = 15}) =>
         ref.read(youtubeMusicSearchProvider).searchSongs(query, limit: limit),
     loadHomeSections: () async {
-      final cached = ref.read(homeRecommendationsProvider).value;
-      final sections = (cached != null && cached.isNotEmpty)
-          ? cached
-          : await ref
+      final cachedPersonal = ref.read(homeRecommendationsProvider).value;
+      final personalFuture =
+          (cachedPersonal != null && cachedPersonal.isNotEmpty)
+          ? Future<List<HomeRecommendationSection>>.value(cachedPersonal)
+          : ref
                 .read(homeRecommendationsProvider.future)
                 .timeout(
                   const Duration(milliseconds: 4500),
                   onTimeout: () => const <HomeRecommendationSection>[],
-                );
+                )
+                .catchError((_) => const <HomeRecommendationSection>[]);
+
+      final cachedYtHome = ref
+          .read(youtubeMusicHomeRecommendationsProvider)
+          .value;
+      final ytHomeFuture = (cachedYtHome != null && cachedYtHome.isNotEmpty)
+          ? Future<List<HomeRecommendationSection>>.value(cachedYtHome)
+          : ref
+                .read(youtubeMusicHomeRecommendationsProvider.future)
+                .timeout(
+                  const Duration(milliseconds: 4500),
+                  onTimeout: () => const <HomeRecommendationSection>[],
+                )
+                .catchError((_) => const <HomeRecommendationSection>[]);
+
+      final fetched = await Future.wait<List<HomeRecommendationSection>>([
+        personalFuture,
+        ytHomeFuture,
+      ]);
+      final seenTitles = <String>{};
+      final sections = <HomeRecommendationSection>[];
+      for (final group in fetched) {
+        for (final section in group) {
+          final key = section.title.trim().toLowerCase();
+          if (key.isEmpty || !seenTitles.add(key)) continue;
+          sections.add(section);
+        }
+      }
       return sections
           .map(
             (section) => AndroidAutoHomeSection(
