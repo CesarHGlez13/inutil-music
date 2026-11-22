@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.17+4275 — 2026-11-22
+
+### Fixed — Resolución y reproducción exacta en Video Preview Reel
+
+- **Corrección de reproducción exacta en carrusel de Video Preview.**
+  Se corrigió el error en los perfiles de artistas y páginas de colecciones donde reproducir cualquier video clip del carrusel de vista previa mandaba siempre a la primera canción popular del artista. Ahora resuelve y busca dinámicamente la pista exacta en streaming para reproducir el tema seleccionado.
+- **Actualización obligatoria.**
+  Esta versión se publica como **actualización obligatoria** (`minSupportedVersion 2.5.17`).
+
 ## 2.5.16+4274 — 2026-11-22
 
 ### Improved — Android Auto Coolwalk con recomendaciones y Explorar, resolución de bucle OTA con verificación de firmas, Canvas cinemático y audio HQ pre-resuelto sin micro-cortes
@@ -12,8 +21,6 @@
   Pre-resolución asíncrona y en paralelo de flujos JioSaavn 320 kbps antes de iniciar la reproducción para arrancar directamente en alta fidelidad y eliminar micro-cortes causados por intercambios de reproductor en caliente. Calidad alta reactiva desactivada por defecto para máxima estabilidad.
 - **Spotify Canvas cinemático y respaldo visual animado inteligente.**
   Validación estricta de título y artista para evitar clips incorrectos en canciones no identificadas; cuando no hay clip disponible se expande la carátula con efecto de movimiento cinemático Ken Burns y aura reactiva ambiental.
-- **Corrección de reproducción exacta en carrusel de Video Preview.**
-  Se corrigió el error donde reproducir cualquier video clip del carrusel de vista previa en perfiles de artistas o colecciones mandaba siempre a la primera canción popular del artista. Ahora resuelve y busca dinámicamente la pista exacta en streaming para reproducir el tema seleccionado.
 - **Actualización obligatoria.**
   Esta versión se publica como **actualización obligatoria** (`minSupportedVersion 2.5.16`).
 

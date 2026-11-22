@@ -11,7 +11,7 @@ Inútil Music is a cross-platform music player and library manager built with Fl
 Published artifacts and the update channel live in
 <https://github.com/CesarHGlez13/inutil-music>.
 
-Current version: **2.5.16+4274**.
+Current version: **2.5.17+4275**.
 
 > The repository does not store media content. YouTube search, playback, and
 > downloads use Inútil Music's self-contained Dart InnerTube pipeline. Supported
