@@ -67,11 +67,69 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
-[ -n "$VERSION" ] || { echo "uso: tool/publish_release.sh <version> [--upload|--local] [--notes-file NOTAS] [--dry-run]" >&2; exit 2; }
+[ -n "$VERSION" ] || { echo "uso: tool/publish_release.sh <version> [--upload|--local|--github] [--notes-file NOTAS] [--dry-run]" >&2; exit 2; }
+
+# --- verificación estricta de versión y metadatos ----------------------------
+echo "==> Validando consistencia de versión $VERSION..."
+CONST_VER="$(grep -E "static const appVersion\s*=\s*'[^']+'" "$PROY/lib/core/constants/app_constants.dart" | sed -E "s/.*'([^']+)'.*/\1/")"
+PUBSPEC_VER="$(grep -E "^version:\s*[0-9]+\.[0-9]+\.[0-9]+" "$PROY/pubspec.yaml" | sed -E "s/^version:\s*([0-9]+\.[0-9]+\.[0-9]+).*/\1/")"
+
+if [ "$CONST_VER" != "$VERSION" ]; then
+  echo "ERROR CRÍTICO: AppConstants.appVersion ('$CONST_VER') no coincide con la versión a publicar ('$VERSION')." >&2
+  echo "Esto provocaría un bucle de actualización obligatoria infinita en los clientes." >&2
+  echo "Actualiza lib/core/constants/app_constants.dart antes de publicar." >&2
+  exit 1
+fi
+
+if [ "$PUBSPEC_VER" != "$VERSION" ]; then
+  echo "ERROR CRÍTICO: pubspec.yaml version ('$PUBSPEC_VER') no coincide con la versión a publicar ('$VERSION')." >&2
+  echo "Actualiza pubspec.yaml antes de publicar." >&2
+  exit 1
+fi
+
+echo "==> Ejecutando prueba de consistencia de metadatos (app_metadata_test.dart)..."
+if ! (cd "$PROY" && flutter test test/core/constants/app_metadata_test.dart >/dev/null 2>&1); then
+  echo "ERROR CRÍTICO: La prueba test/core/constants/app_metadata_test.dart falló." >&2
+  echo "Verifica que pubspec.yaml, README.md, CHANGELOG.md, InutilMusic.iss y app_constants.dart coincidan exactamente." >&2
+  exit 1
+fi
+echo "✓ Metadatos y prueba unitaria validados."
 
 # --- artefactos existentes ----------------------------------------------------
 APK_DIR="${INUTIL_APK_DIR:-$PROY/build/app/outputs/flutter-apk}"
 DIST_DIR="${INUTIL_DIST_DIR:-$PROY/dist}"
+
+# --- validación de firmas e integridad de binarios APK -----------------------
+for apk in "$APK_DIR"/app-*-release.apk; do
+  [ -f "$apk" ] || continue
+  APK_NAME="$(basename "$apk")"
+  
+  # 1. Comprobar firma
+  if which apksigner >/dev/null 2>&1; then
+    CERTS="$(apksigner verify --print-certs "$apk" 2>&1 || true)"
+    if echo "$CERTS" | grep -qi "Android Debug"; then
+      echo "ERROR CRÍTICO: $APK_NAME está firmado con la clave de depuración (Android Debug)!" >&2
+      echo "Android rechazará la actualización con INSTALL_FAILED_UPDATE_INCOMPATIBLE." >&2
+      echo "Asegúrate de que android/key.properties exista y compila con la clave de producción inutilmusic.keystore." >&2
+      exit 1
+    fi
+    if ! echo "$CERTS" | grep -q "CN=InutilMusic"; then
+      echo "ADVERTENCIA: $APK_NAME no contiene el certificado CN=InutilMusic." >&2
+    fi
+  fi
+
+  # 2. Comprobar versión horneada en libapp.so (usando grep -c para evitar SIGPIPE con pipefail)
+  if which unzip >/dev/null 2>&1 && which strings >/dev/null 2>&1; then
+    SO_COUNT="$(unzip -p "$apk" "*libapp.so" 2>/dev/null | strings | grep -c "InutilMusic/$VERSION" || true)"
+    if [ "${SO_COUNT:-0}" -eq 0 ]; then
+      echo "ERROR CRÍTICO: $APK_NAME no contiene la cadena 'InutilMusic/$VERSION' en su libapp.so compilado." >&2
+      echo "El binario fue compilado con una versión desactualizada. Recompila con:" >&2
+      echo "  flutter build apk --release --split-per-abi" >&2
+      exit 1
+    fi
+  fi
+done
+echo "✓ Artefactos APK verificados (firmas de producción y versión interna $VERSION en libapp.so)."
 declare -A FILES=()          # clave -> ruta
 declare -A ABI_OF_KEY=()     # clave -> ABI legible
 add_artifact() { # clave ruta abi

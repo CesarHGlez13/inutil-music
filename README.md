@@ -923,16 +923,13 @@ The repository deliberately excludes:
 > publishing*): comandos exactos, modos de `publish_release.sh` y mediciones
 > reales de esta máquina.
 
-Guía verificada en esta máquina (Flutter 3.50.0 · 2026-11-16). La app compara
-`AppConstants.appVersion` (`lib/core/constants/app_constants.dart:9`, hoy `2.0.0`)
-contra `latestVersion` del manifiesto y, si nada responde, informa «estás al día»
-en vez de inventar una actualización.
+Guía verificada en esta máquina (Flutter 3.50.0). La app compara
+`AppConstants.appVersion` (`lib/core/constants/app_constants.dart:12`, hoy `2.5.16`)
+contra `latestVersion` y `minSupportedVersion` del manifiesto Firestore.
 
 ### 1. Compilar los artefactos
 
-Android, un APK por ABI. El flag es `--split-per-abi`; **`--split-abi` no existe**
-(en el `flutter build apk --help` de este SDK sólo aparece
-`--[no-]split-per-abi`):
+Android, un APK por ABI con firma de producción oficial (`inutilmusic.keystore`). El flag es `--split-per-abi`; **`--split-abi` no existe**:
 
 ```bash
 flutter build apk --release --split-per-abi
@@ -968,13 +965,14 @@ Si no existe, el manifiesto simplemente omite la clave `universal` y
 ### 2. El manifiesto `release.json`
 
 Esquema exacto (`schemaVersion: 1`) que genera `tool/publish_release.sh`; esta es
-la salida real de `bash tool/publish_release.sh 2.0.0 --dry-run`, recortada:
+la salida real de `bash tool/publish_release.sh 2.5.16 --dry-run`, recortada:
 
 ```json
 {
   "schemaVersion": 1,
-  "latestVersion": "2.0.0",
-  "mandatory": false,
+  "latestVersion": "2.5.16",
+  "minSupportedVersion": "2.5.16",
+  "mandatory": true,
   "publishedAt": "2026-11-17T05:18:43+00:00",
   "apkDownloadUrl": "/api/releases/app-arm64-v8a-release.apk",
   "linuxDownloadUrl": "/api/releases/inutil_music_linux_x64.tar.gz",

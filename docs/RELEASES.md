@@ -1,37 +1,32 @@
 # Publicar una versión de Inútil Music (OTA)
 
-1. Sube la versión en los **cinco** sitios que `test/core/constants/
-   app_metadata_test.dart` compara entre sí (si uno se queda atrás, la prueba se
-   cae): `pubspec.yaml` (`version: 2.0.1+201`),
-   `lib/core/constants/app_constants.dart` (`appVersion = '2.0.1'`),
-   `README.md` (`Current version: **2.0.1+201**`),
-   `packaging/windows/InutilMusic.iss` (`#define MyAppVersion "2.0.1"`, de ahí
-   sale el nombre `InutilMusic-2.0.1-Windows-x64-Setup.exe` que genera CI) y la
-   aserción `expect(pubspecVersion, '2.0.1+201')` de esa misma prueba.
-   OJO: `README.md` y `CHANGELOG.md` no son decorativos —el regex de la prueba
-   toma el **primer** `## X.Y.Z+BUILD` del CHANGELOG, así que la sección nueva
-   tiene que ir arriba (más nueva primero)—.
-2. Escribe las novedades en `CHANGELOG.md` bajo un encabezado `## 2.0.1`.
-3. `flutter build apk --release --split-per-abi` (el flag es `--split-per-abi`, no `--split-abi`).
-   Con este flag Flutter suma un desplazamiento de ABI al `versionCode`.
-   Medido con `aapt` (build-tools 36.0.0) sobre Flutter 3.50 usando
-   `2.5.10+4268`: `6268` (arm64-v8a), `5268` (armeabi-v7a) y `8268` (x86_64),
-   o sea desplazamientos `+2000`, `+1000` y `+4000`. La documentación anterior
-   prometía `2210` para arm64 con `2.1.0+210` (`+1000`): ese desplazamiento subió
-   a `+2000` en Flutter moderno, así que un teléfono con `6267` instalado acepta
-   sin rechazar por downgrade un `6268` (`+4268`) o un `6269` (`+4269`). Ignora
-   `app-release.apk` si no se reconstruyó: puede seguir siendo de una versión
-   anterior (medido: el `app-release.apk` del árbol era `1.3.1+131`).
-4. `flutter build linux --release && bash tool/package_linux.sh` → `dist/inutil_music_linux_x64.tar.gz`.
-5. `bash tool/publish_release.sh 2.0.1 --dry-run` → revisa el `release.json` impreso.
-6. Prueba local: `bash tool/publish_release.sh 2.0.1` deja APK + tar.gz + `release.json`
-   en `~/inutil-releases/`; el PC los sirve en `/api/release` y `/api/releases/<archivo>`.
-7. Auto-update de Linux: `bash tool/test_update_swap.sh` → `RESULTADO: PRUEBA
-   SUPERADA` (reemplanta `data/` y `lib/`, relanza y limpia el staging).
-8. Canal público (recomendado hoy): `FIREBASE_ACCESS_TOKEN=… bash tool/publish_release.sh 2.0.1 --github`
-   → Release `v2.0.1` de `CesarHGlez13/inutil-music` (assets descargables sin sesión)
-   + `PATCH` de `app_config/release`. El token sale del `refresh_token` del CLI de
-   Firebase y caduca a la hora.
+1. Sube la versión en los **cinco** sitios que `test/core/constants/app_metadata_test.dart` compara entre sí (si uno se queda atrás, la prueba se cae y el publicador aborta):
+   - `pubspec.yaml` (`version: 2.5.16+4274`)
+   - `lib/core/constants/app_constants.dart` (`static const appVersion = '2.5.16';`) **¡CRÍTICO!**: `InutilUpdateService` usa esta constante en tiempo de ejecución para compararla con `minSupportedVersion` de Firestore; si no se sube, la app se auto-bloquea en bucle infinito de actualización.
+   - `README.md` (`Current version: **2.5.16+4274**`)
+   - `packaging/windows/InutilMusic.iss` (`#define MyAppVersion "2.5.16"`, de ahí sale el nombre de instalador de Windows)
+   - `test/core/constants/app_metadata_test.dart` (`expect(pubspecVersion, '2.5.16+4274');`)
+   OJO: `README.md` y `CHANGELOG.md` no son decorativos —el regex de la prueba toma el **primer** `## X.Y.Z+BUILD` del CHANGELOG, así que la sección nueva tiene que ir arriba (más nueva primero)—.
+2. Escribe las novedades en `CHANGELOG.md` bajo el encabezado `## 2.5.16+4274 — AAAA-MM-DD`.
+3. Verifica la existencia de `android/key.properties` apuntando al keystore de producción `inutilmusic.keystore`. **NUNCA** compilar releases de OTA con firma `Android Debug`, pues el instalador de Android rechazará la actualización con `INSTALL_FAILED_UPDATE_INCOMPATIBLE`.
+4. Compila los APKs de Android por arquitectura:
+   `flutter build apk --release --split-per-abi` (el flag es `--split-per-abi`, no `--split-abi`).
+   Con este flag Flutter suma un desplazamiento de ABI al `versionCode`:
+   `+2000` (arm64-v8a -> 6274), `+1000` (armeabi-v7a -> 5274) y `+4000` (x86_64 -> 8274).
+5. Compila Linux si aplica:
+   `flutter build linux --release && bash tool/package_linux.sh` → `dist/inutil_music_linux_x64.tar.gz`.
+6. Simulación y control previo obligatorio:
+   `bash tool/publish_release.sh 2.5.16 --dry-run`
+   El script ahora valida automáticamente:
+   a) Que `AppConstants.appVersion` y `pubspec.yaml` coincidan con la versión.
+   b) Que `app_metadata_test.dart` pase al 100%.
+   c) Que los APKs estén firmados con el certificado de producción (`CN=InutilMusic`) y NO con `Android Debug`.
+   d) Que `libapp.so` contenga la cadena compilada `InutilMusic/2.5.16`.
+7. Auto-update de Linux (prueba de swap):
+   `bash tool/test_update_swap.sh` → `RESULTADO: PRUEBA SUPERADA`.
+8. Canal público (publicación oficial):
+   `FIREBASE_ACCESS_TOKEN=… bash tool/publish_release.sh 2.5.16 --github`
+   → Crea el Release en GitHub (`CesarHGlez13/inutil-music`), sube los binarios y `release.json`, actualiza el documento Firestore `app_config/release` y purga la caché de los relays (S7 y Cloudflare Workers).
 9. Alternativa `--upload` (Cloud Storage): sigue bloqueada hasta aprovisionar
    Storage en la consola. Medido el 2026-11-17 con `firebase deploy --only storage:rules`:
    *«Firebase Storage has not been set up on project 'inutil-music-app' … click
@@ -418,3 +413,15 @@
       coincidencias** en macOS (una por slice) y **1** en Linux y Windows. Los
       dos `.pkg` solo difieren en la metadata del instalador: 61 300 490 B
       (arm64) contra 61 300 716 B (x64).
+
+23. **El bucle de actualización obligatoria infinita («Versión 2.5.16 disponible · Tienes v2.5.15») y la firma de producción:**
+    * **Mecanismo del bucle de versión**:
+      `InutilUpdateService.checkForUpdate` lee la versión instalada en ejecución mediante el fallback `currentVersion ?? AppConstants.appVersion` (`lib/core/firebase/inutil_update_service.dart:548`). Si se sube la versión en `pubspec.yaml` pero se omite actualizar `lib/core/constants/app_constants.dart` (`static const appVersion = '...'`), la app compila reportando la versión anterior (p. ej. `2.5.15`). Al arrancar, consulta el documento Firestore `app_config/release`. Si dicho documento exige `minSupportedVersion = '2.5.16'` y `mandatory = true`, la app concluye que `2.5.15 < 2.5.16`, activando la compuerta `InutilUpdateGate` que bloquea la pantalla con *«Actualización requerida. Versión 2.5.16 disponible · Tienes v2.5.15»*. Aunque el usuario descargue e instale el nuevo APK, si ese APK tiene la constante vieja horneada en su `libapp.so`, el bucle se repite de forma permanente.
+    * **Mecanismo del rechazo de firmas (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)**:
+      Cuando se compila en local para pruebas con `key.properties` deshabilitado o con llaves por defecto, Gradle firma el APK con `CN=Android Debug, O=Android, C=US` (`SHA-256: 61fda274...`). El release oficial publicado en GitHub y Firestore está firmado con el certificado oficial `CN=InutilMusic, OU=Inutil, O=Inutil, L=CDMX, ST=CDMX, C=MX` (`SHA-256: 64279ecd...`). Android PackageInstaller prohíbe terminantemente actualizar un paquete existente con un APK firmado por una clave distinta: el instalador aborta con `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, dejando el teléfono en la versión anterior.
+    * **Blindaje preventivo en `tool/publish_release.sh`**:
+      Para eliminar el riesgo humano o de automatización, `tool/publish_release.sh` ahora incorpora validaciones obligatorias previas al despliegue:
+      1. Extrae y compara `AppConstants.appVersion` y `pubspec.yaml` contra la versión pasada por argumento: si discrepan, cancela la ejecución con código de salida 1.
+      2. Ejecuta `flutter test test/core/constants/app_metadata_test.dart` y exige 100% de éxito.
+      3. Examina los certificados de cada APK con `apksigner verify --print-certs`: si detecta `Android Debug` aborta inmediatamente.
+      4. Extrae `libapp.so` de cada APK con `unzip` y analiza los símbolos con `strings` buscando `InutilMusic/$VERSION` (usando `grep -c` para proteger la tubería contra SIGPIPE por `set -euo pipefail`). Si no coincide con la versión objetivo, aborta impidiendo la publicación de binarios desactualizados.

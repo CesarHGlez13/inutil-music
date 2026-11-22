@@ -2,10 +2,12 @@
 
 ## 2.5.16+4274 — 2026-11-22
 
-### Improved — Android Auto Coolwalk con recomendaciones, Explorar y soporte multimedia nativo, Canvas cinemático sin desfase y audio HQ pre-resuelto sin micro-cortes
+### Improved — Android Auto Coolwalk con recomendaciones y Explorar, resolución de bucle OTA con verificación de firmas, Canvas cinemático y audio HQ pre-resuelto sin micro-cortes
 
 - **Android Auto Coolwalk nativo y navegación completa estilo Spotify.**
   Integrado servicio `MediaBrowserService` con 4 pestañas principales: **Inicio** (combinando recomendaciones personalizadas, *Seguir escuchando*, *Tus playlists*, *Porque escuchaste...*, *Nuevos para ti*, *Descubrimiento*, *Artistas populares* y *Mixes* en cuadrícula HD 640×640), **Explorar** (catálogo completo por estados de ánimo y géneros con playlists y canciones), **Playlists** (tus listas guardadas) y **Biblioteca** (favoritos y pistas descargadas sin conexión). Controles personalizados en pantalla de auto: Favorito (`♡` ↔ `♥`), Aleatorio (`🔀`) y Repetir (`🔁`), cola completa de reproducción y compatibilidad total con pantalla dividida Google Maps (Coolwalk).
+- **Corrección definitiva de bucle de actualización OTA y sincronización de versiones.**
+  Se corrigió el bloqueo cíclico donde la app se exigía actualizarse repetidamente a sí misma (*«Versión 2.5.16 disponible · Tienes v2.5.15»*). Se alineó `AppConstants.appVersion` a `'2.5.16'`, sincronizándolo con `pubspec.yaml` y Firestore `minSupportedVersion`. Además se integraron validaciones automáticas de firma de producción (`inutilmusic.keystore`) y chequeo de integridad en el pipeline de publicación (`tool/publish_release.sh`).
 - **Audio HQ pre-resuelto sin micro-cortes.**
   Pre-resolución asíncrona y en paralelo de flujos JioSaavn 320 kbps antes de iniciar la reproducción para arrancar directamente en alta fidelidad y eliminar micro-cortes causados por intercambios de reproductor en caliente. Calidad alta reactiva desactivada por defecto para máxima estabilidad.
 - **Spotify Canvas cinemático y respaldo visual animado inteligente.**
