@@ -2875,6 +2875,7 @@ class _RecordingPlayerController extends PlayerController {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
+    int? initialQueueIndex,
   }) async {
     lastTrack = track;
     lastQueue = queue == null ? null : List.unmodifiable(queue);

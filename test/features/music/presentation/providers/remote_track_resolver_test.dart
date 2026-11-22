@@ -732,6 +732,66 @@ void main() {
     expect(primary.resolveCalls, 1);
     expect(fallback.resolveCalls, 0);
   });
+
+  test(
+    'recovers with a fresh resolution when an in-flight prefetch is superseded',
+    () async {
+      final controllable = _ControllableAudioResolver();
+      final container = ProviderContainer(
+        overrides: [
+          audioStreamResolverProvider.overrideWithValue(controllable),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      const track = TrackInfo(
+        id: 'video-id',
+        title: 'Because Of You',
+        artist: 'LIZOT',
+        url: 'https://www.youtube.com/watch?v=video-id',
+      );
+      final resolver = container.read(remoteTrackResolverProvider);
+
+      var prefetchStillActive = true;
+      final prefetchFuture = resolver.resolve(
+        track,
+        shouldContinue: () => prefetchStillActive,
+      );
+      await controllable.waitForCalls(1);
+
+      // User selects the exact track that was being prefetched, superseding the
+      // prefetch request while the active selection remains live.
+      prefetchStillActive = false;
+      final selectionFuture = resolver.resolve(
+        track,
+        shouldContinue: () => true,
+      );
+
+      controllable.requests[0].complete(
+        const AudioStreamResolution(
+          source: AudioStreamSource.innerTube,
+          streamUrl: 'https://media.example/prefetch.m4a',
+        ),
+      );
+
+      await expectLater(
+        prefetchFuture,
+        throwsA(isA<AudioStreamResolverException>()),
+      );
+
+      await controllable.waitForCalls(2);
+      controllable.requests[1].complete(
+        const AudioStreamResolution(
+          source: AudioStreamSource.innerTube,
+          streamUrl: 'https://media.example/active.m4a',
+        ),
+      );
+
+      final resolved = await selectionFuture;
+      expect(resolved.streamUrl, 'https://media.example/active.m4a');
+      expect(controllable.resolveCalls, 2);
+    },
+  );
 }
 
 class _FakeAudioResolver implements AudioStreamResolver {

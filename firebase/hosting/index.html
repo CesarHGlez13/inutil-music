@@ -359,6 +359,40 @@
     .login-box {
       width: 100%; max-width: 420px; padding: 36px 30px;
     }
+
+    /* Relay pill, password row, credentials box & mobile ergonomics */
+    .relay-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 11px; border-radius: 20px; font-size: 11.5px; font-weight: 700;
+      border: 1px solid rgba(255,255,255,0.14); background: rgba(255,255,255,0.04);
+      color: var(--text-muted); cursor: pointer; transition: all 0.15s ease;
+    }
+    .relay-pill.ok {
+      border-color: rgba(52, 211, 153, 0.35); background: rgba(16, 185, 129, 0.12); color: #34d399;
+    }
+    .relay-pill.warn {
+      border-color: rgba(251, 191, 36, 0.35); background: rgba(245, 158, 11, 0.12); color: #fbbf24;
+    }
+    .pass-input-row {
+      display: flex; gap: 8px; align-items: stretch; margin-bottom: 16px;
+    }
+    .pass-input-row input { margin-bottom: 0 !important; flex: 1; }
+    .cred-box {
+      background: rgba(0,0,0,0.45); border: 1px solid rgba(56,189,248,0.3);
+      border-radius: var(--radius-md); padding: 14px; font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+      color: #e2e8f0; margin-bottom: 16px;
+    }
+    @media (max-width: 640px) {
+      .container { padding: 12px 10px 44px; }
+      .topbar { padding: 14px; gap: 12px; }
+      .topbar-actions { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+      .topbar-actions .btn { flex: 1 1 auto; justify-content: center; }
+      .modal { padding: 20px 16px; max-height: 92vh; overflow-y: auto; }
+      .user-footer-actions { flex-direction: column; align-items: stretch; gap: 8px; }
+      .footer-left, .footer-right { display: flex; flex-wrap: wrap; gap: 6px; }
+      .toast { left: 12px; right: 12px; bottom: 16px; text-align: center; }
+    }
   </style>
 </head>
 <body>
@@ -419,6 +453,9 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <button id="relayStatusPill" type="button" class="relay-pill" title="Estado del Cloud Relay · clic para configurar purga instantánea de caché">
+          <span id="relayDot">●</span> <span id="relayStatusLabel">Relay Cloud…</span>
+        </button>
         <div id="adminBadge" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:20px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);font-size:11.5px;font-weight:700;color:var(--accent);">
           <span>👑</span> <span id="adminEmailLabel">admin</span>
         </div>
@@ -498,7 +535,10 @@
         </div>
         <div>
           <label>Contraseña Inicial</label>
-          <input type="password" id="cPass" required placeholder="Mínimo 6 caracteres" />
+          <div class="pass-input-row">
+            <input type="text" id="cPass" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres" />
+            <button type="button" id="genPassBtn" class="btn btn-sm" title="Generar contraseña segura">🎲 Generar</button>
+          </div>
         </div>
         <div>
           <label>Nombre Completo / Titular</label>
@@ -552,6 +592,21 @@
     </div>
   </div>
 
+  <!-- =========================================================================
+       MODAL: CREDENCIALES LISTAS PARA ENVIAR (WHATSAPP)
+       ========================================================================= -->
+  <div id="credModal" class="modal-backdrop hidden">
+    <div class="modal">
+      <h3>✅ Cuenta Creada sin Cerrar tu Sesión</h3>
+      <p>Copia este mensaje y envíaselo directamente al usuario por WhatsApp.</p>
+      <div id="credPreview" class="cred-box"></div>
+      <div class="modal-actions">
+        <button type="button" id="closeCredBtn" class="btn">Cerrar</button>
+        <button type="button" id="copyCredBtn" class="btn btn-primary">📋 Copiar para WhatsApp</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Toast Notificaciones -->
   <div id="toast" class="toast hidden"></div>
 
@@ -562,7 +617,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
     import {
       getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-      createUserWithEmailAndPassword, signOut,
+      createUserWithEmailAndPassword, sendPasswordResetEmail, signOut,
       GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import {
@@ -587,6 +642,55 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    // Instancia secundaria exclusiva para crear usuarios sin cerrar la sesión del admin.
+    const creatorApp = initializeApp(firebaseConfig, "admin-user-creator");
+    const creatorAuth = getAuth(creatorApp);
+    const CLOUD_RELAY_ORIGIN = "https://inutil-cloud-relay.scada-xiaomi-server.workers.dev";
+
+    function generateReadablePassword() {
+      const words = ["Music", "Sound", "Audio", "Pulse", "Beat", "Vibe", "Wave", "Inutil"];
+      const word = words[Math.floor(Math.random() * words.length)];
+      const digits = String(Math.floor(1000 + Math.random() * 9000));
+      const tail = "ABCDEFGHJKLMNPQRSTUVWXYZ"[Math.floor(Math.random() * 24)];
+      return `${word}-${digits}${tail}`;
+    }
+
+    async function checkCloudRelayHealth() {
+      const pill = $("relayStatusPill");
+      const label = $("relayStatusLabel");
+      if (!pill || !label) return;
+      try {
+        const res = await fetch(`${CLOUD_RELAY_ORIGIN}/healthz`, { method: "GET" });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          pill.classList.remove("warn");
+          pill.classList.add("ok");
+          const hasSecret = Boolean(localStorage.getItem("inutilRelayAdminSecret"));
+          label.textContent = hasSecret
+            ? `Relay Cloud OK · purga auto`
+            : `Relay Cloud OK${data.version ? " · " + data.version : ""}`;
+          return;
+        }
+      } catch (_) {}
+      pill.classList.remove("ok");
+      pill.classList.add("warn");
+      label.textContent = "Relay Cloud sin respuesta";
+    }
+
+    async function invalidateRelayUserCache(uid) {
+      const secret = (localStorage.getItem("inutilRelayAdminSecret") || "").trim();
+      if (!secret || !uid) return;
+      try {
+        await fetch(`${CLOUD_RELAY_ORIGIN}/admin/invalidate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Admin-Secret": secret
+          },
+          body: JSON.stringify({ paths: [`users/${uid}`] })
+        });
+      } catch (_) {}
+    }
 
     const $ = (id) => document.getElementById(id);
     let allUsers = [];
@@ -991,6 +1095,8 @@
           <div class="user-footer-actions">
             <div class="footer-left">
               ${(smartTvId || tvPhoneId || musicPhoneId) ? `<button class="btn btn-sm" data-action="releaseAll" data-uid="${u.uid}">🔓 Liberar Todos los Equipos</button>` : ''}
+              <button class="btn btn-sm" data-action="resetPassword" data-uid="${u.uid}" title="Enviar correo para restablecer contraseña">🔑 Reset clave</button>
+              <button class="btn btn-sm" data-action="copySummary" data-uid="${u.uid}" title="Copiar resumen de licencia">📋 Copiar</button>
               <button class="btn btn-sm" data-action="toggleActive" data-uid="${u.uid}">
                 ${u.isActive ? "⏸️ Suspender Acceso" : "▶ Reactivar Acceso"}
               </button>
@@ -1078,6 +1184,42 @@
         });
       });
 
+      // 5b. Enviar correo de recuperación de contraseña
+      document.querySelectorAll("[data-action='resetPassword']").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const uid = btn.dataset.uid;
+          const u = allUsers.find(x => x.uid === uid);
+          if (!u || !u.email) return;
+          if (!confirm(`¿Enviar correo de restablecimiento de contraseña a ${u.email}?`)) return;
+          try {
+            await sendPasswordResetEmail(auth, u.email);
+            toast(`✉️ Correo de reset enviado a ${u.email}`);
+          } catch (err) {
+            toast("Error enviando reset: " + (err?.message || err));
+          }
+        });
+      });
+
+      // 5c. Copiar resumen de cuenta
+      document.querySelectorAll("[data-action='copySummary']").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const uid = btn.dataset.uid;
+          const u = allUsers.find(x => x.uid === uid);
+          if (!u) return;
+          const exp = parseDate(u.accountExpiresAt);
+          const expTxt = isPermanent(u)
+            ? "Permanente"
+            : exp ? exp.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" }) : "Sin fecha";
+          const txt = `Cuenta Inútil Suite\nCorreo: ${u.email}\nEstado: ${u.isActive ? "Activa" : "Suspendida"}\nVigencia: ${expTxt}`;
+          try {
+            await navigator.clipboard.writeText(txt);
+            toast("📋 Datos copiados al portapapeles");
+          } catch (_) {
+            prompt("Copia los datos:", txt);
+          }
+        });
+      });
+
       // 6. Suspender / Reactivar
       document.querySelectorAll("[data-action='toggleActive']").forEach(btn => {
         btn.addEventListener("click", async () => {
@@ -1130,6 +1272,7 @@
       try {
         const ref = doc(db, "users", uid);
         await updateDoc(ref, fields);
+        invalidateRelayUserCache(uid);
       } catch (err) {
         // Si updateDoc falla por 429, intentar con REST
         console.warn("UpdateDoc fallback:", err);
@@ -1238,9 +1381,41 @@
       await loadAllAccounts();
     });
 
-    // Modal Crear Cuenta
-    $("createUserBtn").addEventListener("click", () => $("createModal").classList.remove("hidden"));
+    // Modal Crear Cuenta (usando instancia secundaria para NO cerrar la sesión del admin)
+    let lastCreatedCredText = "";
+    $("createUserBtn").addEventListener("click", () => {
+      if (!$("cPass").value) $("cPass").value = generateReadablePassword();
+      $("createModal").classList.remove("hidden");
+    });
+    $("genPassBtn").addEventListener("click", () => {
+      $("cPass").value = generateReadablePassword();
+    });
     $("cancelCreateBtn").addEventListener("click", () => $("createModal").classList.add("hidden"));
+    $("closeCredBtn").addEventListener("click", () => $("credModal").classList.add("hidden"));
+    $("copyCredBtn").addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(lastCreatedCredText);
+        toast("📋 Accesos copiados — listos para pegar en WhatsApp");
+      } catch (_) {
+        prompt("Copia los accesos:", lastCreatedCredText);
+      }
+    });
+    $("relayStatusPill").addEventListener("click", () => {
+      const current = localStorage.getItem("inutilRelayAdminSecret") || "";
+      const next = prompt(
+        "Opcional: clave X-Admin-Secret del Cloud Relay para purgar caché al instante al modificar licencias (vacío para limpiar):",
+        current
+      );
+      if (next === null) return;
+      if (next.trim()) {
+        localStorage.setItem("inutilRelayAdminSecret", next.trim());
+        toast("🔐 Purga automática del Cloud Relay activada");
+      } else {
+        localStorage.removeItem("inutilRelayAdminSecret");
+        toast("Purga automática desactivada");
+      }
+      checkCloudRelayHealth();
+    });
     $("createForm").addEventListener("submit", async (e) => {
       e.preventDefault();
       const email = $("cEmail").value.trim().toLowerCase();
@@ -1248,14 +1423,18 @@
       const name = $("cName").value.trim() || email.split("@")[0];
       const days = $("cDays").value;
       const role = $("cRole").value;
+      const submitBtn = e.target.querySelector("button[type='submit']");
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Creando…"; }
 
       try {
-        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        const cred = await createUserWithEmailAndPassword(creatorAuth, email, pass);
         const uid = cred.user.uid;
+        await signOut(creatorAuth);
         const now = new Date();
-        const exp = days === "permanent"
-          ? "2099-12-31T23:59:59.000Z"
-          : new Date(now.getTime() + Number(days) * 86400000).toISOString();
+        const expDate = days === "permanent"
+          ? null
+          : new Date(now.getTime() + Number(days) * 86400000);
+        const exp = expDate ? expDate.toISOString() : "2099-12-31T23:59:59.000Z";
 
         await setDoc(doc(db, "users", uid), {
           uid,
@@ -1272,12 +1451,27 @@
           currentTvDeviceId: "",
           currentPhoneDeviceId: ""
         });
+        invalidateRelayUserCache(uid);
         $("createModal").classList.add("hidden");
         $("createForm").reset();
-        toast(`✅ Cuenta ${email} creada exitosamente.`);
+        const validityTxt = days === "permanent"
+          ? "Permanente 💎"
+          : `${days} días (hasta ${expDate.toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })})`;
+        lastCreatedCredText =
+          `🎵 Acceso Inútil Suite\n` +
+          `Titular: ${name}\n` +
+          `Correo: ${email}\n` +
+          `Contraseña: ${pass}\n` +
+          `Vigencia: ${validityTxt}\n` +
+          `Inicia sesión con estos datos en la app.`;
+        $("credPreview").textContent = lastCreatedCredText;
+        $("credModal").classList.remove("hidden");
+        toast(`✅ Cuenta ${email} creada (tu sesión admin sigue activa)`);
         await loadAllAccounts();
       } catch (err) {
         alert("Error creando usuario: " + err.message);
+      } finally {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Crear Cuenta"; }
       }
     });
 
@@ -1298,8 +1492,10 @@
     // Acciones de Topbar
     $("syncBtn").addEventListener("click", async () => {
       toast("↻ Sincronizando con Google Cloud...");
+      checkCloudRelayHealth();
       await loadAllAccounts();
     });
+    checkCloudRelayHealth();
     $("logoutBtn").addEventListener("click", async () => {
       await signOut(auth);
     });

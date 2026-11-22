@@ -1819,6 +1819,7 @@ class _RecordingPlayerController extends PlayerController {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
+    int? initialQueueIndex,
   }) async {
     playCalls += 1;
     lastTrack = track;

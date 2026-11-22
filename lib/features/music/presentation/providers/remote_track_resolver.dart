@@ -190,29 +190,49 @@ class RemoteTrackResolver {
     await _loadPersistentCache();
     _trimMemoryEntries();
 
+    Future<TrackInfo> startFreshResolution() {
+      final generation = Object();
+      final future = _resolveAndCache(
+        track,
+        key,
+        generation: generation,
+        forceRefresh: forceRefresh,
+        allowStaleStreamFallback: allowStaleStreamFallback,
+        mode: mode,
+        onResolverFailure: onResolverFailure,
+        shouldContinue: shouldContinue,
+      );
+
+      _entries[key] = _TrackResolutionEntry(future, generation: generation);
+      _trimMemoryEntries(preserveKey: key);
+      return future;
+    }
+
     final cached = _entries[key];
     if (!forceRefresh &&
         mode == AudioResolutionMode.primaryThenFallback &&
         cached != null &&
         !cached.isExpired) {
-      return cached.future.then((resolved) => _mergeTrackInfo(track, resolved));
+      return cached.future.then(
+        (resolved) => _mergeTrackInfo(track, resolved),
+        onError: (Object error, StackTrace stackTrace) {
+          // A prefetch or earlier request for this same track may have been
+          // superseded when the user selected the track. If THIS caller is
+          // still active, start a fresh resolution instead of propagating the
+          // obsolete caller's cancellation error.
+          if (RemotePlaybackFailureClassifier.isCancellation(error) &&
+              (shouldContinue == null || shouldContinue())) {
+            if (identical(_entries[key], cached)) {
+              _entries.remove(key);
+            }
+            return startFreshResolution();
+          }
+          Error.throwWithStackTrace(error, stackTrace);
+        },
+      );
     }
 
-    final generation = Object();
-    final future = _resolveAndCache(
-      track,
-      key,
-      generation: generation,
-      forceRefresh: forceRefresh,
-      allowStaleStreamFallback: allowStaleStreamFallback,
-      mode: mode,
-      onResolverFailure: onResolverFailure,
-      shouldContinue: shouldContinue,
-    );
-
-    _entries[key] = _TrackResolutionEntry(future, generation: generation);
-    _trimMemoryEntries(preserveKey: key);
-    return future;
+    return startFreshResolution();
   }
 
   void dispose() {

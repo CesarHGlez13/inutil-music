@@ -18,8 +18,13 @@ import '../../../../services/lyrics/lyrics_romanization_service.dart';
 import '../../../../services/lyrics/lyrics_translation_service.dart';
 import '../../../../services/lyrics/lyrics_service.dart';
 import '../../../../services/player/player_service.dart';
+import '../../../../services/spotify_canvas/spotify_canvas_resolver.dart';
 import '../../domain/entities/lyrics.dart';
 import '../providers/music_providers.dart';
+import '../providers/playback_visual_cache_provider.dart';
+import '../providers/spotify_canvas_provider.dart';
+import '../providers/video_preview_provider.dart';
+import 'animated_artwork_motion.dart';
 import 'lyrics_animation_transition.dart';
 import 'lyrics_line_layout.dart';
 import 'lyrics_share_preview.dart';
@@ -31,6 +36,7 @@ import 'playback_menu_bottom_sheet.dart';
 import 'playback_progress_line.dart';
 import '../providers/playback_artwork_provider.dart';
 import 'source_image.dart';
+import 'spotify_canvas_video.dart';
 import 'decorative_progress_transition.dart';
 import 'uniform_playback_slider_track_shape.dart';
 import 'wavy_playback_seek_bar.dart';
@@ -420,8 +426,13 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
           fit: StackFit.expand,
           children: [
             const PlayerPlaybackGradientBackground(),
+            if (!AppPlatform.isFlutterTest &&
+                AppPlatform.supportsRemoteArtworkVideo)
+              const Positioned.fill(
+                child: IgnorePointer(child: _LyricsCanvasBackground()),
+              ),
             const DecoratedBox(
-              decoration: BoxDecoration(color: Color(0x52000000)),
+              decoration: BoxDecoration(color: Color(0x6E000000)),
             ),
             SafeArea(
               bottom: false,
@@ -4056,4 +4067,101 @@ int _activeTimelineEntryIndex(
     }
   }
   return result;
+}
+
+/// Full-bleed looping Spotify Canvas (or animated artwork fallback) rendered
+/// behind the synced lyrics screen on both mobile and desktop.
+class _LyricsCanvasBackground extends ConsumerWidget {
+  const _LyricsCanvasBackground();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsControllerProvider).value;
+    final canvasEnabled =
+        (settings?.spotifyCanvasEnabled ?? true) ||
+        (settings?.animatedArtworkEnabled ?? true);
+    if (!canvasEnabled) {
+      return const SizedBox.shrink();
+    }
+
+    final snapshot = ref.watch(playerControllerProvider).value;
+    if (snapshot == null ||
+        snapshot.status == PlayerStatus.idle ||
+        snapshot.status == PlayerStatus.failed) {
+      return const SizedBox.shrink();
+    }
+
+    final isPlaying = snapshot.status == PlayerStatus.playing;
+    final visualCache = ref.watch(playbackVisualCacheProvider);
+    final artwork = ref.watch(playbackArtworkProvider);
+    final artworkSource = artwork.source ?? snapshot.thumbnailUrl;
+    final artworkFallback = artwork.fallback;
+    final visualIdentity =
+        snapshot.trackId ??
+        snapshot.sourceUrl ??
+        '${snapshot.title ?? ''}|${snapshot.artist ?? ''}';
+
+    final canvasTrack = SpotifyCanvasTrack(
+      snapshot.title ?? '',
+      snapshot.artist ?? '',
+      snapshot.duration ?? Duration.zero,
+    );
+    final spotifyCanvasAsync = ref.watch(spotifyCanvasUrlProvider(canvasTrack));
+    final spotifyCanvasUrl = spotifyCanvasAsync.value;
+    final fallbackVideoPreviewUrl =
+        spotifyCanvasUrl == null && !spotifyCanvasAsync.isLoading
+        ? ref
+              .watch(
+                trackVideoPreviewProvider((
+                  title: snapshot.title ?? '',
+                  artist: snapshot.artist ?? '',
+                )),
+              )
+              .value
+              ?.videoUrl
+        : null;
+    final effectiveVideoUrl = spotifyCanvasUrl ?? fallbackVideoPreviewUrl;
+    final playableUri =
+        (effectiveVideoUrl != null
+            ? visualCache.videoFileFor(visualIdentity, effectiveVideoUrl)
+            : null) ??
+        effectiveVideoUrl;
+
+    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+
+    if (playableUri != null) {
+      return SpotifyCanvasVideo(
+        key: const ValueKey('lyrics-canvas-video'),
+        url: playableUri,
+        isPlaying: isPlaying,
+        identity: visualIdentity,
+        revealDuration: disableAnimations
+            ? Duration.zero
+            : const Duration(milliseconds: 650),
+        revealCurve: Curves.easeInOutCubic,
+      );
+    }
+
+    if (artworkSource?.trim().isNotEmpty == true) {
+      return Opacity(
+        opacity: 0.42,
+        child: AnimatedArtworkMotion(
+          key: ValueKey('lyrics-canvas-artwork-$visualIdentity'),
+          enabled: !disableAnimations,
+          isPlaying: isPlaying,
+          identity: visualIdentity,
+          borderRadius: BorderRadius.zero,
+          depthEnabled: false,
+          child: SourceImage(
+            source: artworkSource,
+            fallbackSource: artworkFallback,
+            fit: BoxFit.cover,
+            fallback: const SizedBox.shrink(),
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
 }

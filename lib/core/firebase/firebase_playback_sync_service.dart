@@ -126,6 +126,11 @@ class PlaybackSyncSession {
     this.positionMs = 0,
     this.durationMs = 0,
     this.isPlaying = false,
+    this.volume = 1.0,
+    this.shuffleEnabled = false,
+    this.repeatMode = 'off',
+    this.queue = const <Map<String, dynamic>>[],
+    this.queueIndex = 0,
     this.updatedAt,
     this.pendingCommandId = '',
     this.pendingCommandType = '',
@@ -144,6 +149,11 @@ class PlaybackSyncSession {
   final int positionMs;
   final int durationMs;
   final bool isPlaying;
+  final double volume;
+  final bool shuffleEnabled;
+  final String repeatMode;
+  final List<Map<String, dynamic>> queue;
+  final int queueIndex;
   final DateTime? updatedAt;
   final String pendingCommandId;
   final String pendingCommandType;
@@ -170,14 +180,22 @@ class PlaybackSyncSession {
   int get estimatedPositionMs => estimatedPositionMsAt(DateTime.now());
 
   PlaybackSyncSession copyWith({
+    String? activeDeviceId,
+    String? activeDeviceName,
+    String? activeDevicePlatform,
     bool? isPlaying,
     int? positionMs,
+    double? volume,
+    bool? shuffleEnabled,
+    String? repeatMode,
+    List<Map<String, dynamic>>? queue,
+    int? queueIndex,
     DateTime? updatedAt,
   }) {
     return PlaybackSyncSession(
-      activeDeviceId: activeDeviceId,
-      activeDeviceName: activeDeviceName,
-      activeDevicePlatform: activeDevicePlatform,
+      activeDeviceId: activeDeviceId ?? this.activeDeviceId,
+      activeDeviceName: activeDeviceName ?? this.activeDeviceName,
+      activeDevicePlatform: activeDevicePlatform ?? this.activeDevicePlatform,
       trackId: trackId,
       title: title,
       artist: artist,
@@ -186,6 +204,11 @@ class PlaybackSyncSession {
       positionMs: positionMs ?? this.positionMs,
       durationMs: durationMs,
       isPlaying: isPlaying ?? this.isPlaying,
+      volume: volume ?? this.volume,
+      shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
+      repeatMode: repeatMode ?? this.repeatMode,
+      queue: queue ?? this.queue,
+      queueIndex: queueIndex ?? this.queueIndex,
       updatedAt: updatedAt ?? this.updatedAt,
       pendingCommandId: pendingCommandId,
       pendingCommandType: pendingCommandType,
@@ -194,7 +217,9 @@ class PlaybackSyncSession {
     );
   }
 
-  Map<String, dynamic> toJson() => {
+  /// Payload ligero para Firestore (omite `queue` para mantener el documento
+  /// pequeño y ahorrar cuota/ancho de banda en nube).
+  Map<String, dynamic> toCloudJson() => {
     'activeDeviceId': activeDeviceId,
     'activeDeviceName': activeDeviceName,
     'activeDevicePlatform': activeDevicePlatform,
@@ -206,6 +231,10 @@ class PlaybackSyncSession {
     'positionMs': positionMs,
     'durationMs': durationMs,
     'isPlaying': isPlaying,
+    'volume': volume.clamp(0.0, 1.0),
+    'shuffleEnabled': shuffleEnabled,
+    'repeatMode': repeatMode,
+    'queueIndex': queueIndex,
     'updatedAt': (updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
     'pendingCommandId': pendingCommandId,
     'pendingCommandType': pendingCommandType,
@@ -213,7 +242,27 @@ class PlaybackSyncSession {
     'pendingCommandIssuerId': pendingCommandIssuerId,
   };
 
+  /// Payload completo para `/api/session` en LAN (incluye la cola compacta).
+  Map<String, dynamic> toJson() => {
+    ...toCloudJson(),
+    if (queue.isNotEmpty) 'queue': queue,
+  };
+
   factory PlaybackSyncSession.fromJson(Map<String, dynamic> map) {
+    final rawQueue = map['queue'];
+    final parsedQueue = <Map<String, dynamic>>[];
+    if (rawQueue is List) {
+      for (final item in rawQueue) {
+        if (item is Map) {
+          parsedQueue.add(Map<String, dynamic>.from(item));
+        }
+      }
+    }
+    final rawVolume = map['volume'];
+    final parsedVolume = rawVolume is num
+        ? rawVolume.toDouble().clamp(0.0, 1.0)
+        : (double.tryParse(rawVolume?.toString() ?? '') ?? 1.0).clamp(0.0, 1.0);
+    final rawRepeat = (map['repeatMode'] as String? ?? 'off').trim();
     return PlaybackSyncSession(
       activeDeviceId: map['activeDeviceId'] as String? ?? '',
       activeDeviceName:
@@ -224,9 +273,20 @@ class PlaybackSyncSession {
       artist: map['artist'] as String? ?? '',
       album: map['album'] as String? ?? '',
       thumbnailUrl: map['thumbnailUrl'] as String? ?? '',
-      positionMs: map['positionMs'] as int? ?? 0,
-      durationMs: map['durationMs'] as int? ?? 0,
+      positionMs: map['positionMs'] is int
+          ? map['positionMs'] as int
+          : int.tryParse(map['positionMs']?.toString() ?? '') ?? 0,
+      durationMs: map['durationMs'] is int
+          ? map['durationMs'] as int
+          : int.tryParse(map['durationMs']?.toString() ?? '') ?? 0,
       isPlaying: map['isPlaying'] as bool? ?? false,
+      volume: parsedVolume,
+      shuffleEnabled: map['shuffleEnabled'] as bool? ?? false,
+      repeatMode: rawRepeat.isEmpty ? 'off' : rawRepeat,
+      queue: parsedQueue,
+      queueIndex: map['queueIndex'] is int
+          ? map['queueIndex'] as int
+          : int.tryParse(map['queueIndex']?.toString() ?? '') ?? 0,
       updatedAt: map['updatedAt'] is DateTime
           ? map['updatedAt'] as DateTime
           : DateTime.tryParse(map['updatedAt']?.toString() ?? ''),
@@ -374,6 +434,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   DateTime _remoteHandoverUntil = DateTime.fromMillisecondsSinceEpoch(0);
   Timer? _syncPollingTimer;
   Timer? _lanDiscoveryTimer;
+  Timer? _lanSessionTimer;
+  DateTime _lastCloudSessionPoll = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _optimisticControlGuardUntil = DateTime.fromMillisecondsSinceEpoch(
+    0,
+  );
+  String? _lastPlayTrackDedupKey;
+  DateTime _lastPlayTrackDedupAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Última re-sonda del relay dentro del tick de 3 s, para no gastar
   /// handshakes TCP en cada tick.
@@ -546,6 +613,61 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       lastSeen: lastSeen,
     );
   }
+
+  /// Extrae un endpoint LAN privado (`192.168.*`, `10.*`, `172.16-31.*`)
+  /// anunciado en el documento `users/{uid}/devices/{deviceId}` para intentar
+  /// enlace directo por Wi-Fi (sin esperar UDP broadcast, que Android suele
+  /// descartar en ahorro de batería).
+  @visibleForTesting
+  static ({String ip, int port})? extractProbeableLanEndpoint(
+    Map<String, dynamic> doc,
+  ) {
+    final ip = (doc['lanIp'] ?? '').toString().trim();
+    final port = doc['lanPort'] is int
+        ? doc['lanPort'] as int
+        : int.tryParse(doc['lanPort']?.toString() ?? '') ?? 0;
+    if (ip.isEmpty || port <= 0 || port > 65535) return null;
+    if (!_isPrivateLanIpv4(ip)) return null;
+    return (ip: ip, port: port);
+  }
+
+  static bool _isPrivateLanIpv4(String ip) {
+    final parts = ip.split('.');
+    if (parts.length != 4) return false;
+    final octets = <int>[];
+    for (final p in parts) {
+      final n = int.tryParse(p);
+      if (n == null || n < 0 || n > 255) return false;
+      octets.add(n);
+    }
+    if (octets[0] == 10) return true;
+    if (octets[0] == 192 && octets[1] == 168) return true;
+    if (octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31) return true;
+    return false;
+  }
+
+  /// Nombre del altavoz remoto a mostrar en verde en el reproductor / mini
+  /// player: sólo se muestra cuando OTRO dispositivo está sonando actualmente,
+  /// nunca cuando el audio suena localmente (comportamiento Spotify Connect).
+  @visibleForTesting
+  static String? remoteSpeakerBadgeName({
+    required bool isCurrentDeviceActive,
+    required String remoteActiveDeviceName,
+  }) {
+    if (isCurrentDeviceActive) return null;
+    final trimmed = remoteActiveDeviceName.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Nombre del altavoz remoto activo ahora mismo (`null` si suena aquí).
+  String? get activeRemoteSpeakerName => remoteSpeakerBadgeName(
+    isCurrentDeviceActive: isCurrentDeviceActive,
+    remoteActiveDeviceName: activeDeviceDisplayName,
+  );
+
+  /// `true` cuando existe al menos un destino Connect en línea (LAN o nube).
+  bool get hasConnectTarget =>
+      _autoPairedPeer != null || connectTargets.isNotEmpty;
 
   /// Candidato a vincularse automáticamente: un PC de la red local tiene
   /// preferencia (responde al instante); si no hay ninguno se usa el equipo de
@@ -762,7 +884,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   bool _isAwaitingRemoteHandover(PlaybackSyncSession doc) {
     final expected = _remoteHandoverTrackId;
     if (expected == null) return false;
-    if (doc.trackId == expected) {
+    if (doc.trackId == expected && doc.isPlaying) {
       _remoteHandoverTrackId = null;
       return false;
     }
@@ -933,6 +1055,45 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     return _auth.deviceName;
   }
 
+  /// Intervalo de sondeo en la nube para `playback_session/current`.
+  ///
+  /// * Con **un solo equipo en línea** (sin otro dispositivo con el que hacer
+  ///   Connect) sondear cada 3 s quema ~1,200 req/h en el Worker y Firestore
+  ///   sin ningún par al otro lado: baja a **30 s**.
+  /// * Con enlace **LAN directo** (`:52445`) ya activo, baja a **15 s**.
+  /// * Con un par remoto **sólo nube** (ej. 4G ↔ PC) mantiene **3 s**.
+  @visibleForTesting
+  static Duration cloudSessionPollInterval({
+    required bool activeOnLan,
+    required bool isCurrentDeviceActive,
+    required bool hasAnyLanPeer,
+    required bool hasAnyOnlinePeer,
+  }) {
+    if (isCurrentDeviceActive && !hasAnyOnlinePeer) {
+      return const Duration(seconds: 30);
+    }
+    if (activeOnLan || (isCurrentDeviceActive && hasAnyLanPeer)) {
+      return const Duration(seconds: 15);
+    }
+    return const Duration(seconds: 3);
+  }
+
+  /// Intervalo de sondeo en la nube para la cola `users/{uid}/commands`.
+  @visibleForTesting
+  static Duration cloudCommandPollInterval({
+    required bool burst,
+    required bool hasCloudOnlyPeer,
+    required bool hasAnyLanPeer,
+    required bool hasAnyOnlinePeer,
+  }) {
+    if (burst) return commandsBurstInterval;
+    if (hasCloudOnlyPeer) return commandsPollInterval;
+    if (hasAnyLanPeer || !hasAnyOnlinePeer) {
+      return const Duration(seconds: 30);
+    }
+    return const Duration(seconds: 15);
+  }
+
   /// Inicia el servidor LAN y la sincronización automática.
   void startSync() {
     _loadPreferences();
@@ -944,9 +1105,51 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     _syncPollingTimer?.cancel();
     _syncPollingTimer = Timer.periodic(const Duration(seconds: 3), (_) {
       _maybeReprobeRelay();
+      final now = DateTime.now();
+      final activeRemoteId = _currentRemoteSession?.activeDeviceId ?? '';
+      final activeOnLan =
+          activeRemoteId.isNotEmpty &&
+          activeRemoteId != _auth.deviceId &&
+          _discoveredPeers[activeRemoteId] != null &&
+          isPeerOnline(_discoveredPeers[activeRemoteId]!);
+      final hasAnyLanPeer = _discoveredPeers.values.any(isPeerOnline);
+      final hasAnyOnlinePeer = connectTargets.isNotEmpty;
+      final minInterval = cloudSessionPollInterval(
+        activeOnLan: activeOnLan,
+        isCurrentDeviceActive: isCurrentDeviceActive,
+        hasAnyLanPeer: hasAnyLanPeer,
+        hasAnyOnlinePeer: hasAnyOnlinePeer,
+      );
+      if (minInterval > const Duration(seconds: 3) &&
+          now.difference(_lastCloudSessionPoll) < minInterval) {
+        return;
+      }
+      _lastCloudSessionPoll = now;
       _pollPlaybackSession();
     });
+    _lanSessionTimer?.cancel();
+    _lanSessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _pollActiveLanPeerSession();
+    });
+    _lastCloudSessionPoll = DateTime.now();
     _pollPlaybackSession();
+  }
+
+  void _pollActiveLanPeerSession() {
+    if (isCurrentDeviceActive) return;
+    final activeId = _currentRemoteSession?.activeDeviceId ?? '';
+    LanDevicePeer? lanPeer = activeId.isNotEmpty
+        ? _discoveredPeers[activeId]
+        : null;
+    if (lanPeer == null &&
+        _autoPairedPeer != null &&
+        !_autoPairedPeer!.isCloudOnly) {
+      lanPeer = _autoPairedPeer;
+    }
+    if (lanPeer == null || lanPeer.isCloudOnly || !isPeerOnline(lanPeer)) {
+      return;
+    }
+    unawaited(_fetchSessionFromPeer(lanPeer));
   }
 
   /// Re-sonda del relay del S7, colgada del tick de 3 s que ya existe.
@@ -985,6 +1188,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   void stopSync() {
     _syncPollingTimer?.cancel();
     _syncPollingTimer = null;
+    _lanSessionTimer?.cancel();
+    _lanSessionTimer = null;
     _lanDiscoveryTimer?.cancel();
     _lanDiscoveryTimer = null;
     _udpAnnounceTimer?.cancel();
@@ -1133,8 +1338,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
             'trackId': '',
           };
         } else {
+          final now = DateTime.now();
           payload = session.toJson();
-          payload['positionMs'] = session.estimatedPositionMs;
+          payload['positionMs'] = session.estimatedPositionMsAt(now);
+          // Siempre acompañar la posición estimada con el instante exacto en
+          // que fue calculada; si se deja el `updatedAt` viejo, el receptor
+          // vuelve a sumar `(now - updatedAt)` y la barra corre a 2x-10x.
+          payload['updatedAt'] = now.toUtc().toIso8601String();
         }
         request.response
           ..statusCode = HttpStatus.ok
@@ -1200,6 +1410,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // no debe reenviarse de vuelta (evita el ping-pong móvil <-> PC).
           _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
           if (commandType == 'playTrack') {
+            _clearHandoffAuthority();
             _currentRemoteSession = null;
           }
           unawaited(
@@ -1656,11 +1867,34 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         unawaited(_persistLiveHosts());
 
         // VINCULACIÓN AUTOMÁTICA SI ES LA MISMA CUENTA
+        // Estabilidad: si ya estamos vinculados a un peer LAN vivo (especialmente
+        // una PC/Laptop host o el altavoz activo), NO dejamos que un segundo
+        // celular inactivo en la misma red secuestre `_autoPairedPeer`.
         final myEmail = _auth.currentUser?.email;
         final myUid = _auth.currentUser?.uid;
         final isSame = peer.isSameAccount(myEmail, myUid);
+        final currentPaired = _autoPairedPeer;
+        final currentStillOnline =
+            currentPaired != null &&
+            !currentPaired.isCloudOnly &&
+            isPeerOnline(currentPaired);
+        final isActiveSpeakerPeer =
+            _currentRemoteSession != null &&
+            _currentRemoteSession!.activeDeviceId == peer.deviceId;
+        final upgradesToHost =
+            currentPaired != null && !currentPaired.isHost && peer.isHost;
+        final shouldAdoptAutoPair =
+            isSame &&
+            (currentPaired == null ||
+                currentPaired.isCloudOnly ||
+                !currentStillOnline ||
+                isActiveSpeakerPeer ||
+                upgradesToHost);
 
-        if (isSame && _autoPairedPeer?.deviceId != peer.deviceId) {
+        if (shouldAdoptAutoPair &&
+            (currentPaired == null ||
+                currentPaired.deviceId != peer.deviceId ||
+                currentPaired.isCloudOnly)) {
           _autoPairedPeer = peer;
           debugPrint(
             'Inútil LAN: ¡Auto-vinculado con éxito con ${peer.deviceName} (${peer.ip}) por misma cuenta!',
@@ -1669,8 +1903,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // Arrastrar la sesión que ya está sonando en el peer para que el
           // mando remoto muestre desde el primer momento "Sonando en ...".
           unawaited(_fetchSessionFromPeer(peer));
-        } else if (_autoPairedPeer?.deviceId == peer.deviceId) {
-          _autoPairedPeer!.lastSeen = DateTime.now();
+        } else if (currentPaired?.deviceId == peer.deviceId) {
+          _autoPairedPeer = peer;
         }
 
         notifyListeners();
@@ -1710,7 +1944,15 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         final session = PlaybackSyncSession.fromJson(map);
 
         if (session.trackId.isNotEmpty) {
-          _confirmRemoteHandover(session.trackId);
+          // Nunca adoptar nuestro propio estado rebotado por un mando remoto:
+          // el altavoz local es la única fuente de verdad de su reproducción y
+          // aceptar el eco produce un bucle de ping-pong de posición/updatedAt.
+          if (session.activeDeviceId == _auth.deviceId) {
+            return;
+          }
+          if (session.isPlaying) {
+            _confirmRemoteHandover(session.trackId);
+          }
           // Igual que con la nube: mientras esperamos que el altavoz estrene la
           // canción que le enviamos, su respuesta todavía puede describir la
           // anterior y pisaría la sesión optimista del mando.
@@ -1728,7 +1970,25 @@ class InutilPlaybackSyncService extends ChangeNotifier {
               // fantasma.
               _currentRemoteSession = null;
             } else {
-              _currentRemoteSession = session;
+              final guarded = DateTime.now().isBefore(
+                _optimisticControlGuardUntil,
+              );
+              final prev = _currentRemoteSession;
+              if (guarded &&
+                  prev != null &&
+                  prev.trackId == session.trackId &&
+                  prev.activeDeviceId == session.activeDeviceId) {
+                _currentRemoteSession = session.copyWith(
+                  positionMs: prev.estimatedPositionMs,
+                  isPlaying: prev.isPlaying,
+                  volume: prev.volume,
+                  shuffleEnabled: prev.shuffleEnabled,
+                  repeatMode: prev.repeatMode,
+                  updatedAt: DateTime.now(),
+                );
+              } else {
+                _currentRemoteSession = session;
+              }
               if (session.activeDeviceId != _auth.deviceId) {
                 _markHandoffToPeer(
                   deviceId: session.activeDeviceId,
@@ -1789,12 +2049,18 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   void _scheduleCommandPoll() {
     _cloudCommandsTimer?.cancel();
     final burst = DateTime.now().isBefore(_commandsBurstUntil);
-    _cloudCommandsTimer = Timer(
-      burst ? commandsBurstInterval : commandsPollInterval,
-      () {
-        unawaited(_pollCloudCommands().whenComplete(_scheduleCommandPoll));
-      },
+    final targets = connectTargets;
+    final hasCloudOnlyPeer = targets.any((peer) => peer.isCloudOnly);
+    final hasAnyLanPeer = _discoveredPeers.values.any(isPeerOnline);
+    final interval = cloudCommandPollInterval(
+      burst: burst,
+      hasCloudOnlyPeer: hasCloudOnlyPeer,
+      hasAnyLanPeer: hasAnyLanPeer,
+      hasAnyOnlinePeer: targets.isNotEmpty,
     );
+    _cloudCommandsTimer = Timer(interval, () {
+      unawaited(_pollCloudCommands().whenComplete(_scheduleCommandPoll));
+    });
   }
 
   /// Escribe el heartbeat `users/{uid}/devices/{deviceId}` de este equipo.
@@ -1895,11 +2161,30 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         );
         if (peer == null) continue;
         fresh[peer.deviceId] = peer;
+
+        // Aunque Android/routers descarten los broadcasts UDP, cada equipo
+        // anuncia su IP LAN privada dentro de `users/{uid}/devices/{id}`.
+        // Probamos esa IP en segundo plano: si están en el mismo Wi-Fi, el
+        // enlace sube a LAN directa (<50 ms y 0 lecturas/escrituras Firebase).
+        final existingLan = _discoveredPeers[peer.deviceId];
+        if (existingLan == null || !isPeerOnline(existingLan)) {
+          final hint = extractProbeableLanEndpoint(doc);
+          if (hint != null) {
+            unawaited(_probePeer(hint.ip, hint.port));
+          }
+        }
       }
+      final hadNoPeersBefore = connectTargets.isEmpty;
       _cloudDevices
         ..clear()
         ..addAll(fresh);
 
+      if (hadNoPeersBefore && fresh.isNotEmpty) {
+        // Acaba de aparecer un segundo equipo en la cuenta: despertamos los
+        // sondeos de sesión/comandos sin esperar el ciclo relajado de 30 s.
+        _lastCloudSessionPoll = DateTime.fromMillisecondsSinceEpoch(0);
+        _scheduleCommandPoll();
+      }
       _maybeAutoPairFromCloud();
       notifyListeners();
     } on FirestoreOperationException catch (error) {
@@ -2110,7 +2395,93 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   // 3. ENVÍO DE COMANDOS EN TIEMPO REAL A LA PC / CELULAR (P2P LAN)
   // ---------------------------------------------------------------------------
 
-  /// Envía un comando remoto por LAN (Play, Pause, Skip, Prev, Seek).
+  void _applyOptimisticCommand(String commandType, dynamic param) {
+    final current = _currentRemoteSession;
+    if (current == null) return;
+    final now = DateTime.now();
+    switch (commandType) {
+      case 'pause':
+        _optimisticControlGuardUntil = now.add(
+          const Duration(milliseconds: 1400),
+        );
+        _currentRemoteSession = current.copyWith(
+          isPlaying: false,
+          positionMs: current.estimatedPositionMsAt(now),
+          updatedAt: now,
+        );
+        notifyListeners();
+        break;
+      case 'play':
+      case 'resume':
+        _optimisticControlGuardUntil = now.add(
+          const Duration(milliseconds: 1400),
+        );
+        final restartFromZero =
+            current.durationMs > 0 &&
+            current.positionMs >= current.durationMs - 2000;
+        _currentRemoteSession = current.copyWith(
+          isPlaying: true,
+          positionMs: restartFromZero ? 0 : current.positionMs,
+          updatedAt: now,
+        );
+        notifyListeners();
+        break;
+      case 'seek':
+        final ms = int.tryParse(param?.toString() ?? '');
+        if (ms != null) {
+          _optimisticControlGuardUntil = now.add(
+            const Duration(milliseconds: 1800),
+          );
+          _currentRemoteSession = current.copyWith(
+            positionMs: ms.clamp(
+              0,
+              current.durationMs > 0 ? current.durationMs : ms,
+            ),
+            updatedAt: now,
+          );
+          notifyListeners();
+        }
+        break;
+      case 'setVolume':
+        final vol = double.tryParse(param?.toString() ?? '');
+        if (vol != null) {
+          _optimisticControlGuardUntil = now.add(
+            const Duration(milliseconds: 1400),
+          );
+          _currentRemoteSession = current.copyWith(
+            volume: vol.clamp(0.0, 1.0),
+            updatedAt: now,
+          );
+          notifyListeners();
+        }
+        break;
+      case 'setShuffle':
+        final enabled = param == true || param?.toString() == 'true';
+        _optimisticControlGuardUntil = now.add(
+          const Duration(milliseconds: 1400),
+        );
+        _currentRemoteSession = current.copyWith(
+          shuffleEnabled: enabled,
+          updatedAt: now,
+        );
+        notifyListeners();
+        break;
+      case 'setRepeat':
+        final mode = (param?.toString() ?? 'off').trim();
+        _optimisticControlGuardUntil = now.add(
+          const Duration(milliseconds: 1400),
+        );
+        _currentRemoteSession = current.copyWith(
+          repeatMode: mode.isEmpty ? 'off' : mode,
+          updatedAt: now,
+        );
+        notifyListeners();
+        break;
+    }
+  }
+
+  /// Envía un comando remoto por LAN (Play, Pause, Skip, Prev, Seek, Volume,
+  /// Shuffle, Repeat).
   Future<bool> sendLanCommand({
     required String commandType,
     dynamic param,
@@ -2141,40 +2512,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         const Duration(milliseconds: 2000),
       );
       final success = response.statusCode == HttpStatus.ok;
-
-      // Actualizar inmediatamente estado local para respuesta táctil instantánea
-      if (commandType == 'pause' && _currentRemoteSession != null) {
-        _currentRemoteSession = PlaybackSyncSession(
-          activeDeviceId: _currentRemoteSession!.activeDeviceId,
-          activeDeviceName: _currentRemoteSession!.activeDeviceName,
-          activeDevicePlatform: _currentRemoteSession!.activeDevicePlatform,
-          trackId: _currentRemoteSession!.trackId,
-          title: _currentRemoteSession!.title,
-          artist: _currentRemoteSession!.artist,
-          album: _currentRemoteSession!.album,
-          thumbnailUrl: _currentRemoteSession!.thumbnailUrl,
-          positionMs: _currentRemoteSession!.positionMs,
-          durationMs: _currentRemoteSession!.durationMs,
-          isPlaying: false,
-        );
-        notifyListeners();
-      } else if (commandType == 'play' && _currentRemoteSession != null) {
-        _currentRemoteSession = PlaybackSyncSession(
-          activeDeviceId: _currentRemoteSession!.activeDeviceId,
-          activeDeviceName: _currentRemoteSession!.activeDeviceName,
-          activeDevicePlatform: _currentRemoteSession!.activeDevicePlatform,
-          trackId: _currentRemoteSession!.trackId,
-          title: _currentRemoteSession!.title,
-          artist: _currentRemoteSession!.artist,
-          album: _currentRemoteSession!.album,
-          thumbnailUrl: _currentRemoteSession!.thumbnailUrl,
-          positionMs: _currentRemoteSession!.positionMs,
-          durationMs: _currentRemoteSession!.durationMs,
-          isPlaying: true,
-        );
-        notifyListeners();
+      if (success) {
+        _applyOptimisticCommand(commandType, param);
+        // Tras un skip o seek, refrescar sesión LAN pronto para reflejar pista
+        // y duración reales en <500 ms.
+        if (commandType == 'next' || commandType == 'previous') {
+          Future<void>.delayed(const Duration(milliseconds: 600), () {
+            unawaited(_fetchSessionFromPeer(peer));
+          });
+        }
       }
-
       return success;
     } catch (e) {
       debugPrint('Error enviando comando LAN: $e');
@@ -2184,7 +2531,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     }
   }
 
-  /// Transfiere y reproduce una canción directamente en la PC (o dispositivo par).
+  /// Transfiere y reproduce una canción (y su cola) directamente en el par remoto.
   Future<bool> playTrackOnPeer({
     required String trackId,
     required String title,
@@ -2192,46 +2539,69 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     String? album,
     String? thumbnailUrl,
     int positionMs = 0,
+    int durationMs = 0,
+    List<Map<String, dynamic>>? queue,
+    int queueIndex = 0,
+    double? volume,
+    bool? shuffleEnabled,
+    String? repeatMode,
     LanDevicePeer? targetPeer,
   }) async {
+    final activeId = _currentRemoteSession?.activeDeviceId ?? '';
     final peer =
         targetPeer ??
-        _autoPairedPeer ??
-        (_currentRemoteSession != null
-            ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
-                  _cloudDevices[_currentRemoteSession!.activeDeviceId]
+        (activeId.isNotEmpty && activeId != _auth.deviceId
+            ? _discoveredPeers[activeId] ?? _cloudDevices[activeId]
+            : null) ??
+        (_autoPairedPeer != null
+            ? _discoveredPeers[_autoPairedPeer!.deviceId] ?? _autoPairedPeer
             : null) ??
         pickAutoPairCandidate(connectTargets);
     if (peer == null) return false;
     _autoPairedPeer = peer;
 
-    // GUARD: Si el peer remoto ya está reproduciendo exactamente este trackId,
-    // evitar reenvíos redundantes que generen bucles de reproducción.
-    if (_currentRemoteSession != null &&
+    // GUARD: Evitar reenvíos duplicados de `playTrack` al mismo altavoz
+    // dentro de una ráfaga de snapshots del mismo toque (incluso con cola).
+    final dedupKey = '${peer.deviceId}|$trackId';
+    final now = DateTime.now();
+    if (targetPeer == null &&
+        _lastPlayTrackDedupKey == dedupKey &&
+        now.difference(_lastPlayTrackDedupAt) <
+            const Duration(milliseconds: 1500)) {
+      return true;
+    }
+    if (targetPeer == null &&
+        (queue == null || queue.isEmpty) &&
+        _currentRemoteSession != null &&
+        _currentRemoteSession!.activeDeviceId == peer.deviceId &&
         _currentRemoteSession!.trackId == trackId &&
         _currentRemoteSession!.isPlaying) {
       return true;
     }
+    _lastPlayTrackDedupKey = dedupKey;
+    _lastPlayTrackDedupAt = now;
 
-    final trackParam = <String, dynamic>{
+    final lanQueue = (queue ?? const <Map<String, dynamic>>[])
+        .take(30)
+        .toList(growable: false);
+    final cloudQueue = lanQueue.take(15).toList(growable: false);
+
+    final lanTrackParam = <String, dynamic>{
       'trackId': trackId,
       'title': title,
       'artist': artist,
       'album': album ?? '',
       'thumbnailUrl': thumbnailUrl ?? '',
       'positionMs': positionMs,
+      if (durationMs > 0) 'durationMs': durationMs,
+      if (lanQueue.isNotEmpty) 'queue': lanQueue,
+      if (lanQueue.isNotEmpty) 'queueIndex': queueIndex,
+      'shuffleEnabled': ?shuffleEnabled,
+      'repeatMode': ?repeatMode,
     };
 
     var success = false;
-    if (peer.isCloudOnly) {
-      // El PC está en otra red (o el firewall tapa el puerto): la canción se
-      // transfiere escribiendo el comando en la nube.
-      success = await sendCloudCommand(
-        targetDeviceId: peer.deviceId,
-        commandType: 'playTrack',
-        param: trackParam,
-      );
-    } else {
+    if (!peer.isCloudOnly) {
       final client = HttpClient()
         ..connectionTimeout = const Duration(milliseconds: 2000);
       try {
@@ -2241,7 +2611,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         request.headers.contentType = ContentType.json;
         final payload = jsonEncode({
           'commandType': 'playTrack',
-          'param': trackParam,
+          'param': lanTrackParam,
           'issuerDeviceId': _auth.deviceId,
           'issuerUid': _auth.currentUser?.uid ?? '',
           'issuerEmail': _auth.currentUser?.email ?? '',
@@ -2259,7 +2629,22 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       }
     }
 
+    // Si era sólo nube o la LAN falló (ej. firewall / cambio de Wi-Fi),
+    // enviamos por el relay de la nube para que nunca se pierda la selección.
+    if (!success) {
+      final cloudTrackParam = <String, dynamic>{
+        ...lanTrackParam,
+        if (cloudQueue.isNotEmpty) 'queue': cloudQueue,
+      };
+      success = await sendCloudCommand(
+        targetDeviceId: peer.deviceId,
+        commandType: 'playTrack',
+        param: cloudTrackParam,
+      );
+    }
+
     if (success) {
+      final prev = _currentRemoteSession;
       _currentRemoteSession = PlaybackSyncSession(
         activeDeviceId: peer.deviceId,
         activeDeviceName: peer.deviceName,
@@ -2270,17 +2655,28 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         album: album ?? '',
         thumbnailUrl: thumbnailUrl ?? '',
         positionMs: positionMs,
+        durationMs: durationMs,
         isPlaying: true,
+        volume: volume ?? prev?.volume ?? 1.0,
+        shuffleEnabled: shuffleEnabled ?? prev?.shuffleEnabled ?? false,
+        repeatMode: repeatMode ?? prev?.repeatMode ?? 'off',
+        queue: lanQueue,
+        queueIndex: queueIndex,
         // Marca de tiempo propia: sin ella el sondeo de la nube, que aún
         // describe la canción anterior, borraría esta sesión en menos de 3 s
         // y el mando volvería a mostrar la canción que ya venía sonando.
         updatedAt: DateTime.now(),
       );
+      _markHandoffToPeer(deviceId: peer.deviceId, deviceName: peer.deviceName);
       _beginRemoteHandover(trackId);
+      _optimisticControlGuardUntil = DateTime.now().add(
+        const Duration(milliseconds: 3500),
+      );
       notifyListeners();
-      // El equipo remoto acaba de convertirse en el altavoz: que la lista y el
-      // resto de dispositivos de la cuenta lo reflejen pronto.
-      unawaited(_publishPresence(force: true));
+      // Sólo forzamos presencia en nube si no hay enlace LAN directo.
+      if (peer.isCloudOnly) {
+        unawaited(_publishPresence(force: true));
+      }
     }
 
     return success;
@@ -2324,6 +2720,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       _cloudPollBlockedUntil = DateTime.fromMillisecondsSinceEpoch(0);
       if (doc != null) {
         final session = PlaybackSyncSession.fromJson(doc);
+        // Si el documento en la nube habla de nosotros mismos y ya tenemos
+        // sesión local viva, no dejamos que un snapshot viejo de Firestore pise
+        // el estado real del altavoz.
+        if (session.activeDeviceId == _auth.deviceId &&
+            _currentLocalSession != null) {
+          _clearHandoffAuthority();
+          return;
+        }
         final stored = _currentRemoteSession;
         final fresher = shouldAdoptDocument(stored: stored, doc: session);
         // La LAN es más rápida; el documento en la nube sólo gana si es al
@@ -2411,6 +2815,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required int positionMs,
     required int durationMs,
     required bool isPlaying,
+    double volume = 1.0,
+    bool shuffleEnabled = false,
+    String repeatMode = 'off',
+    List<Map<String, dynamic>> queue = const <Map<String, dynamic>>[],
+    int queueIndex = 0,
     bool force = false,
   }) async {
     final now = DateTime.now();
@@ -2426,21 +2835,30 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       positionMs: positionMs,
       durationMs: durationMs,
       isPlaying: isPlaying,
+      volume: volume.clamp(0.0, 1.0),
+      shuffleEnabled: shuffleEnabled,
+      repeatMode: repeatMode,
+      queue: queue,
+      queueIndex: queueIndex,
       updatedAt: now,
     );
 
     _currentLocalSession = session;
 
-    // Si este dispositivo es el activo o es el host de escritorio, actualizar remoteSession también
-    if (isDesktopHost || isCurrentDeviceActive) {
+    // Sólo si este dispositivo es el altavoz activo actualizamos remoteSession.
+    // Así una PC actuando como mando remoto de un celular no pisa la sesión.
+    if (isCurrentDeviceActive) {
       _currentRemoteSession = session;
     }
 
     notifyListeners();
 
-    // Debouncing para no saturar Firestore (mínimo 1.5s incluso con force)
+    // Debouncing inteligente para ahorrar cuota de Firestore:
+    // - En LAN `/api/session` ya sirve cada actualización al instante (0 cuota).
+    // - A Firestore sólo escribimos en cambios reales (`force`) cada >= 1.5 s,
+    //   o cada 25 s durante reproducción continua (antes cada 8 s).
     final timeSinceLastPush = now.difference(_lastPositionPushTime);
-    if ((!force && timeSinceLastPush.inSeconds < 8) ||
+    if ((!force && timeSinceLastPush.inSeconds < 25) ||
         (force && timeSinceLastPush.inMilliseconds < 1500)) {
       return;
     }
@@ -2455,7 +2873,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       try {
         final written = await _firestore.setDocument(
           'users/$uid/playback_session/current',
-          session.toJson(),
+          session.toCloudJson(),
         );
         if (!written) {
           _noteCloudUnavailable();
@@ -2482,16 +2900,27 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required int positionMs,
     required int durationMs,
     required bool isPlaying,
+    double volume = 1.0,
+    bool shuffleEnabled = false,
+    String repeatMode = 'off',
+    List<Map<String, dynamic>> queue = const <Map<String, dynamic>>[],
+    int queueIndex = 0,
   }) async {
     // El usuario pidió explícitamente reproducir AQUÍ: bloqueamos el reenvío
     // automático al par remoto y apagamos autoPlayOnPc para que las siguientes
-    // canciones sigan sonando en este teléfono.
+    // canciones sigan sonando en este equipo.
     _routeSuppressedUntil = DateTime.now().add(_routeSuppression);
     unawaited(setAutoPlayOnPc(false));
 
-    // Si hay un peer remoto activo, pausarlo: por LAN si el puerto está al
-    // alcance y por la nube cuando no lo está.
-    final peer = _autoPairedPeer;
+    // Si hay un altavoz remoto activo, pausarlo (preferiendo LAN directa).
+    final activeId = _currentRemoteSession?.activeDeviceId ?? '';
+    final peer =
+        (activeId.isNotEmpty && activeId != _auth.deviceId
+            ? _discoveredPeers[activeId] ?? _cloudDevices[activeId]
+            : null) ??
+        (_autoPairedPeer != null
+            ? _discoveredPeers[_autoPairedPeer!.deviceId] ?? _autoPairedPeer
+            : null);
     if (peer != null) {
       unawaited(
         peer.isCloudOnly
@@ -2499,7 +2928,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
                 targetDeviceId: peer.deviceId,
                 commandType: 'pause',
               )
-            : sendLanCommand(commandType: 'pause'),
+            : sendLanCommand(commandType: 'pause', targetPeer: peer),
       );
     }
     // El usuario pidió explícitamente el audio para este equipo: ya no
@@ -2516,6 +2945,11 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       positionMs: positionMs,
       durationMs: durationMs,
       isPlaying: isPlaying,
+      volume: volume,
+      shuffleEnabled: shuffleEnabled,
+      repeatMode: repeatMode,
+      queue: queue,
+      queueIndex: queueIndex,
       force: true,
     );
   }
@@ -2524,11 +2958,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     required String commandType,
     dynamic param,
   }) async {
+    final activeId = _currentRemoteSession?.activeDeviceId ?? '';
     final peer =
-        _autoPairedPeer ??
-        (_currentRemoteSession != null
-            ? _discoveredPeers[_currentRemoteSession!.activeDeviceId] ??
-                  _cloudDevices[_currentRemoteSession!.activeDeviceId]
+        (activeId.isNotEmpty && activeId != _auth.deviceId
+            ? _discoveredPeers[activeId] ?? _cloudDevices[activeId]
+            : null) ??
+        (_autoPairedPeer != null
+            ? _discoveredPeers[_autoPairedPeer!.deviceId] ?? _autoPairedPeer
             : null) ??
         pickAutoPairCandidate(connectTargets);
     if (peer != null) {
@@ -2536,12 +2972,19 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     }
 
     // 1. Vía rápida por LAN: responde en milisegundos cuando el puerto 52445
-    //    del destino está alcanzable.
+    //    del destino está alcanzable (0 lecturas/escrituras de Firebase).
     if (peer != null && !peer.isCloudOnly) {
-      final ok = await sendLanCommand(commandType: commandType, param: param);
+      final ok = await sendLanCommand(
+        commandType: commandType,
+        param: param,
+        targetPeer: peer,
+      );
       if (ok) {
-        _markPeerAsActiveDevice(peer, playing: commandType != 'pause');
-        unawaited(_publishPresence(force: true));
+        if (commandType == 'play' ||
+            commandType == 'resume' ||
+            commandType == 'pause') {
+          _markPeerAsActiveDevice(peer, playing: commandType != 'pause');
+        }
         return;
       }
     }
@@ -2550,9 +2993,6 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (uid == null || uid.isEmpty) return;
 
     // 2. Relay en la nube con el destino explícito (`users/{uid}/commands`).
-    //    Este es el camino normal cuando el móvil va por datos móviles, el PC
-    //    está en otra red o su firewall bloquea los puertos: no requiere ni
-    //    una sola apertura de puertos, igual que Spotify Connect.
     final targetId =
         peer?.deviceId ?? _currentRemoteSession?.activeDeviceId ?? '';
     final now = DateTime.now();
@@ -2565,10 +3005,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         param: param,
       );
       if (cloudCommandId != null) {
-        if (known != null) {
+        _applyOptimisticCommand(commandType, param);
+        if (known != null &&
+            (commandType == 'play' ||
+                commandType == 'resume' ||
+                commandType == 'pause')) {
           _markPeerAsActiveDevice(known, playing: commandType != 'pause');
         }
-        unawaited(_publishPresence(force: true));
       }
     }
 

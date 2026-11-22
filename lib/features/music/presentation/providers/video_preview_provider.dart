@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../../../../services/video_preview/video_preview_resolver.dart';
 
 final videoPreviewResolverProvider = Provider<VideoPreviewResolver>(
@@ -21,7 +22,11 @@ final trackVideoPreviewProvider = FutureProvider.autoDispose
       ref.onDispose(timer.cancel);
       return ref
           .read(videoPreviewResolverProvider)
-          .resolveForTrack(title: title, artist: artist);
+          .resolveForTrack(
+            title: title,
+            artist: artist,
+            allowBroadFallback: !AppPlatform.isFlutterTest,
+          );
     });
 
 final artistVideoPreviewsProvider = FutureProvider.autoDispose

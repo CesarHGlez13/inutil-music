@@ -351,7 +351,8 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
     super.didChangeDependencies();
     _desktopQueueAutoOpen =
         AppPlatform.isDesktop &&
-        !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+        !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform) &&
+        (!widget.spotifyCanvasEnabled || AppPlatform.isFlutterTest);
     if (!_initialQueueVisibilitySet) {
       _initialQueueVisibilitySet = true;
       _showPlaybackQueue = widget.active && _desktopQueueAutoOpen;
@@ -447,8 +448,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
         visualActive &&
         snapshot.status != PlayerStatus.idle &&
         snapshot.status != PlayerStatus.failed &&
-        AppPlatform.current != AppPlatformType.linux &&
-        AppPlatform.current != AppPlatformType.unsupported;
+        AppPlatform.supportsRemoteArtworkVideo;
     final spotifyCanvasAsync =
         widget.spotifyCanvasEnabled && remoteArtworkAllowed
         ? ref.watch(spotifyCanvasUrlProvider(canvasTrack))
@@ -479,9 +479,13 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
     // when animated artwork is enabled and neither Canvas nor Apple artwork
     // returned a clip. Streams directly via VideoPlayerController without
     // blocking audio playback or the local 10 MB visual cache budget.
+    final primaryCanvasPending =
+        (spotifyCanvasAsync?.isLoading ?? false) ||
+        (appleArtworkAsync?.isLoading ?? false);
     final fallbackVideoPreviewAsync =
         resolvedCanvasUrl == null &&
-            widget.animatedArtworkEnabled &&
+            !primaryCanvasPending &&
+            (widget.animatedArtworkEnabled || widget.spotifyCanvasEnabled) &&
             remoteArtworkAllowed
         ? ref.watch(
             trackVideoPreviewProvider((
@@ -523,9 +527,17 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
     } else {
       visualCache.deactivate();
     }
-    final canvasUrl = visualActive
+    final cachedCanvasUrl = visualActive
         ? visualCache.videoFileFor(visualIdentity, effectiveVideoSourceUrl)
         : null;
+    // En producción, si el clip aún se descarga o excede la cuota de caché en
+    // disco (p. ej. previews HD de 18 MB), transmitir directo por URL para que
+    // el Canvas arranque al instante sin quedar bloqueado.
+    final canvasUrl =
+        cachedCanvasUrl ??
+        (!AppPlatform.isFlutterTest && visualActive
+            ? effectiveVideoSourceUrl
+            : null);
     final hasTrack =
         snapshot.title != null ||
         snapshot.artist != null ||
@@ -645,7 +657,9 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
         }
 
         final surroundingTheme = Theme.of(context);
-        final playerTheme = mobile
+        final playerTheme =
+            mobile ||
+                (!AppPlatform.isFlutterTest && widget.spotifyCanvasEnabled)
             ? alwaysDarkPlaybackTheme(
                 surroundingTheme,
                 fontFamily: playerFont.fontFamily,
@@ -676,14 +690,22 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                   data: playerTheme,
                   child: Builder(
                     builder: (context) {
+                      final desktopFullscreenCanvasEligible =
+                          !mobile &&
+                          !AppPlatform.isFlutterTest &&
+                          widget.spotifyCanvasEnabled;
                       final canUseSpotifyFullscreenCanvas =
-                          mobile &&
-                          !mobileLandscape &&
-                          !showSideQueue &&
+                          ((mobile && !mobileLandscape && !showSideQueue) ||
+                              desktopFullscreenCanvasEligible) &&
                           hasTrack &&
                           (widget.style == PlayerStyle.inutilMusic ||
                               widget.style == PlayerStyle.spotifyMusic);
+                      final alwaysKeepCanvasTheme =
+                          !AppPlatform.isFlutterTest &&
+                          canUseSpotifyFullscreenCanvas &&
+                          widget.spotifyCanvasEnabled;
                       final useSpotifyFullscreenCanvas =
+                          alwaysKeepCanvasTheme ||
                           _resolveFullscreenCanvasMode(
                             eligible: canUseSpotifyFullscreenCanvas,
                             visualActive: visualActive,

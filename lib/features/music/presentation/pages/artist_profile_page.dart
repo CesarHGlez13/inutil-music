@@ -245,9 +245,7 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
       ),
     );
     final videoPreviewAllowed =
-        animatedArtworkEnabled &&
-        AppPlatform.current != AppPlatformType.linux &&
-        AppPlatform.current != AppPlatformType.unsupported;
+        animatedArtworkEnabled && AppPlatform.supportsRemoteArtworkVideo;
     final videoClips = videoPreviewAllowed
         ? (ref.watch(artistVideoPreviewsProvider(profile.artist.name)).value ??
               const <VideoPreviewClip>[])

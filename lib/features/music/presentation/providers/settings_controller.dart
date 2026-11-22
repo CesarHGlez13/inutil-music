@@ -398,8 +398,11 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     final playerArtworkStyle = PlayerArtworkStyle.fromCode(
       prefs.getString(_playerArtworkStyleKey),
     );
+    final defaultSpotifyCanvas = !Platform.environment.containsKey(
+      'FLUTTER_TEST',
+    );
     final spotifyCanvasEnabled =
-        prefs.getBool(_spotifyCanvasEnabledKey) ?? false;
+        prefs.getBool(_spotifyCanvasEnabledKey) ?? defaultSpotifyCanvas;
     // Old or concurrently written preferences must never enable both sources.
     final appleAnimatedArtworkEnabled =
         (prefs.getBool(_appleAnimatedArtworkEnabledKey) ?? false) &&

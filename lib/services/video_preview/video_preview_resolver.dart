@@ -74,6 +74,7 @@ class VideoPreviewResolver {
   Future<VideoPreviewClip?> resolveForTrack({
     required String title,
     required String artist,
+    bool allowBroadFallback = false,
   }) {
     final cleanTitle = cleanVisualTrackTitle(title);
     final cleanArtist = primaryVisualArtist(artist);
@@ -81,7 +82,7 @@ class VideoPreviewResolver {
       return Future.value(null);
     }
     final key =
-        '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}';
+        '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}|${allowBroadFallback ? 1 : 0}';
     final now = _clock();
     final cached = _trackCache[key];
     if (cached != null && cached.expiresAt.isAfter(now)) {
@@ -111,6 +112,29 @@ class VideoPreviewResolver {
           final artistClips = await resolveClipsForArtist(artistName: artist);
           if (artistClips.isNotEmpty) {
             resolved = artistClips.first;
+          }
+        }
+        // 3. Broad fallback for indie / YouTube-only tracks whose artist is not
+        // in iTunes Music Videos: search by track title, then significant title
+        // keyword so Spotify Canvas still activates smoothly.
+        if (resolved == null && allowBroadFallback) {
+          final titleClips = await _searchMusicVideos(cleanTitle, limit: 6);
+          if (titleClips.isNotEmpty) {
+            resolved = titleClips.first;
+          } else {
+            final words = cleanTitle
+                .split(RegExp(r'[\s\-_,.;:!?()]+'))
+                .map((w) => w.trim())
+                .where((w) => w.length >= 5)
+                .toList(growable: false);
+            words.sort((a, b) => b.length.compareTo(a.length));
+            for (final keyword in words.take(2)) {
+              final kwClips = await _searchMusicVideos(keyword, limit: 4);
+              if (kwClips.isNotEmpty) {
+                resolved = kwClips.first;
+                break;
+              }
+            }
           }
         }
       } catch (_) {

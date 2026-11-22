@@ -64,7 +64,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     final isPlaying = snapshot.status == PlayerStatus.playing;
     final player = ref.read(playerControllerProvider.notifier);
     final syncService = ref.watch(inutilPlaybackSyncProvider);
-    final pairedDeviceName = syncService.autoPairedPeer?.deviceName;
+    final pairedDeviceName = syncService.activeRemoteSpeakerName;
     final sleepTimer = ref.watch(sleepTimerControllerProvider);
     final shareTrack = snapshot.isExternal
         ? null
@@ -94,8 +94,10 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
       key: const ValueKey('spotify-fullscreen-canvas-player'),
       fit: StackFit.expand,
       children: [
-        // 1. Soft blurred ambient cover backdrop that cross-fades slowly
-        // while the video buffers or while skipping between tracks.
+        // 1. Crisp animated full-bleed artwork Canvas layer (always present
+        // underneath the video so the player NEVER drops to a blurry grey blob
+        // while a video loads, when paused before frame 1, or on tracks with no
+        // Canvas/video match).
         Positioned.fill(
           child: ColoredBox(
             color: const Color(0xFF0A0C10),
@@ -113,25 +115,17 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                       key: ValueKey(
                         'canvas-backdrop-${artworkSource ?? visualIdentity}',
                       ),
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: 18,
-                          sigmaY: 18,
-                          tileMode: TileMode.mirror,
-                        ),
-                        child: ColorFiltered(
-                          colorFilter: ColorFilter.mode(
-                            const Color(0xFF0A0C10).withValues(alpha: 0.36),
-                            BlendMode.darken,
-                          ),
-                          child: ProportionalArtwork(
-                            source: artworkSource,
-                            fallbackSource: artworkFallbackSource,
-                            cacheWidth: 256,
-                            fallback: const ColoredBox(
-                              color: Color(0xFF0A0C10),
-                            ),
-                          ),
+                      child: AnimatedArtworkMotion(
+                        enabled: !disableAnimations,
+                        isPlaying: isPlaying,
+                        identity: visualIdentity,
+                        borderRadius: BorderRadius.zero,
+                        depthEnabled: false,
+                        child: SourceImage(
+                          source: artworkSource,
+                          fallbackSource: artworkFallbackSource,
+                          fit: BoxFit.cover,
+                          fallback: const ColoredBox(color: Color(0xFF0A0C10)),
                         ),
                       ),
                     )
@@ -142,7 +136,8 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           ),
         ),
 
-        // 2. Full-bleed edge-to-edge looping muted video Canvas with slow fade-in.
+        // 2. Full-bleed edge-to-edge looping muted video Canvas that fades in
+        // smoothly over the animated cover once frame 1 is decoded.
         Positioned.fill(
           key: const ValueKey('player-canvas-viewport'),
           child: IgnorePointer(
@@ -200,422 +195,456 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           ),
         ),
 
-        // 4. Foreground Spotify layout.
-        Padding(
-          padding: EdgeInsets.fromLTRB(20, topInset + 4, 20, bottomInset + 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top bar: Collapse, "Reproduciendo desde Artista", Menu.
-              Row(
-                children: [
-                  IconButton(
-                    key: const ValueKey('spotify-canvas-collapse'),
-                    tooltip: strings.minimizePlayer,
-                    onPressed: onCollapse,
-                    color: Colors.white,
-                    iconSize: 30,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 40,
-                      height: 40,
-                    ),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: InkWell(
-                      onTap: onOpenArtist,
-                      borderRadius: BorderRadius.circular(10),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Reproduciendo desde Artista',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: 0.2,
-                              ),
-                            ),
-                            const SizedBox(height: 1),
-                            Text(
-                              artistLabel,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (!snapshot.isExternal)
-                    _PlayerMenu(
-                      snapshot: snapshot,
-                      isFavorite: isFavorite,
-                      savedTrackId: savedTrackId,
-                      onOpenSearch: onOpenSearch,
-                      onOpenArtist: onOpenArtist,
-                      onOpenAlbum: onOpenAlbum,
-                      strings: strings,
-                      compact: true,
-                    )
-                  else
-                    const SizedBox(width: 40),
-                ],
+        // 4. Foreground Spotify layout (centered on wide desktop windows while
+        // the Canvas video fills 100% edge-to-edge behind it).
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isWideCanvas = constraints.maxWidth >= 720;
+            final foreground = Padding(
+              padding: EdgeInsets.fromLTRB(
+                isWideCanvas ? 28 : 20,
+                topInset + (isWideCanvas ? 12 : 4),
+                isWideCanvas ? 28 : 20,
+                bottomInset + (isWideCanvas ? 18 : 10),
               ),
-
-              // Open center window so the full-bleed artist video shines.
-              const Spacer(),
-
-              // Live floating synced lyric line right over the video.
-              _CanvasFloatingLyricLine(onTap: onOpenLyrics),
-              const SizedBox(height: 18),
-
-              // Track row: mini cover + bold title/artist + circular +/check.
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox.square(
-                      dimension: 48,
-                      child: AnimatedSwitcher(
-                        duration: miniArtFadeDuration,
-                        switchInCurve: Curves.easeInOutCubic,
-                        switchOutCurve: Curves.easeInOutCubic,
-                        layoutBuilder: (currentChild, previousChildren) =>
-                            Stack(
-                              fit: StackFit.expand,
-                              children: [...previousChildren, ?currentChild],
-                            ),
-                        child: KeyedSubtree(
-                          key: ValueKey(
-                            'canvas-mini-art-${artworkSource ?? visualIdentity}',
-                          ),
-                          child: ProportionalArtwork(
-                            source: artworkSource,
-                            fallbackSource: artworkFallbackSource,
-                            cacheWidth: 160,
-                            fallback: const ColoredBox(
-                              color: Color(0xFF1F2430),
-                              child: Icon(
-                                Icons.music_note_rounded,
-                                color: Colors.white70,
-                              ),
+                  // Top bar: Collapse, "Reproduciendo desde Artista", Menu.
+                  Row(
+                    children: [
+                      IconButton(
+                        key: const ValueKey('spotify-canvas-collapse'),
+                        tooltip: strings.minimizePlayer,
+                        onPressed: onCollapse,
+                        color: Colors.white,
+                        iconSize: 30,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 40,
+                          height: 40,
+                        ),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: InkWell(
+                          onTap: onOpenArtist,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Reproduciendo desde Artista',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.78),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  artistLabel,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      if (!snapshot.isExternal)
+                        _PlayerMenu(
+                          snapshot: snapshot,
+                          isFavorite: isFavorite,
+                          savedTrackId: savedTrackId,
+                          onOpenSearch: onOpenSearch,
+                          onOpenArtist: onOpenArtist,
+                          onOpenAlbum: onOpenAlbum,
+                          strings: strings,
+                          compact: true,
+                        )
+                      else
+                        const SizedBox(width: 40),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TrackChangeTransition(
-                      switcherKey: const ValueKey(
-                        'spotify-canvas-metadata-transition',
-                      ),
-                      identity: visualIdentity,
-                      enabled: trackTransitionsEnabled,
-                      alignment: Alignment.centerLeft,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          MarqueeText(
-                            key: const ValueKey('player-track-title'),
-                            snapshot.title ?? strings.noPlayback,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 21,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          InkWell(
-                            key: const ValueKey('player-track-artist-action'),
-                            onTap: onOpenArtist,
-                            child: Text(
-                              artistLabel,
-                              key: const ValueKey('player-track-artist'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.78),
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w500,
+
+                  // Open center window so the full-bleed artist video shines.
+                  const Spacer(),
+
+                  // Live floating synced lyric line right over the video.
+                  _CanvasFloatingLyricLine(onTap: onOpenLyrics),
+                  const SizedBox(height: 18),
+
+                  // Track row: mini cover + bold title/artist + circular +/check.
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: SizedBox.square(
+                          dimension: 48,
+                          child: AnimatedSwitcher(
+                            duration: miniArtFadeDuration,
+                            switchInCurve: Curves.easeInOutCubic,
+                            switchOutCurve: Curves.easeInOutCubic,
+                            layoutBuilder: (currentChild, previousChildren) =>
+                                Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    ...previousChildren,
+                                    ?currentChild,
+                                  ],
+                                ),
+                            child: KeyedSubtree(
+                              key: ValueKey(
+                                'canvas-mini-art-${artworkSource ?? visualIdentity}',
                               ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  if (!snapshot.isExternal)
-                    _SpotifyCircleFavoriteButton(
-                      snapshot: snapshot,
-                      isFavorite: isFavorite,
-                      savedTrackId: savedTrackId,
-                      strings: strings,
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 16),
-
-              // Crisp white progress bar with timestamps.
-              _AppleMusicTimeline(
-                strings: strings,
-                compact: true,
-                trackHeight: 3,
-                sliderHeight: 22,
-                showThumb: true,
-                sliderKey: const ValueKey('spotify-player-linear-seek'),
-              ),
-
-              const SizedBox(height: 10),
-
-              // Main Spotify transport controls.
-              Row(
-                key: const ValueKey('spotify-player-transport'),
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _SpotifyToggleControl(
-                    key: const ValueKey('player-shuffle-control'),
-                    tooltip: snapshot.shuffleEnabled
-                        ? strings.deactivateShuffle
-                        : strings.activateShuffle,
-                    icon: Icons.shuffle_rounded,
-                    active: snapshot.shuffleEnabled,
-                    activeColor: _spotifyGreen,
-                    onPressed: hasTrack ? () => player.toggleShuffle() : null,
-                  ),
-                  IconButton(
-                    key: const ValueKey('player-previous-control'),
-                    tooltip: strings.previous,
-                    color: Colors.white,
-                    disabledColor: Colors.white38,
-                    iconSize: 38,
-                    onPressed: hasTrack ? () => player.playPrevious() : null,
-                    icon: const Icon(Icons.skip_previous_rounded),
-                  ),
-                  SizedBox.square(
-                    dimension: 66,
-                    child: IconButton(
-                      key: const ValueKey('player-primary-control'),
-                      tooltip: isPlaying ? strings.pause : strings.play,
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        disabledBackgroundColor: Colors.white38,
-                        shape: const CircleBorder(),
-                      ),
-                      color: Colors.black,
-                      disabledColor: Colors.black45,
-                      iconSize: 38,
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                      ),
-                      onPressed: hasTrack
-                          ? () => player.togglePlayPause()
-                          : null,
-                    ),
-                  ),
-                  IconButton(
-                    key: const ValueKey('player-next-control'),
-                    tooltip: strings.next,
-                    color: Colors.white,
-                    disabledColor: Colors.white38,
-                    iconSize: 38,
-                    onPressed: hasTrack ? () => player.playNext() : null,
-                    icon: const Icon(Icons.skip_next_rounded),
-                  ),
-                  _SpotifyToggleControl(
-                    key: const ValueKey('player-repeat-control'),
-                    tooltip: switch (snapshot.repeatMode) {
-                      PlaybackRepeatMode.off => strings.repeatQueue,
-                      PlaybackRepeatMode.all => strings.repeatOne,
-                      PlaybackRepeatMode.one => strings.disableRepeat,
-                    },
-                    icon: snapshot.repeatMode == PlaybackRepeatMode.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                    active: snapshot.repeatMode != PlaybackRepeatMode.off,
-                    activeColor: _spotifyGreen,
-                    onPressed: hasTrack ? () => player.cycleRepeatMode() : null,
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 12),
-
-              // Bottom utility row: Devices (left), Sleep Timer + Share + Queue (right).
-              Row(
-                children: [
-                  InkWell(
-                    onTap: () => InutilConnectSheet.show(context),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 6,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          InutilIcon(
-                            InutilGlyph.devices,
-                            size: 21,
-                            filled: pairedDeviceName != null,
-                            color: pairedDeviceName != null
-                                ? _spotifyGreen
-                                : Colors.white.withValues(alpha: 0.88),
-                          ),
-                          if (pairedDeviceName != null) ...[
-                            const SizedBox(width: 6),
-                            ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 150),
-                              child: Text(
-                                pairedDeviceName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: _spotifyGreen,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
+                              child: ProportionalArtwork(
+                                source: artworkSource,
+                                fallbackSource: artworkFallbackSource,
+                                cacheWidth: 160,
+                                fallback: const ColoredBox(
+                                  color: Color(0xFF1F2430),
+                                  child: Icon(
+                                    Icons.music_note_rounded,
+                                    color: Colors.white70,
+                                  ),
                                 ),
                               ),
                             ),
-                          ],
-                        ],
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TrackChangeTransition(
+                          switcherKey: const ValueKey(
+                            'spotify-canvas-metadata-transition',
+                          ),
+                          identity: visualIdentity,
+                          enabled: trackTransitionsEnabled,
+                          alignment: Alignment.centerLeft,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              MarqueeText(
+                                key: const ValueKey('player-track-title'),
+                                snapshot.title ?? strings.noPlayback,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 21,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              InkWell(
+                                key: const ValueKey(
+                                  'player-track-artist-action',
+                                ),
+                                onTap: onOpenArtist,
+                                child: Text(
+                                  artistLabel,
+                                  key: const ValueKey('player-track-artist'),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.78),
+                                    fontSize: 14.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      if (!snapshot.isExternal)
+                        _SpotifyCircleFavoriteButton(
+                          snapshot: snapshot,
+                          isFavorite: isFavorite,
+                          savedTrackId: savedTrackId,
+                          strings: strings,
+                        ),
+                    ],
                   ),
-                  const Spacer(),
-                  IconButton(
-                    key: const ValueKey('spotify-canvas-sleep-timer'),
-                    tooltip: 'Temporizador de sueño',
-                    onPressed: () => InutilSleepTimerSheet.show(context),
-                    icon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        InutilIcon(
-                          InutilGlyph.sleepTimer,
-                          size: 21,
-                          filled: sleepTimer.isActive,
-                          color: sleepTimer.isActive
+
+                  const SizedBox(height: 16),
+
+                  // Crisp white progress bar with timestamps.
+                  _AppleMusicTimeline(
+                    strings: strings,
+                    compact: true,
+                    trackHeight: 3,
+                    sliderHeight: 22,
+                    showThumb: true,
+                    sliderKey: const ValueKey('spotify-player-linear-seek'),
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Main Spotify transport controls.
+                  Row(
+                    key: const ValueKey('spotify-player-transport'),
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _SpotifyToggleControl(
+                        key: const ValueKey('player-shuffle-control'),
+                        tooltip: snapshot.shuffleEnabled
+                            ? strings.deactivateShuffle
+                            : strings.activateShuffle,
+                        icon: Icons.shuffle_rounded,
+                        active: snapshot.shuffleEnabled,
+                        activeColor: _spotifyGreen,
+                        onPressed: hasTrack
+                            ? () => player.toggleShuffle()
+                            : null,
+                      ),
+                      IconButton(
+                        key: const ValueKey('player-previous-control'),
+                        tooltip: strings.previous,
+                        color: Colors.white,
+                        disabledColor: Colors.white38,
+                        iconSize: 38,
+                        onPressed: hasTrack
+                            ? () => player.playPrevious()
+                            : null,
+                        icon: const Icon(Icons.skip_previous_rounded),
+                      ),
+                      SizedBox.square(
+                        dimension: 66,
+                        child: IconButton(
+                          key: const ValueKey('player-primary-control'),
+                          tooltip: isPlaying ? strings.pause : strings.play,
+                          style: IconButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            disabledBackgroundColor: Colors.white38,
+                            shape: const CircleBorder(),
+                          ),
+                          color: Colors.black,
+                          disabledColor: Colors.black45,
+                          iconSize: 38,
+                          padding: EdgeInsets.zero,
+                          icon: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                          ),
+                          onPressed: hasTrack
+                              ? () => player.togglePlayPause()
+                              : null,
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('player-next-control'),
+                        tooltip: strings.next,
+                        color: Colors.white,
+                        disabledColor: Colors.white38,
+                        iconSize: 38,
+                        onPressed: hasTrack ? () => player.playNext() : null,
+                        icon: const Icon(Icons.skip_next_rounded),
+                      ),
+                      _SpotifyToggleControl(
+                        key: const ValueKey('player-repeat-control'),
+                        tooltip: switch (snapshot.repeatMode) {
+                          PlaybackRepeatMode.off => strings.repeatQueue,
+                          PlaybackRepeatMode.all => strings.repeatOne,
+                          PlaybackRepeatMode.one => strings.disableRepeat,
+                        },
+                        icon: snapshot.repeatMode == PlaybackRepeatMode.one
+                            ? Icons.repeat_one_rounded
+                            : Icons.repeat_rounded,
+                        active: snapshot.repeatMode != PlaybackRepeatMode.off,
+                        activeColor: _spotifyGreen,
+                        onPressed: hasTrack
+                            ? () => player.cycleRepeatMode()
+                            : null,
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  // Bottom utility row: Devices (left), Sleep Timer + Share + Queue (right).
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: () => InutilConnectSheet.show(context),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 6,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              InutilIcon(
+                                InutilGlyph.devices,
+                                size: 21,
+                                filled: pairedDeviceName != null,
+                                color: pairedDeviceName != null
+                                    ? _spotifyGreen
+                                    : Colors.white.withValues(alpha: 0.88),
+                              ),
+                              if (pairedDeviceName != null) ...[
+                                const SizedBox(width: 6),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 150,
+                                  ),
+                                  child: Text(
+                                    pairedDeviceName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: _spotifyGreen,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        key: const ValueKey('spotify-canvas-sleep-timer'),
+                        tooltip: 'Temporizador de sueño',
+                        onPressed: () => InutilSleepTimerSheet.show(context),
+                        icon: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            InutilIcon(
+                              InutilGlyph.sleepTimer,
+                              size: 21,
+                              filled: sleepTimer.isActive,
+                              color: sleepTimer.isActive
+                                  ? _spotifyGreen
+                                  : Colors.white.withValues(alpha: 0.88),
+                            ),
+                            if (sleepTimer.isActive) ...[
+                              const SizedBox(width: 4),
+                              Text(
+                                '${sleepTimer.remaining.inMinutes + 1}m',
+                                style: const TextStyle(
+                                  color: _spotifyGreen,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      if (shareTrack != null)
+                        IconButton(
+                          tooltip: strings.shareSong,
+                          color: Colors.white.withValues(alpha: 0.88),
+                          iconSize: 21,
+                          onPressed: () => unawaited(
+                            _shareTrack(
+                              context: context,
+                              ref: ref,
+                              track: shareTrack,
+                              strings: strings,
+                            ),
+                          ),
+                          icon: const Icon(Icons.share_outlined),
+                        ),
+                      IconButton(
+                        tooltip: 'Cola de reproducción',
+                        onPressed: onToggleQueue,
+                        icon: InutilIcon(
+                          InutilGlyph.queue,
+                          size: 22,
+                          filled: queueVisible,
+                          color: queueVisible
                               ? _spotifyGreen
                               : Colors.white.withValues(alpha: 0.88),
                         ),
-                        if (sleepTimer.isActive) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            '${sleepTimer.remaining.inMinutes + 1}m',
-                            style: const TextStyle(
-                              color: _spotifyGreen,
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  if (shareTrack != null)
-                    IconButton(
-                      tooltip: strings.shareSong,
-                      color: Colors.white.withValues(alpha: 0.88),
-                      iconSize: 21,
-                      onPressed: () => unawaited(
-                        _shareTrack(
-                          context: context,
-                          ref: ref,
-                          track: shareTrack,
-                          strings: strings,
+
+                  if (hasError) ...[
+                    const SizedBox(height: 6),
+                    PlayerErrorMessage(
+                      message: errorText ?? strings.playbackError,
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+
+                  // Bottom "Muestra de la letra" peek card (Spotify style).
+                  Material(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(16),
+                    child: InkWell(
+                      key: const ValueKey('spotify-canvas-lyrics-card'),
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: onOpenLyrics,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Expanded(
+                              child: Text(
+                                'Muestra de la letra',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              Icons.translate_rounded,
+                              size: 19,
+                              color: Colors.white.withValues(alpha: 0.88),
+                            ),
+                          ],
                         ),
                       ),
-                      icon: const Icon(Icons.share_outlined),
-                    ),
-                  IconButton(
-                    tooltip: 'Cola de reproducción',
-                    onPressed: onToggleQueue,
-                    icon: InutilIcon(
-                      InutilGlyph.queue,
-                      size: 22,
-                      filled: queueVisible,
-                      color: queueVisible
-                          ? _spotifyGreen
-                          : Colors.white.withValues(alpha: 0.88),
                     ),
                   ),
                 ],
               ),
-
-              if (hasError) ...[
-                const SizedBox(height: 6),
-                PlayerErrorMessage(message: errorText ?? strings.playbackError),
-              ],
-
-              const SizedBox(height: 8),
-
-              // Bottom "Muestra de la letra" peek card (Spotify style).
-              Material(
-                color: Colors.white.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  key: const ValueKey('spotify-canvas-lyrics-card'),
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: onOpenLyrics,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.12),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            'Muestra de la letra',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        Icon(
-                          Icons.translate_rounded,
-                          size: 19,
-                          color: Colors.white.withValues(alpha: 0.88),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+            );
+            if (!isWideCanvas) return foreground;
+            return Align(
+              alignment: Alignment.center,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: foreground,
               ),
-            ],
-          ),
+            );
+          },
         ),
       ],
     );

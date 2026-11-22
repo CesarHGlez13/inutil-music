@@ -2,30 +2,18 @@
 
 ## 2.5.15+4273 — 2026-11-21
 
-### Improved — reproductor Canvas sin parpadeo, actualizaciones multiplataforma y firma de producción
+### Improved — Spotify Connect sin congelamientos, Canvas a pantalla completa en escritorio/letras, motor Linux optimizado y OTA obligatoria multiplataforma
 
-- **Reproductor Canvas sin parpadeo ni superposición al abrir canciones.** Al
-  tocar una canción o abrir el reproductor, la vista Canvas a pantalla completa
-  se monta desde el primer cuadro mientras se resuelve el video en segundo
-  plano, eliminando el salto desde la interfaz clásica de carátula cuadrada y
-  la doble exposición durante el fundido.
-- **Actualizaciones directas en escritorio sin enlaces incorrectos.** Windows y
-  macOS (Apple Silicon e Intel) ahora descargan su instalador nativo (`.exe` y
-  `.pkg`) y Linux prioriza su paquete propio (`.tar.gz`, `.deb` o `.rpm`), sin
-  volver a caer al archivo `.apk` de Android. Todos los instaladores de PC
-  quedan incluidos en el mapa de verificación `checksums` de `release.json`.
-- **Efecto Liquid Glass más estable en Windows.** Se reestructuró
-  `shaders/liquid_glass_refraction.frag` eliminando los `return` tempranos junto
-  a muestreos de textura (`impellerc` compila con 0 advertencias en SkSL, Metal,
-  OpenGL ES y Vulkan, evitando fallos en Windows — flutter/190809).
-- **Mejor diagnóstico de sincronización y red.** Se instrumentaron 26 rutas de
-  error silenciosas en la capa de autenticación, sincronización LAN/nube y
-  actualizaciones para registrar fallos reales sin interrumpir el respaldo.
-- **Firma de producción definitiva en Android y pipeline 8/8 en CI.** Los APKs
-  de Android salen firmados con el certificado de producción propio válido hasta
-  2054; esta versión se publica como actualización opcional (`minSupported 2.5.14`)
-  para facilitar la reinstalación única desde builds anteriores firmados en modo
-  desarrollo.
+- **Selección desde Biblioteca y Spotify Connect sin congelamientos ni canciones fantasma.**
+  Se corrigió el desfase de URL (`music.youtube.com` vs `www.youtube.com`) al transferir colas de playlists entre móvil y PC que abortaba la resolución como reemplazada y congelaba el altavoz en pausa con el tiempo anterior; también se evitó que un prefetch cancelado afectara la selección activa en `RemoteTrackResolver`, se protegió `_decorateSnapshot` frente a snapshots salientes, se eliminó la explosión de posición en `/api/session` sincronizando `updatedAt`, se evitó que equipos inactivos en LAN secuestraran el auto-emparejamiento y se alineó el resaltado de filas en `Biblioteca` con la pista real del altavoz remoto.
+- **Canvas a pantalla completa en escritorio, en Letras y con respaldo visual inteligente.**
+  En escritorio el reproductor con Canvas oculta la barra lateral y usa tema oscuro completo sin parpadeo; la pantalla de letras sincronizadas ahora muestra el fondo Canvas animado; y las canciones que no tienen video en Spotify Canvas mantienen el estilo Canvas con carátula animada nítida y fallback de video preview de YouTube/iTunes sin degradarse al reproductor clásico.
+- **Motor nativo Linux Canvas optimizado (`InutilLinuxCanvasEngine`).**
+  Se desactivó la salida de audio en el `mpv` del Canvas (`ao=null`), se eliminó la comprobación frágil de AOT y se ajustó el muestreo a 15 FPS / 320×568, reduciendo el consumo de CPU en Linux de ~72% a ~16% sin perder fluidez.
+- **Ahorro de cuota en nube y panel de administración web mejorado.**
+  Las cuentas con un solo equipo en línea ahora espacian el sondeo en la nube a 30 s (despertando al instante al detectar un segundo dispositivo) y el Cloudflare Cloud Relay amplió su caché de identidad a 55 min + RAM por isolate (reduciendo 11x las escrituras de KV). El panel de administración en `https://inutil-music-app.web.app` ya no cierra la sesión del admin al crear cuentas, incluye generador de contraseñas legibles, botón de WhatsApp en 1 clic, recuperación de contraseña y monitoreo del Cloud Relay.
+- **Actualizaciones directas multiplataforma y firma de producción definitiva.**
+  Windows y macOS (Apple Silicon e Intel) descargan su instalador nativo (`.exe` y `.pkg`), Linux prioriza su paquete propio (`.tar.gz`, `.deb` o `.rpm`) y los APKs de Android salen firmados con el certificado de producción propio válido hasta 2054. Se corrigió además `shaders/liquid_glass_refraction.frag` para compilar con 0 advertencias en todas las plataformas. Esta versión se publica como **actualización obligatoria** (`minSupportedVersion 2.5.15`).
 
 ## 2.5.14+4272 — 2026-11-20
 

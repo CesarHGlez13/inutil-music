@@ -202,10 +202,29 @@ class InutilFirestoreService {
   // ---------------------------------------------------------------------------
   // 2. DOCUMENTOS Y COLECCIONES
   // ---------------------------------------------------------------------------
+
+  /// Las colecciones de emparejamiento QR (`music_pairing/*`, `tv_pairing/*`)
+  /// las crea un equipo SIN sesión iniciada (sin JWT de Firebase). Los relays
+  /// (S7 y Cloudflare) exigen Bearer JWT en todas las rutas, así que estas
+  /// rutas temporales (TTL 3 min) van directo a Google Firestore donde
+  /// `firestore.rules` valida su esquema anónimo.
+  @visibleForTesting
+  static bool shouldBypassRelay(String path) {
+    final normalized = path.trim().replaceFirst(RegExp(r'^/+'), '');
+    return normalized.startsWith('music_pairing/') ||
+        normalized == 'music_pairing' ||
+        normalized.startsWith('tv_pairing/') ||
+        normalized == 'tv_pairing';
+  }
+
+  static String _baseUrlForPath(String path) => shouldBypassRelay(path)
+      ? FirebaseConfig.directFirestoreBaseUrl
+      : FirebaseConfig.firestoreBaseUrl;
+
   Future<Map<String, dynamic>?> getDocument(String path) async {
     final response = await _sendWithRelayFallback(
       label: path,
-      urlBuilder: () => Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path'),
+      urlBuilder: () => Uri.parse('${_baseUrlForPath(path)}/$path'),
       send: (url) => http.get(url, headers: _headers()),
     );
     if (response.statusCode == 404) return null;
@@ -231,7 +250,7 @@ class InutilFirestoreService {
     Iterable<String> fieldPaths, {
     bool merge = true,
   }) {
-    final base = Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path');
+    final base = Uri.parse('${_baseUrlForPath(path)}/$path');
     if (!merge || fieldPaths.isEmpty) return base;
     return base.replace(
       queryParameters: {
@@ -264,7 +283,7 @@ class InutilFirestoreService {
   Future<bool> deleteDocument(String path) async {
     final response = await _sendWithRelayFallback(
       label: 'DELETE $path',
-      urlBuilder: () => Uri.parse('${FirebaseConfig.firestoreBaseUrl}/$path'),
+      urlBuilder: () => Uri.parse('${_baseUrlForPath(path)}/$path'),
       send: (url) => http.delete(url, headers: _headers()),
     );
     return response.statusCode >= 200 && response.statusCode < 300;

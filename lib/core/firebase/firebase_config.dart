@@ -308,6 +308,17 @@ class FirebaseConfig {
   /// Tier de datos efectivo ahora mismo.
   static RelayTier get dataTier => RelayTierSelector.select(relayTierInputs);
 
+  /// Endpoint directo de Google Firestore (sin pasar por relays).
+  /// Usado por colecciones efímeras sin JWT (como `music_pairing/*` y
+  /// `tv_pairing/*`) cuyas reglas en Firestore permiten creación anónima.
+  static String get directFirestoreBaseUrl {
+    if (useEmulator) {
+      return 'http://$emulatorHost:$emulatorFirestorePort'
+          '/v1/projects/$projectId/databases/(default)/documents';
+    }
+    return 'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents';
+  }
+
   /// Base de documentos. Antes era binaria (`relayUsable ? LAN : Google`);
   /// ahora delega en `RelayTierSelector`, que añade el tier cloud entre medio.
   /// Con `FB_CLOUD_RELAY_HOST` vacío (el default) el resultado es idéntico
@@ -315,13 +326,11 @@ class FirebaseConfig {
   /// existente.
   static String get firestoreBaseUrl {
     if (useEmulator) {
-      return 'http://$emulatorHost:$emulatorFirestorePort'
-          '/v1/projects/$projectId/databases/(default)/documents';
+      return directFirestoreBaseUrl;
     }
     return RelayTierSelector.urlFor(
       i: relayTierInputs,
-      googleUrl:
-          'https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents',
+      googleUrl: directFirestoreBaseUrl,
     );
   }
 

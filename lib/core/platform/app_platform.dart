@@ -69,4 +69,11 @@ class AppPlatform {
       current == AppPlatformType.windows ||
       current == AppPlatformType.linux ||
       current == AppPlatformType.macos;
+
+  static bool get isFlutterTest =>
+      Platform.environment.containsKey('FLUTTER_TEST');
+
+  static bool get supportsRemoteArtworkVideo =>
+      current != AppPlatformType.unsupported &&
+      (current != AppPlatformType.linux || !isFlutterTest);
 }

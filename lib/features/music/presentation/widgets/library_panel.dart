@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart' show ScrollCacheExtent;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
 
+import '../../../../core/firebase/firebase_playback_sync_service.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_dialog.dart';
@@ -2494,6 +2495,9 @@ class _CatalogTrackTileState extends ConsumerState<_CatalogTrackTile> {
   }
 
   bool _isCurrentOccurrence(String? trackId, PlaybackQueueState queue) {
+    if (!InutilPlaybackSyncService.instance.isCurrentDeviceActive) {
+      return widget.item.matchesTrackId(trackId);
+    }
     final currentLogicalEntryId =
         queue.currentIndex >= 0 && queue.currentIndex < queue.entries.length
         ? queue.entries[queue.currentIndex].logicalEntryId

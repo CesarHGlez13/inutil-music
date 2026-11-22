@@ -11,6 +11,7 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_ui.dart';
@@ -23,6 +24,7 @@ import '../providers/music_providers.dart';
 import '../providers/playback_artwork_provider.dart';
 import '../providers/playback_visual_cache_provider.dart';
 import 'favorite_star_badge.dart';
+import 'inutil_connect_sheet.dart';
 import 'decorative_progress_transition.dart';
 import 'playback_progress_line.dart';
 import 'source_image.dart';
@@ -194,6 +196,9 @@ class MiniPlayer extends ConsumerWidget {
       thumbnailUrl: artworkSource,
     );
     final visualCache = ref.watch(playbackVisualCacheProvider);
+    final remoteSpeakerName = ref.watch(
+      inutilPlaybackSyncProvider.select((sync) => sync.activeRemoteSpeakerName),
+    );
     final metadata = TrackChangeTransition(
       key: const ValueKey('mini-player-metadata'),
       switcherKey: const ValueKey('mini-player-track-transition'),
@@ -242,25 +247,50 @@ class MiniPlayer extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 3),
-                Text(
-                  compactErrorText ??
-                      presentation.artist ??
-                      AppConstants.appName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: windowsLayout ? 13 : null,
-                    color: compactErrorText == null
-                        ? liquidLightTextColor ??
-                              AppColors.contentSubtitleFor(context)
-                        : theme.colorScheme.error,
-                    shadows: compactErrorText == null && isDark
-                        ? const [
-                            Shadow(color: Color(0x99000000), blurRadius: 7),
-                          ]
-                        : null,
+                if (compactErrorText == null && remoteSpeakerName != null)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.speaker_group_rounded,
+                        size: 13,
+                        color: Color(0xFF1DB954),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          remoteSpeakerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: windowsLayout ? 12.5 : 12,
+                            color: const Color(0xFF1DB954),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    compactErrorText ??
+                        presentation.artist ??
+                        AppConstants.appName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: windowsLayout ? 13 : null,
+                      color: compactErrorText == null
+                          ? liquidLightTextColor ??
+                                AppColors.contentSubtitleFor(context)
+                          : theme.colorScheme.error,
+                      shadows: compactErrorText == null && isDark
+                          ? const [
+                              Shadow(color: Color(0x99000000), blurRadius: 7),
+                            ]
+                          : null,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -360,6 +390,15 @@ class MiniPlayer extends ConsumerWidget {
       tooltip: strings.playbackQueue,
       icon: Icons.format_list_bulleted_rounded,
       onPressed: () => showDesktopPlaybackQueue(context),
+    );
+    final desktopConnect = _MiniTransportButton(
+      key: const ValueKey('mini-player-connect-control'),
+      tooltip: remoteSpeakerName != null
+          ? 'Escuchando en $remoteSpeakerName'
+          : 'Conectar a un dispositivo',
+      icon: Icons.speaker_group_rounded,
+      color: remoteSpeakerName != null ? const Color(0xFF1DB954) : null,
+      onPressed: () => InutilConnectSheet.show(context),
     );
     final swipeEnabled =
         compactMobile &&
@@ -632,9 +671,11 @@ class MiniPlayer extends ConsumerWidget {
                                                 ),
                                               if (presentation.hasError)
                                                 const SizedBox(width: 12),
+                                              desktopLyrics,
+                                              const SizedBox(width: 4),
                                               desktopQueue,
                                               const SizedBox(width: 4),
-                                              desktopLyrics,
+                                              desktopConnect,
                                               const SizedBox(width: 4),
                                               Flexible(child: desktopVolume),
                                             ],

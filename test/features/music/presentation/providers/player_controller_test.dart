@@ -6114,6 +6114,80 @@ void main() {
       expect(session.states.last.snapshot.position, const Duration(seconds: 3));
     },
   );
+
+  test(
+    'playRemote plays after pause when track uses music.youtube.com and queue uses www.youtube.com',
+    () async {
+      final player = _FakePlayerService();
+      final resolver = FallbackAudioResolver([
+        _SequencedAudioResolver(const [
+          AudioStreamResolution(
+            source: AudioStreamSource.innerTube,
+            streamUrl: 'https://media.example/NW2XLQSPOBs.m4a',
+          ),
+          AudioStreamResolution(
+            source: AudioStreamSource.innerTube,
+            streamUrl: 'https://media.example/xqaoUZy7iaA.m4a',
+          ),
+        ]),
+      ]);
+      final container = _container(player, audioResolver: resolver);
+      addTearDown(container.dispose);
+
+      await container.read(playerControllerProvider.future);
+      final controller = container.read(playerControllerProvider.notifier);
+
+      const q1 = TrackInfo(
+        id: 'NW2XLQSPOBs',
+        title: 'Te Veo a la Vuelta',
+        artist: 'José Madero',
+        url: 'https://www.youtube.com/watch?v=NW2XLQSPOBs',
+      );
+      const q2 = TrackInfo(
+        id: 'xqaoUZy7iaA',
+        title: 'Because Of You',
+        artist: 'LIZOT',
+        url: 'https://www.youtube.com/watch?v=xqaoUZy7iaA',
+      );
+      final queue = const [q1, q2];
+
+      await controller.playRemote(
+        const TrackInfo(
+          id: 'NW2XLQSPOBs',
+          title: 'Te Veo a la Vuelta',
+          artist: 'José Madero',
+          url: 'https://music.youtube.com/watch?v=NW2XLQSPOBs',
+        ),
+        queue: queue,
+        initialQueueIndex: 0,
+      );
+      player.emit(
+        player.currentSnapshot.copyWith(
+          position: const Duration(milliseconds: 2753),
+        ),
+      );
+      await _flushCompletion();
+      await controller.pause();
+      await _flushCompletion();
+
+      await controller.playRemote(
+        const TrackInfo(
+          id: 'xqaoUZy7iaA',
+          title: 'Because Of You',
+          artist: 'LIZOT',
+          url: 'https://music.youtube.com/watch?v=xqaoUZy7iaA',
+        ),
+        queue: queue,
+        initialQueueIndex: 1,
+      );
+      await _flushCompletion();
+
+      final snap = container.read(playerControllerProvider).value!;
+      expect(snap.trackId, 'xqaoUZy7iaA');
+      expect(snap.status, PlayerStatus.playing);
+      expect(player.playedRemote.last.id, 'xqaoUZy7iaA');
+    },
+  );
 }
 
 ProviderContainer _container(

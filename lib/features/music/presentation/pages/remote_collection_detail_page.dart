@@ -139,8 +139,7 @@ class _RemoteCollectionDetailPageState
     );
     final videoPreviewAllowed =
         animatedArtworkEnabled &&
-        AppPlatform.current != AppPlatformType.linux &&
-        AppPlatform.current != AppPlatformType.unsupported &&
+        AppPlatform.supportsRemoteArtworkVideo &&
         (resolvedSubtitle.trim().isNotEmpty || resolvedTitle.trim().isNotEmpty);
     final albumVideoClips = videoPreviewAllowed
         ? (ref

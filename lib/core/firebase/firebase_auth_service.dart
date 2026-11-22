@@ -368,6 +368,47 @@ class InutilAuthService extends ChangeNotifier {
   /// reclaman `currentPhoneDeviceId`; PC/tablet actúan como altavoz o mando.
   bool get _isPhoneDevice => (_devicePlatform ?? '') == 'android';
 
+  /// Nombre legible del equipo derivado dinámicamente del sistema operativo y
+  /// del hostname local (o del nombre personalizado guardado), sin valores
+  /// fijos ligados a un usuario concreto.
+  @visibleForTesting
+  static String resolveDefaultDeviceName({
+    required String platform,
+    required String hostname,
+    String? savedCustomName,
+  }) {
+    final custom = savedCustomName?.trim() ?? '';
+    if (custom.isNotEmpty) return custom;
+
+    if (platform == 'android') return 'Teléfono Android';
+    if (platform == 'ios') return 'iPhone';
+
+    var cleanHost = hostname.trim();
+    if (cleanHost.toLowerCase().endsWith('.local')) {
+      cleanHost = cleanHost.substring(0, cleanHost.length - 6);
+    }
+    final genericHost =
+        cleanHost.isEmpty ||
+        cleanHost.toLowerCase() == 'localhost' ||
+        cleanHost.toLowerCase() == '127.0.0.1';
+
+    final osLabel = switch (platform) {
+      'linux' => 'Linux',
+      'windows' => 'Windows',
+      'macos' => 'macOS',
+      _ => 'Desktop',
+    };
+    if (genericHost) {
+      return switch (platform) {
+        'linux' => 'PC Linux',
+        'windows' => 'PC Windows',
+        'macos' => 'Mac',
+        _ => 'PC Desktop',
+      };
+    }
+    return '$cleanHost ($osLabel)';
+  }
+
   // ---------------------------------------------------------------------------
   // 1. ARRANQUE Y PERSISTENCIA DE SESIÓN
   // ---------------------------------------------------------------------------
@@ -383,17 +424,29 @@ class InutilAuthService extends ChangeNotifier {
 
     if (Platform.isAndroid) {
       _devicePlatform = 'android';
-      _deviceName = 'Teléfono Android';
+    } else if (Platform.isIOS) {
+      _devicePlatform = 'ios';
     } else if (Platform.isLinux) {
       _devicePlatform = 'linux';
-      _deviceName = 'PC de César (Ubuntu)';
     } else if (Platform.isWindows) {
       _devicePlatform = 'windows';
-      _deviceName = 'PC de César (Windows)';
+    } else if (Platform.isMacOS) {
+      _devicePlatform = 'macos';
     } else {
       _devicePlatform = 'desktop';
-      _deviceName = 'PC de César (Desktop)';
     }
+
+    var localHostname = '';
+    try {
+      localHostname = Platform.localHostname;
+    } catch (_) {
+      localHostname = '';
+    }
+    _deviceName = resolveDefaultDeviceName(
+      platform: _devicePlatform ?? 'desktop',
+      hostname: localHostname,
+      savedCustomName: prefs.getString('inutil_custom_device_name'),
+    );
 
     // 2. Restaurar sesión desde el almacenamiento seguro (o fallback prefs)
     final sessionJson = await _readSecure(prefs, _storageSessionKey);

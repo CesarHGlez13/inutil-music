@@ -39,16 +39,61 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
     // Registrar callback para ejecutar comandos remotos que vengan de otro dispositivo (PC o celular)
     syncService.onRemoteCommandReceived = (commandType, param) async {
       final notifier = ref.read(playerControllerProvider.notifier);
+      final currentSnap = ref.read(playerServiceProvider).currentSnapshot;
+      Future<bool> hydrateIdleSessionIfNeeded() async {
+        if (currentSnap.status != PlayerStatus.idle &&
+            (currentSnap.trackId?.trim().isNotEmpty ?? false)) {
+          return false;
+        }
+        final session = syncService.remoteSession;
+        if (session == null || session.trackId.trim().isEmpty) {
+          return false;
+        }
+        final track = TrackInfo(
+          id: session.trackId,
+          title: session.title.isNotEmpty ? session.title : 'Canción',
+          artist: session.artist.isNotEmpty ? session.artist : 'Inútil Music',
+          url: 'https://music.youtube.com/watch?v=${session.trackId}',
+          thumbnailUrl: session.thumbnailUrl.isEmpty
+              ? null
+              : session.thumbnailUrl,
+          album: session.album,
+          duration: session.durationMs > 0
+              ? Duration(milliseconds: session.durationMs)
+              : null,
+        );
+        final queueTracks = <TrackInfo>[];
+        for (final item in session.queue) {
+          final parsed = _trackInfoFromRemoteMap(item);
+          if (parsed != null) queueTracks.add(parsed);
+        }
+        await notifier.playRemote(
+          track,
+          queue: queueTracks.isNotEmpty ? queueTracks : null,
+        );
+        final nearEnd =
+            session.durationMs > 0 &&
+            session.positionMs >= session.durationMs - 2500;
+        if (session.positionMs > 0 && !nearEnd) {
+          await notifier.seek(Duration(milliseconds: session.positionMs));
+        }
+        return true;
+      }
+
       switch (commandType) {
         case 'play':
         case 'resume':
-          await notifier.resume();
+          if (!await hydrateIdleSessionIfNeeded()) {
+            await notifier.resume();
+          }
           break;
         case 'pause':
           await notifier.pause();
           break;
         case 'toggle':
-          await notifier.togglePlayPause();
+          if (!await hydrateIdleSessionIfNeeded()) {
+            await notifier.togglePlayPause();
+          }
           break;
         case 'next':
           await notifier.playNext();
@@ -62,6 +107,39 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
             await notifier.seek(Duration(milliseconds: ms));
           }
           break;
+        case 'setVolume':
+          if (param != null) {
+            final vol = double.tryParse(param.toString());
+            if (vol != null) {
+              await notifier.setVolume(vol.clamp(0.0, 1.0));
+            }
+          }
+          break;
+        case 'setShuffle':
+          if (param != null) {
+            final enabled = param == true || param.toString() == 'true';
+            notifier.setShuffleEnabled(enabled, fromRemoteCommand: true);
+          }
+          break;
+        case 'setRepeat':
+          if (param != null) {
+            final raw = param.toString().trim().toLowerCase();
+            final mode = switch (raw) {
+              'all' => PlaybackRepeatMode.all,
+              'one' => PlaybackRepeatMode.one,
+              _ => PlaybackRepeatMode.off,
+            };
+            notifier.setRepeatMode(mode, fromRemoteCommand: true);
+          }
+          break;
+        case 'addToQueue':
+          if (param is Map<String, dynamic>) {
+            final track = _trackInfoFromRemoteMap(param);
+            if (track != null) {
+              notifier.enqueueRemoteNext(track);
+            }
+          }
+          break;
         case 'playTrack':
           if (param is Map<String, dynamic>) {
             final trackId = param['trackId'] as String? ?? '';
@@ -69,18 +147,82 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
             final artist = param['artist'] as String? ?? '';
             final album = param['album'] as String?;
             final thumbnailUrl = param['thumbnailUrl'] as String?;
-            final posMs = param['positionMs'] as int? ?? 0;
+            final posMs = param['positionMs'] is int
+                ? param['positionMs'] as int
+                : int.tryParse(param['positionMs']?.toString() ?? '') ?? 0;
+            final durationMs = param['durationMs'] is int
+                ? param['durationMs'] as int
+                : int.tryParse(param['durationMs']?.toString() ?? '') ?? 0;
 
             if (trackId.isNotEmpty) {
+              final rawQueue = param['queue'];
+              final queueTracks = <TrackInfo>[];
+              if (rawQueue is List) {
+                for (final item in rawQueue) {
+                  if (item is Map) {
+                    final parsed = _trackInfoFromRemoteMap(
+                      Map<String, dynamic>.from(item),
+                    );
+                    if (parsed != null) queueTracks.add(parsed);
+                  }
+                }
+              }
+              final rawQueueIndex = param['queueIndex'];
+              final initialQueueIndex = rawQueueIndex is num
+                  ? rawQueueIndex.toInt()
+                  : null;
+              final explicitUrl = (param['url'] ?? '').toString().trim();
+              String? matchedQueueUrl;
+              if (initialQueueIndex != null &&
+                  initialQueueIndex >= 0 &&
+                  initialQueueIndex < queueTracks.length &&
+                  queueTracks[initialQueueIndex].id == trackId) {
+                matchedQueueUrl = queueTracks[initialQueueIndex].url;
+              } else {
+                for (final candidate in queueTracks) {
+                  if (candidate.id == trackId && candidate.url.isNotEmpty) {
+                    matchedQueueUrl = candidate.url;
+                    break;
+                  }
+                }
+              }
+              final canonicalUrl = explicitUrl.isNotEmpty
+                  ? explicitUrl
+                  : (matchedQueueUrl != null && matchedQueueUrl.isNotEmpty
+                        ? matchedQueueUrl
+                        : 'https://music.youtube.com/watch?v=$trackId');
               final track = TrackInfo(
                 id: trackId,
                 title: title.isNotEmpty ? title : 'Canción',
                 artist: artist.isNotEmpty ? artist : 'Inútil Music',
-                url: 'https://music.youtube.com/watch?v=$trackId',
+                url: canonicalUrl,
                 thumbnailUrl: thumbnailUrl,
                 album: album,
+                duration: durationMs > 0
+                    ? Duration(milliseconds: durationMs)
+                    : null,
               );
-              await notifier.playRemote(track);
+              if (param['shuffleEnabled'] is bool) {
+                notifier.setShuffleEnabled(
+                  param['shuffleEnabled'] as bool,
+                  fromRemoteCommand: true,
+                );
+              }
+              if (param['repeatMode'] is String) {
+                final raw = (param['repeatMode'] as String)
+                    .trim()
+                    .toLowerCase();
+                notifier.setRepeatMode(switch (raw) {
+                  'all' => PlaybackRepeatMode.all,
+                  'one' => PlaybackRepeatMode.one,
+                  _ => PlaybackRepeatMode.off,
+                }, fromRemoteCommand: true);
+              }
+              await notifier.playRemote(
+                track,
+                queue: queueTracks.isNotEmpty ? queueTracks : null,
+                initialQueueIndex: initialQueueIndex,
+              );
               if (posMs > 0) {
                 await notifier.seek(Duration(milliseconds: posMs));
               }
@@ -92,11 +234,9 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
 
     // Encaminar una selección al altavoz remoto y sólo silenciar el reproductor
     // local si el encaminamiento llegó de verdad.
-    //
-    // Si la PC está apagada o no responde, lo único que quedó en el aire es una
-    // orden que nadie ejecutó: pausar aquí dejaría el teléfono mudo y la canción
-    // no sonaría en ningún lado.
     Future<void> routeSelectionToPeer(PlayerSnapshot snapshot) async {
+      final controller = ref.read(playerControllerProvider.notifier);
+      final exported = controller.exportCompactRemoteQueue();
       final routed = await syncService.playTrackOnPeer(
         trackId: snapshot.trackId!,
         title: snapshot.title ?? 'Canción',
@@ -104,12 +244,16 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
         album: snapshot.album,
         thumbnailUrl: snapshot.thumbnailUrl,
         positionMs: snapshot.position.inMilliseconds,
+        durationMs: snapshot.duration?.inMilliseconds ?? 0,
+        queue: exported.items,
+        queueIndex: exported.index,
+        volume: snapshot.volume,
+        shuffleEnabled: snapshot.shuffleEnabled,
+        repeatMode: snapshot.repeatMode.name,
       );
       if (!routed) return;
       if (!ref.mounted) return;
-      await ref
-          .read(playerControllerProvider.notifier)
-          .pause(notifyPeer: false);
+      await controller.pause(notifyPeer: false);
     }
 
     // Escuchar cambios del reproductor local para sincronizarlos en LAN y la nube
@@ -120,14 +264,15 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
       final snapshot = next.value;
       if (snapshot == null) return;
 
-      final isPlaying = snapshot.status == PlayerStatus.playing;
-      final isRemoteController =
-          !InutilPlaybackSyncService.isDesktopHost &&
-          !syncService.isCurrentDeviceActive;
+      final isPlaying =
+          snapshot.status == PlayerStatus.playing ||
+          (snapshot.status == PlayerStatus.loading &&
+              snapshot.playWhenReady == true);
+      final isRemoteController = !syncService.isCurrentDeviceActive;
 
-      // Si el móvil está en modo control remoto y el track que tiene coincide con el
-      // que la PC ya está reproduciendo, este evento es sólo un reflejo de UI del par:
-      // no se procesa localmente ni se reenvía a la PC (rompe completamente el ping-pong).
+      // Si este equipo está en modo control remoto y el track coincide con el
+      // que el altavoz remoto ya está reproduciendo, este evento es sólo un
+      // reflejo de UI del par: no se procesa localmente ni se reenvía.
       final isMirroringRemoteTrack =
           isRemoteController &&
           snapshot.trackId != null &&
@@ -147,15 +292,16 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
           isPlaying: isPlaying,
         );
       }
+      final prevSnap = prev?.value;
       final forcePush =
-          prev?.value?.status != snapshot.status ||
-          prev?.value?.trackId != snapshot.trackId;
+          prevSnap?.status != snapshot.status ||
+          prevSnap?.trackId != snapshot.trackId ||
+          prevSnap?.shuffleEnabled != snapshot.shuffleEnabled ||
+          prevSnap?.repeatMode != snapshot.repeatMode ||
+          ((prevSnap?.volume ?? snapshot.volume) - snapshot.volume).abs() >=
+              0.04;
 
       if (snapshot.trackId != null && snapshot.trackId!.isNotEmpty) {
-        // Reproducción en la PC (Spotify Connect):
-        // Si la PC ya es el altavoz activo O si está activado "Reproducir siempre en la PC",
-        // cualquier canción seleccionada o cambio de pista en el móvil se envía a la PC
-        // y el móvil queda como mando a distancia.
         final shouldRouteToPeer =
             InutilPlaybackSyncService.shouldRoutePlaybackToPeer(
               autoPlayOnPc: syncService.autoPlayOnPc,
@@ -173,19 +319,16 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
             );
 
         if (shouldRouteToPeer) {
-          // Enviar a la PC y pausar el reproductor del celular LOCALMENTE (sin
-          // enviar comando remoto de pausa), pero sólo si la PC aceptó la canción.
           unawaited(routeSelectionToPeer(snapshot));
           return;
         }
 
         if (isRemoteController) {
-          // En modo control remoto, este dispositivo no reproduce el audio
-          // ni publica su estado local para evitar sobreescribir la sesión del altavoz (PC)
-          // y prevenir bucles de notificación.
           return;
         }
 
+        final controller = ref.read(playerControllerProvider.notifier);
+        final exported = controller.exportCompactRemoteQueue();
         unawaited(
           syncService.notifyPlaybackProgress(
             trackId: snapshot.trackId!,
@@ -196,6 +339,11 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
             positionMs: snapshot.position.inMilliseconds,
             durationMs: snapshot.duration?.inMilliseconds ?? 0,
             isPlaying: isPlaying,
+            volume: snapshot.volume,
+            shuffleEnabled: snapshot.shuffleEnabled,
+            repeatMode: snapshot.repeatMode.name,
+            queue: exported.items,
+            queueIndex: exported.index,
             force: forcePush,
           ),
         );
@@ -216,3 +364,25 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
   // `test/core/firebase/shared_singleton_dispose_test.dart`.
   disposeNotifier: false,
 );
+
+TrackInfo? _trackInfoFromRemoteMap(Map<String, dynamic> raw) {
+  final id = (raw['id'] ?? raw['trackId'] ?? '').toString().trim();
+  if (id.isEmpty) return null;
+  final title = (raw['title'] ?? '').toString().trim();
+  final artist = (raw['artist'] ?? '').toString().trim();
+  final album = (raw['album'] ?? '').toString().trim();
+  final thumb = (raw['thumbnailUrl'] ?? '').toString().trim();
+  final durationMs = raw['durationMs'] is int
+      ? raw['durationMs'] as int
+      : int.tryParse(raw['durationMs']?.toString() ?? '') ?? 0;
+  final url = (raw['url'] ?? '').toString().trim();
+  return TrackInfo(
+    id: id,
+    title: title.isNotEmpty ? title : 'Canción',
+    artist: artist.isNotEmpty ? artist : 'Inútil Music',
+    album: album.isEmpty ? null : album,
+    thumbnailUrl: thumb.isEmpty ? null : thumb,
+    url: url.isNotEmpty ? url : 'https://music.youtube.com/watch?v=$id',
+    duration: durationMs > 0 ? Duration(milliseconds: durationMs) : null,
+  );
+}

@@ -39,6 +39,7 @@ import '../providers/music_providers.dart';
 import '../providers/local_track_index_provider.dart';
 import '../providers/track_selection_controller.dart';
 import '../widgets/inutil_account_dialog.dart';
+import '../widgets/desktop_now_playing_rail.dart';
 import '../widgets/inutil_connect_sheet.dart';
 import '../widgets/inutil_support_popup.dart';
 import '../widgets/inutil_wrapped_dialog.dart';
@@ -218,6 +219,7 @@ class _HomePageState extends ConsumerState<HomePage>
   int _bottomNavigationScrollDirection = 0;
   bool _bottomNavigationUserScrollActive = false;
   bool _bottomNavigationIgnoringOverscroll = false;
+  bool _desktopNowPlayingRailOpen = !AppPlatform.isFlutterTest;
   FlutterView? _view;
   bool _keyboardVisible = false;
   double? _lastKeyboardInsetBottom;
@@ -1632,13 +1634,25 @@ class _HomePageState extends ConsumerState<HomePage>
                       bottom: false,
                       child: Row(
                         children: [
-                          if (useSideNavigation)
+                          if (useSideNavigation &&
+                              !(_isPlayerSelected &&
+                                  spotifyCanvasEnabled &&
+                                  !AppPlatform.isFlutterTest))
                             _SideNavigation(
                               selectedIndex: _selectedIndex,
                               dimPlaybackBackground: _isPlayerSelected,
                               transitionDuration: shellTransitionDuration,
                               onSelected: _selectIndex,
                               destinations: destinations,
+                              showNowPlayingToggle:
+                                  width >= 1120 &&
+                                  hasActivePlayback &&
+                                  !_isPlayerSelected,
+                              nowPlayingRailOpen: _desktopNowPlayingRailOpen,
+                              onToggleNowPlayingRail: () => setState(
+                                () => _desktopNowPlayingRailOpen =
+                                    !_desktopNowPlayingRailOpen,
+                              ),
                             ),
                           Expanded(
                             child: ClipRect(
@@ -1755,6 +1769,27 @@ class _HomePageState extends ConsumerState<HomePage>
                               ),
                             ),
                           ),
+                          if (useSideNavigation &&
+                              width >= 1120 &&
+                              hasActivePlayback &&
+                              !_isPlayerSelected &&
+                              _desktopNowPlayingRailOpen)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                bottom: miniPlayerVisible
+                                    ? miniPlayerHeight
+                                    : 0,
+                              ),
+                              child: DesktopNowPlayingRail(
+                                spotifyCanvasEnabled: spotifyCanvasEnabled,
+                                animatedArtworkEnabled: animatedArtworkEnabled,
+                                onOpenPlayer: _openPlayer,
+                                onOpenLyrics: _openLyrics,
+                                onClose: () => setState(
+                                  () => _desktopNowPlayingRailOpen = false,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -3003,6 +3038,9 @@ class _SideNavigation extends StatelessWidget {
     required this.transitionDuration,
     required this.onSelected,
     required this.destinations,
+    this.showNowPlayingToggle = false,
+    this.nowPlayingRailOpen = false,
+    this.onToggleNowPlayingRail,
   });
 
   final int selectedIndex;
@@ -3010,6 +3048,9 @@ class _SideNavigation extends StatelessWidget {
   final Duration transitionDuration;
   final ValueChanged<int> onSelected;
   final List<_AppDestination> destinations;
+  final bool showNowPlayingToggle;
+  final bool nowPlayingRailOpen;
+  final VoidCallback? onToggleNowPlayingRail;
 
   @override
   Widget build(BuildContext context) {
@@ -3065,6 +3106,57 @@ class _SideNavigation extends StatelessWidget {
                   },
                 ),
               ),
+              if (showNowPlayingToggle && onToggleNowPlayingRail != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 92),
+                  child: InkWell(
+                    key: const ValueKey('side-navigation-now-playing-toggle'),
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: onToggleNowPlayingRail,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: nowPlayingRailOpen
+                            ? const Color(0xFF1ED760).withValues(alpha: 0.14)
+                            : AppColors.cardSurfaceFor(context),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: nowPlayingRailOpen
+                              ? const Color(0xFF1ED760).withValues(alpha: 0.36)
+                              : AppColors.cardBorderFor(context),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.movie_filter_rounded,
+                            size: 18,
+                            color: nowPlayingRailOpen
+                                ? const Color(0xFF1ED760)
+                                : theme.colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Ahora suena · Canvas',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: nowPlayingRailOpen
+                                    ? const Color(0xFF1ED760)
+                                    : theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

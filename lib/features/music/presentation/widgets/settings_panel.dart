@@ -2930,10 +2930,10 @@ class _AppearanceSettings extends StatelessWidget {
                 key: const ValueKey('apple-animated-artwork-toggle'),
                 icon: Icons.live_tv_rounded,
                 title: strings.appleAnimatedArtwork,
-                subtitle: AppPlatform.current == AppPlatformType.linux
+                subtitle: !AppPlatform.supportsRemoteArtworkVideo
                     ? strings.spotifyCanvasUnavailable
                     : strings.appleAnimatedArtworkDescription,
-                onTap: AppPlatform.current == AppPlatformType.linux
+                onTap: !AppPlatform.supportsRemoteArtworkVideo
                     ? null
                     : () => onAppleAnimatedArtworkEnabledChanged(
                         !appleAnimatedArtworkEnabled,
@@ -2941,9 +2941,9 @@ class _AppearanceSettings extends StatelessWidget {
                 trailing: Switch.adaptive(
                   key: const ValueKey('apple-animated-artwork-switch'),
                   value:
-                      AppPlatform.current != AppPlatformType.linux &&
+                      AppPlatform.supportsRemoteArtworkVideo &&
                       appleAnimatedArtworkEnabled,
-                  onChanged: AppPlatform.current == AppPlatformType.linux
+                  onChanged: !AppPlatform.supportsRemoteArtworkVideo
                       ? null
                       : onAppleAnimatedArtworkEnabledChanged,
                 ),
@@ -2953,19 +2953,19 @@ class _AppearanceSettings extends StatelessWidget {
                 key: const ValueKey('spotify-canvas-toggle'),
                 icon: Icons.movie_filter_rounded,
                 title: strings.spotifyCanvas,
-                subtitle: AppPlatform.current == AppPlatformType.linux
+                subtitle: !AppPlatform.supportsRemoteArtworkVideo
                     ? strings.spotifyCanvasUnavailable
                     : strings.spotifyCanvasDescription,
-                onTap: AppPlatform.current == AppPlatformType.linux
+                onTap: !AppPlatform.supportsRemoteArtworkVideo
                     ? null
                     : () =>
                           onSpotifyCanvasEnabledChanged(!spotifyCanvasEnabled),
                 trailing: Switch.adaptive(
                   key: const ValueKey('spotify-canvas-switch'),
                   value:
-                      AppPlatform.current != AppPlatformType.linux &&
+                      AppPlatform.supportsRemoteArtworkVideo &&
                       spotifyCanvasEnabled,
-                  onChanged: AppPlatform.current == AppPlatformType.linux
+                  onChanged: !AppPlatform.supportsRemoteArtworkVideo
                       ? null
                       : onSpotifyCanvasEnabledChanged,
                 ),

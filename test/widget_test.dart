@@ -11824,6 +11824,7 @@ class _RecordingHomePlayerController extends PlayerController {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
+    int? initialQueueIndex,
   }) async {
     remotePlayCalls++;
     lastRemoteTrack = track;

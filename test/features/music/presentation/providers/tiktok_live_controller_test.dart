@@ -2199,6 +2199,7 @@ class _RecordingPlayerController extends PlayerController {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
+    int? initialQueueIndex,
   }) async {
     remotePlayCalls++;
     lastRemoteTrack = track;
@@ -2326,9 +2327,15 @@ class _TrackingLivePlayerController extends PlayerController {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
+    int? initialQueueIndex,
   }) {
     publicRemoteStarts.add(track.id);
-    return super.playRemote(track, queue: queue, queueSourceId: queueSourceId);
+    return super.playRemote(
+      track,
+      queue: queue,
+      queueSourceId: queueSourceId,
+      initialQueueIndex: initialQueueIndex,
+    );
   }
 
   @override

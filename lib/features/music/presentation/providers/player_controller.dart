@@ -86,6 +86,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   Duration? _resumePlaybackPosition;
   ({int requestId, Duration position})? _pendingLiveRestorePosition;
   Timer? _playbackRecoveryTimer;
+  Timer? _remoteClockTimer;
   bool _useNativeLocalQueue = true;
   bool _activePlaybackIsRemote = false;
   // En modo mando a distancia la cola vive aquí, pero el audio lo pone el
@@ -215,21 +216,59 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     // notifica lo mismo en el mismo momento, pero no registra dependencia
     // riverpod: el ciclo desaparece y el grafo queda en un solo sentido.
     final syncService = InutilPlaybackSyncService.instance;
+    void stopRemoteClockTimer() {
+      _remoteClockTimer?.cancel();
+      _remoteClockTimer = null;
+    }
+
+    void syncRemoteClockTimer(bool shouldTick) {
+      if (!shouldTick) {
+        stopRemoteClockTimer();
+        return;
+      }
+      if (_remoteClockTimer != null) return;
+      _remoteClockTimer = Timer.periodic(const Duration(milliseconds: 500), (
+        _,
+      ) {
+        if (_disposed) {
+          stopRemoteClockTimer();
+          return;
+        }
+        final current = state.value;
+        final remote = syncService.remoteSession;
+        if (current == null ||
+            !current.isRemote ||
+            syncService.isCurrentDeviceActive ||
+            remote == null ||
+            !remote.isPlaying) {
+          stopRemoteClockTimer();
+          return;
+        }
+        final nextPos = Duration(milliseconds: remote.estimatedPositionMs);
+        if ((current.position - nextPos).inMilliseconds.abs() >= 250) {
+          state = AsyncData(current.copyWith(position: nextPos));
+        }
+      });
+    }
+
+    var wasMirroringRemoteSpeaker = false;
+
     void handleSyncServiceChange() {
       if (_disposed) {
+        stopRemoteClockTimer();
         return;
       }
       final remote = syncService.remoteSession;
       final current = state.value;
 
-      if (InutilPlaybackSyncService.isDesktopHost ||
-          syncService.isCurrentDeviceActive) {
-        // Somos el altavoz (o el PC anfitrión): lo que reporte la nube no
-        // pisa nuestro estado local. PERO un estado que antes espejó al par
-        // no puede seguir diciendo "reproduciendo" encima de un motor local
-        // silencioso: así quedaba el reproductor colgado media hora.
-        if (current != null &&
-            current.isRemote &&
+      if (syncService.isCurrentDeviceActive) {
+        stopRemoteClockTimer();
+        // Somos el altavoz activo: lo que reporte otro par no pisa nuestro
+        // estado local. Sólo limpiamos el espejo cuando veníamos espejando a
+        // otro altavoz Connect (no cuando reproducimos YouTube localmente, que
+        // también tiene `current.isRemote == true`).
+        if (wasMirroringRemoteSpeaker &&
+            current != null &&
             current.status == PlayerStatus.playing &&
             service.currentSnapshot.status != PlayerStatus.playing) {
           state = AsyncData(
@@ -241,14 +280,16 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             ),
           );
         }
+        wasMirroringRemoteSpeaker = false;
         return;
       }
 
       if (remote == null || remote.trackId.isEmpty) {
+        stopRemoteClockTimer();
         // Perdimos de vista la sesión del altavoz: el mando muestra la
         // verdad de su propio motor (silencioso), no el último estado
         // espejado que se había quedado pegado en pantalla.
-        if (current != null && current.isRemote) {
+        if (wasMirroringRemoteSpeaker && current != null) {
           state = AsyncData(
             current.copyWith(
               status: service.currentSnapshot.status,
@@ -258,21 +299,51 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             ),
           );
         }
+        wasMirroringRemoteSpeaker = false;
         return;
+      }
+
+      // Si acabamos de recibir una orden remota para reproducir AQUÍ, no
+      // cancelar la carga en curso ni espejar la sesión saliente.
+      if (syncService.isPlaybackRouteSuppressed) {
+        return;
+      }
+
+      wasMirroringRemoteSpeaker = true;
+
+      // Si otro dispositivo es el altavoz activo, nuestro motor local jamás
+      // debe quedarse sonando en segundo plano ("canción fantasma").
+      if (service.currentSnapshot.status == PlayerStatus.playing ||
+          _playWhenReady ||
+          _awaitingPlayback) {
+        _userPaused = true;
+        _releasePlaybackIntent();
+        if (_awaitingPlayback || _changingLocalTrack) {
+          _cancelPendingPlaybackForPause();
+        }
+        unawaited(service.pause());
       }
 
       final newStatus = remote.isPlaying
           ? PlayerStatus.playing
           : PlayerStatus.paused;
-      // El altavoz escribe su posición cada ~8 s; entre escrituras hay que
-      // contar el tiempo transcurrido. Sin esto la barra del mando se queda
-      // congelada aunque la PC esté avanzando.
+      final newRepeat = switch (remote.repeatMode.toLowerCase()) {
+        'all' => PlaybackRepeatMode.all,
+        'one' => PlaybackRepeatMode.one,
+        _ => PlaybackRepeatMode.off,
+      };
+      _shuffleEnabled = remote.shuffleEnabled;
+      _repeatMode = newRepeat;
       final newPosition = Duration(milliseconds: remote.estimatedPositionMs);
+      syncRemoteClockTimer(remote.isPlaying);
       if (current != null &&
           current.isRemote &&
           current.trackId == remote.trackId &&
           current.status == newStatus &&
-          (current.position - newPosition).inSeconds.abs() < 2) {
+          current.shuffleEnabled == remote.shuffleEnabled &&
+          current.repeatMode == newRepeat &&
+          (current.volume - remote.volume).abs() < 0.02 &&
+          (current.position - newPosition).inMilliseconds.abs() < 900) {
         return;
       }
       state = AsyncData(
@@ -288,6 +359,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
           duration: remote.durationMs > 0
               ? Duration(milliseconds: remote.durationMs)
               : current?.duration,
+          volume: remote.volume,
+          shuffleEnabled: remote.shuffleEnabled,
+          repeatMode: newRepeat,
           isRemote: true,
         ),
       );
@@ -368,8 +442,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         return;
       }
       final sync = InutilPlaybackSyncService.instance;
-      if (!InutilPlaybackSyncService.isDesktopHost &&
-          !sync.isCurrentDeviceActive) {
+      if (!sync.isCurrentDeviceActive) {
         // En modo control remoto, este dispositivo actúa como mando a distancia (Spotify Connect).
         // El audio suena en el equipo remoto (PC) y el estado de la UI es gobernado
         // exclusivamente por InutilPlaybackSyncService. Los snapshots del reproductor local
@@ -382,6 +455,12 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         // It is not a pause of the newly selected song, even when a repeated
         // song or wrapped queue has the same identity as the outgoing source.
         return;
+      }
+      if (snapshot.status == PlayerStatus.playing &&
+          _remoteSelectionPauseRequestId == _playRequestId &&
+          (_pendingRemoteSnapshot == null ||
+              _snapshotMatchesPending(snapshot, _pendingRemoteSnapshot!))) {
+        _remoteSelectionPauseRequestId = null;
       }
       if (_explicitlyStopped && _queue.isEmpty) return;
       if ((_userPaused && snapshot.status == PlayerStatus.playing) ||
@@ -509,6 +588,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       _recommendationExtension.invalidate();
       _remotePrefetch.dispose();
       _cancelPlaybackRecoveryTimer();
+      _remoteClockTimer?.cancel();
+      _remoteClockTimer = null;
       _liveQueueCompletionListeners.clear();
       _suspendedLivePlayback = null;
       _interruptedLiveQueuePlayback = null;
@@ -1158,7 +1239,54 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     TrackInfo track, {
     List<TrackInfo>? queue,
     String? queueSourceId,
-  }) => _startRemoteQueue(track, queue: queue, queueSourceId: queueSourceId);
+    int? initialQueueIndex,
+  }) => _startRemoteQueue(
+    track,
+    queue: queue,
+    queueSourceId: queueSourceId,
+    initialQueueIndex: initialQueueIndex,
+  );
+
+  /// Exporta una ventana compacta (hasta 30 pistas alrededor de `_queueIndex`)
+  /// para transferir la cola completa a otro equipo Connect y que Siguiente /
+  /// Anterior funcionen igual que en Spotify.
+  ({List<Map<String, dynamic>> items, int index}) exportCompactRemoteQueue() {
+    if (_queue.isEmpty) {
+      return (items: const <Map<String, dynamic>>[], index: 0);
+    }
+    const maxItems = 30;
+    final currentIdx = _queueIndex.clamp(0, _queue.length - 1).toInt();
+    final start = (currentIdx - 5)
+        .clamp(0, math.max(0, _queue.length - maxItems))
+        .toInt();
+    final end = math.min(_queue.length, start + maxItems);
+    final items = <Map<String, dynamic>>[];
+    var mappedIndex = 0;
+    for (var i = start; i < end; i++) {
+      final entry = _queue[i];
+      final local = entry.local;
+      final remote =
+          entry.remote ??
+          (local != null ? _catalogTrackForDownload(local) : null);
+      if (remote == null || remote.id.trim().isEmpty) continue;
+      if (i == currentIdx) {
+        mappedIndex = items.length;
+      }
+      items.add(<String, dynamic>{
+        'id': remote.id,
+        'title': remote.title,
+        'artist': remote.artist,
+        if (remote.album != null && remote.album!.isNotEmpty)
+          'album': remote.album,
+        if (remote.thumbnailUrl != null && remote.thumbnailUrl!.isNotEmpty)
+          'thumbnailUrl': remote.thumbnailUrl,
+        if (remote.duration != null && remote.duration!.inMilliseconds > 0)
+          'durationMs': remote.duration!.inMilliseconds,
+        if (remote.url.isNotEmpty) 'url': remote.url,
+      });
+    }
+    return (items: items, index: mappedIndex);
+  }
 
   Future<void> _startRemoteQueue(
     TrackInfo track, {
@@ -1196,10 +1324,59 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _queue = List<_QueueItem>.unmodifiable(
       normalizedQueue.map(_remoteQueueEntries.newRemoteItem),
     );
+    final activeTrack = _queue[_queueIndex].remote ?? track;
     _resetShuffleHistory();
     _publishPlaybackQueue();
 
-    await _playRemoteTrack(track);
+    // Spotify Connect: si este equipo actúa como mando remoto (o tiene activo
+    // "Reproducir siempre en la PC" en móvil), enviamos la canción + cola
+    // DIRECTAMENTE al altavoz remoto sin iniciar audio local (cero micro-audio
+    // local y funciona aunque la PC estuviera pausada).
+    final sync = InutilPlaybackSyncService.instance;
+    final shouldSendDirectlyToRemote =
+        !sync.isPlaybackRouteSuppressed &&
+        (!sync.isCurrentDeviceActive ||
+            (!InutilPlaybackSyncService.isDesktopHost &&
+                sync.autoPlayOnPc &&
+                sync.hasConnectTarget));
+    if (shouldSendDirectlyToRemote) {
+      final exported = exportCompactRemoteQueue();
+      final routed = await sync.playTrackOnPeer(
+        trackId: activeTrack.id,
+        title: activeTrack.title,
+        artist: activeTrack.artist,
+        album: activeTrack.album,
+        thumbnailUrl: activeTrack.thumbnailUrl,
+        positionMs: 0,
+        durationMs: activeTrack.duration?.inMilliseconds ?? 0,
+        queue: exported.items,
+        queueIndex: exported.index,
+        shuffleEnabled: _shuffleEnabled,
+        repeatMode: _repeatMode.name,
+      );
+      if (routed) {
+        final current =
+            state.value ?? ref.read(playerServiceProvider).currentSnapshot;
+        state = AsyncData(
+          current.copyWith(
+            trackId: activeTrack.id,
+            title: activeTrack.title,
+            artist: activeTrack.artist,
+            album: activeTrack.album,
+            thumbnailUrl: activeTrack.thumbnailUrl,
+            sourceUrl: activeTrack.url,
+            status: PlayerStatus.playing,
+            playWhenReady: true,
+            position: Duration.zero,
+            duration: activeTrack.duration,
+            isRemote: true,
+          ),
+        );
+        return;
+      }
+    }
+
+    await _playRemoteTrack(activeTrack);
   }
 
   /// Starts a recommendation shelf without splitting downloaded and remote
@@ -1596,14 +1773,12 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         // The selected URL may take seconds to resolve. Silence the skipped
         // source now, including one that is already playing, rather than
         // letting it sound behind the next song's loading screen.
+        // Keep `_remoteSelectionPauseRequestId` armed until the replacement
+        // source activates (`_clearPendingRemoteSnapshot`, explicit `pause()`,
+        // or a newer play request) so asynchronous `paused` callbacks from the
+        // outgoing track never leak a paused/hybrid snapshot.
         _remoteSelectionPauseRequestId = requestId;
-        try {
-          await service.pause();
-        } finally {
-          if (_remoteSelectionPauseRequestId == requestId) {
-            _remoteSelectionPauseRequestId = null;
-          }
-        }
+        await service.pause();
         if (!_isCurrentPlayRequest(requestId)) return;
       }
       await _syncNativePlaybackOptions();
@@ -2219,6 +2394,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   void _clearPendingRemoteSnapshot(int requestId) {
     if (_isCurrentPlayRequest(requestId)) {
       _pendingRemoteSnapshot = null;
+      if (_remoteSelectionPauseRequestId == requestId) {
+        _remoteSelectionPauseRequestId = null;
+      }
       _remoteRetry.clearTerminalFailure();
       final hadFallbackNotice = _remoteRetry.noticeBelongsTo(requestId);
       _clearRemoteFallbackNotice(requestId);
@@ -2886,7 +3064,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     }
     final current = _playingRemoteTrack;
     return current != null &&
-        _remoteTrackIdentity(current) == _remoteTrackIdentity(track);
+        (_remoteTrackIdentity(current) == _remoteTrackIdentity(track) ||
+            _sameLogicalRemoteTrack(current, track));
   }
 
   void _replaceCurrentRemoteTrack(TrackInfo track) {
@@ -2894,7 +3073,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       return;
     }
     final current = _queue[_queueIndex].remote;
-    if (current == null || current.url != track.url) {
+    if (current == null ||
+        (current.url != track.url &&
+            !_sameLogicalRemoteTrack(current, track))) {
       return;
     }
     final next = List<_QueueItem>.of(_queue);
@@ -3061,6 +3242,61 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     if (_queue.any((item) => item.remote != null)) _useNativeLocalQueue = false;
     _resetShuffleHistory();
     _publishPlaybackQueue();
+
+    // Si este dispositivo actúa como mando remoto (o tiene "Reproducir siempre
+    // en la PC" activo) y la pista descargada corresponde a una canción de
+    // catálogo, enviamos la selección + cola directamente al altavoz remoto y
+    // silenciamos el motor local para que jamás suene una canción fantasma en
+    // segundo plano.
+    final sync = InutilPlaybackSyncService.instance;
+    final shouldSendDirectlyToRemote =
+        !sync.isPlaybackRouteSuppressed &&
+        (!sync.isCurrentDeviceActive ||
+            (!InutilPlaybackSyncService.isDesktopHost &&
+                sync.autoPlayOnPc &&
+                sync.hasConnectTarget));
+    if (shouldSendDirectlyToRemote) {
+      final remoteTrack =
+          _queue[_queueIndex].remote ?? _catalogTrackForDownload(track);
+      if (remoteTrack != null && remoteTrack.id.trim().isNotEmpty) {
+        final exported = exportCompactRemoteQueue();
+        final routed = await sync.playTrackOnPeer(
+          trackId: remoteTrack.id,
+          title: remoteTrack.title,
+          artist: remoteTrack.artist,
+          album: remoteTrack.album,
+          thumbnailUrl: remoteTrack.thumbnailUrl,
+          positionMs: 0,
+          durationMs: remoteTrack.duration?.inMilliseconds ?? 0,
+          queue: exported.items,
+          queueIndex: exported.index,
+          shuffleEnabled: _shuffleEnabled,
+          repeatMode: _repeatMode.name,
+        );
+        if (routed) {
+          _userPaused = true;
+          _releasePlaybackIntent();
+          unawaited(service.pause());
+          final current = state.value ?? service.currentSnapshot;
+          state = AsyncData(
+            current.copyWith(
+              trackId: remoteTrack.id,
+              title: remoteTrack.title,
+              artist: remoteTrack.artist,
+              album: remoteTrack.album,
+              thumbnailUrl: remoteTrack.thumbnailUrl,
+              sourceUrl: remoteTrack.url,
+              status: PlayerStatus.playing,
+              playWhenReady: true,
+              position: Duration.zero,
+              duration: remoteTrack.duration,
+              isRemote: true,
+            ),
+          );
+          return;
+        }
+      }
+    }
 
     await _playQueueItem(_queue[_queueIndex]);
     unawaited(
@@ -3641,19 +3877,26 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> pause({bool notifyPeer = true}) async {
     final sync = InutilPlaybackSyncService.instance;
-    if (notifyPeer &&
-        !InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
-      unawaited(sync.sendRemoteControlCommand(commandType: 'pause'));
-      final current = state.value;
-      if (current != null) {
-        state = AsyncData(
-          current.copyWith(status: PlayerStatus.paused, playWhenReady: false),
-        );
+    final service = ref.read(playerServiceProvider);
+    if (!sync.isCurrentDeviceActive) {
+      // Asegurar que el motor local esté siempre silenciado en modo remoto.
+      _userPaused = true;
+      _releasePlaybackIntent();
+      if (_awaitingPlayback || _changingLocalTrack) {
+        _cancelPendingPlaybackForPause();
+      }
+      unawaited(service.pause());
+      if (notifyPeer) {
+        unawaited(sync.sendRemoteControlCommand(commandType: 'pause'));
+        final current = state.value;
+        if (current != null) {
+          state = AsyncData(
+            current.copyWith(status: PlayerStatus.paused, playWhenReady: false),
+          );
+        }
       }
       return;
     }
-    final service = ref.read(playerServiceProvider);
     final current = state.value ?? service.currentSnapshot;
     final pendingRemote = _pendingRemoteSnapshot;
     final pendingSourceActivated =
@@ -3665,6 +3908,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         (pendingRemote != null && !pendingSourceActivated) ||
         _changingLocalTrack;
     _userPaused = true;
+    _remoteSelectionPauseRequestId = null;
     _releasePlaybackIntent();
     _resetQueueNavigation();
     if (pending) _cancelPendingPlaybackForPause();
@@ -3682,8 +3926,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> resume() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       unawaited(sync.sendRemoteControlCommand(commandType: 'play'));
       final current = state.value;
       if (current != null) {
@@ -3724,8 +3967,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> togglePlayPause() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       final isRemotePlaying = sync.remoteSession?.isPlaying ?? false;
       unawaited(
         sync.sendRemoteControlCommand(
@@ -3756,8 +3998,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> playPrevious() async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       unawaited(sync.sendRemoteControlCommand(commandType: 'previous'));
       return;
     }
@@ -3822,15 +4063,14 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     bool fromRemoteSpeaker = false,
   }) {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       if (automatic && !fromRemoteSpeaker) {
         // En modo control remoto, el avance disparado por el reproductor local
         // (pausado a propósito) no significa nada: se ignora.
         return Future.value();
       }
       if (!fromRemoteSpeaker) {
-        // 'next' pulsado por el usuario: la PC adelanta lo que tenga en su cola.
+        // 'next' pulsado por el usuario: el altavoz remoto adelanta su cola.
         return sync.sendRemoteControlCommand(commandType: 'next');
       }
       // El altavoz terminó su canción; la cola real vive en el mando, que es
@@ -3991,6 +4231,25 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   /// Inserts [track] right after the currently playing item in the active queue,
   /// or starts playing it immediately if nothing is queued yet.
   Future<void> enqueueRemoteNext(TrackInfo track) async {
+    final sync = InutilPlaybackSyncService.instance;
+    if (!sync.isCurrentDeviceActive) {
+      unawaited(
+        sync.sendRemoteControlCommand(
+          commandType: 'addToQueue',
+          param: <String, dynamic>{
+            'id': track.id,
+            'title': track.title,
+            'artist': track.artist,
+            if (track.album != null) 'album': track.album,
+            if (track.thumbnailUrl != null) 'thumbnailUrl': track.thumbnailUrl,
+            if (track.duration != null)
+              'durationMs': track.duration!.inMilliseconds,
+            'url': track.url,
+          },
+        ),
+      );
+      return;
+    }
     if (_queue.isEmpty || _queueIndex < 0) {
       await playRemote(track, queue: [track]);
       return;
@@ -4033,8 +4292,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   Future<void> seek(Duration position) async {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       unawaited(
         sync.sendRemoteControlCommand(
           commandType: 'seek',
@@ -4079,15 +4337,42 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> setVolume(double volume) async {
-    await ref.read(playerServiceProvider).setVolume(volume);
+    final clamped = volume.clamp(0.0, 1.0);
+    final sync = InutilPlaybackSyncService.instance;
+    if (!sync.isCurrentDeviceActive) {
+      unawaited(
+        sync.sendRemoteControlCommand(commandType: 'setVolume', param: clamped),
+      );
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(current.copyWith(volume: clamped));
+      }
+      return;
+    }
+    await ref.read(playerServiceProvider).setVolume(clamped);
   }
 
   void toggleShuffle() {
     setShuffleEnabled(!_shuffleEnabled);
   }
 
-  void setShuffleEnabled(bool enabled) {
+  void setShuffleEnabled(bool enabled, {bool fromRemoteCommand = false}) {
     if (isLiveQueueActive && enabled) return;
+    final sync = InutilPlaybackSyncService.instance;
+    if (!fromRemoteCommand && !sync.isCurrentDeviceActive) {
+      _shuffleEnabled = enabled;
+      unawaited(
+        sync.sendRemoteControlCommand(
+          commandType: 'setShuffle',
+          param: enabled,
+        ),
+      );
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(current.copyWith(shuffleEnabled: enabled));
+      }
+      return;
+    }
     if (_shuffleEnabled == enabled) {
       return;
     }
@@ -4144,8 +4429,26 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     return playlists.toggleFavoriteRemote(remote);
   }
 
-  void setRepeatMode(PlaybackRepeatMode mode) {
+  void setRepeatMode(
+    PlaybackRepeatMode mode, {
+    bool fromRemoteCommand = false,
+  }) {
     if (isLiveQueueActive && mode != PlaybackRepeatMode.off) return;
+    final sync = InutilPlaybackSyncService.instance;
+    if (!fromRemoteCommand && !sync.isCurrentDeviceActive) {
+      _repeatMode = mode;
+      unawaited(
+        sync.sendRemoteControlCommand(
+          commandType: 'setRepeat',
+          param: mode.name,
+        ),
+      );
+      final current = state.value;
+      if (current != null) {
+        state = AsyncData(current.copyWith(repeatMode: mode));
+      }
+      return;
+    }
     if (_repeatMode == mode) {
       return;
     }
@@ -4161,6 +4464,58 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _QueueItem item, {
     bool automaticTransition = false,
   }) async {
+    final sync = InutilPlaybackSyncService.instance;
+    final shouldSendDirectlyToRemote =
+        !sync.isPlaybackRouteSuppressed &&
+        (!sync.isCurrentDeviceActive ||
+            (!InutilPlaybackSyncService.isDesktopHost &&
+                sync.autoPlayOnPc &&
+                sync.hasConnectTarget));
+    if (shouldSendDirectlyToRemote) {
+      final remoteTrack =
+          item.remote ??
+          (item.local != null ? _catalogTrackForDownload(item.local!) : null);
+      if (remoteTrack != null && remoteTrack.id.trim().isNotEmpty) {
+        final exported = exportCompactRemoteQueue();
+        final routed = await sync.playTrackOnPeer(
+          trackId: remoteTrack.id,
+          title: remoteTrack.title,
+          artist: remoteTrack.artist,
+          album: remoteTrack.album,
+          thumbnailUrl: remoteTrack.thumbnailUrl,
+          positionMs: 0,
+          durationMs: remoteTrack.duration?.inMilliseconds ?? 0,
+          queue: exported.items,
+          queueIndex: exported.index,
+          shuffleEnabled: _shuffleEnabled,
+          repeatMode: _repeatMode.name,
+        );
+        if (routed) {
+          final service = ref.read(playerServiceProvider);
+          _userPaused = true;
+          _releasePlaybackIntent();
+          unawaited(service.pause());
+          final current = state.value ?? service.currentSnapshot;
+          state = AsyncData(
+            current.copyWith(
+              trackId: remoteTrack.id,
+              title: remoteTrack.title,
+              artist: remoteTrack.artist,
+              album: remoteTrack.album,
+              thumbnailUrl: remoteTrack.thumbnailUrl,
+              sourceUrl: remoteTrack.url,
+              status: PlayerStatus.playing,
+              playWhenReady: true,
+              position: Duration.zero,
+              duration: remoteTrack.duration,
+              isRemote: true,
+            ),
+          );
+          return;
+        }
+      }
+    }
+
     final local = item.local;
     if (local != null) {
       final catalog = item.remote ?? _catalogTrackForDownload(local);
@@ -4541,13 +4896,30 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   PlayerSnapshot _decorateSnapshot(PlayerSnapshot snapshot) {
     final remote = _playingRemoteTrack;
+    final cachedRemote =
+        remote != null && _isCachedRemoteSnapshot(snapshot, remote);
+    final pending = _pendingRemoteSnapshot;
+    if (pending != null &&
+        !cachedRemote &&
+        !_snapshotMatchesPending(snapshot, pending)) {
+      return pending.copyWith(
+        playWhenReady: _playWhenReady,
+        volume: snapshot.volume,
+        // Never borrow artwork from the outgoing snapshot while the new
+        // remote item is loading; doing so leaves the player showing the
+        // previous cover during a mixed local/stream transition.
+        thumbnailUrl: pending.thumbnailUrl ?? snapshot.thumbnailUrl,
+        shuffleEnabled: _shuffleEnabled,
+        repeatMode: _repeatMode,
+      );
+    }
+
     if (remote != null) {
-      final cachedRemote = _isCachedRemoteSnapshot(snapshot, remote);
       snapshot = snapshot.copyWith(
         title: remote.title.trim().isEmpty ? snapshot.title : remote.title,
         artist: remote.artist.trim().isEmpty ? snapshot.artist : remote.artist,
         album: remote.album ?? snapshot.album,
-        trackId: cachedRemote
+        trackId: cachedRemote || (remote.id.isNotEmpty && snapshot.isRemote)
             ? (remote.id.isEmpty ? remote.url : remote.id)
             : snapshot.trackId,
         sourceUrl: remote.url,
@@ -4576,20 +4948,6 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         // path; the previous source's recovery notice is no longer relevant.
         _clearRemoteFallbackNotice(_playRequestId);
       }
-    }
-
-    final pending = _pendingRemoteSnapshot;
-    if (pending != null && !_snapshotMatchesPending(snapshot, pending)) {
-      return pending.copyWith(
-        playWhenReady: _playWhenReady,
-        volume: snapshot.volume,
-        // Never borrow artwork from the outgoing snapshot while the new
-        // remote item is loading; doing so leaves the player showing the
-        // previous cover during a mixed local/stream transition.
-        thumbnailUrl: pending.thumbnailUrl ?? snapshot.thumbnailUrl,
-        shuffleEnabled: _shuffleEnabled,
-        repeatMode: _repeatMode,
-      );
     }
 
     return snapshot.copyWith(
@@ -4744,10 +5102,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   void _maybeHandleCompletion(PlayerSnapshot snapshot) {
     final sync = InutilPlaybackSyncService.instance;
-    if (!InutilPlaybackSyncService.isDesktopHost &&
-        !sync.isCurrentDeviceActive) {
+    if (!sync.isCurrentDeviceActive) {
       // En modo control remoto, no procesamos completaciones de reproducción locales:
-      // el audio se reproduce y finaliza exclusivamente en el altavoz activo (PC).
+      // el audio se reproduce y finaliza exclusivamente en el altavoz activo.
       return;
     }
     if (_explicitlyStopped ||

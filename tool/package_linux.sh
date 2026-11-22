@@ -28,4 +28,4 @@ tar -czf "$output" -C "$bundle" \
   THIRD_PARTY_NOTICES.md
 
 echo "Paquete OTA: $output ($(du -h "$output" | cut -f1))"
-tar -tzf "$output" | head -5
+tar -tzf "$output" | head -5 || true
