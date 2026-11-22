@@ -70,11 +70,14 @@ class VideoPreviewResolver {
   final Map<String, Future<VideoPreviewClip?>> _trackInFlight = {};
   final Map<String, Future<List<VideoPreviewClip>>> _clipsInFlight = {};
 
-  /// Resolves the best official music-video preview clip for a single song.
+  /// Resolves the official music-video preview clip for a single song.
+  ///
+  /// Only returns a clip when BOTH title and artist match the requested song so
+  /// a track without its own video never displays another song's or artist's
+  /// music video as its Canvas background.
   Future<VideoPreviewClip?> resolveForTrack({
     required String title,
     required String artist,
-    bool allowBroadFallback = false,
   }) {
     final cleanTitle = cleanVisualTrackTitle(title);
     final cleanArtist = primaryVisualArtist(artist);
@@ -82,7 +85,7 @@ class VideoPreviewResolver {
       return Future.value(null);
     }
     final key =
-        '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}|${allowBroadFallback ? 1 : 0}';
+        '${normalVisualText(cleanArtist)}|${normalVisualText(cleanTitle)}';
     final now = _clock();
     final cached = _trackCache[key];
     if (cached != null && cached.expiresAt.isAfter(now)) {
@@ -95,46 +98,14 @@ class VideoPreviewResolver {
           '$cleanArtist $cleanTitle',
           limit: 6,
         );
-        // 1. Exact title + artist match.
+        // Exact title + artist match only. Tracks without a verified match fall
+        // back to the full-bleed cinematic animated cover instead of showing a
+        // wrong song's video.
         for (final clip in clips) {
           if (sameVisualTitle(cleanTitle, clip.title) &&
               sameVisualArtist(artist, clip.artist)) {
             resolved = clip;
             break;
-          }
-        }
-        // 2. Same artist fallback (official video preview for artist canvas).
-        resolved ??= clips.cast<VideoPreviewClip?>().firstWhere(
-          (clip) => clip != null && sameVisualArtist(artist, clip.artist),
-          orElse: () => null,
-        );
-        if (resolved == null) {
-          final artistClips = await resolveClipsForArtist(artistName: artist);
-          if (artistClips.isNotEmpty) {
-            resolved = artistClips.first;
-          }
-        }
-        // 3. Broad fallback for indie / YouTube-only tracks whose artist is not
-        // in iTunes Music Videos: search by track title, then significant title
-        // keyword so Spotify Canvas still activates smoothly.
-        if (resolved == null && allowBroadFallback) {
-          final titleClips = await _searchMusicVideos(cleanTitle, limit: 6);
-          if (titleClips.isNotEmpty) {
-            resolved = titleClips.first;
-          } else {
-            final words = cleanTitle
-                .split(RegExp(r'[\s\-_,.;:!?()]+'))
-                .map((w) => w.trim())
-                .where((w) => w.length >= 5)
-                .toList(growable: false);
-            words.sort((a, b) => b.length.compareTo(a.length));
-            for (final keyword in words.take(2)) {
-              final kwClips = await _searchMusicVideos(keyword, limit: 4);
-              if (kwClips.isNotEmpty) {
-                resolved = kwClips.first;
-                break;
-              }
-            }
           }
         }
       } catch (_) {

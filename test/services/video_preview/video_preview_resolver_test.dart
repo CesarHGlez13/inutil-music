@@ -136,5 +136,34 @@ void main() {
         isEmpty,
       );
     });
+
+    test(
+      'resolveForTrack returns null instead of using another song by the same artist or unrelated title match',
+      () async {
+        final resolver = VideoPreviewResolver(
+          fetchJson: (_) async => {
+            'results': [
+              {
+                'trackName': 'Adiós Amor',
+                'artistName': 'Christian Nodal',
+                'previewUrl': 'https://video-ssl.itunes.apple.com/other.m4v',
+              },
+              {
+                'trackName': 'Perdonarte',
+                'artistName': 'Otro Artista Ajeno',
+                'previewUrl': 'https://video-ssl.itunes.apple.com/wrong.m4v',
+              },
+            ],
+          },
+        );
+
+        final resolved = await resolver.resolveForTrack(
+          title: 'Perdonarte ¿Para Qué?',
+          artist: 'Christian Nodal',
+        );
+
+        expect(resolved, isNull);
+      },
+    );
   });
 }

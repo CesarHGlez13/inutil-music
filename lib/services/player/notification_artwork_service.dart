@@ -59,8 +59,9 @@ class NotificationArtworkService {
            deviceAudioArtworkLoader ?? _loadDeviceAudioArtwork,
        _sourceFileLookup = sourceFileLookup ?? _defaultSourceFileLookup;
 
-  static final NotificationArtworkService instance =
-      NotificationArtworkService();
+  static final NotificationArtworkService instance = NotificationArtworkService(
+    outputSize: 512,
+  );
 
   static const _cacheVersion = 'center-crop-v2';
   static const _jpegQuality = 94;

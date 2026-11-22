@@ -4144,7 +4144,7 @@ class _LyricsCanvasBackground extends ConsumerWidget {
 
     if (artworkSource?.trim().isNotEmpty == true) {
       return Opacity(
-        opacity: 0.42,
+        opacity: 0.46,
         child: AnimatedArtworkMotion(
           key: ValueKey('lyrics-canvas-artwork-$visualIdentity'),
           enabled: !disableAnimations,
@@ -4152,6 +4152,9 @@ class _LyricsCanvasBackground extends ConsumerWidget {
           identity: visualIdentity,
           borderRadius: BorderRadius.zero,
           depthEnabled: false,
+          motionScale: 1.85,
+          zoomDuration: const Duration(seconds: 18),
+          panDuration: const Duration(seconds: 22),
           child: SourceImage(
             source: artworkSource,
             fallbackSource: artworkFallback,

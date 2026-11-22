@@ -10,20 +10,59 @@ import '../player/notification_artwork_service.dart';
 import '../player/player_service.dart';
 import 'desktop_media_session.dart';
 
+const androidAutoActionToggleFavorite = 'inutil.toggle_favorite';
+const androidAutoActionToggleShuffle = 'inutil.toggle_shuffle';
+const androidAutoActionCycleRepeat = 'inutil.cycle_repeat';
+
 @visibleForTesting
-PlaybackState buildAudioServicePlaybackState(DesktopMediaSessionState state) {
+PlaybackState buildAudioServicePlaybackState(
+  DesktopMediaSessionState state, {
+  bool includeExtendedControls = false,
+}) {
   final snapshot = state.snapshot;
   final wantsToPlay = snapshot.wantsToPlay;
-  final controls = <MediaControl>[
+  final transportControls = <MediaControl>[
     if (state.hasPrevious) MediaControl.skipToPrevious,
     wantsToPlay ? MediaControl.pause : MediaControl.play,
     if (state.hasNext) MediaControl.skipToNext,
   ];
   final compactActions = List<int>.generate(
-    controls.length.clamp(0, 3),
+    transportControls.length.clamp(0, 3),
     (index) => index,
     growable: false,
   );
+  final controls = <MediaControl>[
+    ...transportControls,
+    if (includeExtendedControls) ...[
+      MediaControl.custom(
+        androidIcon: state.isFavorite
+            ? 'drawable/ic_aa_favorite_filled'
+            : 'drawable/ic_aa_favorite_border',
+        label: state.isFavorite ? 'Quitar de favoritos' : 'Favorito',
+        name: androidAutoActionToggleFavorite,
+      ),
+      MediaControl.custom(
+        androidIcon: snapshot.shuffleEnabled
+            ? 'drawable/ic_aa_shuffle_on'
+            : 'drawable/ic_aa_shuffle_off',
+        label: snapshot.shuffleEnabled ? 'Desactivar aleatorio' : 'Aleatorio',
+        name: androidAutoActionToggleShuffle,
+      ),
+      MediaControl.custom(
+        androidIcon: switch (snapshot.repeatMode) {
+          PlaybackRepeatMode.off => 'drawable/ic_aa_repeat_off',
+          PlaybackRepeatMode.all => 'drawable/ic_aa_repeat_all',
+          PlaybackRepeatMode.one => 'drawable/ic_aa_repeat_one',
+        },
+        label: switch (snapshot.repeatMode) {
+          PlaybackRepeatMode.off => 'Repetir',
+          PlaybackRepeatMode.all => 'Repitiendo lista',
+          PlaybackRepeatMode.one => 'Repitiendo canción',
+        },
+        name: androidAutoActionCycleRepeat,
+      ),
+    ],
+  ];
 
   return PlaybackState(
     controls: controls,
@@ -32,6 +71,11 @@ PlaybackState buildAudioServicePlaybackState(DesktopMediaSessionState state) {
       MediaAction.seek,
       MediaAction.seekForward,
       MediaAction.seekBackward,
+      MediaAction.skipToQueueItem,
+      MediaAction.playFromMediaId,
+      MediaAction.playFromSearch,
+      MediaAction.setShuffleMode,
+      MediaAction.setRepeatMode,
     },
     processingState: switch (snapshot.status) {
       PlayerStatus.idle => AudioProcessingState.idle,
@@ -115,6 +159,31 @@ class AudioServiceMediaSessionCallbackBridge {
 
   Future<void> setRepeatMode(PlaybackRepeatMode mode) =>
       _callbacks?.setRepeatMode(mode) ?? Future<void>.value();
+
+  Future<void> toggleFavorite() =>
+      _callbacks?.toggleFavorite?.call() ?? Future<void>.value();
+
+  Future<void> toggleShuffle() =>
+      _callbacks?.toggleShuffle?.call() ?? Future<void>.value();
+
+  Future<void> cycleRepeatMode() =>
+      _callbacks?.cycleRepeatMode?.call() ?? Future<void>.value();
+
+  Future<List<DesktopMediaBrowseItem>> getBrowseChildren(
+    String parentMediaId,
+  ) =>
+      _callbacks?.getBrowseChildren?.call(parentMediaId) ??
+      Future<List<DesktopMediaBrowseItem>>.value(const []);
+
+  Future<void> playFromMediaId(String mediaId) =>
+      _callbacks?.playFromMediaId?.call(mediaId) ?? Future<void>.value();
+
+  Future<List<DesktopMediaBrowseItem>> searchMedia(String query) =>
+      _callbacks?.searchMedia?.call(query) ??
+      Future<List<DesktopMediaBrowseItem>>.value(const []);
+
+  Future<void> playFromSearch(String query) =>
+      _callbacks?.playFromSearch?.call(query) ?? Future<void>.value();
 }
 
 class AudioServiceDesktopMediaSession implements DesktopMediaSession {
@@ -132,6 +201,7 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
   bool? _lastWantsToPlay;
   bool? _lastShuffleEnabled;
   PlaybackRepeatMode? _lastRepeatMode;
+  bool? _lastIsFavorite;
   DateTime? _lastPositionUpdate;
 
   static Future<void> ensureInitialized() async {
@@ -171,8 +241,16 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
           // Playback intent keeps automatic loads/retries active. A genuine
           // pause must still release foreground priority and its wake lock.
           androidStopForegroundOnPause: true,
-          artDownscaleWidth: 320,
-          artDownscaleHeight: 320,
+          artDownscaleWidth: 512,
+          artDownscaleHeight: 512,
+          androidBrowsableRootExtras: <String, dynamic>{
+            AndroidContentStyle.supportedKey: true,
+            AndroidContentStyle.browsableHintKey:
+                AndroidContentStyle.gridItemHintValue,
+            AndroidContentStyle.playableHintKey:
+                AndroidContentStyle.listItemHintValue,
+            'android.media.browse.SEARCH_SUPPORTED': true,
+          },
         ),
       );
       return handler;
@@ -218,7 +296,8 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
         snapshot.status != _lastStatus ||
         snapshot.wantsToPlay != _lastWantsToPlay ||
         snapshot.shuffleEnabled != _lastShuffleEnabled ||
-        snapshot.repeatMode != _lastRepeatMode;
+        snapshot.repeatMode != _lastRepeatMode ||
+        state.isFavorite != _lastIsFavorite;
 
     if (requiresImmediateSync || _positionIsDue) {
       _positionTimer?.cancel();
@@ -297,7 +376,12 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
         );
       }
 
-      handler.playbackState.add(buildAudioServicePlaybackState(state));
+      handler.playbackState.add(
+        buildAudioServicePlaybackState(
+          state,
+          includeExtendedControls: AppPlatform.isAndroid,
+        ),
+      );
       _lastPositionUpdate = DateTime.now();
       _remember(state);
     } catch (error) {
@@ -313,6 +397,7 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
     _lastWantsToPlay = snapshot.wantsToPlay;
     _lastShuffleEnabled = snapshot.shuffleEnabled;
     _lastRepeatMode = snapshot.repeatMode;
+    _lastIsFavorite = state.isFavorite;
   }
 
   bool _hasTrack(PlayerSnapshot snapshot) =>
@@ -426,4 +511,111 @@ class _DesktopAudioHandler extends BaseAudioHandler with SeekHandler {
         AudioServiceRepeatMode.all ||
         AudioServiceRepeatMode.group => PlaybackRepeatMode.all,
       });
+
+  @override
+  Future<List<MediaItem>> getChildren(
+    String parentMediaId, [
+    Map<String, dynamic>? options,
+  ]) async {
+    try {
+      final items = await _callbacks.getBrowseChildren(parentMediaId);
+      return items.map(_toBrowseMediaItem).toList(growable: false);
+    } catch (error) {
+      debugPrint('Android Auto getChildren($parentMediaId) failed: $error');
+      return const <MediaItem>[];
+    }
+  }
+
+  @override
+  Future<void> playFromMediaId(
+    String mediaId, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    try {
+      await _callbacks.playFromMediaId(mediaId);
+    } catch (error) {
+      debugPrint('Android Auto playFromMediaId($mediaId) failed: $error');
+    }
+  }
+
+  @override
+  Future<List<MediaItem>> search(
+    String query, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    try {
+      final items = await _callbacks.searchMedia(query);
+      return items.map(_toBrowseMediaItem).toList(growable: false);
+    } catch (error) {
+      debugPrint('Android Auto search($query) failed: $error');
+      return const <MediaItem>[];
+    }
+  }
+
+  @override
+  Future<void> playFromSearch(
+    String query, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    try {
+      await _callbacks.playFromSearch(query);
+    } catch (error) {
+      debugPrint('Android Auto playFromSearch($query) failed: $error');
+    }
+  }
+
+  @override
+  Future<dynamic> customAction(
+    String name, [
+    Map<String, dynamic>? extras,
+  ]) async {
+    switch (name) {
+      case androidAutoActionToggleFavorite:
+        await _callbacks.toggleFavorite();
+        return null;
+      case androidAutoActionToggleShuffle:
+        await _callbacks.toggleShuffle();
+        return null;
+      case androidAutoActionCycleRepeat:
+        await _callbacks.cycleRepeatMode();
+        return null;
+      default:
+        return super.customAction(name, extras);
+    }
+  }
+
+  MediaItem _toBrowseMediaItem(DesktopMediaBrowseItem item) => MediaItem(
+    id: item.id,
+    title: item.title,
+    artist: item.subtitle,
+    album: item.album,
+    playable: item.playable,
+    duration: item.duration,
+    artUri: _browseArtUri(item.thumbnailUrl),
+    extras: item.extras,
+  );
+
+  Uri? _browseArtUri(String? source) {
+    final value = source?.trim();
+    if (value == null || value.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(value);
+    if (uri != null &&
+        (uri.scheme == 'https' ||
+            uri.scheme == 'http' ||
+            uri.scheme == 'android.resource')) {
+      return uri;
+    }
+    if (AppPlatform.isMobile) {
+      final notificationUri = NotificationArtworkService.instance.uriFor(value);
+      if (notificationUri != null) {
+        return notificationUri;
+      }
+    }
+    if (uri != null && uri.hasScheme) {
+      return uri;
+    }
+    return null;
+  }
 }

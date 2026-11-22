@@ -36,6 +36,13 @@
         <meta-data
             android:name="inutil_music.notification_icon"
             android:resource="@drawable/ic_stat_inutil_music" />
+        <!-- Declara Inútil Music como aplicación multimedia compatible con Android Auto. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+        <meta-data
+            android:name="com.google.android.gms.car.notification.SmallIcon"
+            android:resource="@drawable/ic_stat_inutil_music" />
         <receiver
             android:name=".InutilMusicWidget"
             android:exported="true">

@@ -1,7 +1,162 @@
 part of 'music_providers.dart';
 
 extension _PlayerAudioQualityUpgrade on PlayerController {
+  /// Resolves High Quality audio (JioSaavn 320 kbps) in parallel with YouTube
+  /// BEFORE playback starts so the track begins at 0:00 directly in 320 kbps
+  /// without a mid-song deck swap or micro-cut.
+  ///
+  /// Returns both the chosen `playable` track (320 kbps when available within
+  /// the timeout budget, otherwise YouTube) and the `youtubeFallback` track so
+  /// any unexpected CDN failure can fall back immediately without re-resolving.
+  Future<({TrackInfo playable, TrackInfo youtubeFallback})>
+  _resolveTrackWithPreResolvedHighQuality(
+    TrackInfo baseTrack, {
+    required Future<TrackInfo> Function() resolveYoutube,
+    required bool Function() shouldContinue,
+    Duration? budgetOverride,
+  }) async {
+    final budget =
+        budgetOverride ??
+        _audioSourceRef.read(audioQualityPreResolveTimeoutProvider);
+    if (budget == null || budget <= Duration.zero || _disposed) {
+      final yt = await resolveYoutube();
+      return (playable: yt, youtubeFallback: yt);
+    }
+    final service = _audioSourceRef.read(playerServiceProvider);
+    final policy = _audioSourceRef.read(audioSourcePolicyProvider);
+    final anyHighProfile =
+        policy.jioSaavnEnabled &&
+        (policy.wifiAudioQuality == AudioQualityProfile.high ||
+            (!policy.useSingleProfile &&
+                policy.mobileAudioQuality == AudioQualityProfile.high));
+    if (service is! AudioSourceUpgradePlayer ||
+        !anyHighProfile ||
+        _audioUpgradeUnnecessary(baseTrack)) {
+      final yt = await resolveYoutube();
+      return (playable: yt, youtubeFallback: yt);
+    }
+
+    final startedAt = DateTime.now();
+    // Kick off YouTube immediately so we never add serial latency if JioSaavn
+    // misses or times out.
+    final youtubeFuture = resolveYoutube();
+
+    // Check network eligibility in parallel (instant on desktop / cached).
+    Future<AudioStreamResolution?>? upgradeFuture;
+    final hasKnownDuration =
+        baseTrack.duration != null && baseTrack.duration! > Duration.zero;
+
+    Future<bool> checkAllowed() async {
+      if (_disposed || !shouldContinue()) return false;
+      if (policy.useSingleProfile) {
+        return policy.allowsUpgrade(AudioNetworkKind.wifi);
+      }
+      final monitor = _audioSourceRef.read(audioNetworkMonitorProvider);
+      var kind = monitor.lastKnownKind;
+      if (kind == AudioNetworkKind.unknown) {
+        try {
+          kind = await monitor.current().timeout(
+            const Duration(milliseconds: 250),
+          );
+        } catch (_) {
+          kind = monitor.lastKnownKind;
+        }
+      }
+      return !_disposed && shouldContinue() && policy.allowsUpgrade(kind);
+    }
+
+    final allowedFuture = checkAllowed();
+    if (hasKnownDuration) {
+      upgradeFuture = allowedFuture.then((ok) async {
+        if (!ok || _disposed || !shouldContinue()) return null;
+        try {
+          return await _audioSourceRef.read(audioSourceUpgradeLookupProvider)(
+            baseTrack,
+            currentBitrate: baseTrack.streamBitrate,
+            shouldContinue: () => !_disposed && shouldContinue(),
+          );
+        } catch (_) {
+          return null;
+        }
+      });
+    }
+
+    final yt = await youtubeFuture;
+    if (_disposed || !shouldContinue() || _audioUpgradeUnnecessary(yt)) {
+      return (playable: yt, youtubeFallback: yt);
+    }
+
+    if (upgradeFuture == null) {
+      final allowed = await allowedFuture;
+      if (!allowed ||
+          _disposed ||
+          !shouldContinue() ||
+          yt.duration == null ||
+          yt.duration! <= Duration.zero) {
+        return (playable: yt, youtubeFallback: yt);
+      }
+      upgradeFuture = () async {
+        try {
+          return await _audioSourceRef.read(audioSourceUpgradeLookupProvider)(
+            yt,
+            currentBitrate: yt.streamBitrate,
+            shouldContinue: () => !_disposed && shouldContinue(),
+          );
+        } catch (_) {
+          return null;
+        }
+      }();
+    }
+
+    final elapsed = DateTime.now().difference(startedAt);
+    final remaining = budget - elapsed;
+    AudioStreamResolution? candidate;
+    try {
+      candidate = remaining > Duration.zero
+          ? await upgradeFuture.timeout(remaining, onTimeout: () => null)
+          : await upgradeFuture.timeout(
+              const Duration(milliseconds: 1),
+              onTimeout: () => null,
+            );
+    } catch (_) {
+      candidate = null;
+    }
+
+    if (_disposed ||
+        !shouldContinue() ||
+        candidate == null ||
+        !candidate.isUsable ||
+        (candidate.bitrate ?? 0) <= (yt.streamBitrate ?? 0)) {
+      return (playable: yt, youtubeFallback: yt);
+    }
+
+    final improved = _mergeTrackInfo(
+      yt,
+      TrackInfo(
+        id: '',
+        title: '',
+        artist: '',
+        url: '',
+        streamUrl: candidate.streamUrl,
+        streamExtension: candidate.streamExtension,
+        streamMimeType: candidate.streamMimeType,
+        streamSource: candidate.source.name,
+        streamFormatId: candidate.formatId,
+        streamCodec: candidate.codec,
+        streamBitrate: candidate.bitrate,
+        streamSampleRate: candidate.sampleRate,
+        streamChannels: candidate.channels,
+        streamClientProfileKey: '',
+        httpHeaders: candidate.httpHeaders ?? const {},
+      ),
+    );
+    return (playable: improved, youtubeFallback: yt);
+  }
+
   void _maybeStartAudioQualityUpgrade(PlayerSnapshot snapshot) {
+    if (!_audioSourceRef.read(audioQualityMidPlaybackSwapEnabledProvider)) {
+      return;
+    }
     var track = _playingRemoteTrack;
     final entryId = _currentRemoteQueueEntryId;
     final prepared = _preparedRemoteAudioSources[entryId];

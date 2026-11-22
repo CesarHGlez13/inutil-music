@@ -89,6 +89,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
         ? Duration.zero
         : const Duration(milliseconds: 500);
     final activeCanvasUrl = canvasUrl;
+    final artworkAccentColor = artworkSource?.trim().isNotEmpty == true
+        ? ref.watch(artworkProgressColorProvider(artworkSource)).value
+        : null;
 
     return Stack(
       key: const ValueKey('spotify-fullscreen-canvas-player'),
@@ -97,7 +100,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
         // 1. Crisp animated full-bleed artwork Canvas layer (always present
         // underneath the video so the player NEVER drops to a blurry grey blob
         // while a video loads, when paused before frame 1, or on tracks with no
-        // Canvas/video match).
+        // Canvas/video match). When no exact video Canvas exists, elevate the
+        // Ken Burns motion and overlay a soft color-matched ambient aura so the
+        // expanded cover itself feels alive and 100% faithful to the song.
         Positioned.fill(
           child: ColoredBox(
             color: const Color(0xFF0A0C10),
@@ -121,6 +126,13 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         identity: visualIdentity,
                         borderRadius: BorderRadius.zero,
                         depthEnabled: false,
+                        motionScale: activeCanvasUrl == null ? 1.85 : 1.0,
+                        zoomDuration: activeCanvasUrl == null
+                            ? const Duration(seconds: 18)
+                            : AnimatedArtworkMotion.defaultZoomDuration,
+                        panDuration: activeCanvasUrl == null
+                            ? const Duration(seconds: 22)
+                            : AnimatedArtworkMotion.defaultPanDuration,
                         child: SourceImage(
                           source: artworkSource,
                           fallbackSource: artworkFallbackSource,
@@ -135,6 +147,20 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
             ),
           ),
         ),
+
+        // 1b. Dynamic breathing ambient glow when displaying the expanded cover
+        // without a video Canvas; fades out cleanly once a real Canvas video
+        // takes over.
+        if (activeCanvasUrl == null && artworkSource?.trim().isNotEmpty == true)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: _CanvasArtworkAmbientAura(
+                accentColor: artworkAccentColor ?? const Color(0xFF1DB954),
+                enabled: !disableAnimations,
+                isPlaying: isPlaying,
+              ),
+            ),
+          ),
 
         // 2. Full-bleed edge-to-edge looping muted video Canvas that fades in
         // smoothly over the animated cover once frame 1 is decoded.
@@ -844,6 +870,98 @@ class _SpotifyCircleFavoriteButton extends ConsumerWidget {
             color: isFavorite ? Colors.black : Colors.white,
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Paint-only breathing color aura layered over the expanded full-bleed album
+/// artwork when a song does not have an exact Spotify Canvas / music-video
+/// match. Freezes cleanly when playback is paused.
+class _CanvasArtworkAmbientAura extends StatefulWidget {
+  const _CanvasArtworkAmbientAura({
+    required this.accentColor,
+    required this.enabled,
+    required this.isPlaying,
+  });
+
+  final Color accentColor;
+  final bool enabled;
+  final bool isPlaying;
+
+  @override
+  State<_CanvasArtworkAmbientAura> createState() =>
+      _CanvasArtworkAmbientAuraState();
+}
+
+class _CanvasArtworkAmbientAuraState extends State<_CanvasArtworkAmbientAura>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 12),
+    );
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CanvasArtworkAmbientAura oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.enabled != widget.enabled ||
+        oldWidget.isPlaying != widget.isPlaying) {
+      _syncAnimation();
+    }
+  }
+
+  void _syncAnimation() {
+    if (widget.enabled && widget.isPlaying) {
+      if (!_controller.isAnimating) {
+        _controller.repeat();
+      }
+    } else {
+      if (_controller.isAnimating) {
+        _controller.stop(canceled: false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      key: const ValueKey('canvas-artwork-ambient-aura'),
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final phase = _controller.value * math.pi * 2;
+          final dx = math.sin(phase) * 0.42;
+          final dy = math.cos(phase * 0.5) * 0.28 - 0.18;
+          final pulse = 0.5 + 0.5 * math.sin(phase);
+          final glowAlpha = 0.16 + 0.12 * pulse;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(dx, dy),
+                radius: 1.05,
+                colors: [
+                  widget.accentColor.withValues(alpha: glowAlpha),
+                  widget.accentColor.withValues(alpha: glowAlpha * 0.25),
+                  Colors.transparent,
+                ],
+                stops: const [0.0, 0.48, 1.0],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

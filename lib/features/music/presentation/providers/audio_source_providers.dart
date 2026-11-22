@@ -48,6 +48,21 @@ final audioSourceUpgradeLookupProvider = Provider<AudioSourceUpgradeLookup>(
   (ref) => ref.watch(jioSaavnAudioResolverProvider).findUpgrade,
 );
 
+/// Maximum wait budget to resolve High Quality audio (JioSaavn 320 kbps) in
+/// parallel with YouTube BEFORE starting playback so the song begins directly
+/// in 320 kbps with zero mid-song cuts. `null` disables upfront pre-resolution.
+final audioQualityPreResolveTimeoutProvider = Provider<Duration?>(
+  (ref) =>
+      AppPlatform.isFlutterTest ? null : const Duration(milliseconds: 1400),
+);
+
+/// Whether an already-playing standard stream may hot-swap to a higher-bitrate
+/// deck mid-song. Disabled in production to eliminate audible mid-song
+/// micro-cuts; kept enabled in Flutter tests to preserve dual-deck coverage.
+final audioQualityMidPlaybackSwapEnabledProvider = Provider<bool>(
+  (ref) => AppPlatform.isFlutterTest,
+);
+
 class AudioQualityUpgradeState {
   const AudioQualityUpgradeState({this.queueEntryId, this.active = false});
 

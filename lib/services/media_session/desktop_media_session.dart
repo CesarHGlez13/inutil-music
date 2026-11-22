@@ -6,6 +6,36 @@ typedef DesktopMediaShuffleAction = Future<void> Function(bool enabled);
 typedef DesktopMediaRepeatAction =
     Future<void> Function(PlaybackRepeatMode mode);
 typedef DesktopMediaQueueAction = Future<void> Function(int index);
+typedef DesktopMediaBrowseChildrenLoader =
+    Future<List<DesktopMediaBrowseItem>> Function(String parentMediaId);
+typedef DesktopMediaPlayIdAction = Future<void> Function(String mediaId);
+typedef DesktopMediaSearchLoader =
+    Future<List<DesktopMediaBrowseItem>> Function(String query);
+typedef DesktopMediaPlaySearchAction = Future<void> Function(String query);
+
+/// One browsable folder or playable track exposed to external media browsers
+/// such as Android Auto.
+class DesktopMediaBrowseItem {
+  const DesktopMediaBrowseItem({
+    required this.id,
+    required this.title,
+    required this.playable,
+    this.subtitle,
+    this.album,
+    this.thumbnailUrl,
+    this.duration,
+    this.extras,
+  });
+
+  final String id;
+  final String title;
+  final bool playable;
+  final String? subtitle;
+  final String? album;
+  final String? thumbnailUrl;
+  final Duration? duration;
+  final Map<String, dynamic>? extras;
+}
 
 class DesktopMediaSessionCallbacks {
   const DesktopMediaSessionCallbacks({
@@ -21,6 +51,13 @@ class DesktopMediaSessionCallbacks {
     required this.setShuffleEnabled,
     required this.setRepeatMode,
     required this.playQueueIndex,
+    this.toggleFavorite,
+    this.toggleShuffle,
+    this.cycleRepeatMode,
+    this.getBrowseChildren,
+    this.playFromMediaId,
+    this.searchMedia,
+    this.playFromSearch,
   });
 
   final DesktopMediaAction play;
@@ -40,6 +77,13 @@ class DesktopMediaSessionCallbacks {
   final DesktopMediaShuffleAction setShuffleEnabled;
   final DesktopMediaRepeatAction setRepeatMode;
   final DesktopMediaQueueAction playQueueIndex;
+  final DesktopMediaAction? toggleFavorite;
+  final DesktopMediaAction? toggleShuffle;
+  final DesktopMediaAction? cycleRepeatMode;
+  final DesktopMediaBrowseChildrenLoader? getBrowseChildren;
+  final DesktopMediaPlayIdAction? playFromMediaId;
+  final DesktopMediaSearchLoader? searchMedia;
+  final DesktopMediaPlaySearchAction? playFromSearch;
 }
 
 class DesktopMediaQueueItem {
@@ -87,18 +131,21 @@ class DesktopMediaSessionState {
     required this.snapshot,
     required this.queue,
     required this.currentIndex,
+    this.isFavorite = false,
   }) : _queueFingerprint = null;
 
   DesktopMediaSessionState.withQueue({
     required this.snapshot,
     required DesktopMediaQueue queue,
     required this.currentIndex,
+    this.isFavorite = false,
   }) : queue = queue.items,
        _queueFingerprint = queue.fingerprint;
 
   final PlayerSnapshot snapshot;
   final List<DesktopMediaQueueItem> queue;
   final int currentIndex;
+  final bool isFavorite;
   final int? _queueFingerprint;
 
   String get queueKey =>

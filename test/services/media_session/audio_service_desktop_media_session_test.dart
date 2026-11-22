@@ -159,6 +159,59 @@ void main() {
         expect(state.controls.first.action, MediaAction.play);
       }
     });
+
+    test(
+      'adds Android Auto favorite, shuffle, and repeat custom controls while keeping compact indices',
+      () {
+        final state = buildAudioServicePlaybackState(
+          DesktopMediaSessionState(
+            snapshot: const PlayerSnapshot(
+              status: PlayerStatus.playing,
+              trackId: 'track-1',
+              title: 'Track 1',
+              artist: 'Artist',
+              position: Duration(seconds: 15),
+              duration: Duration(minutes: 3),
+              shuffleEnabled: true,
+              repeatMode: PlaybackRepeatMode.one,
+            ),
+            queue: const [
+              DesktopMediaQueueItem(
+                id: 'track-0',
+                title: 'Track 0',
+                artist: 'Artist',
+              ),
+              DesktopMediaQueueItem(
+                id: 'track-1',
+                title: 'Track 1',
+                artist: 'Artist',
+              ),
+            ],
+            currentIndex: 1,
+            isFavorite: true,
+          ),
+          includeExtendedControls: true,
+        );
+
+        expect(state.androidCompactActionIndices, const [0, 1, 2]);
+        expect(state.controls, hasLength(6));
+        expect(
+          state.controls[3].customAction?.name,
+          androidAutoActionToggleFavorite,
+        );
+        expect(state.controls[3].androidIcon, 'drawable/ic_aa_favorite_filled');
+        expect(
+          state.controls[4].customAction?.name,
+          androidAutoActionToggleShuffle,
+        );
+        expect(state.controls[4].androidIcon, 'drawable/ic_aa_shuffle_on');
+        expect(
+          state.controls[5].customAction?.name,
+          androidAutoActionCycleRepeat,
+        );
+        expect(state.controls[5].androidIcon, 'drawable/ic_aa_repeat_one');
+      },
+    );
   });
 
   group('AudioServiceMediaSessionCallbackBridge', () {

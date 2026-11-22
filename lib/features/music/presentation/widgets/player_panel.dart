@@ -31,6 +31,7 @@ import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../domain/entities/local_track.dart';
 import '../../domain/entities/lyrics_document.dart';
 import '../../domain/entities/track_info.dart';
+import '../providers/artwork_progress_color_provider.dart';
 import '../providers/music_providers.dart';
 import '../providers/audio_source_providers.dart';
 import '../providers/playback_artwork_provider.dart';

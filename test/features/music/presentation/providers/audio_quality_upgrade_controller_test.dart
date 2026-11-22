@@ -793,6 +793,60 @@ void main() {
       },
     );
   }
+
+  test(
+    'pre-resolves 320 kbps JioSaavn before starting playback with zero mid-song swaps',
+    () async {
+      final fixture = _Fixture(
+        preResolveTimeout: const Duration(milliseconds: 1400),
+        midPlaybackSwapEnabled: false,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.ready();
+
+      final track = _track('pre-resolved-hq');
+      final playFuture = fixture.controller.playRemote(track);
+      await _until(() => fixture.lookupRequests.isNotEmpty);
+      fixture.complete(track.id, _upgrade(track.id));
+      await playFuture;
+      await _flush();
+
+      expect(fixture.player.started, hasLength(1));
+      expect(fixture.player.started.single.track.streamSource, 'jioSaavn');
+      expect(fixture.player.started.single.track.streamBitrate, 320000);
+      expect(
+        fixture.player.upgraded,
+        isEmpty,
+        reason: 'Track already started in 320 kbps, so zero mid-song swaps.',
+      );
+    },
+  );
+
+  test(
+    'starts YouTube immediately without mid-song swap when JioSaavn exceeds pre-resolve timeout',
+    () async {
+      final fixture = _Fixture(
+        preResolveTimeout: const Duration(milliseconds: 25),
+        midPlaybackSwapEnabled: false,
+      );
+      addTearDown(fixture.dispose);
+      await fixture.ready();
+
+      final track = _track('pre-resolve-timeout');
+      await fixture.controller.playRemote(track);
+      await _flush();
+
+      expect(fixture.player.started, hasLength(1));
+      expect(fixture.player.started.single.track.streamSource, 'innerTube');
+      // Even if JioSaavn resolves later, mid-song swap stays disabled so there
+      // is never an audible micro-cut mid-track.
+      if (fixture.lookupRequests.isNotEmpty) {
+        fixture.complete(track.id, _upgrade(track.id));
+        await _flush();
+      }
+      expect(fixture.player.upgraded, isEmpty);
+    },
+  );
 }
 
 SettingsState _settings({
@@ -853,6 +907,8 @@ class _Fixture {
     AudioNetworkReader? networkReader,
     DateTime Function()? networkClock,
     List<LocalTrack> libraryTracks = const [],
+    Duration? preResolveTimeout,
+    bool midPlaybackSwapEnabled = true,
   }) : settings = _Settings(settings ?? _settings()),
        player = nativeQueue ? _Player() : _DesktopPlayer() {
     monitor = AudioNetworkMonitor(
@@ -863,6 +919,12 @@ class _Fixture {
     container = ProviderContainer(
       overrides: [
         audioSourceUsesSingleProfileProvider.overrideWithValue(singleProfile),
+        audioQualityPreResolveTimeoutProvider.overrideWithValue(
+          preResolveTimeout,
+        ),
+        audioQualityMidPlaybackSwapEnabledProvider.overrideWithValue(
+          midPlaybackSwapEnabled,
+        ),
         playerControllerProvider.overrideWith(
           () => PlayerController(
             remotePrefetchCoordinator: RemotePrefetchCoordinator(

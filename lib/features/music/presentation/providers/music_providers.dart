@@ -22,6 +22,7 @@ import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../services/player/cast_aware_player_service.dart';
+import 'android_auto_media_browser.dart';
 import 'audio_route_providers.dart';
 import 'audio_source_providers.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -752,6 +753,143 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
     return Duration(milliseconds: milliseconds.toInt());
   }
 
+  final exploreCategoriesById = <String, SearchBrowseCategory>{};
+
+  final mediaBrowser = AndroidAutoMediaBrowser(
+    loadHistory: () => ref.read(databaseServiceProvider).getHistory(),
+    loadPlaylists: () =>
+        ref.read(databaseServiceProvider).getCatalogPlaylists(),
+    loadCatalogPlaylist: (playlistId) =>
+        ref.read(databaseServiceProvider).getCatalogPlaylist(playlistId),
+    loadLocalTracks: () => ref.read(libraryRepositoryProvider).getLocalTracks(),
+    searchSongs: (query, {limit = 15}) =>
+        ref.read(youtubeMusicSearchProvider).searchSongs(query, limit: limit),
+    loadHomeSections: () async {
+      final cached = ref.read(homeRecommendationsProvider).value;
+      final sections = (cached != null && cached.isNotEmpty)
+          ? cached
+          : await ref
+                .read(homeRecommendationsProvider.future)
+                .timeout(
+                  const Duration(milliseconds: 4500),
+                  onTimeout: () => const <HomeRecommendationSection>[],
+                );
+      return sections
+          .map(
+            (section) => AndroidAutoHomeSection(
+              title: section.title,
+              items: section.items
+                  .map<AndroidAutoHomeItem>((item) {
+                    return switch (item) {
+                      HomeRecommendationTrackItem(:final track) =>
+                        AndroidAutoHomeTrack(track),
+                      HomeRecommendationCollectionItem(:final collection) =>
+                        AndroidAutoHomeCollection(
+                          title: collection.title,
+                          browseId: collection.browseId,
+                          subtitle: collection.subtitle,
+                          thumbnailUrl: collection.thumbnailUrl,
+                        ),
+                      HomeRecommendationArtistItem(:final artist) =>
+                        AndroidAutoHomeArtist(
+                          name: artist.name,
+                          thumbnailUrl: artist.thumbnailUrl,
+                        ),
+                    };
+                  })
+                  .toList(growable: false),
+            ),
+          )
+          .toList(growable: false);
+    },
+    loadCollectionTracks: (browseId) => ref
+        .read(homeCollectionTracksProvider(browseId).future)
+        .timeout(
+          const Duration(seconds: 6),
+          onTimeout: () => const <TrackInfo>[],
+        ),
+    loadExploreCategories: () async {
+      final catalog = await ref
+          .read(searchBrowseCatalogProvider.future)
+          .timeout(
+            const Duration(milliseconds: 4000),
+            onTimeout: () => SearchBrowseCatalog(
+              categories: const <SearchBrowseCategory>[],
+              usesLiveYouTubeMusicCategories: false,
+            ),
+          );
+      final artworkCache = ref.read(searchBrowseCategoryArtworkCacheProvider);
+      exploreCategoriesById.clear();
+      return Future.wait(
+        catalog.categories.take(18).map((category) async {
+          exploreCategoriesById[category.id] = category;
+          final artwork = await artworkCache.read(category.id);
+          return AndroidAutoExploreCategory(
+            id: category.id,
+            title: category.title,
+            searchQuery: category.searchQuery,
+            artworkUrl: artwork,
+          );
+        }),
+      );
+    },
+    loadExploreCategoryPage: (autoCategory) async {
+      final category = exploreCategoriesById[autoCategory.id];
+      if (category == null) {
+        return const AndroidAutoExplorePage();
+      }
+      final page = await ref
+          .read(searchBrowseCategoryPageProvider(category).future)
+          .timeout(
+            const Duration(seconds: 6),
+            onTimeout: () => InnerTubeMoodGenrePage(sections: const []),
+          );
+      final collections = <AndroidAutoHomeCollection>[];
+      final tracks = <TrackInfo>[];
+      for (final section in page.sections) {
+        for (final item in section.items) {
+          if (item is InnerTubeHomeCollection) {
+            collections.add(
+              AndroidAutoHomeCollection(
+                title: item.title,
+                browseId: item.browseId,
+                subtitle: item.subtitle,
+                thumbnailUrl: item.thumbnailUrl,
+              ),
+            );
+          } else if (item is InnerTubeHomeSongItem) {
+            tracks.add(trackInfoFromInnerTubeSong(item.song));
+          }
+        }
+      }
+      return AndroidAutoExplorePage(collections: collections, tracks: tracks);
+    },
+    playHistoryTrack: (track, {required fallbackQueue}) => ref
+        .read(playerControllerProvider.notifier)
+        .playFromHistory(track, fallbackQueue: fallbackQueue),
+    playCatalogPlaylistItem:
+        (selected, {required queue, required playlistId}) => ref
+            .read(playerControllerProvider.notifier)
+            .playCatalogPlaylist(
+              selected,
+              queue: queue,
+              playlistId: playlistId,
+            ),
+    playLocalTrack: (track, {required queue}) => ref
+        .read(playerControllerProvider.notifier)
+        .playLocal(track, queue: queue),
+    playRemoteTrack: (track, {queue}) => ref
+        .read(playerControllerProvider.notifier)
+        .playRemote(track, queue: queue),
+    resumePlayback: () => ref.read(playerControllerProvider.notifier).resume(),
+    hasActiveTrack: () {
+      final snapshot = latestSnapshot;
+      return snapshot != null &&
+          ((snapshot.trackId?.isNotEmpty ?? false) ||
+              (snapshot.title?.isNotEmpty ?? false));
+    },
+  );
+
   final callbacks = DesktopMediaSessionCallbacks(
     play: () => ref.read(playerControllerProvider.notifier).resume(),
     pause: () => ref.read(playerControllerProvider.notifier).pause(),
@@ -774,6 +912,19 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
     },
     playQueueIndex: (index) =>
         ref.read(playerControllerProvider.notifier).playQueueIndex(index),
+    toggleFavorite: () async {
+      await ref.read(playerControllerProvider.notifier).toggleCurrentFavorite();
+    },
+    toggleShuffle: () async {
+      ref.read(playerControllerProvider.notifier).toggleShuffle();
+    },
+    cycleRepeatMode: () async {
+      ref.read(playerControllerProvider.notifier).cycleRepeatMode();
+    },
+    getBrowseChildren: mediaBrowser.getChildren,
+    playFromMediaId: mediaBrowser.playFromMediaId,
+    searchMedia: mediaBrowser.search,
+    playFromSearch: mediaBrowser.playFromSearch,
   );
   final binding = DesktopMediaSessionBinding(
     session,
@@ -787,16 +938,32 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
       return;
     }
     final queue = latestQueue;
+    final currentTrackId = snapshot.trackId;
+    var isFavorite = false;
+    if (currentTrackId != null && currentTrackId.isNotEmpty) {
+      try {
+        isFavorite = ref
+            .read(favoriteTrackIdsProvider)
+            .contains(currentTrackId);
+      } catch (_) {
+        isFavorite = false;
+      }
+    }
     unawaited(
       binding.update(
         DesktopMediaSessionState.withQueue(
           snapshot: snapshot,
           queue: sessionQueue,
           currentIndex: queue.currentIndex,
+          isFavorite: isFavorite,
         ),
       ),
     );
   }
+
+  ref.listen<Set<String>>(favoriteTrackIdsProvider, (_, _) {
+    publishState();
+  });
 
   ref.listen<AsyncValue<PlayerSnapshot>>(playerControllerProvider, (_, next) {
     final snapshot = next.value;

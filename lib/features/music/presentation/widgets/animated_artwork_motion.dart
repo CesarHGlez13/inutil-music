@@ -28,6 +28,7 @@ class AnimatedArtworkMotion extends StatefulWidget {
     this.identity,
     this.borderRadius = BorderRadius.zero,
     this.depthEnabled = true,
+    this.motionScale = 1.0,
     this.zoomDuration = defaultZoomDuration,
     this.panDuration = defaultPanDuration,
     this.depthDuration = defaultDepthDuration,
@@ -57,6 +58,11 @@ class AnimatedArtworkMotion extends StatefulWidget {
   /// breathing zoom. A changing perspective prevents large filtered layers
   /// from being composited as cheaply as an ordinary 2D transform.
   final bool depthEnabled;
+
+  /// Multiplier for zoom/pan amplitude. Full-bleed artwork-only Canvas mode
+  /// raises this slightly so the expanded cover feels alive without needing a
+  /// mismatched video.
+  final double motionScale;
   final Duration zoomDuration;
   final Duration panDuration;
   final Duration depthDuration;
@@ -230,6 +236,7 @@ class _AnimatedArtworkMotionState extends State<AnimatedArtworkMotion>
                           : 0,
                       variant: variant,
                       viewportSize: viewportSize,
+                      motionScale: widget.motionScale,
                     )
                   : _ArtworkMotionFrame.neutral;
               if (!widget.depthEnabled) {
@@ -321,6 +328,7 @@ class _ArtworkMotionFrame {
     required double depthProgress,
     required _ArtworkMotionVariant variant,
     required Size? viewportSize,
+    double motionScale = 1.0,
   }) {
     final zoom = zoomProgress.clamp(0.0, 1.0).toDouble();
     final pan = panProgress.clamp(0.0, 1.0).toDouble();
@@ -329,7 +337,8 @@ class _ArtworkMotionFrame {
       return neutral;
     }
 
-    final intensity = math.min(variant.intensity, 1.0);
+    final scaleFactor = motionScale.clamp(0.5, 2.5).toDouble();
+    final intensity = math.min(variant.intensity, 1.0) * scaleFactor;
     final zoomPhase = zoom * math.pi * 2;
     final panPhase = pan * math.pi * 2;
     final depthPhase = depth * math.pi * 2;

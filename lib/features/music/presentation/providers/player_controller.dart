@@ -1929,24 +1929,31 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         }
       }
 
-      var playableTrack = await _resolveRemoteTrack(
+      bool stillCurrentSelection() => _isCurrentRemoteSelection(
         track,
-        checkLocalDownload: false,
-        shouldContinue: () => _isCurrentRemoteSelection(
-          track,
-          requestId,
-          pendingSnapshot.queueEntryId,
-        ),
-        onResolverFailure: (source, error) {
-          _showRemoteFallbackNotice(
-            source,
-            error,
-            track,
-            requestId,
-            pendingSnapshot.queueEntryId,
-          );
-        },
+        requestId,
+        pendingSnapshot.queueEntryId,
       );
+      final resolution = await _resolveTrackWithPreResolvedHighQuality(
+        track,
+        resolveYoutube: () => _resolveRemoteTrack(
+          track,
+          checkLocalDownload: false,
+          shouldContinue: stillCurrentSelection,
+          onResolverFailure: (source, error) {
+            _showRemoteFallbackNotice(
+              source,
+              error,
+              track,
+              requestId,
+              pendingSnapshot.queueEntryId,
+            );
+          },
+        ),
+        shouldContinue: stillCurrentSelection,
+      );
+      var playableTrack = resolution.playable;
+      var youtubeFallbackTrack = resolution.youtubeFallback;
       if (!_isCurrentPlayRequest(requestId)) {
         return;
       }
@@ -1955,6 +1962,10 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         playableTrack = _preserveCatalogMetadata(
           currentMetadata,
           playableTrack,
+        );
+        youtubeFallbackTrack = _preserveCatalogMetadata(
+          currentMetadata,
+          youtubeFallbackTrack,
         );
       }
       _replaceCurrentRemoteTrack(playableTrack);
@@ -2010,9 +2021,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         }
         final loadAttemptId = _beginRemoteLoadAttempt();
         try {
-          await nativeRemoteService.playRemoteSource(
-            _networkRemotePlaybackSource(playableTrack),
-          );
+          final networkSource = _networkRemotePlaybackSource(playableTrack);
+          await nativeRemoteService.playRemoteSource(networkSource);
           if (_wasRemoteLoadFailureHandled(loadAttemptId) ||
               !_isCurrentRemoteSelection(
                 playableTrack,
@@ -2021,6 +2031,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
               )) {
             return;
           }
+          _rememberPreparedAudioSource(networkSource);
           _clearPendingRemoteSnapshot(requestId);
           unawaited(_warmUpcomingRemoteTracks(requestId));
           return;
@@ -2046,6 +2057,24 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             // may already have finished by the time the original Future
             // completes, so keep the fallback result instead of replacing it
             // with this stale primary error.
+            return;
+          }
+          if (playableTrack.streamSource == AudioStreamSource.jioSaavn.name &&
+              !identical(playableTrack, youtubeFallbackTrack)) {
+            _replaceCurrentRemoteTrack(youtubeFallbackTrack);
+            final ytSource = _networkRemotePlaybackSource(youtubeFallbackTrack);
+            await nativeRemoteService.playRemoteSource(ytSource);
+            if (_wasRemoteLoadFailureHandled(loadAttemptId) ||
+                !_isCurrentRemoteSelection(
+                  youtubeFallbackTrack,
+                  requestId,
+                  pendingSnapshot.queueEntryId,
+                )) {
+              return;
+            }
+            _rememberPreparedAudioSource(ytSource);
+            _clearPendingRemoteSnapshot(requestId);
+            unawaited(_warmUpcomingRemoteTracks(requestId));
             return;
           }
           debugPrint(
@@ -2158,6 +2187,9 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             )) {
           return;
         }
+        _rememberPreparedAudioSource(
+          _networkRemotePlaybackSource(playableTrack),
+        );
         _clearPendingRemoteSnapshot(requestId);
         unawaited(_warmUpcomingRemoteTracks(requestId));
       } catch (error) {
@@ -2179,6 +2211,27 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             _resolvedRemoteSourceWasReplaced(playableTrack)) {
           // See the native branch above: this can be a late duplicate of the
           // primary failure that already triggered and completed recovery.
+          return;
+        }
+        if (playableTrack.streamSource == AudioStreamSource.jioSaavn.name &&
+            !identical(playableTrack, youtubeFallbackTrack)) {
+          _replaceCurrentRemoteTrack(youtubeFallbackTrack);
+          await ref
+              .read(playerServiceProvider)
+              .playRemote(youtubeFallbackTrack);
+          if (_wasRemoteLoadFailureHandled(loadAttemptId) ||
+              !_isCurrentRemoteSelection(
+                youtubeFallbackTrack,
+                requestId,
+                pendingSnapshot.queueEntryId,
+              )) {
+            return;
+          }
+          _rememberPreparedAudioSource(
+            _networkRemotePlaybackSource(youtubeFallbackTrack),
+          );
+          _clearPendingRemoteSnapshot(requestId);
+          unawaited(_warmUpcomingRemoteTracks(requestId));
           return;
         }
         debugPrint(
@@ -4617,8 +4670,19 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
             ? Future.value(File.fromUri(uri!))
             : cache.warmResolved(track);
       },
-      resolve: (track, shouldContinue) =>
-          _resolveRemoteTrack(track, shouldContinue: shouldContinue),
+      resolve: (track, shouldContinue) async {
+        final preBudget = ref.read(audioQualityPreResolveTimeoutProvider);
+        final resolved = await _resolveTrackWithPreResolvedHighQuality(
+          track,
+          resolveYoutube: () =>
+              _resolveRemoteTrack(track, shouldContinue: shouldContinue),
+          shouldContinue: shouldContinue,
+          budgetOverride: preBudget == null
+              ? null
+              : const Duration(milliseconds: 3000),
+        );
+        return resolved.playable;
+      },
       networkSource: (track, queueIndex) =>
           _networkRemotePlaybackSource(track, queueIndex: queueIndex),
       onSourcePrepared: _rememberPreparedAudioSource,
