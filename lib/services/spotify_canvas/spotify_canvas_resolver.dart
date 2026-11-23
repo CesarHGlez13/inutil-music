@@ -84,7 +84,7 @@ class SpotifyCanvasResolver {
   }
 
   Future<Uri?> _resolveUncached(SpotifyCanvasTrack track) async {
-    final queryTitle = cleanVisualTrackTitle(track.title);
+    final queryTitle = _searchTitle(track.title, track.artist);
     if (queryTitle.isEmpty) return null;
     final artist = primaryVisualArtist(track.artist);
     final fullArtist = track.artist
@@ -135,7 +135,7 @@ class SpotifyCanvasResolver {
             (track.duration.inMilliseconds - durationMs).abs() > tolerance) {
           continue;
         }
-        if (!RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(id)) continue;
+        if (!_isCanvasId(id)) continue;
         if (!ids.contains(id)) ids.add(id);
         if (ids.length == 2) break;
       }
@@ -177,16 +177,16 @@ class SpotifyCanvasResolver {
         }),
       );
       _checkThrottle(direct);
-      final resolution = direct?['resolution'];
       final resolvedId = direct?['trackId'];
-      if (resolution is! Map ||
-          resolvedId is! String ||
-          !RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(resolvedId) ||
-          resolution['matchedTrack'] is! String ||
-          resolution['matchedArtist'] is! String ||
-          !sameVisualTitle(queryTitle, resolution['matchedTrack'] as String) ||
-          normalVisualText(resolution['matchedArtist'] as String) !=
-              normalVisualText(queryArtist)) {
+      // The best-match confirmation used to be nested under 'resolution'; the
+      // provider now reports the same fields at the top level. Either shape is
+      // accepted, but the confirmation must still name this exact recording.
+      final resolution = _resolutionFields(direct);
+      if (resolvedId is! String ||
+          !_isCanvasId(resolvedId) ||
+          resolution == null ||
+          !sameVisualTitle(queryTitle, resolution.$1) ||
+          normalVisualText(resolution.$2) != normalVisualText(queryArtist)) {
         continue;
       }
       final url = await _videoFromCanvasPayload(
@@ -225,11 +225,54 @@ class SpotifyCanvasResolver {
     return null;
   }
 
+  /// The provider moved from classic 22-character Spotify IDs to
+  /// `t_<n>.<token>` identifiers. Both formats are accepted so a verified match
+  /// is never discarded for a cosmetic reason.
+  static final RegExp _canvasIdPattern = RegExp(
+    r'^(?:[A-Za-z0-9]{22}|t_[0-9]+[._-][A-Za-z0-9]+)$',
+  );
+
+  static bool _isCanvasId(String id) => _canvasIdPattern.hasMatch(id);
+
   static bool _isProviderStream(Uri uri) =>
       (uri.host == 'www.spotycovs.lol' || uri.host == 'spotycovs.lol') &&
       uri.path == '/api/canvas' &&
       uri.queryParameters['stream'] == '1' &&
-      RegExp(r'^[A-Za-z0-9]{22}$').hasMatch(uri.queryParameters['id'] ?? '');
+      _isCanvasId(uri.queryParameters['id'] ?? '');
+
+  /// Best-match confirmation fields, read from the nested `resolution` block or
+  /// the top level, whichever shape the provider answered with.
+  static (String, String)? _resolutionFields(Map<String, dynamic>? body) {
+    final nested = body?['resolution'];
+    final source = nested is Map ? nested : body;
+    if (source == null) return null;
+    final matchedTrack = source['matchedTrack'];
+    final matchedArtist = source['matchedArtist'];
+    if (matchedTrack is! String || matchedArtist is! String) return null;
+    return (matchedTrack, matchedArtist);
+  }
+
+  /// YouTube Music feeds hand the label as `Artist - Title`, which the provider
+  /// cannot match against a recording name. The prefix is dropped only when it
+  /// is exactly this track's own artist; titles that merely contain a dash keep
+  /// their full identity.
+  static String _searchTitle(String title, String artist) {
+    final trimmed = title.trim();
+    final separator = RegExp(r'^(.+?)\s+-\s+(.+)$').firstMatch(trimmed);
+    if (separator == null) return cleanVisualTrackTitle(trimmed);
+    final remainder = separator.group(2)!.trim();
+    if (remainder.isEmpty) return cleanVisualTrackTitle(trimmed);
+    final cleanedArtist = artist
+        .trim()
+        .replaceFirst(RegExp(r'\s*-\s*Topic$', caseSensitive: false), '')
+        .trim();
+    final prefix = normalVisualText(cleanVisualTrackTitle(separator.group(1)!));
+    if (prefix != normalVisualText(cleanedArtist) &&
+        prefix != normalVisualText(primaryVisualArtist(cleanedArtist))) {
+      return cleanVisualTrackTitle(trimmed);
+    }
+    return cleanVisualTrackTitle(remainder);
+  }
 
   static void _checkThrottle(Map<String, dynamic>? response) {
     final code = response?['code'] ?? response?['error'];

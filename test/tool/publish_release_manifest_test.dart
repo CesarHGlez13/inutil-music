@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:inutil_music/core/constants/app_constants.dart';
 import 'package:inutil_music/core/firebase/inutil_update_service.dart';
 import 'package:path/path.dart' as p;
 
@@ -22,7 +23,9 @@ void main() {
       final apkDir = Directory(p.join(tempRoot.path, 'apks'))..createSync();
       final distDir = Directory(p.join(tempRoot.path, 'dist'))..createSync();
 
-      const version = '2.5.15';
+      // publish_release.sh aborts unless the version to publish matches
+      // AppConstants.appVersion, so the fixture has to track the current one.
+      const version = AppConstants.appVersion;
       final expectedFiles = <String, File>{
         'app-arm64-v8a-release.apk': File(
           p.join(apkDir.path, 'app-arm64-v8a-release.apk'),
@@ -53,11 +56,31 @@ void main() {
         ),
       };
 
+      // publish_release.sh rejects an APK whose libapp.so lacks the baked-in
+      // 'InutilMusic/<version>' marker, so the Android fixtures have to be real
+      // zip archives; the PC installers can stay plain byte payloads.
+      final markerEntry = File(p.join(tempRoot.path, 'libapp.so'))
+        ..writeAsBytesSync(utf8.encode('InutilMusic/$version'));
       final expectedChecksums = <String, String>{};
       for (final entry in expectedFiles.entries) {
-        final bytes = utf8.encode('payload-${entry.key}');
-        entry.value.writeAsBytesSync(bytes);
-        expectedChecksums[entry.key] = sha256.convert(bytes).toString();
+        if (entry.key.endsWith('.apk')) {
+          final zip = await Process.run('zip', [
+            '-q',
+            '-j',
+            entry.value.path,
+            markerEntry.path,
+          ]);
+          expect(
+            zip.exitCode,
+            0,
+            reason: 'No se pudo crear el fixture APK: ${zip.stderr}',
+          );
+        } else {
+          entry.value.writeAsBytesSync(utf8.encode('payload-${entry.key}'));
+        }
+        expectedChecksums[entry.key] = sha256
+            .convert(entry.value.readAsBytesSync())
+            .toString();
       }
 
       final result = await Process.run(

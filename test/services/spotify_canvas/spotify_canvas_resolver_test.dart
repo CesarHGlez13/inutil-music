@@ -648,6 +648,152 @@ void main() {
       expect(canvases, sample.$5 ? 1 : 2, reason: sample.$3);
     }
   });
+
+  test('accepts the provider current t_1.* identifiers', () async {
+    final requestedIds = <String?>[];
+    final resolver = SpotifyCanvasResolver(
+      fetchJson: (uri) async {
+        if (uri.path == '/api/search') {
+          return {
+            'results': [
+              {
+                'trackId': 't_1.MTY5NDc2ODAzMQ',
+                'name': 'vampire',
+                'artistNames': ['Olivia Rodrigo'],
+                'durationMs': 219724,
+              },
+            ],
+          };
+        }
+        requestedIds.add(uri.queryParameters['id']);
+        return canvas(
+          'https://www.spotycovs.lol/api/canvas?id=t_1.MTY5NDc2ODAzMQ&stream=1',
+        );
+      },
+      probeMediaSize: (_) async => 1600000,
+    );
+    expect(
+      await resolver.resolve(
+        const SpotifyCanvasTrack(
+          'vampire',
+          'Olivia Rodrigo',
+          Duration(milliseconds: 219724),
+        ),
+      ),
+      Uri.parse(
+        'https://www.spotycovs.lol/api/canvas?id=t_1.MTY5NDc2ODAzMQ&stream=1',
+      ),
+    );
+    expect(requestedIds, ['t_1.MTY5NDc2ODAzMQ']);
+  });
+
+  test('finds a Canvas when the feed hands an Artist - Title label', () async {
+    final queries = <String?>[];
+    final resolver = SpotifyCanvasResolver(
+      fetchJson: (uri) async {
+        if (uri.path == '/api/search') {
+          queries.add(uri.queryParameters['track']);
+          return {
+            'results': [
+              {
+                'trackId': 't_1.MTY5NDc2ODAzMQ',
+                'name': 'vampire',
+                'artistNames': ['Olivia Rodrigo'],
+                'durationMs': 219724,
+              },
+            ],
+          };
+        }
+        return canvas('https://canvaz.scdn.co/upload/vampire.cnvs.mp4');
+      },
+      probeMediaSize: (_) async => 1000000,
+    );
+    expect(
+      await resolver.resolve(
+        const SpotifyCanvasTrack(
+          'Olivia Rodrigo - vampire',
+          'Olivia Rodrigo',
+          Duration(milliseconds: 219724),
+        ),
+      ),
+      Uri.parse('https://canvaz.scdn.co/upload/vampire.cnvs.mp4'),
+    );
+    // The prefix is this track's own artist, so the first search identifies it.
+    expect(queries, ['vampire']);
+  });
+
+  test('keeps a title whose dash is not the artist prefix', () async {
+    final queries = <String?>[];
+    final resolver = SpotifyCanvasResolver(
+      fetchJson: (uri) async {
+        if (uri.path == '/api/search') {
+          queries.add(uri.queryParameters['track']);
+          return {
+            'results': [
+              {
+                'trackId': 't_1.MTY5NDc2ODAzMQ',
+                'name': 'Live - Acoustic',
+                'artistNames': ['Radiohead'],
+                'durationMs': 240000,
+              },
+            ],
+          };
+        }
+        return canvas('https://canvaz.scdn.co/upload/live.cnvs.mp4');
+      },
+      probeMediaSize: (_) async => 1000000,
+    );
+    expect(
+      await resolver.resolve(
+        const SpotifyCanvasTrack(
+          'Live - Acoustic',
+          'Radiohead',
+          Duration(seconds: 240),
+        ),
+      ),
+      Uri.parse('https://canvaz.scdn.co/upload/live.cnvs.mp4'),
+    );
+    // A dash that is not the artist stays part of the recording's identity.
+    expect(queries, ['Live - Acoustic']);
+  });
+
+  test('direct fallback accepts the top-level confirmation fields', () async {
+    final requests = <Uri>[];
+    final resolver = SpotifyCanvasResolver(
+      fetchJson: (uri) async {
+        requests.add(uri);
+        if (uri.path == '/api/search') return {'results': []};
+        return {
+          'success': true,
+          'trackId': 't_1.MTY5NDc2ODAzMQ',
+          'matchedTrack': 'vampire',
+          'matchedArtist': 'Olivia Rodrigo',
+          'hasCanvas': true,
+          'canvases': [
+            {
+              'type': 'VIDEO',
+              'canvasUrl':
+                  'https://www.spotycovs.lol/api/canvas?id=t_1.MTY5NDc2ODAzMQ&stream=1',
+            },
+          ],
+        };
+      },
+      probeMediaSize: (_) async => 1600000,
+    );
+    expect(
+      await resolver.resolve(
+        const SpotifyCanvasTrack(
+          'vampire',
+          'Olivia Rodrigo',
+          Duration(milliseconds: 219724),
+        ),
+      ),
+      Uri.parse(
+        'https://www.spotycovs.lol/api/canvas?id=t_1.MTY5NDc2ODAzMQ&stream=1',
+      ),
+    );
+    expect(requests.last.queryParameters['track'], 'vampire Olivia Rodrigo');
+  });
 }
 
 Future<Uri?> _withMediaServer(
