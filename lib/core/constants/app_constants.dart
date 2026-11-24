@@ -9,7 +9,7 @@ class AppConstants {
   /// interno (`+4278`) es el `versionCode` base de Android — Flutter le suma
   /// 2000 al dividir por ABI, medido con `aapt`: `+4268` produce 6268 en el
   /// APK `arm64-v8a` — y no se muestra en la interfaz.
-  static const appVersion = '2.5.20';
+  static const appVersion = '2.5.21';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 11;
   static const fileExportChannel = 'inutil_music/file_export';

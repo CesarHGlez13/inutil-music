@@ -221,11 +221,497 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           ),
         ),
 
-        // 4. Foreground Spotify layout (centered on wide desktop windows while
-        // the Canvas video fills 100% edge-to-edge behind it).
+        // 4. Foreground Spotify layout:
+        // On desktop windows (wide layout), render full desktop width with the
+        // bottom control deck adopting the exact capsule, liquid glass, and
+        // 3-section layout of the desktop mini reproductor.
         LayoutBuilder(
           builder: (context, constraints) {
+            final compactMobile = AppPlatform.isMobileTargetPlatform(
+              Theme.of(context).platform,
+            );
+            final isDesktop = AppPlatform.isDesktop && !compactMobile;
+            final isWideDesktop = isDesktop && constraints.maxWidth >= 720;
             final isWideCanvas = constraints.maxWidth >= 720;
+
+            if (isWideDesktop) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Top bar (desktop): Clean top context without mobile collapse arrow.
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      32,
+                      topInset + 14,
+                      32,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        InkWell(
+                          onTap: onOpenArtist,
+                          borderRadius: BorderRadius.circular(10),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'Reproduciendo desde Artista',
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.75),
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  artistLabel,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const Spacer(),
+                        if (!snapshot.isExternal)
+                          _PlayerMenu(
+                            snapshot: snapshot,
+                            isFavorite: isFavorite,
+                            savedTrackId: savedTrackId,
+                            onOpenSearch: onOpenSearch,
+                            onOpenArtist: onOpenArtist,
+                            onOpenAlbum: onOpenAlbum,
+                            strings: strings,
+                            compact: true,
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // Open center window with live synced lyrics over Canvas video
+                  const Spacer(),
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 48),
+                      child: _CanvasFloatingLyricLine(
+                        onTap: onOpenLyrics,
+                        isDesktop: true,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+
+                  // Desktop controls capsule with the exact same appearance as the mini player!
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      0,
+                      24,
+                      18 + bottomInset,
+                    ),
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1280),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(40),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                            child: Container(
+                              height: 104,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0x6612161A),
+                                borderRadius: BorderRadius.circular(40),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  width: 0.8,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.35),
+                                    blurRadius: 20,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  // Left section: 60px artwork + metadata + favorite button
+                                  Expanded(
+                                    flex: 3,
+                                    child: Row(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: SizedBox.square(
+                                            dimension: 60,
+                                            child: ProportionalArtwork(
+                                              source: artworkSource,
+                                              fallbackSource:
+                                                  artworkFallbackSource,
+                                              cacheWidth: 180,
+                                              fallback: const ColoredBox(
+                                                color: Color(0xFF1F2430),
+                                                child: Icon(
+                                                  Icons.music_note_rounded,
+                                                  color: Colors.white70,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              MarqueeText(
+                                                key: const ValueKey(
+                                                  'player-track-title',
+                                                ),
+                                                snapshot.title ??
+                                                    strings.noPlayback,
+                                                pause: const Duration(
+                                                  milliseconds: 1700,
+                                                ),
+                                                travel: const Duration(
+                                                  milliseconds: 6200,
+                                                ),
+                                                style: const TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: Colors.white,
+                                                  shadows: [
+                                                    Shadow(
+                                                      color: Color(0xAA000000),
+                                                      blurRadius: 8,
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 3),
+                                              if (pairedDeviceName != null)
+                                                Row(
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    const Icon(
+                                                      Icons.speaker_group_rounded,
+                                                      size: 13,
+                                                      color: Color(0xFF1DB954),
+                                                    ),
+                                                    const SizedBox(width: 4),
+                                                    Flexible(
+                                                      child: Text(
+                                                        pairedDeviceName,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                            TextOverflow.ellipsis,
+                                                        style: const TextStyle(
+                                                          fontSize: 12.5,
+                                                          color:
+                                                              Color(0xFF1DB954),
+                                                          fontWeight:
+                                                              FontWeight.w700,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                )
+                                              else
+                                                InkWell(
+                                                  key: const ValueKey(
+                                                    'player-track-artist-action',
+                                                  ),
+                                                  onTap: onOpenArtist,
+                                                  child: Text(
+                                                    artistLabel,
+                                                    key: const ValueKey(
+                                                      'player-track-artist',
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 13,
+                                                      color: Colors.white
+                                                          .withValues(
+                                                            alpha: 0.78,
+                                                          ),
+                                                      fontWeight: FontWeight.w500,
+                                                      shadows: const [
+                                                        Shadow(
+                                                          color: Color(0x99000000),
+                                                          blurRadius: 7,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        if (!snapshot.isExternal)
+                                          _SpotifyCircleFavoriteButton(
+                                            snapshot: snapshot,
+                                            isFavorite: isFavorite,
+                                            savedTrackId: savedTrackId,
+                                            strings: strings,
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 16),
+
+                                  // Center section: Transport controls + seek bar
+                                  Expanded(
+                                    flex: 4,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              _SpotifyToggleControl(
+                                                key: const ValueKey(
+                                                  'player-shuffle-control',
+                                                ),
+                                                tooltip: snapshot.shuffleEnabled
+                                                    ? strings.deactivateShuffle
+                                                    : strings.activateShuffle,
+                                                icon: Icons.shuffle_rounded,
+                                                active: snapshot.shuffleEnabled,
+                                                activeColor: _spotifyGreen,
+                                                onPressed: hasTrack
+                                                    ? () => player.toggleShuffle()
+                                                    : null,
+                                              ),
+                                              IconButton(
+                                                key: const ValueKey(
+                                                  'player-previous-control',
+                                                ),
+                                                tooltip: strings.previous,
+                                                color: Colors.white,
+                                                disabledColor: Colors.white38,
+                                                iconSize: 32,
+                                                onPressed: hasTrack
+                                                    ? () => player.playPrevious()
+                                                    : null,
+                                                icon: const Icon(
+                                                  Icons.skip_previous_rounded,
+                                                ),
+                                              ),
+                                              SizedBox.square(
+                                                dimension: 52,
+                                                child: IconButton(
+                                                  key: const ValueKey(
+                                                    'player-primary-control',
+                                                  ),
+                                                  tooltip: isPlaying
+                                                      ? strings.pause
+                                                      : strings.play,
+                                                  style: IconButton.styleFrom(
+                                                    backgroundColor: Colors.white,
+                                                    disabledBackgroundColor:
+                                                        Colors.white38,
+                                                    shape: const CircleBorder(),
+                                                  ),
+                                                  color: Colors.black,
+                                                  disabledColor: Colors.black45,
+                                                  iconSize: 32,
+                                                  padding: EdgeInsets.zero,
+                                                  icon: Icon(
+                                                    isPlaying
+                                                        ? Icons.pause_rounded
+                                                        : Icons.play_arrow_rounded,
+                                                  ),
+                                                  onPressed: hasTrack
+                                                      ? () => player
+                                                            .togglePlayPause()
+                                                      : null,
+                                                ),
+                                              ),
+                                              IconButton(
+                                                key: const ValueKey(
+                                                  'player-next-control',
+                                                ),
+                                                tooltip: strings.next,
+                                                color: Colors.white,
+                                                disabledColor: Colors.white38,
+                                                iconSize: 32,
+                                                onPressed: hasTrack
+                                                    ? () => player.playNext()
+                                                    : null,
+                                                icon: const Icon(
+                                                  Icons.skip_next_rounded,
+                                                ),
+                                              ),
+                                              _SpotifyToggleControl(
+                                                key: const ValueKey(
+                                                  'player-repeat-control',
+                                                ),
+                                                tooltip: switch (
+                                                  snapshot.repeatMode
+                                                ) {
+                                                  PlaybackRepeatMode.off =>
+                                                    strings.repeatQueue,
+                                                  PlaybackRepeatMode.all =>
+                                                    strings.repeatOne,
+                                                  PlaybackRepeatMode.one =>
+                                                    strings.disableRepeat,
+                                                },
+                                                icon: snapshot.repeatMode ==
+                                                        PlaybackRepeatMode.one
+                                                    ? Icons.repeat_one_rounded
+                                                    : Icons.repeat_rounded,
+                                                active:
+                                                    snapshot.repeatMode !=
+                                                    PlaybackRepeatMode.off,
+                                                activeColor: _spotifyGreen,
+                                                onPressed: hasTrack
+                                                    ? () => player
+                                                          .cycleRepeatMode()
+                                                    : null,
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(
+                                            height: 24,
+                                            child: _AppleMusicTimeline(
+                                              strings: strings,
+                                              compact: true,
+                                              trackHeight: 3,
+                                              sliderHeight: 18,
+                                              showThumb: true,
+                                              sliderKey: const ValueKey(
+                                                'spotify-player-linear-seek',
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 16),
+
+                                  // Right section: Utility controls + volume
+                                  Expanded(
+                                    flex: 3,
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.end,
+                                      children: [
+                                        IconButton(
+                                          tooltip: strings.lyrics,
+                                          color: Colors.white.withValues(
+                                            alpha: 0.88,
+                                          ),
+                                          iconSize: 22,
+                                          onPressed: onOpenLyrics,
+                                          icon: const PlayerLyricsIcon(),
+                                        ),
+                                        IconButton(
+                                          key: const ValueKey(
+                                            'spotify-canvas-sleep-timer',
+                                          ),
+                                          tooltip: 'Temporizador de sueño',
+                                          onPressed: () =>
+                                              InutilSleepTimerSheet.show(context),
+                                          icon: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              InutilIcon(
+                                                InutilGlyph.sleepTimer,
+                                                size: 21,
+                                                filled: sleepTimer.isActive,
+                                                color: sleepTimer.isActive
+                                                    ? _spotifyGreen
+                                                    : Colors.white.withValues(
+                                                        alpha: 0.88,
+                                                      ),
+                                              ),
+                                              if (sleepTimer.isActive) ...[
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${sleepTimer.remaining.inMinutes + 1}m',
+                                                  style: const TextStyle(
+                                                    color: _spotifyGreen,
+                                                    fontSize: 11.5,
+                                                    fontWeight: FontWeight.w800,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: 'Cola de reproducción',
+                                          onPressed: onToggleQueue,
+                                          icon: InutilIcon(
+                                            InutilGlyph.queue,
+                                            size: 22,
+                                            filled: queueVisible,
+                                            color: queueVisible
+                                                ? _spotifyGreen
+                                                : Colors.white.withValues(
+                                                    alpha: 0.88,
+                                                  ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: pairedDeviceName != null
+                                              ? 'Escuchando en $pairedDeviceName'
+                                              : 'Conectar a un dispositivo',
+                                          onPressed: () =>
+                                              InutilConnectSheet.show(context),
+                                          icon: InutilIcon(
+                                            InutilGlyph.devices,
+                                            size: 21,
+                                            filled: pairedDeviceName != null,
+                                            color: pairedDeviceName != null
+                                                ? _spotifyGreen
+                                                : Colors.white.withValues(
+                                                    alpha: 0.88,
+                                                  ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Flexible(
+                                          child: _CanvasVolumeControl(
+                                            volume: snapshot.volume,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            }
+
             final foreground = Padding(
               padding: EdgeInsets.fromLTRB(
                 isWideCanvas ? 28 : 20,
@@ -707,9 +1193,13 @@ String activeSyncedLyricLineText(LyricsDocument doc, Duration position) {
 }
 
 class _CanvasFloatingLyricLine extends ConsumerWidget {
-  const _CanvasFloatingLyricLine({required this.onTap});
+  const _CanvasFloatingLyricLine({
+    required this.onTap,
+    this.isDesktop = false,
+  });
 
   final VoidCallback onTap;
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -738,20 +1228,21 @@ class _CanvasFloatingLyricLine extends ConsumerWidget {
           switchOutCurve: Curves.easeIn,
           child: Align(
             key: ValueKey(activeText),
-            alignment: Alignment.centerLeft,
+            alignment: isDesktop ? Alignment.center : Alignment.centerLeft,
             child: Text(
               activeText,
               maxLines: 2,
+              textAlign: isDesktop ? TextAlign.center : TextAlign.left,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: isDesktop ? 26 : 18,
                 fontWeight: FontWeight.w800,
                 height: 1.28,
-                shadows: [
+                shadows: const [
                   Shadow(
-                    color: Color(0xCC000000),
-                    blurRadius: 12,
+                    color: Color(0xEE000000),
+                    blurRadius: 16,
                     offset: Offset(0, 2),
                   ),
                 ],
@@ -759,6 +1250,66 @@ class _CanvasFloatingLyricLine extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _CanvasVolumeControl extends ConsumerWidget {
+  const _CanvasVolumeControl({required this.volume});
+
+  final double volume;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final normalizedVolume = volume.clamp(0.0, 1.0);
+    return SizedBox(
+      width: 140,
+      height: 40,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            iconSize: 20 * appVolumeIconScale,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: Icon(
+              normalizedVolume <= 0
+                  ? Icons.volume_off_rounded
+                  : normalizedVolume < 0.5
+                  ? Icons.volume_down_rounded
+                  : Icons.volume_up_rounded,
+              color: Colors.white.withValues(alpha: 0.88),
+            ),
+            onPressed: () {
+              final newVol = normalizedVolume > 0 ? 0.0 : 0.8;
+              unawaited(
+                ref.read(playerControllerProvider.notifier).setVolume(newVol),
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                activeTrackColor: Colors.white,
+                inactiveTrackColor: Colors.white24,
+                thumbColor: Colors.white,
+              ),
+              child: Slider(
+                value: normalizedVolume,
+                onChanged: (val) {
+                  unawaited(
+                    ref.read(playerControllerProvider.notifier).setVolume(val),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
