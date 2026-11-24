@@ -1,5 +1,5 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "2.5.28"
+  #define MyAppVersion "2.5.29"
 #endif
 
 #define MyAppName "Inutix Music"

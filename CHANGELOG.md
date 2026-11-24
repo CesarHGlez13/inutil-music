@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.5.29+4287 — 2026-11-24
+- Ajuste de proporción y zona segura del icono adaptativo Android (`iX MUSIC` + fondo carbono degradado) para encuadrar con simetría exacta 1:1 junto al icono de Inutix TV en launchers circulares y *squircle*.
+
 ## 2.5.28+4286 — 2026-11-24
 - Nuevo logotipo oficial **Monolith iX (`iX` + `MUSIC`)** con acento verde esmeralda en todas las plataformas: icono adaptativo Android sin bordes, icono monocromático `iX` en barra de notificaciones, marca de agua de *Compartir momento*, Linux, Windows `.ico`, macOS e iOS.
 - Respaldo automático de actualizaciones en Cloudflare Edge (`ota.inutix.com/music`) para manifiestos y descargas directas cuando GitHub presente lentitud o bloqueo de red.
