@@ -64,7 +64,12 @@ cp -a "$bundle/." "$stage/opt/inutil-music/"
 cat >"$stage/opt/inutil-music/$launcher" <<EOF
 #!/bin/sh
 set -e
-exec "\$(dirname "\$0")/$executable" "\$@"
+DIR="\$(cd "\$(dirname "\$0")" && pwd)"
+export LD_LIBRARY_PATH="\$DIR/lib:\$DIR/mpv_libs:\${LD_LIBRARY_PATH:-}"
+if [ -f "\$DIR/lib/libmpv.so.2" ]; then
+  export LIBMPV_LIBRARY_PATH="\$DIR/lib/libmpv.so.2"
+fi
+exec "\$DIR/$executable" "\$@"
 EOF
 chmod 0755 "$stage/opt/inutil-music/$launcher"
 install -m 0755 "$repo_root/packaging/linux/inutil-music" \

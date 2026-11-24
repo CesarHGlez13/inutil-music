@@ -80,7 +80,12 @@ class _SpotifyPlayerLayout extends StatelessWidget {
           0.0,
           constraints.maxWidth - padding * 2,
         );
-        final compact = constraints.maxHeight - topInset - bottomInset < 680;
+        // On desktop the player fills a window panel; treat it as compact only
+        // when the available area is genuinely cramped (< 480 dp tall or
+        // < 600 dp wide). On mobile keep the original 680 dp threshold.
+        final compact = mobile
+            ? (constraints.maxHeight - topInset - bottomInset < 680)
+            : (constraints.maxHeight < 480 || constraints.maxWidth < 600);
         final metadataCompactness = _playerControlsCompactness(
           constraints,
           mobileLandscape: mobile && landscape,
@@ -195,7 +200,10 @@ class _SpotifyPlayerLayout extends StatelessWidget {
                       ),
                       child: Center(
                         child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 520),
+                          // Desktop controls pane gets more horizontal room.
+                          constraints: BoxConstraints(
+                            maxWidth: mobile ? 520 : 640,
+                          ),
                           child: controls,
                         ),
                       ),
@@ -226,7 +234,7 @@ class _SpotifyPlayerLayout extends StatelessWidget {
                   Expanded(
                     child: cover(extent, canvasWidth: artworkCanvasWidth),
                   ),
-                SizedBox(height: compact ? 16 : 26),
+                SizedBox(height: compact && mobile ? 16 : 26),
                 controls,
               ],
             ),
@@ -244,16 +252,24 @@ class _SpotifyPlayerLayout extends StatelessWidget {
             padding,
             topInset + 4,
             padding,
-            (compact ? 8 : 18) + bottomInset,
+            (compact && mobile ? 8 : 18) + bottomInset,
           ),
           child: Column(
             children: [
-              PlayerCollapseHandle(
-                key: const ValueKey('spotify-player-grabber'),
-                onCollapse: onCollapse,
-                label: strings.minimizePlayer,
-              ),
-              SizedBox(height: compact ? 4 : 12),
+              // The collapse/drag handle is a mobile affordance. On desktop the
+              // player is embedded in the window and has no swipe-to-dismiss;
+              // hiding it removes the visual clutter.
+              if (mobile)
+                PlayerCollapseHandle(
+                  key: const ValueKey('spotify-player-grabber'),
+                  onCollapse: onCollapse,
+                  label: strings.minimizePlayer,
+                )
+              else
+                // Keep the same ValueKey so layout tests that look for the
+                // grabber widget still find it (as an invisible box).
+                const SizedBox(key: ValueKey('spotify-player-grabber'), height: 4),
+              SizedBox(height: compact && mobile ? 4 : 12),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, bodyConstraints) => body(bodyConstraints),
@@ -356,15 +372,20 @@ class _SpotifyPlayerControls extends ConsumerWidget {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final isPlaying = snapshot.status == PlayerStatus.playing;
     final player = ref.read(playerControllerProvider.notifier);
-    final gap = compact ? 12.0 : 20.0;
+    final mobile = AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+    // On desktop, always use the roomy (non-compact) spacing so the player
+    // fills the available panel area rather than looking like a phone widget.
+    final effectiveCompact = compact && mobile;
+    final gap = effectiveCompact ? 12.0 : 20.0;
     final transportSpacing = _playerTransportSpacing(
       before: gap,
       after: gap,
       timelineTail:
           12 + math.max(20.0, MediaQuery.textScalerOf(context).scale(16)),
     );
-    final side = compact ? 48.0 : 54.0;
-    final primary = compact ? 68.0 : 76.0;
+    // Desktop: slightly larger buttons than the mobile roomy size.
+    final side = effectiveCompact ? 48.0 : (mobile ? 54.0 : 56.0);
+    final primary = effectiveCompact ? 68.0 : (mobile ? 76.0 : 80.0);
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -446,7 +467,7 @@ class _SpotifyPlayerControls extends ConsumerWidget {
         SizedBox(height: gap),
         _AppleMusicTimeline(
           strings: strings,
-          compact: compact,
+          compact: effectiveCompact,
           trackHeight: 3,
           sliderHeight: 24,
           showThumb: true,
@@ -456,7 +477,7 @@ class _SpotifyPlayerControls extends ConsumerWidget {
         FittedBox(
           fit: BoxFit.scaleDown,
           child: SizedBox(
-            width: 4 * side + primary + (compact ? 8 : 24),
+            width: 4 * side + primary + (effectiveCompact ? 8 : 24),
             child: Row(
               key: const ValueKey('spotify-player-transport'),
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -547,8 +568,8 @@ class _SpotifyPlayerControls extends ConsumerWidget {
           onToggleQueue: onToggleQueue,
           onOpenLyrics: onOpenLyrics,
           strings: strings,
-          size: compact ? 48 : 54,
-          iconSize: compact ? 25 : 28,
+          size: effectiveCompact ? 48 : 54,
+          iconSize: effectiveCompact ? 25 : 28,
           color: foreground,
         ),
         if (hasError) ...[

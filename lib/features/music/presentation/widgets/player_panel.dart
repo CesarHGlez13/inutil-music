@@ -134,11 +134,24 @@ double _playerControlsCompactness(
   );
 }
 
-double _playerTitleFontSize(BuildContext context, double compactness) =>
-    _playerMetadataFontSize(context, lerpDouble(24, 21, compactness)!);
+double _playerTitleFontSize(BuildContext context, double compactness) {
+  final desktop = AppPlatform.isDesktop &&
+      !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+  // Desktop gets larger title (28px roomy → 24px at minimum) while mobile
+  // keeps the original 24→21 range.
+  final roomy = desktop ? 28.0 : 24.0;
+  final compact = desktop ? 24.0 : 21.0;
+  return _playerMetadataFontSize(context, lerpDouble(roomy, compact, compactness)!);
+}
 
-double _playerArtistFontSize(BuildContext context, double compactness) =>
-    _playerMetadataFontSize(context, lerpDouble(18, 16, compactness)!);
+double _playerArtistFontSize(BuildContext context, double compactness) {
+  final desktop = AppPlatform.isDesktop &&
+      !AppPlatform.isMobileTargetPlatform(Theme.of(context).platform);
+  // Desktop gets larger artist (19px roomy → 17px at minimum).
+  final roomy = desktop ? 19.0 : 18.0;
+  final compact = desktop ? 17.0 : 16.0;
+  return _playerMetadataFontSize(context, lerpDouble(roomy, compact, compactness)!);
+}
 
 final _appleAnimatedArtworkResolverProvider =
     Provider<AppleAnimatedArtworkResolver>(
@@ -658,21 +671,14 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
         }
 
         final surroundingTheme = Theme.of(context);
-        final playerTheme =
-            mobile ||
-                (!AppPlatform.isFlutterTest && widget.spotifyCanvasEnabled)
-            ? alwaysDarkPlaybackTheme(
-                surroundingTheme,
-                fontFamily: playerFont.fontFamily,
-              )
-            : surroundingTheme.copyWith(
-                textTheme: surroundingTheme.textTheme.apply(
-                  fontFamily: playerFont.fontFamily,
-                ),
-                primaryTextTheme: surroundingTheme.primaryTextTheme.apply(
-                  fontFamily: playerFont.fontFamily,
-                ),
-              );
+        // Always use the isolated dark playback palette so the player surface
+        // matches the PlaybackArtworkBackdrop and LyricsPage on every platform,
+        // including desktop where `mobile` is false and Spotify Canvas may be
+        // disabled.
+        final playerTheme = alwaysDarkPlaybackTheme(
+          surroundingTheme,
+          fontFamily: playerFont.fontFamily,
+        );
 
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,

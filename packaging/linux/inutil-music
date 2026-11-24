@@ -4,6 +4,10 @@
 # KDE/PipeWire («Inútil Music»); se conservan también los nombres heredados de
 # Inutil por si el bundle instalado todavía los usa.
 base=/opt/inutil-music
+export LD_LIBRARY_PATH="$base/lib:$base/mpv_libs:${LD_LIBRARY_PATH:-}"
+if [ -f "$base/lib/libmpv.so.2" ]; then
+  export LIBMPV_LIBRARY_PATH="$base/lib/libmpv.so.2"
+fi
 for candidate in "Inútil Music" "Inútil Music" "inutil_music" "inutil_music"; do
   if [ -x "$base/$candidate" ]; then
     exec "$base/$candidate" "$@"

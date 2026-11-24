@@ -3693,7 +3693,7 @@ void main() {
     }
   });
 
-  testWidgets('desktop player follows the app theme for every style', (
+  testWidgets('desktop player uses the dark playback theme for every style', (
     tester,
   ) async {
     _configureView(tester, const Size(1200, 820));
@@ -3720,8 +3720,11 @@ void main() {
           await tester.pump();
           final title = find.byKey(const ValueKey('player-track-title'));
           final context = tester.element(title);
-          expect(Theme.of(context).brightness, brightness);
-          expect(Theme.of(context).colorScheme.brightness, brightness);
+          // The desktop player surface always uses the isolated dark playback
+          // theme so controls look right over PlaybackArtworkBackdrop,
+          // regardless of the surrounding app brightness.
+          expect(Theme.of(context).brightness, Brightness.dark);
+          expect(Theme.of(context).colorScheme.brightness, Brightness.dark);
           expect(tester.widget<MarqueeText>(title).style?.fontFamily, 'Lora');
           expect(tester.takeException(), isNull);
         }
@@ -4145,7 +4148,9 @@ void main() {
       Theme.of(
         tester.element(find.byKey(const ValueKey('apple-player-layout'))),
       ).brightness,
-      Brightness.light,
+      // The player surface always uses the dark playback theme on desktop
+      // so controls look right over PlaybackArtworkBackdrop.
+      Brightness.dark,
     );
 
     final queueRail = find.byKey(const ValueKey('desktop-playback-queue-rail'));
@@ -4153,7 +4158,7 @@ void main() {
     expect(
       Theme.of(tester.element(queueRail)).brightness,
       Brightness.light,
-      reason: 'the desktop rail and player follow the surrounding light theme',
+      reason: 'the queue rail is outside the player theme and keeps the app brightness',
     );
     expect(tester.takeException(), isNull);
   });
@@ -4648,9 +4653,21 @@ void main() {
         );
         expect(
           firstTone.lightness,
-          scenario.brightness == Brightness.dark
-              ? greaterThan(0.5)
-              : lessThan(0.5),
+          // Desktop always uses the dark playback theme, so the wave color is
+          // always adapted to contrast against a dark surface (lightness > 0.5).
+          // Mobile follows the actual app brightness.
+          () {
+            final isDesktop = switch (scenario.platform) {
+              TargetPlatform.windows ||
+              TargetPlatform.macOS ||
+              TargetPlatform.linux =>
+                true,
+              _ => false,
+            };
+            return (scenario.brightness == Brightness.dark || isDesktop)
+                ? greaterThan(0.5)
+                : lessThan(0.5);
+          }(),
         );
         expect(service.sources, [blueCover]);
 
