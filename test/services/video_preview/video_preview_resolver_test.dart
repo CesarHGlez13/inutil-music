@@ -138,18 +138,34 @@ void main() {
     });
 
     test(
-      'resolveForTrack returns null instead of using another song by the same artist or unrelated title match',
+      'resolveForTrack falls back to official video by the same artist when exact track has no video, but rejects unrelated artists',
       () async {
-        final resolver = VideoPreviewResolver(
+        final resolverWithSameArtist = VideoPreviewResolver(
           fetchJson: (_) async => {
             'results': [
               {
                 'trackName': 'Adiós Amor',
                 'artistName': 'Christian Nodal',
-                'previewUrl': 'https://video-ssl.itunes.apple.com/other.m4v',
+                'previewUrl': 'https://video-ssl.itunes.apple.com/adios.m4v',
               },
+            ],
+          },
+        );
+
+        final resolvedSameArtist = await resolverWithSameArtist.resolveForTrack(
+          title: 'Cabrón yo puedo',
+          artist: 'Christian Nodal',
+        );
+        expect(
+          resolvedSameArtist?.videoUrl.toString(),
+          'https://video-ssl.itunes.apple.com/adios.m4v',
+        );
+
+        final resolverWithUnrelated = VideoPreviewResolver(
+          fetchJson: (_) async => {
+            'results': [
               {
-                'trackName': 'Perdonarte',
+                'trackName': 'Canción Random',
                 'artistName': 'Otro Artista Ajeno',
                 'previewUrl': 'https://video-ssl.itunes.apple.com/wrong.m4v',
               },
@@ -157,12 +173,11 @@ void main() {
           },
         );
 
-        final resolved = await resolver.resolveForTrack(
+        final resolvedUnrelated = await resolverWithUnrelated.resolveForTrack(
           title: 'Perdonarte ¿Para Qué?',
           artist: 'Christian Nodal',
         );
-
-        expect(resolved, isNull);
+        expect(resolvedUnrelated, isNull);
       },
     );
 

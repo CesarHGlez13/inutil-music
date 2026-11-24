@@ -72,9 +72,10 @@ class VideoPreviewResolver {
 
   /// Resolves the official music-video preview clip for a single song.
   ///
-  /// Only returns a clip when BOTH title and artist match the requested song so
-  /// a track without its own video never displays another song's or artist's
-  /// music video as its Canvas background.
+  /// Matches exact track title and artist first. When a track does not have
+  /// its own individual music video on iTunes (e.g. album cuts), falls back
+  /// to an official video clip by the same artist (sameVisualArtist) as an
+  /// artist visual canvas, but NEVER displays an unrelated artist.
   Future<VideoPreviewClip?> resolveForTrack({
     required String title,
     required String artist,
@@ -111,9 +112,7 @@ class VideoPreviewResolver {
 
         // Widen the search net with title-only and artist-only queries so that
         // tracks whose iTunes entry uses a different spelling than the combined
-        // "Artist Title" query are still found. The strict sameVisualTitle +
-        // sameVisualArtist guard is applied to every result — no wrong song can
-        // ever pass through.
+        // "Artist Title" query are still found.
         if (resolved == null) {
           final byTitle = await _searchMusicVideos(cleanTitle, limit: 6);
           for (final clip in byTitle) {
@@ -132,6 +131,18 @@ class VideoPreviewResolver {
               resolved = clip;
               break;
             }
+          }
+        }
+
+        // Same artist official video preview fallback (restores v2.5.15 Canvas
+        // behavior when the specific track has no individual music video on
+        // iTunes, e.g. "Cabrón yo puedo" by Mario Bautista).
+        // Strictly validates sameVisualArtist so unrelated artists can never
+        // pass through.
+        if (resolved == null) {
+          final artistClips = await resolveClipsForArtist(artistName: artist);
+          if (artistClips.isNotEmpty) {
+            resolved = artistClips.first;
           }
         }
       } catch (_) {

@@ -264,7 +264,8 @@ bucket = os.environ["BUCKET"]
 prefix = os.environ["PREFIX"]
 mode = os.environ["MODE"]
 repo = os.environ["REPO"]
-min_supported = os.environ.get("MIN_SUPPORTED", "").strip() or version
+_min_env = os.environ.get("MIN_SUPPORTED", None)
+min_supported = "" if _min_env is not None and _min_env.strip() == "" else (_min_env.strip() if _min_env else version)
 mandatory = os.environ.get("MANDATORY", "1").strip() not in ("0", "false", "no")
 
 notes_path = manifest_dir / "notes.json"
