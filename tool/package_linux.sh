@@ -47,13 +47,21 @@ exec "$DIR/Inútil Music" "$@"
 EOF
 chmod 0755 "$bundle/inutil_music"
 
+# Incluir install.sh en el paquete si existe en la raíz del repo
+repo_root_installer="$repo_root/install.sh"
+if [[ -f "$repo_root_installer" ]]; then
+  cp "$repo_root_installer" "$bundle/install.sh"
+  chmod 0755 "$bundle/install.sh"
+fi
+
 mkdir -p "$(dirname "$output")"
 tar -czf "$output" -C "$bundle" \
   "Inútil Music" \
   inutil_music \
   data \
   lib \
-  THIRD_PARTY_NOTICES.md
+  THIRD_PARTY_NOTICES.md \
+  $([ -f "$bundle/install.sh" ] && echo install.sh || true)
 
 echo "Paquete OTA: $output ($(du -h "$output" | cut -f1))"
 tar -tzf "$output" | head -5 || true
