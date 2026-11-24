@@ -238,7 +238,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Top bar (desktop): Clean top context without mobile collapse arrow.
+                  // Top bar (desktop): Botón Atrás + Reproduciendo desde Artista + Menú.
                   Padding(
                     padding: EdgeInsets.fromLTRB(
                       32,
@@ -248,6 +248,27 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     ),
                     child: Row(
                       children: [
+                        Material(
+                          color: Colors.white.withValues(alpha: 0.12),
+                          shape: const CircleBorder(),
+                          clipBehavior: Clip.antiAlias,
+                          child: InkWell(
+                            key: const ValueKey('spotify-canvas-collapse'),
+                            onTap: onCollapse,
+                            child: Tooltip(
+                              message: strings.back,
+                              child: const SizedBox.square(
+                                dimension: 40,
+                                child: Icon(
+                                  Icons.arrow_back_rounded,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
                         InkWell(
                           onTap: onOpenArtist,
                           borderRadius: BorderRadius.circular(10),

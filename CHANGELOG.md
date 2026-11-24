@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.22+4280 — 2026-11-23
+
+### Fixed — Botón Atrás y tecla Escape para salir del reproductor en escritorio y laptop
+
+- **Botón Atrás visible en barra superior de escritorio.**
+  Se agregó el botón de retroceso circular translúcido (`Icons.arrow_back_rounded`) en la esquina superior izquierda de la vista de pantalla completa en laptop y escritorio, permitiendo minimizar y salir del reproductor para volver a la navegación principal.
+- **Soporte para tecla Escape en escritorio.**
+  Al presionar la tecla `Esc` en el teclado físico en sistemas de escritorio, el reproductor a pantalla completa se colapsa automáticamente restaurando la vista anterior.
+
 ## 2.5.21+4279 — 2026-11-23
 
 ### Improved — Adaptación del reproductor completo en laptop al estilo y proporciones del mini reproductor

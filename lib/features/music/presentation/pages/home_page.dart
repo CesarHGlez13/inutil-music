@@ -1073,9 +1073,18 @@ class _HomePageState extends ConsumerState<HomePage>
     FocusNode shortcutFocus,
     KeyEvent event,
   ) {
-    if (!AppPlatform.isDesktop ||
-        event is! KeyDownEvent ||
-        event.logicalKey != LogicalKeyboardKey.space) {
+    if (!AppPlatform.isDesktop || event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      if (_selectedIndex == _playerIndex) {
+        _handleSystemBack();
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (event.logicalKey != LogicalKeyboardKey.space) {
       return KeyEventResult.ignored;
     }
 
