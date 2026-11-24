@@ -26,13 +26,15 @@ fi
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 
 # 3. Obtener los archivos de la app
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" 2>/dev/null && pwd || echo "")"
 LOCAL_BUNDLE=""
-
-if [[ -n "$SCRIPT_DIR" && -x "$SCRIPT_DIR/build/linux/x64/release/bundle/Inútil Music" ]]; then
-  LOCAL_BUNDLE="$SCRIPT_DIR/build/linux/x64/release/bundle"
-elif [[ -n "$SCRIPT_DIR" && -x "$SCRIPT_DIR/Inútil Music" ]]; then
-  LOCAL_BUNDLE="$SCRIPT_DIR"
+_SRC="${BASH_SOURCE[0]:-}"
+if [[ -n "$_SRC" ]]; then
+  _SDIR="$(cd "$(dirname "$_SRC")" 2>/dev/null && pwd || echo "")"
+  if [[ -n "$_SDIR" && -x "$_SDIR/build/linux/x64/release/bundle/Inútil Music" ]]; then
+    LOCAL_BUNDLE="$_SDIR/build/linux/x64/release/bundle"
+  elif [[ -n "$_SDIR" && -x "$_SDIR/Inútil Music" ]]; then
+    LOCAL_BUNDLE="$_SDIR"
+  fi
 fi
 
 if [[ -n "$LOCAL_BUNDLE" ]]; then
