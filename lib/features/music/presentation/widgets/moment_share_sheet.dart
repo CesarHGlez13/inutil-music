@@ -7,12 +7,14 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/utils/duration_formatter.dart';
+import '../../../../services/memories/echo_memory.dart';
 import '../../../../services/player/player_service.dart';
 import '../../../../services/sharing/moment_clip_export_service.dart';
 import '../../../../services/sharing/moment_clip_models.dart';
 import '../../domain/entities/lyrics.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/app_strings.dart';
+import '../providers/echo_memory_providers.dart';
 import '../providers/moment_clip_providers.dart';
 import '../providers/music_providers.dart';
 import '../providers/playback_artwork_provider.dart';
@@ -110,6 +112,8 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
   String? _frozenArtworkSource;
   String? _frozenArtworkFallback;
   Color? _frozenAccentColor;
+  EchoMemory? _frozenEchoMemory;
+  bool _includeEchoMemory = false;
 
   // Reuse an already-rendered clip if user shares and then taps Save without
   // changing the mode or selected moment window.
@@ -170,6 +174,18 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
     _frozenArtworkSource = widget.artworkSource ?? artwork.source ?? snapshot.thumbnailUrl;
     _frozenArtworkFallback = widget.artworkFallbackSource ?? artwork.fallback;
     _frozenAccentColor = widget.accentColor ?? ref.read(playbackArtworkColorProvider);
+    _frozenEchoMemory = ref.read(activeTrackEchoMemoryProvider);
+  }
+
+  String _effectiveArtistCaption(String baseArtist) {
+    final memory = _frozenEchoMemory;
+    if (!_includeEchoMemory || memory == null) return baseArtist;
+    final cleanNote = memory.note.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (cleanNote.isEmpty) return baseArtist;
+    final shortNote = cleanNote.length > 42
+        ? '${cleanNote.substring(0, 41)}…'
+        : cleanNote;
+    return '$baseArtist · “$shortNote”';
   }
 
   @override
@@ -454,12 +470,14 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
     final title = (snapshot.title ?? '').trim().isNotEmpty
         ? snapshot.title!.trim()
         : 'Inútil Music';
-    final artist = (snapshot.artist ?? '').trim().isNotEmpty
+    final baseArtist = (snapshot.artist ?? '').trim().isNotEmpty
         ? snapshot.artist!.trim()
         : 'Inútil Music';
+    final artist = _effectiveArtistCaption(baseArtist);
+    final effectiveSignature = '$signature|mem:$_includeEchoMemory';
 
     MomentClipExportResult? result;
-    if (_cachedSignature == signature && _cachedResult != null) {
+    if (_cachedSignature == effectiveSignature && _cachedResult != null) {
       result = _cachedResult;
     } else {
       final jobId = 'moment_${DateTime.now().microsecondsSinceEpoch}';
@@ -513,7 +531,7 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
             });
           },
         );
-        _cachedSignature = signature;
+        _cachedSignature = effectiveSignature;
         _cachedResult = result;
       } on MomentExportCancelledException {
         if (mounted) {
@@ -617,9 +635,10 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
     final title = (snapshot.title ?? '').trim().isNotEmpty
         ? snapshot.title!.trim()
         : 'Inútil Music';
-    final artist = (snapshot.artist ?? '').trim().isNotEmpty
+    final baseArtist = (snapshot.artist ?? '').trim().isNotEmpty
         ? snapshot.artist!.trim()
         : 'Inútil Music';
+    final artist = _effectiveArtistCaption(baseArtist);
     final artworkSource =
         _frozenArtworkSource ?? widget.artworkSource ?? artwork.source;
     final artworkFallback =
@@ -741,6 +760,39 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
                   ),
                 ),
               ),
+              if (_frozenEchoMemory != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2, bottom: 2),
+                  child: FilterChip(
+                    key: const ValueKey('moment-include-echo-memory'),
+                    selected: _includeEchoMemory,
+                    avatar: const Icon(
+                      Icons.auto_stories_rounded,
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                    label: Text(
+                      strings.choose(
+                        'Incluir Echo Memory en el clip',
+                        'Include Echo Memory in clip',
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    backgroundColor: Colors.white.withValues(alpha: 0.08),
+                    selectedColor: accent.withValues(alpha: 0.42),
+                    checkmarkColor: Colors.white,
+                    side: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                    onSelected: _exporting
+                        ? null
+                        : (v) => setState(() => _includeEchoMemory = v),
+                  ),
+                ),
 
               // Live 9:16 vertical clip preview canvas.
               Expanded(

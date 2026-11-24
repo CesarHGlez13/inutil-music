@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'algorithm_control_settings.dart';
 import 'recommendation_catalog.dart';
 import 'recommendation_feed_models.dart';
 import 'recommendation_repository.dart';
@@ -34,6 +35,7 @@ class PersonalizedRecommendationConfig {
     this.newForYouMaximum = 8,
     this.discoveryMinimum = 4,
     this.discoveryMaximum = 12,
+    this.algorithmControl = AlgorithmControlSettings.defaults,
   }) : assert(minimumDistinctSeeds >= 1),
        assert(historyScanLimit >= minimumDistinctSeeds),
        assert(recentSeedLimit >= 1),
@@ -75,6 +77,7 @@ class PersonalizedRecommendationConfig {
   final int newForYouMaximum;
   final int discoveryMinimum;
   final int discoveryMaximum;
+  final AlgorithmControlSettings algorithmControl;
 }
 
 class CachedPersonalizedRecommendationFeed {
@@ -175,12 +178,131 @@ class PersonalizedRecommendationEngine {
       return emptyFeed;
     }
 
+    final control = config.algorithmControl;
+    final sections = <PersonalizedRecommendationSection>[];
+    final effectiveMaxTracksPerArtist =
+        !control.isDefault && control.wildcardPercent >= 20
+        ? 1
+        : config.maxTracksPerArtist;
+    final allocation = _TrackAllocation(
+      maxTracksPerArtist: effectiveMaxTracksPerArtist,
+      avoidSameArtistBackToBack: !control.isDefault &&
+          control.avoidSameArtistBackToBack,
+    );
+
+    final continueMaximum = control.isDefault
+        ? config.continueMaximum
+        : (config.continueMaximum * (0.6 + control.knownPercent / 100.0))
+              .round()
+              .clamp(config.continueMinimum, config.continueMaximum + 4);
+
+    final continueItems = allocation.trySelect(
+      recentSeeds.map(PersonalizedTrackItem.fromSeed),
+      minimum: config.continueMinimum,
+      maximum: continueMaximum,
+    );
+    if (continueItems.isNotEmpty) {
+      sections.add(
+        PersonalizedRecommendationSection(
+          kind: PersonalizedSectionKind.continueListening,
+          title: 'Seguir escuchando',
+          items: continueItems,
+        ),
+      );
+    }
+
+    // Modo sin algoritmo: muestra únicamente el historial propio del usuario
+    // sin generar recomendaciones automáticas ni hacer consultas de radio.
+    if (control.algorithmDisabled) {
+      final manualFeed = PersonalizedRecommendationFeed(
+        generatedAt: now,
+        sections: sections,
+      );
+      if (repository.generation != generation) {
+        return PersonalizedRecommendationFeed(
+          generatedAt: now,
+          sections: const <PersonalizedRecommendationSection>[],
+        );
+      }
+      await _saveFeedBestEffort(manualFeed, now, generation);
+      return manualFeed;
+    }
+
+    final skippedSeedKeys = control.penalizeSkippedTracks
+        ? allSeeds
+              .where(_isRepeatedlySkippedSeed)
+              .map((seed) => seed.trackKey)
+              .toSet()
+        : const <String>{};
+
+    // Modo Nostalgia: rescata canciones muy escuchadas que llevan al menos
+    // 21 días sin sonar cuando el usuario eleva el peso de "Olvidadas".
+    if (control.forgottenPercent >= 20) {
+      final forgottenCutoff = now.subtract(const Duration(days: 21));
+      final nostalgiaSeeds = topSeeds
+          .where(
+            (seed) =>
+                !skippedSeedKeys.contains(seed.trackKey) &&
+                seed.lastPlayedAt.toUtc().isBefore(forgottenCutoff),
+          )
+          .toList(growable: false)
+        ..sort((a, b) {
+          if (control.prioritizeFavorites) {
+            final favA = (a.isFavorite == true || a.isLiked == true) ? 1 : 0;
+            final favB = (b.isFavorite == true || b.isLiked == true) ? 1 : 0;
+            if (favA != favB) return favB.compareTo(favA);
+          }
+          final playCmp = b.playCount.compareTo(a.playCount);
+          if (playCmp != 0) return playCmp;
+          return a.lastPlayedAt.compareTo(b.lastPlayedAt);
+        });
+      final nostalgiaMax = (4 + (control.forgottenPercent / 10).round()).clamp(
+        4,
+        12,
+      );
+      final nostalgiaItems = allocation.trySelect(
+        nostalgiaSeeds.map(PersonalizedTrackItem.fromSeed),
+        minimum: 1,
+        maximum: nostalgiaMax,
+      );
+      if (nostalgiaItems.isNotEmpty) {
+        sections.add(
+          PersonalizedRecommendationSection(
+            kind: PersonalizedSectionKind.nostalgia,
+            title: 'Modo Nostalgia',
+            items: nostalgiaItems,
+          ),
+        );
+      }
+    }
+
+    Iterable<RecommendationSeed> rankSeeds(
+      Iterable<RecommendationSeed> input,
+    ) {
+      final list = input.where((seed) => seed.canQueryYouTube).toList();
+      if (control.isDefault && skippedSeedKeys.isEmpty) {
+        return list;
+      }
+      list.sort((a, b) {
+        final skippedA = skippedSeedKeys.contains(a.trackKey) ? 1 : 0;
+        final skippedB = skippedSeedKeys.contains(b.trackKey) ? 1 : 0;
+        if (skippedA != skippedB) return skippedA.compareTo(skippedB);
+        if (!control.isDefault && control.prioritizeFavorites) {
+          final favA = (a.isFavorite == true || a.isLiked == true) ? 1 : 0;
+          final favB = (b.isFavorite == true || b.isLiked == true) ? 1 : 0;
+          if (favA != favB) return favB.compareTo(favA);
+        }
+        return 0;
+      });
+      return list;
+    }
+
     // Local-only imports still belong in Continue, but they must not consume
     // the finite slots used for `/next`. Skip them before applying the limit
     // so later streaming/downloaded YouTube seeds remain eligible.
     final queryableSeeds = _balancedSeeds(
-      recentSeeds.where((seed) => seed.canQueryYouTube),
-      topSeeds.where((seed) => seed.canQueryYouTube),
+      rankSeeds(recentSeeds),
+      rankSeeds(topSeeds),
       limit: config.topSeedLimit,
     );
     final pools = await _mapConcurrent<RecommendationSeed, _SeedCandidatePool>(
@@ -195,36 +317,42 @@ class PersonalizedRecommendationEngine {
       ),
     );
 
-    final sections = <PersonalizedRecommendationSection>[];
-    final allocation = _TrackAllocation(
-      maxTracksPerArtist: config.maxTracksPerArtist,
-    );
-
-    final continueItems = allocation.trySelect(
-      recentSeeds.map(PersonalizedTrackItem.fromSeed),
-      minimum: config.continueMinimum,
-      maximum: config.continueMaximum,
-    );
-    if (continueItems.isNotEmpty) {
-      sections.add(
-        PersonalizedRecommendationSection(
-          kind: PersonalizedSectionKind.continueListening,
-          title: 'Seguir escuchando',
-          items: continueItems,
-        ),
-      );
-    }
-
     final recentKeys = recentSeeds.map((seed) => seed.trackKey).toSet();
+    final antiRepeatCutoff = control.antiRepetitionDays > 0
+        ? now.subtract(Duration(days: control.antiRepetitionDays))
+        : null;
+    final antiRepeatKeys = antiRepeatCutoff == null
+        ? const <String>{}
+        : allSeeds
+              .where((seed) => !seed.lastPlayedAt.toUtc().isBefore(antiRepeatCutoff))
+              .map((seed) => seed.trackKey)
+              .toSet();
+    final excludedFromBecause = control.isDefault
+        ? recentKeys
+        : <String>{
+            ...antiRepeatKeys,
+            if (control.antiRepetitionDays > 0) ...recentKeys,
+            ...skippedSeedKeys,
+          };
+
+    final becauseMaximum = control.isDefault
+        ? config.becauseMaximum
+        : (config.becauseMaximum *
+                  (0.55 + (control.knownPercent + control.discoveryPercent) / 140.0))
+              .round()
+              .clamp(config.becauseMinimum, config.becauseMaximum + 3);
+
     for (final pool in pools.take(config.becauseSeedCount)) {
       final ranked = pool.candidates.toList(growable: false)
         ..sort(_compareCandidates);
       final becauseItems = allocation.trySelect(
         ranked
-            .where((candidate) => !recentKeys.contains(candidate.trackKey))
+            .where(
+              (candidate) => !excludedFromBecause.contains(candidate.trackKey),
+            )
             .map(PersonalizedTrackItem.fromCandidate),
         minimum: config.becauseMinimum,
-        maximum: config.becauseMaximum,
+        maximum: becauseMaximum,
       );
       if (becauseItems.isEmpty) {
         continue;
@@ -272,14 +400,25 @@ class PersonalizedRecommendationEngine {
     final everKeys = <String>{
       ...allSeeds.map((seed) => seed.trackKey),
       ...libraryKeys,
+      ...antiRepeatKeys,
+      ...skippedSeedKeys,
     };
+    final discoveryMaximum = control.isDefault
+        ? config.discoveryMaximum
+        : (config.discoveryMaximum *
+                  (0.5 +
+                      (control.discoveryPercent + control.wildcardPercent) /
+                          75.0))
+              .round()
+              .clamp(config.discoveryMinimum, config.discoveryMaximum + 6);
     final discoveryCandidates = _rankDiscovery(
       pools,
+      wildcardBoost: !control.isDefault && control.wildcardPercent >= 20,
     ).where((candidate) => !everKeys.contains(candidate.trackKey));
     final discoveryItems = allocation.trySelect(
       discoveryCandidates.map(PersonalizedTrackItem.fromCandidate),
       minimum: config.discoveryMinimum,
-      maximum: config.discoveryMaximum,
+      maximum: discoveryMaximum,
     );
     if (discoveryItems.isNotEmpty) {
       sections.add(
@@ -333,7 +472,8 @@ class PersonalizedRecommendationEngine {
         PersonalizedSectionKind.mixes ||
         PersonalizedSectionKind.discovery => candidateSourcesUnavailable,
         PersonalizedSectionKind.newForYou => releaseSourcesUnavailable,
-        PersonalizedSectionKind.continueListening => false,
+        PersonalizedSectionKind.continueListening ||
+        PersonalizedSectionKind.nostalgia => false,
       };
       final source = usePrevious ? previous.sections : current;
       return source.where((section) => section.kind == kind);
@@ -647,7 +787,10 @@ class PersonalizedRecommendationEngine {
     }
   }
 
-  List<RelatedTrackCandidate> _rankDiscovery(List<_SeedCandidatePool> pools) {
+  List<RelatedTrackCandidate> _rankDiscovery(
+    List<_SeedCandidatePool> pools, {
+    bool wildcardBoost = false,
+  }) {
     final aggregated = <String, _AggregatedCandidate>{};
     for (final pool in pools) {
       for (final candidate in pool.candidates) {
@@ -673,6 +816,14 @@ class PersonalizedRecommendationEngine {
     }
     final ranked = aggregated.values.toList(growable: false)
       ..sort((left, right) {
+        if (wildcardBoost) {
+          // Higher wildcard weight promotes single-seed/deeper surprises
+          // while remaining deterministic.
+          final rankComparison = right.bestRank.compareTo(left.bestRank);
+          if (rankComparison != 0) {
+            return rankComparison;
+          }
+        }
         final appearanceComparison = right.appearances.compareTo(
           left.appearances,
         );
@@ -735,9 +886,13 @@ class PersonalizedRecommendationEngine {
 }
 
 class _TrackAllocation {
-  _TrackAllocation({required this.maxTracksPerArtist});
+  _TrackAllocation({
+    required this.maxTracksPerArtist,
+    this.avoidSameArtistBackToBack = false,
+  });
 
   final int maxTracksPerArtist;
+  final bool avoidSameArtistBackToBack;
   Set<String> _seenTrackKeys = <String>{};
 
   List<PersonalizedTrackItem> trySelect(
@@ -753,10 +908,10 @@ class _TrackAllocation {
     // global so the same video can never leak into another section.
     final stagedArtistCounts = <String, int>{};
     final selected = <PersonalizedTrackItem>[];
-    for (final candidate in candidates) {
-      if (!stagedKeys.add(candidate.trackKey)) {
-        continue;
-      }
+    final deferred = <PersonalizedTrackItem>[];
+    Set<String> previousArtistKeys = const <String>{};
+
+    bool canTake(PersonalizedTrackItem candidate, {required bool checkAdjacent}) {
       final artistKeys = _artistKeys(
         candidate.artists,
         candidate.artistBrowseIds,
@@ -764,15 +919,56 @@ class _TrackAllocation {
       if (artistKeys.any(
         (artist) => (stagedArtistCounts[artist] ?? 0) >= maxTracksPerArtist,
       )) {
-        stagedKeys.remove(candidate.trackKey);
-        continue;
+        return false;
       }
+      if (checkAdjacent &&
+          avoidSameArtistBackToBack &&
+          previousArtistKeys.isNotEmpty &&
+          artistKeys.any(previousArtistKeys.contains)) {
+        return false;
+      }
+      return true;
+    }
+
+    void commit(PersonalizedTrackItem candidate) {
+      final artistKeys = _artistKeys(
+        candidate.artists,
+        candidate.artistBrowseIds,
+      );
       for (final artist in artistKeys) {
         stagedArtistCounts[artist] = (stagedArtistCounts[artist] ?? 0) + 1;
       }
+      previousArtistKeys = artistKeys.toSet();
       selected.add(candidate);
+    }
+
+    for (final candidate in candidates) {
+      if (!stagedKeys.add(candidate.trackKey)) {
+        continue;
+      }
+      if (!canTake(candidate, checkAdjacent: true)) {
+        stagedKeys.remove(candidate.trackKey);
+        if (avoidSameArtistBackToBack &&
+            canTake(candidate, checkAdjacent: false)) {
+          deferred.add(candidate);
+        }
+        continue;
+      }
+      commit(candidate);
       if (selected.length >= maximum) {
         break;
+      }
+    }
+
+    if (selected.length < maximum && deferred.isNotEmpty) {
+      for (final candidate in deferred) {
+        if (selected.length >= maximum) break;
+        if (!stagedKeys.add(candidate.trackKey)) continue;
+        if (!canTake(candidate, checkAdjacent: false)) {
+          stagedKeys.remove(candidate.trackKey);
+          continue;
+        }
+        commit(candidate);
       }
     }
     if (selected.length < minimum) {
@@ -781,6 +977,17 @@ class _TrackAllocation {
     _seenTrackKeys = stagedKeys;
     return List<PersonalizedTrackItem>.unmodifiable(selected);
   }
+}
+
+bool _isRepeatedlySkippedSeed(RecommendationSeed seed) {
+  if (seed.isFavorite == true || seed.isLiked == true) {
+    return false;
+  }
+  if (seed.playCount < 2 || seed.completedCount > 0) {
+    return false;
+  }
+  final avgListenedMs = seed.totalListenedMs / seed.playCount;
+  return avgListenedMs < 35000;
 }
 
 class _SeedCandidatePool {

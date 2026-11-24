@@ -2114,6 +2114,13 @@ final personalizedHomeFeedSourceProvider =
       }
       final database = ref.watch(databaseServiceProvider);
       final coordinator = ref.watch(libraryOperationCoordinatorProvider);
+      final algorithmControl = ref.watch(
+        settingsControllerProvider.select(
+          (state) =>
+              state.asData?.value.algorithmControl ??
+              AlgorithmControlSettings.defaults,
+        ),
+      );
       final engine = PersonalizedRecommendationEngine(
         repository: LocalDatabaseRecommendationRepository(
           database: database,
@@ -2122,6 +2129,9 @@ final personalizedHomeFeedSourceProvider =
         catalog: InnerTubeRecommendationCatalog(
           related: service as YouTubeMusicRelated,
           artists: service as YouTubeMusicArtistLookup,
+        ),
+        config: PersonalizedRecommendationConfig(
+          algorithmControl: algorithmControl,
         ),
       );
       return EnginePersonalizedHomeFeedSource(engine);
@@ -2196,13 +2206,21 @@ class HomeRecommendationsController
     _inFlightForcesNetwork = false;
     _inFlightRefreshesYouTube = false;
     final strings = ref.watch(appStringsProvider);
+    final algorithmDisabled = ref.watch(
+      settingsControllerProvider.select(
+        (state) =>
+            state.asData?.value.algorithmControl.algorithmDisabled ?? false,
+      ),
+    );
     _personalizedSource = ref.watch(personalizedHomeFeedSourceProvider);
-    _artistSource = ref.watch(homeArtistRecommendationSourceProvider);
+    _artistSource = algorithmDisabled
+        ? null
+        : ref.watch(homeArtistRecommendationSourceProvider);
     _historyArtistSection = null;
     _hasQualifiedArtistHistory = false;
 
     // An invisible feed must not create a cold generic network provider.
-    if (ref.read(homeFeedActivityProvider)) {
+    if (!algorithmDisabled && ref.read(homeFeedActivityProvider)) {
       final youtubeState = ref.read(youtubeMusicHomeRecommendationsProvider);
       _youtubeMusic = youtubeState.value ?? const [];
     } else {
@@ -2389,19 +2407,31 @@ class HomeRecommendationsController
         }
       }());
     }
-    if (refreshYouTube) {
-      ref.invalidate(youtubeMusicHomeRecommendationsProvider);
-    }
-    final youtubeMusicFuture = ref.read(
-      youtubeMusicHomeRecommendationsProvider.future,
-    );
-    tasks.add(() async {
-      try {
-        refreshedYouTubeMusic = await youtubeMusicFuture;
-      } catch (error, stackTrace) {
-        rememberError(error, stackTrace);
+    final algorithmDisabled =
+        ref
+            .read(settingsControllerProvider)
+            .asData
+            ?.value
+            .algorithmControl
+            .algorithmDisabled ??
+        false;
+    if (!algorithmDisabled) {
+      if (refreshYouTube) {
+        ref.invalidate(youtubeMusicHomeRecommendationsProvider);
       }
-    }());
+      final youtubeMusicFuture = ref.read(
+        youtubeMusicHomeRecommendationsProvider.future,
+      );
+      tasks.add(() async {
+        try {
+          refreshedYouTubeMusic = await youtubeMusicFuture;
+        } catch (error, stackTrace) {
+          rememberError(error, stackTrace);
+        }
+      }());
+    } else {
+      refreshedYouTubeMusic = const <HomeRecommendationSection>[];
+    }
     await Future.wait(tasks);
     if (!ref.mounted || expectedEpoch != _buildEpoch) {
       return;
@@ -2486,6 +2516,8 @@ List<HomeRecommendationSection> _homeSectionsFromPersonalizedFeed(
             title: switch (section.kind) {
               PersonalizedSectionKind.continueListening =>
                 strings.continueListening,
+              PersonalizedSectionKind.nostalgia =>
+                strings.choose('Modo Nostalgia', 'Nostalgia Mode'),
               PersonalizedSectionKind.becauseYouListened =>
                 strings.becauseYouListened(section.seedTitle),
               PersonalizedSectionKind.mixes => strings.yourMixes,

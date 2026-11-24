@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.5.25+4283 — 2026-11-24
+
+### Added — Top 5 innovaciones de Inútil Music (Algoritmo configurable, Echo Memory, Versiones, Máquina del Tiempo y Listening Rooms)
+
+- **Centro de Control del Algoritmo (Inicio y Ajustes).**
+  Permite controlar por completo cómo recomienda música Inútil Music: presets rápidos (`Equilibrado`, `Descubrimiento`, `Nostalgia`, `Sin algoritmo`), mezcla deslizable auto-equilibrada a 100 % (`Conocidas`, `Descubrimiento`, `Olvidadas/Nostalgia`, `Sorpresa`), **Modo sin algoritmo** (oculta recomendaciones automáticas y desactiva la radio automática en la cola), ventana de **Anti-repetición** (`Off`, `1d`, `3d`, `7d`, `14d`), penalización de canciones omitidas, prioridad a favoritos y alternancia de artistas.
+- **Echo Memory (Recuerdos en canciones).**
+  Asocia notas personales, fecha y fotografía opcional a cualquier canción desde el menú `⋮` del reproductor (SQLite v12 + respaldo automático en la nube). Al volver a escuchar la canción aparece un aviso translúcido discreto y descartable (respetando privacidad global y por recuerdo), incluye galería buscable de recuerdos desde Inicio y opción para incluir tu recuerdo dentro de los clips de *Compartir momento*.
+- **Detector de Versiones en el reproductor.**
+  Nueva acción *Otras versiones* en el menú `⋮` que localiza y clasifica versiones `Original`, `En vivo`, `Acústica`, `Remix`, `Remaster` y `Cover` de la canción activa con filtros por categoría, reproducción directa y añadir siguiente a la cola.
+- **Máquina del Tiempo Musical.**
+  Accesible desde Inicio para viajar por tu historial real: *Modo Nostalgia* («Canciones que amabas y olvidaste»), *En esta época / Hace un año* y explorador *Por mes* con estadísticas, reproducción de sesión en 1 toque y creación instantánea de playlist.
+- **Listening Rooms (Salas sincronizadas con amigos).**
+  Accesible desde Inicio, *Dispositivos (Connect)* y el reproductor: crea salas con código de 6 letras, enlace compartible y código QR, reproduce música sincronizada con compensación de latencia, cola colaborativa con votos, reacciones en vivo y chat en tiempo real respaldado por reglas dedicadas en Firestore.
+
 ## 2.5.24+4282 — 2026-11-24
 
 ### Improved — Apariencia funcional y configurable, botón Guardar (+) para Favoritos y Playlists, y mini clips desde frases seleccionadas

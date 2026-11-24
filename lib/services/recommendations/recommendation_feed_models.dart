@@ -3,6 +3,7 @@ import 'recommendation_storage_models.dart';
 /// Semantic groups produced by the local personalization engine.
 enum PersonalizedSectionKind {
   continueListening,
+  nostalgia,
   becauseYouListened,
   mixes,
   newForYou,

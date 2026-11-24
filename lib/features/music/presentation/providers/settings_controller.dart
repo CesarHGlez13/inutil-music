@@ -158,6 +158,8 @@ class SettingsState {
     this.skipSilenceEnabled = false,
     this.dynamicPlayerAccent = false,
     this.playerSaveButtonAction = PlayerSaveButtonAction.smart,
+    this.algorithmControl = AlgorithmControlSettings.defaults,
+    this.echoMemoryBannerEnabled = true,
   });
 
   final String downloadDirectory;
@@ -197,6 +199,8 @@ class SettingsState {
   final bool skipSilenceEnabled;
   final bool dynamicPlayerAccent;
   final PlayerSaveButtonAction playerSaveButtonAction;
+  final AlgorithmControlSettings algorithmControl;
+  final bool echoMemoryBannerEnabled;
 
   PlayerVisualBackdropMode get visualBackdropMode {
     if (spotifyCanvasEnabled) return PlayerVisualBackdropMode.videoCanvas;
@@ -241,6 +245,8 @@ class SettingsState {
     bool? skipSilenceEnabled,
     bool? dynamicPlayerAccent,
     PlayerSaveButtonAction? playerSaveButtonAction,
+    AlgorithmControlSettings? algorithmControl,
+    bool? echoMemoryBannerEnabled,
   }) {
     return SettingsState(
       downloadDirectory: downloadDirectory ?? this.downloadDirectory,
@@ -291,6 +297,9 @@ class SettingsState {
       dynamicPlayerAccent: dynamicPlayerAccent ?? this.dynamicPlayerAccent,
       playerSaveButtonAction:
           playerSaveButtonAction ?? this.playerSaveButtonAction,
+      algorithmControl: algorithmControl ?? this.algorithmControl,
+      echoMemoryBannerEnabled:
+          echoMemoryBannerEnabled ?? this.echoMemoryBannerEnabled,
     );
   }
 }
@@ -345,6 +354,8 @@ class SettingsController extends AsyncNotifier<SettingsState> {
   static const _skipSilenceEnabledKey = 'settings.skipSilenceEnabled';
   static const _dynamicPlayerAccentKey = 'settings.dynamicPlayerAccent';
   static const _playerSaveButtonActionKey = 'settings.playerSaveButtonAction';
+  static const _algorithmControlKey = 'settings.algorithmControl';
+  static const _echoMemoryBannerEnabledKey = 'settings.echoMemoryBannerEnabled';
   static const _mediaRootDirectoryName = 'Inutil-Music';
   Future<void> _lyricsTextAlignmentWriteTail = Future<void>.value();
   Future<void> _enabledLyricsProvidersWriteTail = Future<void>.value();
@@ -498,6 +509,11 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     final playerSaveButtonAction = PlayerSaveButtonAction.fromCode(
       prefs.getString(_playerSaveButtonActionKey),
     );
+    final algorithmControl = AlgorithmControlSettings.fromJsonString(
+      prefs.getString(_algorithmControlKey),
+    );
+    final echoMemoryBannerEnabled =
+        prefs.getBool(_echoMemoryBannerEnabledKey) ?? true;
     final storedDirectory = prefs.getString(_downloadDirectoryKey);
     final encodedMigrationJournal = prefs.getString(
       _downloadDirectoryMigrationJournalKey,
@@ -685,6 +701,8 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       skipSilenceEnabled: skipSilenceEnabled,
       dynamicPlayerAccent: dynamicPlayerAccent,
       playerSaveButtonAction: playerSaveButtonAction,
+      algorithmControl: algorithmControl,
+      echoMemoryBannerEnabled: echoMemoryBannerEnabled,
     );
   }
 
@@ -1157,6 +1175,26 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     state = AsyncData(current.copyWith(playerSaveButtonAction: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_playerSaveButtonActionKey, action.code);
+  }
+
+  Future<void> setAlgorithmControl(AlgorithmControlSettings control) async {
+    final current = state.asData?.value ?? await future;
+    if (current.algorithmControl == control) return;
+    state = AsyncData(current.copyWith(algorithmControl: control));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_algorithmControlKey, control.toJsonString());
+  }
+
+  Future<void> applyAlgorithmPreset(AlgorithmPreset preset) {
+    return setAlgorithmControl(AlgorithmControlSettings.forPreset(preset));
+  }
+
+  Future<void> setEchoMemoryBannerEnabled(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.echoMemoryBannerEnabled == enabled) return;
+    state = AsyncData(current.copyWith(echoMemoryBannerEnabled: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_echoMemoryBannerEnabledKey, enabled);
   }
 
   Future<void> setMiniPlayerMode(MiniPlayerMode mode) async {

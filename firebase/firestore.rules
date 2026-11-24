@@ -152,5 +152,23 @@ service cloud.firestore {
       // `timestampValue` real para que las dos apps hablen el mismo tipo.
       allow delete: if isSignedIn() || request.time < resource.data.expiresAt;
     }
+
+    // Listening Rooms (Salas sincronizadas con amigos):
+    // - `allow list: if false` impide enumerar salas activas; solo quien tiene
+    //   el código de 6 caracteres (o enlace/QR) puede leer y unirse.
+    // - Solo usuarios autenticados pueden crear, leer o participar.
+    // - El anfitrión (`hostUid`) y el código (`code`) son inmutables tras crear.
+    // - Solo el anfitrión puede cerrar/borrar la sala.
+    match /listening_rooms/{roomCode} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn() &&
+                    request.resource.data.hostUid == request.auth.uid &&
+                    request.resource.data.code == roomCode;
+      allow update: if isSignedIn() &&
+                    request.resource.data.hostUid == resource.data.hostUid &&
+                    request.resource.data.code == resource.data.code;
+      allow delete: if isSignedIn() && resource.data.hostUid == request.auth.uid;
+    }
   }
 }

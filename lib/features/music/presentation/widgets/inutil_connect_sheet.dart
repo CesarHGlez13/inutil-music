@@ -8,7 +8,9 @@ import '../../../../core/firebase/firebase_playback_sync_service.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
 import '../../../../services/player/player_service.dart';
 import '../../domain/entities/track_info.dart';
+import '../providers/listening_room_providers.dart';
 import '../providers/music_providers.dart';
+import 'listening_room_sheet.dart';
 
 /// Modal estilo Spotify Connect para control de reproducción, volumen remoto y
 /// transferencia instantánea entre cualquier equipo con la misma cuenta.
@@ -603,6 +605,37 @@ class InutilConnectSheet extends ConsumerWidget {
                   onChanged: (val) => syncService.setAutoPlayOnPc(val),
                 ),
               ],
+
+              // Listening Rooms (Salas sincronizadas con amigos)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: Builder(
+                  builder: (context) {
+                    final room =
+                        ref.watch(listeningRoomStateProvider).asData?.value ??
+                        ref.watch(listeningRoomServiceProvider).room;
+                    return _DeviceTargetTile(
+                      icon: Icons.groups_rounded,
+                      title: room != null
+                          ? 'Sala en vivo · ${room.name}'
+                          : 'Listening Rooms (Salas con amigos)',
+                      subtitle: room != null
+                          ? 'Código ${room.code} · ${room.activeMembersAt(DateTime.now()).length} escuchando'
+                          : 'Crea o únete a una sala sincronizada con cola y reacciones',
+                      dotColor: room != null
+                          ? _spotifyGreen
+                          : colors.primary,
+                      trailingLabel: room != null ? 'Abrir' : 'Entrar',
+                      cardSurface: cardSurface,
+                      cardBorder: cardBorder,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        unawaited(ListeningRoomSheet.show(context));
+                      },
+                    );
+                  },
+                ),
+              ),
 
               Padding(
                 padding: const EdgeInsets.only(top: 10),

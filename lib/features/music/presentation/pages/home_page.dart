@@ -35,14 +35,19 @@ import '../../data/datasources/remote_music_datasource.dart';
 import '../../domain/entities/local_track.dart';
 import '../../domain/entities/track_info.dart';
 import '../../domain/usecases/get_track_info.dart';
+import '../providers/listening_room_providers.dart';
 import '../providers/music_providers.dart';
 import '../providers/local_track_index_provider.dart';
 import '../providers/track_selection_controller.dart';
+import '../widgets/algorithm_control_settings.dart';
+import '../widgets/echo_memory_sheet.dart';
 import '../widgets/inutil_account_dialog.dart';
 import '../widgets/desktop_now_playing_rail.dart';
 import '../widgets/inutil_connect_sheet.dart';
 import '../widgets/inutil_support_popup.dart';
 import '../widgets/inutil_wrapped_dialog.dart';
+import '../widgets/listening_room_sheet.dart';
+import '../widgets/time_machine_sheet.dart';
 import '../providers/youtube_music_auth_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
 import '../widgets/inutil_logo.dart';
@@ -3941,6 +3946,7 @@ class _HomeViewState extends ConsumerState<_HomeView> {
     final historyTracks = history.value ?? const <LocalTrack>[];
     final hasHistory = historyTracks.isNotEmpty;
     final recommendationsState = ref.watch(homeRecommendationsProvider);
+    ref.watch(listeningRoomPlayerBridgeProvider);
     final recommendations =
         (recommendationsState.value ?? const <HomeRecommendationSection>[])
             .where((section) => !_isHomeMixSection(section, strings))
@@ -4062,7 +4068,7 @@ class _HomeViewState extends ConsumerState<_HomeView> {
         slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(4, 2, 4, 12),
+              padding: const EdgeInsets.fromLTRB(4, 2, 4, 8),
               child: _HomeFilterPills(
                 selected: _filter,
                 onSelected: (next) {
@@ -4070,6 +4076,12 @@ class _HomeViewState extends ConsumerState<_HomeView> {
                   setState(() => _filter = next);
                 },
               ),
+            ),
+          ),
+          const SliverToBoxAdapter(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(4, 0, 4, 12),
+              child: _HomeSmartToolsStrip(),
             ),
           ),
           if (showQuickGrid)
@@ -4188,6 +4200,117 @@ class _HomeFilterPills extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _HomeSmartToolsStrip extends ConsumerWidget {
+  const _HomeSmartToolsStrip();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colors = Theme.of(context).colorScheme;
+    final spanish = ref.watch(appStringsProvider).language != 'en';
+    final algorithmControl = ref.watch(
+      settingsControllerProvider.select(
+        (s) => s.asData?.value.algorithmControl,
+      ),
+    );
+    final activeRoom =
+        ref.watch(listeningRoomStateProvider).asData?.value ??
+        ref.watch(listeningRoomServiceProvider).room;
+    final isNoAlgorithm = algorithmControl?.algorithmDisabled == true;
+
+    Widget buildTool({
+      required String keyName,
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      Color? highlightColor,
+    }) {
+      final accent = highlightColor ?? colors.primary;
+      final highlighted = highlightColor != null;
+      return InkWell(
+        key: ValueKey(keyName),
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: highlighted
+                ? accent.withValues(alpha: 0.16)
+                : colors.surfaceContainerLow.withValues(alpha: 0.78),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: highlighted
+                  ? accent.withValues(alpha: 0.55)
+                  : colors.outlineVariant.withValues(alpha: 0.28),
+              width: 0.9,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: accent),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: colors.onSurface.withValues(alpha: 0.92),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 34,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 2),
+        children: [
+          buildTool(
+            keyName: 'home-tool-time-machine',
+            icon: Icons.history_toggle_off_rounded,
+            label: spanish ? 'Máquina del Tiempo' : 'Time Machine',
+            onTap: () => TimeMachineSheet.show(context),
+          ),
+          const SizedBox(width: 8),
+          buildTool(
+            keyName: 'home-tool-echo-memory',
+            icon: Icons.auto_stories_rounded,
+            label: 'Echo Memory',
+            onTap: () => EchoMemoriesGallerySheet.show(context),
+          ),
+          const SizedBox(width: 8),
+          buildTool(
+            keyName: 'home-tool-algorithm',
+            icon: Icons.tune_rounded,
+            label: isNoAlgorithm
+                ? (spanish ? 'Sin algoritmo' : 'No algorithm')
+                : (spanish ? 'Algoritmo' : 'Algorithm'),
+            highlightColor: isNoAlgorithm ? colors.primary : null,
+            onTap: () => AlgorithmControlSettingsView.showSheet(context),
+          ),
+          const SizedBox(width: 8),
+          buildTool(
+            keyName: 'home-tool-listening-rooms',
+            icon: Icons.groups_rounded,
+            label: activeRoom != null
+                ? '${spanish ? 'Sala' : 'Room'} · ${activeRoom.code}'
+                : (spanish ? 'Salas en vivo' : 'Listening Rooms'),
+            highlightColor: activeRoom != null
+                ? const Color(0xFF1ED760)
+                : null,
+            onTap: () => ListeningRoomSheet.show(context),
+          ),
+        ],
       ),
     );
   }

@@ -1528,6 +1528,14 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     if (_queueIndex < 0 || _queueIndex >= _queue.length) {
       return Future<bool>.value(false);
     }
+    final algorithmControl = ref
+        .read(settingsControllerProvider)
+        .asData
+        ?.value
+        .algorithmControl;
+    if (algorithmControl?.algorithmDisabled == true) {
+      return Future<bool>.value(false);
+    }
     final sourceId = _recommendationExtension.sourceId;
     final remaining = _shuffleEnabled
         ? _queue.length - _shufflePlayedIndices.length

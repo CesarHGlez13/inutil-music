@@ -827,6 +827,13 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     ],
                   ),
 
+                  const SizedBox(height: 10),
+                  _PlayerLiveOverlaysBar(
+                    snapshot: snapshot,
+                    spanish: strings.language != 'en',
+                    accentColor: effectiveAccent,
+                  ),
+
                   // Open center window so the full-bleed artist video shines.
                   const Spacer(),
 
@@ -1765,5 +1772,192 @@ Future<void> _showCanvasSharePicker({
           strings: strings,
         );
       }
+  }
+}
+
+/// Subtle translucent banner pills inside the fullscreen player for:
+/// 1) Active Listening Room status + live emoji reactions
+/// 2) Saved Echo Memory for the currently playing song (dismissible & privacy-gated)
+class _PlayerLiveOverlaysBar extends ConsumerStatefulWidget {
+  const _PlayerLiveOverlaysBar({
+    required this.snapshot,
+    required this.spanish,
+    required this.accentColor,
+  });
+
+  final PlayerSnapshot snapshot;
+  final bool spanish;
+  final Color accentColor;
+
+  @override
+  ConsumerState<_PlayerLiveOverlaysBar> createState() =>
+      _PlayerLiveOverlaysBarState();
+}
+
+class _PlayerLiveOverlaysBarState
+    extends ConsumerState<_PlayerLiveOverlaysBar> {
+  String? _dismissedMemoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    final memory = ref.watch(activeTrackEchoMemoryProvider);
+    final bannerAllowed = ref.watch(
+      settingsControllerProvider.select(
+        (s) => s.asData?.value.echoMemoryBannerEnabled ?? true,
+      ),
+    );
+    final roomService = ref.watch(listeningRoomServiceProvider);
+    final activeRoom =
+        ref.watch(listeningRoomStateProvider).asData?.value ?? roomService.room;
+
+    final showMemory =
+        bannerAllowed &&
+        memory != null &&
+        memory.showOnPlayback &&
+        memory.id != _dismissedMemoryId;
+
+    if (!showMemory && activeRoom == null) {
+      return const SizedBox.shrink();
+    }
+
+    final latestReaction = roomService.recentBurstReactions.isNotEmpty
+        ? roomService.recentBurstReactions.last
+        : null;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (activeRoom != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: InkWell(
+              onTap: () => ListeningRoomSheet.show(context),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.48),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFF1ED760).withValues(alpha: 0.55),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: Color(0xFF1ED760),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '${activeRoom.name} · ${activeRoom.activeMembersAt(DateTime.now()).length}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (latestReaction != null) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '${latestReaction.emoji} ${latestReaction.senderName}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        if (showMemory)
+          Material(
+            color: Colors.black.withValues(alpha: 0.52),
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              key: const ValueKey('player-echo-memory-banner'),
+              onTap: () => EchoMemoryEditorSheet.show(
+                context,
+                trackKey: memory.trackKey,
+                trackTitle: memory.trackTitle,
+                trackArtist: memory.trackArtist,
+                trackThumbnailUrl: memory.trackThumbnailUrl,
+                existing: memory,
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: widget.accentColor.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.auto_stories_rounded,
+                      size: 16,
+                      color: widget.accentColor,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Echo Memory · ${memory.formattedDate(spanish: widget.spanish)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: widget.accentColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            memory.note,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.94),
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 28,
+                        height: 28,
+                      ),
+                      onPressed: () =>
+                          setState(() => _dismissedMemoryId = memory.id),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.72),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
   }
 }

@@ -9,6 +9,7 @@ import '../../features/music/domain/entities/catalog_track.dart';
 import '../../features/music/domain/entities/local_track.dart';
 import '../../features/music/domain/entities/playlist.dart';
 import '../../features/music/domain/entities/playlist_entry.dart';
+import '../../services/memories/echo_memory.dart';
 import '../../services/storage/local_database_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
@@ -258,6 +259,16 @@ class InutilCloudBackupService {
         fieldName: 'entries',
         items: catalogEntries,
       );
+
+      final echoMemories = await _db.getEchoMemories();
+      if (echoMemories.isNotEmpty) {
+        await _setDocument('users/$uid/data/backup_echo_memories', {
+          'memories': echoMemories
+              .map((m) => m.toCloudJson())
+              .toList(growable: false),
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      }
 
       await _syncWrappedToCloud();
 
@@ -536,9 +547,40 @@ class InutilCloudBackupService {
         restoredEntries += normalized.length;
       }
 
+      // Restaurar Echo Memories (solo agrega los que no existen localmente o
+      // tienen updatedAt más reciente).
+      var restoredMemories = 0;
+      try {
+        final memoriesDoc = await _getDocument(
+          'users/$uid/data/backup_echo_memories',
+        );
+        final rawMemories = memoriesDoc?['memories'];
+        if (rawMemories is List) {
+          final existing = await _db.getEchoMemories();
+          final existingById = {for (final m in existing) m.id: m};
+          for (final item in rawMemories) {
+            if (item is! Map) continue;
+            final remote = EchoMemory.fromCloudJson(
+              Map<String, dynamic>.from(item),
+            );
+            if (remote == null) continue;
+            final local = existingById[remote.id];
+            if (local == null || remote.updatedAt.isAfter(local.updatedAt)) {
+              await _db.upsertEchoMemory(remote);
+              restoredMemories += 1;
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('No se pudieron restaurar Echo Memories: $e');
+      }
+
       _initialPullCompleted = true;
       _lastRestoreHadChanges =
-          restoredPlaylists > 0 || restoredTracks > 0 || restoredEntries > 0;
+          restoredPlaylists > 0 ||
+          restoredTracks > 0 ||
+          restoredEntries > 0 ||
+          restoredMemories > 0;
       _lastError = '';
       if (!_lastRestoreHadChanges && meta == null) {
         return 'Aún no hay respaldo en la nube para esta cuenta.';

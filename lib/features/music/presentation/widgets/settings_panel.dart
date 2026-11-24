@@ -26,6 +26,7 @@ import '../../../../services/live/tiktok_live_command_service.dart';
 import '../../../../services/storage/library_csv_service.dart';
 import '../providers/live_overlay_controller.dart';
 import '../providers/music_providers.dart';
+import 'algorithm_control_settings.dart';
 import 'app_update_dialog.dart';
 import 'library_csv_import_dialog.dart';
 import 'lyrics_animation_transition.dart';
@@ -158,6 +159,7 @@ enum _SettingsRoute {
   liveWidget,
   lyrics,
   lyricsProviders,
+  algorithmControl,
   storage,
   audioSources,
   dataSaving,
@@ -432,6 +434,10 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
       _SettingsRoute.liveWidget => strings.liveWidget,
       _SettingsRoute.lyrics => strings.lyricsAppearance,
       _SettingsRoute.lyricsProviders => strings.lyricsProviders,
+      _SettingsRoute.algorithmControl => strings.choose(
+        'Centro de control del algoritmo',
+        'Algorithm control center',
+      ),
       _SettingsRoute.storage => strings.storage,
       _SettingsRoute.audioSources => strings.audioSources,
       _SettingsRoute.dataSaving => strings.dataSaving,
@@ -630,6 +636,7 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         onSupport: _openSupportDevelopment,
         onGitHub: _openGitHubRepository,
       ),
+      _SettingsRoute.algorithmControl => const AlgorithmControlSettingsView(),
       _SettingsRoute.root => const SizedBox.shrink(),
     };
 
@@ -847,6 +854,19 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
                       title: strings.audioSources,
                       subtitle: strings.audioSourcesSummary,
                       onTap: () => _openRoute(_SettingsRoute.audioSources),
+                    ),
+                    const SizedBox(height: appCardGap),
+                    _SettingsEntryCard(
+                      key: const ValueKey('settings-card-algorithm-control'),
+                      glyph: InutilGlyph.sparkles,
+                      title: strings.choose(
+                        'Centro de control del algoritmo',
+                        'Algorithm control center',
+                      ),
+                      subtitle: state.algorithmControl.summaryLabel(
+                        spanish: strings.language != 'en',
+                      ),
+                      onTap: () => _openRoute(_SettingsRoute.algorithmControl),
                     ),
                     if (showSupportedLinks || tiktokLive != null)
                       const SizedBox(height: appCardGap),

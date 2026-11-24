@@ -214,7 +214,9 @@ class InutilFirestoreService {
     return normalized.startsWith('music_pairing/') ||
         normalized == 'music_pairing' ||
         normalized.startsWith('tv_pairing/') ||
-        normalized == 'tv_pairing';
+        normalized == 'tv_pairing' ||
+        normalized.startsWith('listening_rooms/') ||
+        normalized == 'listening_rooms';
   }
 
   static String _baseUrlForPath(String path) => shouldBypassRelay(path)

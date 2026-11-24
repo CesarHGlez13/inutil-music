@@ -15,6 +15,7 @@ import '../../features/music/domain/entities/local_track.dart';
 import '../../features/music/domain/entities/playlist.dart';
 import '../../features/music/domain/entities/playlist_entry.dart';
 import '../../features/music/domain/repositories/catalog_playlist_repository.dart';
+import '../memories/echo_memory.dart';
 import '../recommendations/recommendation_storage_models.dart';
 import '../sharing/inutil_track_link.dart';
 import 'portable_sqlite_upsert.dart';
@@ -196,6 +197,18 @@ const _requiredDatabaseIndexes = <_DatabaseIndexDefinition>[
     table: 'playlist_sync_conflicts',
     columns: <String>['account_key', 'playlist_id', 'resolved_at'],
     descending: <bool>[false, false, false],
+  ),
+  _DatabaseIndexDefinition(
+    name: 'idx_echo_memories_track_key',
+    table: 'echo_memories',
+    columns: <String>['track_key'],
+    descending: <bool>[false],
+  ),
+  _DatabaseIndexDefinition(
+    name: 'idx_echo_memories_updated_at',
+    table: 'echo_memories',
+    columns: <String>['updated_at'],
+    descending: <bool>[true],
   ),
 ];
 
@@ -2099,6 +2112,7 @@ class LocalDatabaseService {
         await _createRecommendationTables(db);
         await _createPlaylistSyncTables(db);
         await _createLibraryTrackOrderTable(db);
+        await _createEchoMemoriesTable(db);
         await _createIndexes(db);
       },
       onUpgrade: (db, oldVersion, newVersion) async {
@@ -2223,6 +2237,10 @@ class LocalDatabaseService {
             definition: 'TEXT',
           );
         }
+        if (oldVersion < 12) {
+          await _createEchoMemoriesTable(db);
+          await _createIndexes(db);
+        }
       },
       onOpen: _repairAndValidateCurrentSchema,
     );
@@ -2303,6 +2321,7 @@ class LocalDatabaseService {
     }
     await _backfillCatalogPlaylistData(db);
     await _createLibraryTrackOrderTable(db);
+    await _createEchoMemoriesTable(db);
     await _migrateLegacyFavoritesId(db);
     await _validateSchemaForVersion(db, AppConstants.databaseVersion);
     await _repairIndexes(db);
@@ -2649,6 +2668,36 @@ class LocalDatabaseService {
       table: 'playlist_sync_conflicts',
       columns: const <String>['conflict_id'],
     );
+    if (version >= 12) {
+      if (!tables.contains('echo_memories')) {
+        throw const FormatException(
+          'La base de datos no contiene la tabla echo_memories.',
+        );
+      }
+      await _requireTableColumns(
+        db,
+        table: 'echo_memories',
+        requiredColumns: const <String>{
+          'id',
+          'track_key',
+          'title_artist_key',
+          'track_title',
+          'track_artist',
+          'track_thumbnail_url',
+          'note',
+          'memory_date',
+          'photo_file_name',
+          'show_on_playback',
+          'created_at',
+          'updated_at',
+        },
+      );
+      await _requirePrimaryKey(
+        db,
+        table: 'echo_memories',
+        columns: const <String>['id'],
+      );
+    }
   }
 
   Future<Set<String>> _tableNames(DatabaseExecutor db) async {
@@ -3136,6 +3185,123 @@ class LocalDatabaseService {
     );
   }
 
+  Future<void> _createEchoMemoriesTable(DatabaseExecutor db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS echo_memories (
+        id TEXT PRIMARY KEY,
+        track_key TEXT NOT NULL,
+        title_artist_key TEXT NOT NULL,
+        track_title TEXT NOT NULL,
+        track_artist TEXT NOT NULL,
+        track_thumbnail_url TEXT,
+        note TEXT NOT NULL,
+        memory_date TEXT NOT NULL,
+        photo_file_name TEXT,
+        show_on_playback INTEGER NOT NULL DEFAULT 1 CHECK (show_on_playback IN (0, 1)),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_echo_memories_track_key '
+      'ON echo_memories(track_key)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_echo_memories_updated_at '
+      'ON echo_memories(updated_at DESC)',
+    );
+  }
+
+  Future<List<EchoMemory>> getEchoMemories() async {
+    final db = await database;
+    final rows = await db.query(
+      'echo_memories',
+      orderBy: 'memory_date DESC, updated_at DESC',
+    );
+    return List<EchoMemory>.unmodifiable(rows.map(EchoMemory.fromDbMap));
+  }
+
+  Future<void> upsertEchoMemory(EchoMemory memory) async {
+    final db = await database;
+    await db.insert(
+      'echo_memories',
+      memory.toDbMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> deleteEchoMemory(String id) async {
+    final db = await database;
+    await db.delete('echo_memories', where: 'id = ?', whereArgs: <Object?>[id]);
+  }
+
+  /// Returns chronological playback history rows used by Máquina del Tiempo.
+  Future<List<PlaybackEvent>> getPlaybackEventsForTimeMachine({
+    int limit = 10000,
+  }) async {
+    final db = await database;
+    final rows = await db.query(
+      'playback_events',
+      orderBy: 'played_at DESC, session_id DESC',
+      limit: limit,
+    );
+    return List<PlaybackEvent>.unmodifiable(
+      rows.map((row) {
+        final artistsRaw = row['artists_json']?.toString() ?? '[]';
+        final browseIdsRaw = row['artist_browse_ids_json']?.toString() ?? '[]';
+        List<String> artists = const <String>[];
+        List<String?> browseIds = const <String?>[];
+        try {
+          final parsed = jsonDecode(artistsRaw);
+          if (parsed is List) {
+            artists = parsed
+                .map((e) => e?.toString().trim() ?? '')
+                .where((e) => e.isNotEmpty)
+                .toList(growable: false);
+          }
+        } catch (_) {}
+        try {
+          final parsed = jsonDecode(browseIdsRaw);
+          if (parsed is List) {
+            browseIds = parsed
+                .map((e) => e?.toString())
+                .toList(growable: false);
+          }
+        } catch (_) {}
+        final sourceName = row['source']?.toString() ?? '';
+        final source = PlaybackEventSource.values.firstWhere(
+          (candidate) => candidate.name == sourceName,
+          orElse: () => PlaybackEventSource.unknown,
+        );
+        final now = DateTime.now().toUtc();
+        return PlaybackEvent(
+          sessionId: row['session_id']?.toString() ?? '',
+          trackId: row['track_id']?.toString() ?? '',
+          videoId: row['video_id']?.toString(),
+          title: row['title']?.toString() ?? '',
+          artists: artists,
+          artistBrowseIds: browseIds,
+          album: row['album']?.toString(),
+          thumbnailUrl: row['thumbnail_url']?.toString(),
+          durationMs: (row['duration_ms'] as num?)?.toInt(),
+          source: source,
+          startedAt:
+              DateTime.tryParse(row['started_at']?.toString() ?? '') ?? now,
+          playedAt:
+              DateTime.tryParse(row['played_at']?.toString() ?? '') ?? now,
+          listenedMs: (row['listened_ms'] as num?)?.toInt() ?? 0,
+          completed: (row['completed'] as num?)?.toInt() == 1,
+          isFavorite: row['is_favorite'] == null
+              ? null
+              : (row['is_favorite'] as num?)?.toInt() == 1,
+          isLiked: row['is_liked'] == null
+              ? null
+              : (row['is_liked'] as num?)?.toInt() == 1,
+        );
+      }),
+    );
+  }
+
   Future<void> _repairIndexes(DatabaseExecutor db) async {
     final rows = await db.rawQuery(
       "SELECT name, tbl_name FROM sqlite_master WHERE type = 'index'",
@@ -3181,6 +3347,7 @@ class LocalDatabaseService {
     );
     await db.execute('DROP INDEX IF EXISTS idx_playback_events_played_at');
     await _createIndexes(db);
+    await _createEchoMemoriesTable(db);
   }
 
   bool _sameOrderedValues<T>(List<T> left, List<T> right) {

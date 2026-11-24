@@ -33,6 +33,8 @@ import '../../domain/entities/local_track.dart';
 import '../../domain/entities/lyrics_document.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/artwork_progress_color_provider.dart';
+import '../providers/echo_memory_providers.dart';
+import '../providers/listening_room_providers.dart';
 import '../providers/moment_clip_providers.dart';
 import '../providers/music_providers.dart';
 import '../providers/audio_source_providers.dart';
@@ -47,9 +49,11 @@ import 'animated_artwork_motion.dart';
 import 'artwork_fade_gradients.dart';
 import 'audio_routing_menus.dart';
 import 'classic_vinyl_deck.dart';
+import 'echo_memory_sheet.dart';
 import 'favorite_star_badge.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_sleep_timer_sheet.dart';
+import 'listening_room_sheet.dart';
 import 'lyrics_page_route.dart';
 import 'moment_share_sheet.dart';
 import 'now_playing_equalizer.dart';
@@ -63,6 +67,7 @@ import 'source_image.dart';
 import 'spotify_canvas_video.dart';
 import 'track_library_quick_sheet.dart';
 import 'track_change_transition.dart';
+import 'track_versions_sheet.dart';
 import 'uniform_playback_slider_track_shape.dart';
 import 'wavy_playback_seek_bar.dart';
 
@@ -5859,12 +5864,15 @@ class _PlayerMenu extends ConsumerWidget {
           onPressed: snapshot.trackId == null
               ? null
               : () async {
+                  final activeMemory = ref.read(activeTrackEchoMemoryProvider);
                   final value = await showPlaybackMenuBottomSheet<String>(
                     context: actionContext,
                     builder: (_) => _PlayerOptionsMenu(
                       strings: strings,
                       canShare: canShare,
                       canShareMoment: canShareMoment,
+                      hasEchoMemory: activeMemory != null,
+                      canFindVersions: (snapshot.title ?? '').trim().isNotEmpty,
                       canOpenArtist: onOpenArtist != null,
                       canOpenAlbum: onOpenAlbum != null,
                       canDownload:
@@ -5897,6 +5905,41 @@ class _PlayerMenu extends ConsumerWidget {
                           snapshot: snapshot,
                         ),
                       );
+                      return;
+                    case 'echo-memory':
+                      const codec = InutilTrackLinkCodec();
+                      final trackKey =
+                          codec.extractVideoId(snapshot.sourceUrl ?? '') ??
+                          codec.extractVideoId(snapshot.trackId ?? '') ??
+                          snapshot.trackId ??
+                          '';
+                      unawaited(
+                        EchoMemoryEditorSheet.show(
+                          actionContext,
+                          trackKey: trackKey,
+                          trackTitle: snapshot.title ?? 'Canción',
+                          trackArtist: snapshot.artist ?? 'Inútil Music',
+                          trackThumbnailUrl: snapshot.thumbnailUrl,
+                          existing: activeMemory,
+                        ),
+                      );
+                      return;
+                    case 'versions':
+                      const codec = InutilTrackLinkCodec();
+                      final currentVideoId =
+                          codec.extractVideoId(snapshot.sourceUrl ?? '') ??
+                          codec.extractVideoId(snapshot.trackId ?? '');
+                      unawaited(
+                        TrackVersionsSheet.show(
+                          actionContext,
+                          title: snapshot.title ?? '',
+                          artist: snapshot.artist ?? '',
+                          currentVideoId: currentVideoId,
+                        ),
+                      );
+                      return;
+                    case 'listening-room':
+                      unawaited(ListeningRoomSheet.show(actionContext));
                       return;
                     case 'audio-output':
                       unawaited(showAudioOutputPicker(actionContext, ref));
@@ -6091,6 +6134,8 @@ class _PlayerOptionsMenu extends StatelessWidget {
     required this.strings,
     required this.canShare,
     required this.canShareMoment,
+    this.hasEchoMemory = false,
+    this.canFindVersions = false,
     required this.canOpenArtist,
     required this.canOpenAlbum,
     required this.canDownload,
@@ -6101,6 +6146,8 @@ class _PlayerOptionsMenu extends StatelessWidget {
   final AppStrings strings;
   final bool canShare;
   final bool canShareMoment;
+  final bool hasEchoMemory;
+  final bool canFindVersions;
   final bool canOpenArtist;
   final bool canOpenAlbum;
   final bool canDownload;
@@ -6205,6 +6252,44 @@ class _PlayerOptionsMenu extends StatelessWidget {
                 icon: Icons.movie_creation_outlined,
                 label: strings.shareMoment,
               ),
+            action(
+              key: 'player-menu-echo-memory',
+              value: 'echo-memory',
+              icon: hasEchoMemory
+                  ? Icons.auto_stories_rounded
+                  : Icons.auto_stories_outlined,
+              label: hasEchoMemory
+                  ? strings.choose(
+                      'Echo Memory · Ver recuerdo',
+                      'Echo Memory · View memory',
+                    )
+                  : strings.choose(
+                      'Echo Memory · Guardar recuerdo',
+                      'Echo Memory · Save memory',
+                    ),
+              color: hasEchoMemory
+                  ? Theme.of(context).colorScheme.primary
+                  : null,
+            ),
+            if (canFindVersions)
+              action(
+                key: 'player-menu-versions',
+                value: 'versions',
+                icon: Icons.layers_rounded,
+                label: strings.choose(
+                  'Otras versiones (en vivo, acústica, remix)',
+                  'Other versions (live, acoustic, remix)',
+                ),
+              ),
+            action(
+              key: 'player-menu-listening-room',
+              value: 'listening-room',
+              icon: Icons.groups_rounded,
+              label: strings.choose(
+                'Listening Rooms · Salas con amigos',
+                'Listening Rooms · Listen with friends',
+              ),
+            ),
             if (canOpenArtist)
               action(
                 key: 'player-menu-go-to-artist',
