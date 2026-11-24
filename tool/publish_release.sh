@@ -26,9 +26,10 @@
 #   RELEASE_REPO       repositorio de GitHub (por defecto CesarHGlez13/inutil-music,
 #                      el mismo `--dart-define=RELEASE_REPO` que compila la app)
 #   FB_PROJECT         proyecto Firebase (por defecto inutil-music-app)
-#   MIN_SUPPORTED      versión mínima soportada (kill switch). Por defecto la
-#                      versión que se publica: las anteriores dejan de funcionar.
-#   MANDATORY=0        desactiva la actualización forzosa (por defecto: forzosa)
+#   MIN_SUPPORTED      versión mínima soportada (kill switch). Por defecto
+#                      2.5.26 (piso inutix.com sin cuota Firebase); pasar
+#                      MIN_SUPPORTED=<version> solo en cambios críticos.
+#   MANDATORY=1        activa la actualización forzosa (por defecto: 0 / opcional)
 #
 # Requisitos para --upload/--github: un token OAuth con permisos de escritura en
 # el proyecto, en la variable FIREBASE_ACCESS_TOKEN. Se obtiene con
@@ -49,8 +50,8 @@ RELEASE_REPO="${RELEASE_REPO:-CesarHGlez13/inutil-music}"
 # origin/main origin/master` esta vacio (0 antepasados en comun), main tiene 9
 # commits y master 56, y `git diff --stat main..master` son 1051 archivos.
 RELEASE_TARGET="${RELEASE_TARGET:-master}"
-MIN_SUPPORTED="${MIN_SUPPORTED:-}"
-MANDATORY="${MANDATORY:-1}"
+MIN_SUPPORTED="${MIN_SUPPORTED:-2.5.26}"
+MANDATORY="${MANDATORY:-0}"
 LOCAL_DIR="${INUTIL_RELEASES_DIR:-$HOME/inutil-releases}"
 STORAGE_PREFIX="releases"
 
@@ -265,8 +266,8 @@ prefix = os.environ["PREFIX"]
 mode = os.environ["MODE"]
 repo = os.environ["REPO"]
 _min_env = os.environ.get("MIN_SUPPORTED", None)
-min_supported = "" if _min_env is not None and _min_env.strip() == "" else (_min_env.strip() if _min_env else version)
-mandatory = os.environ.get("MANDATORY", "1").strip() not in ("0", "false", "no")
+min_supported = _min_env.strip() if _min_env is not None else "2.5.26"
+mandatory = os.environ.get("MANDATORY", "0").strip().lower() in ("1", "true", "yes", "si", "sí")
 
 notes_path = manifest_dir / "notes.json"
 notes = json.loads(notes_path.read_text()) if notes_path.exists() else []
