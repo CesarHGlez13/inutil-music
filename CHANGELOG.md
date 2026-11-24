@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.19+4277 — 2026-11-23
+
+### Fixed — Canvas de video de artista y sincronización de letra restaurados (estilo v2.5.15)
+
+- **Canvas de video del artista como fallback visual seguro.**
+  Se restauró el comportamiento visual de la versión 2.5.15 donde canciones sin video individual propio en iTunes (como temas de álbum) aprovechan clips oficiales del mismo artista (`sameVisualArtist`) para animar el reproductor en pantalla completa y la vista de letra sincronizada, garantizando que nunca se muestren videos de otros artistas.
+- **OTA opcional sin bloqueo forzado.**
+  Corrección en el script de publicación para respetar el valor vacío de `MIN_SUPPORTED=""` sin forzar erróneamente un kill switch de versión mínima.
+
 ## 2.5.18+4276 — 2026-11-23
 
 ### Fixed — Fallback de Video Preview ampliado y Canvas resiliente
