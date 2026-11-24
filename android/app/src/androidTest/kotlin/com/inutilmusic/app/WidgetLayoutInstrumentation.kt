@@ -108,7 +108,7 @@ class WidgetLayoutInstrumentation : Instrumentation() {
             val context = FixtureContext(base.createConfigurationContext(configuration), privateFiles)
             val prefs = context.getSharedPreferences("inutil_home_widget", Context.MODE_PRIVATE)
             val title = if (case.empty) "" else if (case.longText) "Un nombre de canción realmente largo para probar que no ocupa dos líneas" else "Mi canción favorita"
-            val artist = if (case.longText) "Un artista con nombre muy largo y muchos colaboradores" else "Inútil Music"
+            val artist = if (case.longText) "Un artista con nombre muy largo y muchos colaboradores" else "Inutix Music"
             prefs.edit().clear()
                 .putString("trackId", "native-layout-fixture")
                 .putString("title", title)
@@ -163,7 +163,7 @@ class WidgetLayoutInstrumentation : Instrumentation() {
                 check(bounds(queue, parent).top >= bounds(queueTitle, parent).bottom)
                 check(bounds(queue, parent).bottom <= height)
             } else if (size.hasSeparateMetadata) {
-                check(label != null && label.text.toString() == "Inútil Music") { "${case.name}: player label missing" }
+                check(label != null && label.text.toString() == "Inutix Music") { "${case.name}: player label missing" }
                 check(song.text.toString() == if (case.empty) (if (case.english) "Not playing" else "Sin reproducción") else title)
                 check(artistView.visibility == View.VISIBLE)
                 check(artistView.text.toString() == if (case.empty) (if (case.english) "Tap to open" else "Toca para abrir") else artist)

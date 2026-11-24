@@ -54,6 +54,30 @@ void main() {
       }
     });
 
+    test('cero referencias a la marca anterior Inútil Music en lib/, android/, linux/, packaging/ y README', () {
+      final legacy = RegExp(r'in[uú]til\s+(music|connect|wrapped)', caseSensitive: false);
+      for (final root in const ['lib', 'android/app/src', 'linux', 'packaging', 'tool']) {
+        final dir = Directory(root);
+        if (!dir.existsSync()) continue;
+        for (final entity in dir.listSync(recursive: true)) {
+          if (entity is! File) continue;
+          final p = entity.path;
+          if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.ico') ||
+              p.endsWith('.ttf') || p.endsWith('.otf') || p.endsWith('.so') ||
+              p.endsWith('.jar') || p.endsWith('.keystore') || p.contains('ephemeral')) {
+            continue;
+          }
+          try {
+            final src = entity.readAsStringSync();
+            expect(legacy.hasMatch(src), isFalse, reason: 'Marca anterior encontrada en $p');
+          } catch (_) {
+            // Ignora binarios sin extensión estándar
+          }
+        }
+      }
+      expect(legacy.hasMatch(File('README.md').readAsStringSync()), isFalse);
+    });
+
     test('InutilUpdateService.otaFallbackUrlFor traduce enlaces GitHub a ota.inutix.com/music', () {
       expect(InutilUpdateService.otaEdgeBaseUrl, 'https://ota.inutix.com');
 

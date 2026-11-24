@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publica una versión de Inútil Music.
+# Publica una versión de Inutix Music.
 #
 # Genera el manifiesto `release.json` (el que lee la app en
 # InutilUpdateService.checkForUpdate) y, según el modo, coloca los artefactos:

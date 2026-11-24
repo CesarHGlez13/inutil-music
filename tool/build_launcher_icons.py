@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Genera los iconos del launcher Android a partir del arte oficial de Inútil Music.
+"""Genera los iconos del launcher Android a partir del arte oficial de Inutix Music.
 
 El repo arrastraba el icono por defecto de la plantilla de Flutter
 (mipmap-*/ic_launcher.png = robot de Android + logo de Flutter).  Este script

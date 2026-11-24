@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   Rutas expuestas por `androidx.core.content.FileProvider` al instalador de
-  paquetes de Android (OTA de Inútil Music).
+  paquetes de Android (OTA de Inutix Music).
 
   El gestor de descargas del OTA escribe en
   `getExternalStorageDirectory()/updates`, que en Android resuelve a

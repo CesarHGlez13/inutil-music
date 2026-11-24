@@ -294,7 +294,7 @@ class TrackVersionsService {
         .split(RegExp(r',|&| x | feat\.?| ft\.?|/|•|·', caseSensitive: false))
         .first
         .trim();
-    if (first.toLowerCase() == 'inútil music' ||
+    if (first.toLowerCase() == 'inutix music' ||
         first.toLowerCase() == 'unknown artist' ||
         first.toLowerCase() == 'artista desconocido') {
       return '';

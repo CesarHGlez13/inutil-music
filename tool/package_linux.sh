@@ -4,7 +4,7 @@
 # El archivo resultante se publica en `app_config/release` como
 # `linuxDownloadUrl`; InutilUpdateService lo descarga, lo descomprime y
 # reemplanta el bundle en ~/.local/share/inutil-music. Por eso el tar debe
-# contener el contenido del bundle en la raíz («Inútil Music», data/, lib/,
+# contener el contenido del bundle en la raíz («Inutix Music», data/, lib/,
 # THIRD_PARTY_NOTICES.md), sin carpetas intermedias.
 #
 # Uso: tool/package_linux.sh [salida.tar.gz]
@@ -13,7 +13,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 output="${1:-$repo_root/dist/inutil_music_linux_x64.tar.gz}"
 bundle="$repo_root/build/linux/x64/release/bundle"
-executable="$bundle/Inútil Music"
+executable="$bundle/Inutix Music"
 
 if [[ ! -x "$executable" ]]; then
   echo "Falta el bundle. Ejecuta antes: flutter build linux --release" >&2
@@ -43,7 +43,7 @@ export LD_LIBRARY_PATH="$DIR/lib:$DIR/mpv_libs:${LD_LIBRARY_PATH:-}"
 if [ -f "$DIR/lib/libmpv.so.2" ]; then
   export LIBMPV_LIBRARY_PATH="$DIR/lib/libmpv.so.2"
 fi
-exec "$DIR/Inútil Music" "$@"
+exec "$DIR/Inutix Music" "$@"
 EOF
 chmod 0755 "$bundle/inutil_music"
 
@@ -56,7 +56,7 @@ fi
 
 mkdir -p "$(dirname "$output")"
 tar -czf "$output" -C "$bundle" \
-  "Inútil Music" \
+  "Inutix Music" \
   inutil_music \
   data \
   lib \

@@ -63,7 +63,7 @@ add_subdirectory("runner")
 # KDE's volume controls display.
 set_target_properties(${BINARY_NAME}
   PROPERTIES
-  OUTPUT_NAME "Inútil Music"
+  OUTPUT_NAME "Inutix Music"
 )
 
 # Run the Flutter tool portions of the build. This must not be removed.

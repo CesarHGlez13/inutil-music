@@ -25,8 +25,8 @@ rm -rf "$SBX" "$STG" "$LOG" "$MARKER"
 mkdir -p "$SBX/data" "$SBX/lib" "$HOME/.cache"
 
 # Instalación "vieja": ejecutable que anota su versión al arrancar.
-printf '#!/usr/bin/env bash\necho "version-vieja" >> "%s"\n' "$MARKER" > "$SBX/Inútil Music"
-chmod +x "$SBX/Inútil Music"
+printf '#!/usr/bin/env bash\necho "version-vieja" >> "%s"\n' "$MARKER" > "$SBX/Inutix Music"
+chmod +x "$SBX/Inutix Music"
 echo "dato viejo" > "$SBX/data/asset"
 echo "lib vieja" > "$SBX/lib/libghostty_vte.so"
 
@@ -34,8 +34,8 @@ echo "lib vieja" > "$SBX/lib/libghostty_vte.so"
 # stub para no abrir la app de verdad durante la prueba.
 mkdir -p "$STG"
 tar -xzf "$TARBALL" -C "$STG"
-printf '#!/usr/bin/env bash\necho "version-nueva relanzada" >> "%s"\n' "$MARKER" > "$STG/Inútil Music"
-chmod +x "$STG/Inútil Music"
+printf '#!/usr/bin/env bash\necho "version-nueva relanzada" >> "%s"\n' "$MARKER" > "$STG/Inutix Music"
+chmod +x "$STG/Inutix Music"
 
 # El script embebido se extrae del código Dart (mismo nombre de archivo que usa
 # la app en producción: inutil_update_apply.sh dentro del staging).
@@ -56,7 +56,7 @@ sleep 3 &
 APP_PID=$!
 
 mkdir -p "$(dirname "$LOG")"
-setsid /bin/sh "$STG/inutil_update_apply.sh" "$APP_PID" "$STG" "$SBX" "$SBX/Inútil Music" > "$LOG" 2>&1 &
+setsid /bin/sh "$STG/inutil_update_apply.sh" "$APP_PID" "$STG" "$SBX" "$SBX/Inutix Music" > "$LOG" 2>&1 &
 
 echo "helper lanzado; esperando a que muera el proceso simulado (pid $APP_PID)..."
 wait $APP_PID 2>/dev/null || true
@@ -90,7 +90,7 @@ fi
 if [ -d "$STG" ]; then echo "MAL: el staging sigue existiendo"; FAIL=1; else echo "OK: staging eliminado"; fi
 if [ -f "$SBX/inutil_update_apply.sh" ]; then echo "MAL: el helper quedó instalado"; FAIL=1; else echo "OK: el helper no queda en la instalación"; fi
 
-head -2 "$SBX/Inútil Music" | tail -1 | grep -q "version-nueva" \
+head -2 "$SBX/Inutix Music" | tail -1 | grep -q "version-nueva" \
   && echo "OK: el ejecutable instalado es el del paquete nuevo" \
   || { echo "MAL: el ejecutable instalado no es el nuevo"; FAIL=1; }
 

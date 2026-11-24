@@ -40,7 +40,7 @@ add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
 # `flutter run -d windows` behaves the same as CI.  The script is idempotent;
 # it only downloads on the first build and leaves newer smtc versions alone.
 if(WIN32)
-  set(INUTIL_NUGET_DIR "$ENV{LOCALAPPDATA}/Inútil Music/tools")
+  set(INUTIL_NUGET_DIR "$ENV{LOCALAPPDATA}/Inutix Music/tools")
   set(INUTIL_WINDOWS_BOOTSTRAP
       "${CMAKE_CURRENT_SOURCE_DIR}/../tool/ensure_windows_build_dependencies.ps1")
   if(EXISTS "${INUTIL_WINDOWS_BOOTSTRAP}")

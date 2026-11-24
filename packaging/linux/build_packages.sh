@@ -12,7 +12,7 @@ output_dir="$(mkdir -p "$3" && realpath "$3")"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 # El bundle de Flutter trae el entry point que espera el tool (`inutil_music`,
-# hoy un script) y el binario real con nombre legible (`Inútil Music`, el que
+# hoy un script) y el binario real con nombre legible (`Inutix Music`, el que
 # muestra KDE/PipeWire). Se aceptan también los nombres heredados de Inutil
 # para poder empaquetar bundles de checks anteriores.
 launcher=""
@@ -25,7 +25,7 @@ if [[ -z "$launcher" ]]; then
 fi
 
 executable=""
-for candidate in "Inútil Music" "Inútil Music"; do
+for candidate in "Inutix Music" "Inutix Music"; do
   if [[ -x "$bundle/$candidate" ]]; then executable="$candidate"; break; fi
 done
 if [[ -z "$executable" ]]; then
@@ -93,7 +93,7 @@ Maintainer: Cesar <cesar@inutilmusic.com>
 Depends: libgtk-3-0 | libgtk-3-0t64, libmpv2 | libmpv1, libsqlite3-0, libsecret-1-0, libc6, libstdc++6
 Homepage: https://github.com/CesarHGlez13/inutil-music
 Description: Reproductor y gestor musical multiplataforma
- Inútil Music permite buscar, reproducir, descargar y organizar musica,
+ Inutix Music permite buscar, reproducir, descargar y organizar musica,
  playlists y favoritos desde una interfaz construida con Flutter.
 EOF
 cat >"$deb_root/DEBIAN/postinst" <<'EOF'

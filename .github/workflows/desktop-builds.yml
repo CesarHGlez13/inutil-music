@@ -826,7 +826,7 @@ jobs:
           set -euo pipefail
           bundle="$PWD/build/linux/x64/release/bundle"
           test -x "$bundle/inutil_music"
-          test -x "$bundle/Inútil Music"
+          test -x "$bundle/Inutix Music"
           test ! -e "$bundle/tools"
           test ! -e "$bundle/scripts"
           desktop-file-validate packaging/linux/com.inutilmusic.app.desktop
@@ -877,7 +877,7 @@ jobs:
 
           for root in "$stage/deb" "$stage/rpm"; do
             test -x "$root/opt/inutil-music/inutil_music"
-            test -x "$root/opt/inutil-music/Inútil Music"
+            test -x "$root/opt/inutil-music/Inutix Music"
             test -f "$root/opt/inutil-music/THIRD_PARTY_NOTICES.md"
             test -x "$root/usr/bin/inutil-music"
             test -f \
@@ -1014,7 +1014,7 @@ jobs:
             if ! kill -0 "$app_pid" 2>/dev/null; then
               wait "$app_pid" || true
               cat "$log"
-              echo "Inútil Music terminated during the macOS launch smoke test." >&2
+              echo "Inutix Music terminated during the macOS launch smoke test." >&2
               exit 1
             fi
           done
@@ -1033,7 +1033,7 @@ jobs:
           lipo "$executable" -verify_arch "${{ matrix.host_arch }}"
 
           payload="$RUNNER_TEMP/inutil-pkg-root"
-          staged_app="$payload/Applications/Inútil Music.app"
+          staged_app="$payload/Applications/Inutix Music.app"
           rm -rf "$payload"
           mkdir -p "$payload/Applications"
           ditto "$app" "$staged_app"

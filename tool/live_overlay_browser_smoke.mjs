@@ -245,7 +245,7 @@ try {
   // overflow:hidden can otherwise conceal vertical clipping in compact cards.
   const longItems = await cdp.evaluate(`window.__base.items.map(item => ({...item,
     title: '16bitガール (Full Size) — Tu canción favorita con un título muy largo',
-    artist: 'Kurumi Tokisaki (CV: Asami Sanada), Inútil Music y otros artistas'
+    artist: 'Kurumi Tokisaki (CV: Asami Sanada), Inutix Music y otros artistas'
   }))`);
   for (const style of ['classic', 'wave']) {
     for (const width of [1280, 900, 560, 400, 320]) {

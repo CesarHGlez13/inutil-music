@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string] $RepositoryRoot = (Split-Path -Parent $PSScriptRoot),
-    [string] $InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Inútil Music\tools')
+    [string] $InstallDirectory = (Join-Path $env:LOCALAPPDATA 'Inutix Music\tools')
 )
 
 $ErrorActionPreference = 'Stop'

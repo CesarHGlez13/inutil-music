@@ -1,4 +1,4 @@
-# Inútil Music
+# Inutix Music
 
 ![Flutter 3.47.9](https://img.shields.io/badge/Flutter-3.47.9-02569B?logo=flutter&logoColor=white)
 ![Platform](https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Windows%20%7C%20Linux%20%7C%20macOS-blue)
@@ -6,7 +6,7 @@
 ![Release](https://img.shields.io/badge/release-v2.1.0-brightgreen)
 ![License](https://img.shields.io/badge/license-BSD--2--Clause-green)
 
-Inútil Music is a cross-platform music player and library manager built with Flutter. It lets you search for music, play and download tracks, organize a local library, and manage playlists on Android, iOS, Windows, Linux, and macOS.
+Inutix Music is a cross-platform music player and library manager built with Flutter. It lets you search for music, play and download tracks, organize a local library, and manage playlists on Android, iOS, Windows, Linux, and macOS.
 
 Published artifacts and the update channel live in
 <https://github.com/CesarHGlez13/inutil-music>.
@@ -14,16 +14,16 @@ Published artifacts and the update channel live in
 Current version: **2.5.28+4286**.
 
 > The repository does not store media content. YouTube search, playback, and
-> downloads use Inútil Music's self-contained Dart InnerTube pipeline. Supported
+> downloads use Inutix Music's self-contained Dart InnerTube pipeline. Supported
 > builds neither bundle nor launch an external media resolver. Users are
 > responsible for complying with copyright laws and provider terms.
 
 ## Propiedad del código, licencias y plan de independencia
 
-Mientras Inútil Music completa su transición gradual hacia un código fuente 100 % reescrito desde cero, este repositorio distingue explícitamente la titularidad de cada bloque conforme a `LICENSE` y `THIRD_PARTY_NOTICES.md`:
+Mientras Inutix Music completa su transición gradual hacia un código fuente 100 % reescrito desde cero, este repositorio distingue explícitamente la titularidad de cada bloque conforme a `LICENSE` y `THIRD_PARTY_NOTICES.md`:
 
-### Qué pertenece 100 % a Inútil Music (`Copyright (c) 2026, Inútil Music`)
-- **Identidad visual y marca:** nombre «Inútil Music», iconografía **iM**, glifos vectoriales (`lib/core/theme/inutil_icons.dart`), sistema de diseño (`lib/core/theme/inutil_design_system.dart`) e iconos/recursos propios en todas las plataformas (`assets/icons/`, `res/drawable-nodpi/ic_stat_inutil_music.png`, mipmaps adaptativos, `.ico`, `.appiconset`).
+### Qué pertenece 100 % a Inutix Music (`Copyright (c) 2026, Inutix Music`)
+- **Identidad visual y marca:** nombre «Inutix Music», iconografía **iX**, glifos vectoriales (`lib/core/theme/inutil_icons.dart`), sistema de diseño (`lib/core/theme/inutil_design_system.dart`) e iconos/recursos propios en todas las plataformas (`assets/icons/`, `res/drawable-nodpi/ic_stat_inutil_music.png`, mipmaps adaptativos, `.ico`, `.appiconset`).
 - **Infraestructura Firebase, cuentas, nube y OTA (`lib/core/firebase/`, `firebase/`, `lib/services/app_update/`, `tool/`):** autenticación, acceso por vigencia/inactividad, panel administrativo (`inutil_admin_panel.dart`), respaldo y restauración en la nube de playlists/pistas/ajustes (`inutil_cloud_backup_service.dart`), sincronización de reproducción entre dispositivos, campañas/popup de apoyo, Wrapped (`inutil_wrapped_*`), motor de actualizaciones OTA (`InutilUpdateService`, `OtaDownloadManager`, `AndroidPackageInstaller`, `OtaPlaybackResumeStore`) y scripts de publicación (`tool/publish_release.sh`, `tool/package_linux.sh`).
 - **Módulos y pantallas nuevas en Dart/nativo:** motor separado de vistas previas de video (`lib/services/video_preview/video_preview_resolver.dart`, `video_preview_reel_sheet.dart`, `video_preview_provider.dart`), diálogo e importador avanzado de Spotify (`inutil_spotify_import_dialog.dart`), tour interactivo (`inutil_onboarding_tour.dart`), canvas engine (`inutil_canvas_engine.dart`, `InutilCanvasEnginePlugin.kt`, `spotify_fullscreen_canvas_player.dart`), enlace canónico (`inutil_track_link.dart`), hoja Connect/SleepTimer/Account (`inutil_connect_sheet.dart`, `inutil_sleep_timer_sheet.dart`, `inutil_account_dialog.dart`) y enrutamiento Mesa EGL en Linux NVIDIA (`linux/runner/main.cc`) + icono `_NET_WM_ICON` (`linux/runner/my_application.cc`).
 
@@ -55,10 +55,10 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
 
 - Optional YouTube Music account sign-in and bidirectional playlist sync. New
   local playlists are created remotely as private playlists, imported remote
-  playlists may contain streaming-only entries, and Inútil Music Favorites maps to
+  playlists may contain streaming-only entries, and Inutix Music Favorites maps to
   YouTube Music's **Liked Music** collection. The system playlist “Episodes for
   later” is intentionally excluded.
-- Synced playlist playback is download-first: Inútil Music uses a valid local copy
+- Synced playlist playback is download-first: Inutix Music uses a valid local copy
   when available and falls back to streaming the same catalog entry when the
   file is missing or cannot be opened.
 - InnerTube search tabs for Songs, Videos, and Albums, with up to 20 results,
@@ -80,7 +80,7 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
   Web BotGuard PO tokens only for profiles that require them; degraded fallback
   tokens fail closed and independent EJS/WebPO capability circuit breakers
   advance immediately to tokenless clients. If an active stream loses
-  connectivity, Inútil Music
+  connectivity, Inutix Music
   retries the resolver chain with bounded backoff; navigation cancels obsolete
   attempts. YouTube candidates are deep-probed at or beyond 3 MiB before
   publication, and downloads resume through validated range requests and safe
@@ -115,11 +115,11 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
 - Dedicated **Favorites** playlist with accent-colored hearts on favorited
   tracks.
 - ZIP backup and restore for the database, audio files, and thumbnails.
-- CSV imports recognize Inútil Music, MetroList, Harmony/RiMusic, Soundiiz,
+- CSV imports recognize Inutix Music, MetroList, Harmony/RiMusic, Soundiiz,
   Exportify, and common title/artist/album/ISRC layouts. They show a preview,
   reuse existing local tracks, and process up to three missing songs
   concurrently only after confirmation while retaining source playlist order.
-  Exports offer Inútil Music, MetroList, Harmony/RiMusic, and Soundiiz profiles
+  Exports offer Inutix Music, MetroList, Harmony/RiMusic, and Soundiiz profiles
   and contain metadata, not audio.
 
 ### Player
@@ -133,14 +133,14 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
   applications can recognize: YouTube Music when the track came from the
   InnerTube catalog, otherwise the regular YouTube watch URL. Local-only files
   without a YouTube identity are intentionally not shared.
-- Android can also offer Inútil Music when opening public YouTube/YouTube Music
+- Android can also offer Inutix Music when opening public YouTube/YouTube Music
   links. Video links open the player directly; playlist and album links open a
   catalog view with Play and Add to playlist actions. Unsupported or unsafe
   URLs are ignored.
 - Lyrics offer three persistent animation styles (Smooth by default),
   Normal/Centered alignment, optional per-script romanization, and a live
   preview in Appearance settings.
-- Appearance opens a dedicated gallery with responsive previews of Inútil Music
+- Appearance opens a dedicated gallery with responsive previews of Inutix Music
   Music, Apple Music Style, Classic Vinyl, and Spotify Style. Selecting a style
   applies it immediately. Their controls and artwork adapt to portrait,
   compact landscape, large phones, and desktop windows.
@@ -172,7 +172,7 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
 - Animated progress waves use the current artwork's color, with a smooth color
   transition and an accent-color fallback when artwork is unavailable.
 - Volume is available directly in the player controls.
-- On Windows, Linux, and macOS, choose Inútil Music's audio output device from the
+- On Windows, Linux, and macOS, choose Inutix Music's audio output device from the
   player's More menu, with independent player volume and crossfade support.
 - On desktop, Space toggles Play/Pause from the mini or full player unless an
   editable text field such as Search currently has focus.
@@ -187,7 +187,7 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
 - Source opens use bounded deadlines and generation/epoch isolation. A broken
   decoder or network source cannot hold a newer selection, Stop, or shutdown
   indefinitely, and late events from the retired source are ignored.
-- Windows registers a stable application identity so SMTC shows the Inútil Music
+- Windows registers a stable application identity so SMTC shows the Inutix Music
   Music name and icon in system media controls.
 - Failed-track handling: a track that cannot be downloaded or played does not leave the queue stuck on the previous track.
 
@@ -205,7 +205,7 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
   restore their last valid source playlist and fall back safely when that
   playlist no longer exists.
 - Without requiring an account, Home learns only from qualified local playback
-  events and combines YouTube Music related candidates with Inútil Music's own
+  events and combines YouTube Music related candidates with Inutix Music's own
   ranking. Personalized shelves include **Because you listened**, **Your
   mixes**, **New for you**, and **Discovery for you**; the previous feed is
   shown instantly while a fresh one is prepared in the background.
@@ -217,14 +217,14 @@ El objetivo a mediano plazo es **reemplazar de forma limpia (*clean-room*) cada 
   selectable from Settings, including localized release highlights.
 - An Application information section in Settings opens an organized About the
   app detail with the current version, optional Ko-fi development support, and
-  the official GitHub repository; Inútil Music remains free.
+  the official GitHub repository; Inutix Music remains free.
 - Windows window minimum size of `960 × 600`; the player progressively adapts artwork, text, spacing, and controls to the available height.
 - Icons generated from one source asset for Android, iOS, Windows, macOS, and
   Flutter resources.
 
 ## TikTok LIVE on Android, iOS, Windows, Linux, and macOS
 
-Every supported Inútil Music platform connects to TikTok LIVE through a client
+Every supported Inutix Music platform connects to TikTok LIVE through a client
 implemented directly in Dart and turns chat commands into a temporary music
 queue. The integration does not launch an external bridge.
 
@@ -270,7 +270,7 @@ from the LIVE queue, while `!stop` pauses the current LIVE song.
 
 The local LIVE overlay is available only in the Windows build. Connect to LIVE
 and enable **Local LIVE overlay** immediately below the connection control.
-On first use, Windows asks for administrator confirmation once so Inútil Music can
+On first use, Windows asks for administrator confirmation once so Inutix Music can
 add its marked `hosts` entry:
 
 ```text
@@ -279,12 +279,12 @@ add its marked `hosts` entry:
 
 Afterward, activating the overlay does not need elevation. The name uses the
 reserved `.test` namespace, contains neither `localhost` nor a raw IP, and has
-no explicit port, while Windows still resolves it directly to this PC. Inútil Music
+no explicit port, while Windows still resolves it directly to this PC. Inutix Music
 listens exclusively on `127.0.0.1`; it does not publish the server to the LAN
 or Internet. No HTTPS
 certificate is created or installed for the overlay.
 
-Inútil Music reports the overlay as active only after the hostname resolves safely
+Inutix Music reports the overlay as active only after the hostname resolves safely
 and a direct request to its local `/health` endpoint succeeds. These checks use
 bounded retries, never use an HTTP proxy, and release port `80` completely if
 startup cannot be verified.
@@ -309,12 +309,12 @@ the scene background transparent. The choice is saved and updates an active
 Windows browser source immediately; no reconnect is required. The wave pauses
 with playback, when the browser source is hidden, and for reduced motion.
 
-Keep Inútil Music running while the source is in use. The page contains its own
-HTML, CSS, and JavaScript and receives queue updates from Inútil Music over WS; it
+Keep Inutix Music running while the source is in use. The page contains its own
+HTML, CSS, and JavaScript and receives queue updates from Inutix Music over WS; it
 does not contact an external overlay service. Port `80` must be free because an
-HTTP URL without an explicit port necessarily uses it; Inútil Music reports an error
+HTTP URL without an explicit port necessarily uses it; Inutix Music reports an error
 instead of stopping or reconfiguring another application that already owns the
-port. If Windows access is declined, the rest of Inútil Music remains unaffected and
+port. If Windows access is declined, the rest of Inutix Music remains unaffected and
 the overlay can be activated again later.
 
 To preview and style the real HTTP/WS overlay without installing or
@@ -332,8 +332,8 @@ or Android reclaiming that process also ends the LIVE connection; it is not an
 independent background service.
 
 This integration uses an unofficial, reverse-engineered protocol. If TikTok
-changes it, the Dart client may need to be updated. Inútil Music is not
-affiliated with or endorsed by TikTok or ByteDance. Inútil Music can keep its local
+changes it, the Dart client may need to be updated. Inutix Music is not
+affiliated with or endorsed by TikTok or ByteDance. Inutix Music can keep its local
 processing responsive, but it can only act on chat messages that TikTok
 actually delivers to the WebSocket client.
 
@@ -371,9 +371,9 @@ bounded bytes, requests and elapsed time; unavailable details remain unknown
 without preventing a verified source upgrade. Catalog availability depends on the track
 and region; an unavailable recording remains on YouTube. Its source-upgrade
 behavior was researched against [BitChord](https://github.com/kushagrasinghx/BitChord)
-and implemented independently for Inútil Music's existing playback infrastructure.
+and implemented independently for Inutix Music's existing playback infrastructure.
 
-Inútil Music preserves the original audio samples and does not extract, remux, or
+Inutix Music preserves the original audio samples and does not extract, remux, or
 transcode them. Compatible downloaded files receive
 embedded title, artist and album before entering the library, reusing the
 resolved catalog data. Container detection uses the file contents, with these
@@ -413,13 +413,13 @@ reuse each catalog's session snapshot; refreshing updates the device catalog.
 Mobile device artwork is requested separately on demand rather than extracted
 for every song during a library scan. Desktop text scans skip embedded images.
 
-Inútil Music does not invoke or bundle standalone `ffmpeg` or `ffprobe`
+Inutix Music does not invoke or bundle standalone `ffmpeg` or `ffprobe`
 executables. Desktop playback still relies on the codec libraries included by
 `media_kit`/libmpv; those libraries decode M4A, Opus, and other formats during
 playback, but they are not a transcoding or download post-processing step.
 
 Lyrics are requested from the selected Better Lyrics, LyricsPlus, and
-[LRCLIB](https://lrclib.net) providers when the lyrics view is opened. Inútil Music
+[LRCLIB](https://lrclib.net) providers when the lyrics view is opened. Inutix Music
 sends the current title, artist, duration, and album when available, identifies
 itself with the required client header, and keeps bounded 15-minute in-memory
 caches of at most 24 songs per provider to avoid duplicate requests. Word timing
@@ -553,12 +553,12 @@ URL scheme, keeps account credentials in the system Keychain, and enables the
 audio background mode for lock-screen and Now Playing controls. Remote search,
 playback, downloads, embedded YouTube Music account login, TikTok LIVE, backup
 export, and CSV export are adapted to iOS. The system document picker handles
-exports outside Inútil Music's sandbox.
+exports outside Inutix Music's sandbox.
 
 The Now Playing home-screen widget is available on iOS 14 or newer (small and
 medium sizes). Its artwork and metadata are copied into the shared App Group
 `group.com.inutilmusic.app`; the widget never starts an audio engine or
-downloads music. Its controls open Inútil Music to execute playback actions. For
+downloads music. Its controls open Inutix Music to execute playback actions. For
 device signing, register that App Group for **both** the Runner and
 `com.inutilmusic.app.NowPlayingWidget` extension and sign both targets
 with profiles that include the entitlement. An external signing tool that
@@ -569,22 +569,22 @@ for its transport controls.
 With the user's Media Library permission, the Local view reads songs through
 `MPMediaLibrary`. Only media that is downloaded to the device, exposes a
 playable asset URL, and is not DRM-protected is listed. Cloud-only Apple Music
-items remain unavailable until iOS downloads them locally. Inútil Music's downloaded
+items remain unavailable until iOS downloads them locally. Inutix Music's downloaded
 tracks remain in its own library as on the other platforms.
 
 The app cannot claim public `youtube.com` links as Universal Links because
-those domains do not publish an association for Inútil Music; app-owned
-`inutilmusic://` links are the contract owned by Inútil Music.
+those domains do not publish an association for Inutix Music; app-owned
+`inutilmusic://` links are the contract owned by Inutix Music.
 
 The repository's CI compiles both an unsigned simulator application and an
 unsigned Release application for physical devices. It packages the latter as
-`Inútil Music-Music-<version>-iOS-unsigned.ipa` and uploads it to the corresponding
+`Inutix-Music-<version>-iOS-unsigned.ipa` and uploads it to the corresponding
 GitHub Actions run; it does not sign the package or publish it to a store.
 
 The unsigned IPA can be used as input for an external signing or sideloading
 tool such as GBox. It is not directly installable in its unsigned state: the
 chosen tool must sign or re-sign it using credentials and provisioning that the
-target device accepts. GBox and similar services are independent of Inútil Music,
+target device accepts. GBox and similar services are independent of Inutix Music,
 and their availability and compatibility are not guaranteed by this project.
 
 Media Library behavior must be tested on a physical device because it is not
@@ -594,7 +594,7 @@ distribution require the corresponding Apple signing and provisioning setup.
 ## macOS permissions
 
 The application is distributed outside the Mac App Store. App Sandbox is
-disabled so Inútil Music can access the selected download folder and make network
+disabled so Inutix Music can access the selected download folder and make network
 connections. Hardened Runtime remains enabled for Developer ID signing and
 notarization. Release bundles contain no external YouTube resolver or
 JavaScript runtime. TikTok LIVE uses the same in-process Dart transport on
@@ -710,8 +710,8 @@ The workflow verifies all three APK signatures before uploading the artifacts.
   duplicate playlist. “Episodes for later” is ignored during account bootstrap.
 - ZIP backups contain the database, `audio/`, `thumbnails/`, and a manifest.
 - The Storage page separates local ZIP backup transfer from portable CSV
-  transfer. Inútil Music CSV preserves playlist membership and order; importing can
-  resolve up to three missing tracks concurrently, and Inútil Music,
+  transfer. Inutix Music CSV preserves playlist membership and order; importing can
+  resolve up to three missing tracks concurrently, and Inutix Music,
   MetroList, Harmony/RiMusic, or Soundiiz can be selected as export profiles.
 - Restore validates the manifest, archive paths and limits, SQLite integrity,
   schema, and version before touching local data. Database and media changes
@@ -762,7 +762,7 @@ build/linux/x64/release/bundle/inutil_music
 build/macos/Build/Products/Release/inutil_music.app
 build/ios/iphonesimulator/Runner.app
 build/ios/iphoneos/Runner.app
-dist/Inútil Music-Music-<version>-iOS-unsigned.ipa
+dist/Inutix-Music-<version>-iOS-unsigned.ipa
 ```
 
 ## Release packages with GitHub Actions
@@ -781,15 +781,15 @@ application and needs no additional runtime. Artifacts are retained for 30
 days:
 
 ```text
-Inútil Music-Music-<version>-Android-armeabi-v7a.apk
-Inútil Music-Music-<version>-Android-arm64-v8a.apk
-Inútil Music-Music-<version>-Android-x86_64.apk
-Inútil Music-Music-<version>-Windows-x64-Setup.exe
-Inútil Music-Music-<version>-linux-amd64.deb
-Inútil Music-Music-<version>-linux-x86_64.rpm
-Inútil Music-Music-<version>-macOS-arm64.pkg
-Inútil Music-Music-<version>-macOS-x64.pkg
-Inútil Music-Music-<version>-iOS-unsigned.ipa
+Inutix-Music-<version>-Android-armeabi-v7a.apk
+Inutix-Music-<version>-Android-arm64-v8a.apk
+Inutix-Music-<version>-Android-x86_64.apk
+Inutix-Music-<version>-Windows-x64-Setup.exe
+Inutix-Music-<version>-linux-amd64.deb
+Inutix-Music-<version>-linux-x86_64.rpm
+Inutix-Music-<version>-macOS-arm64.pkg
+Inutix-Music-<version>-macOS-x64.pkg
+Inutix-Music-<version>-iOS-unsigned.ipa
 ```
 
 ### Which file should I install?
@@ -798,7 +798,7 @@ Inútil Music-Music-<version>-iOS-unsigned.ipa
 - **Older 32-bit ARM Android devices:** install `app-armeabi-v7a-release.apk`.
 - **Android x86_64 devices and emulators:** install `app-x86_64-release.apk`.
 - **iPhone and iPad:** download
-  `Inútil Music-Music-<version>-iOS-unsigned.ipa` from the artifacts of a successful
+  `Inutix-Music-<version>-iOS-unsigned.ipa` from the artifacts of a successful
   **Release installers** run in GitHub Actions, then supply it to GBox or
   another compatible signing/sideloading tool. The IPA is deliberately
   unsigned and cannot be installed directly without being signed or re-signed
@@ -807,7 +807,7 @@ Inútil Music-Music-<version>-iOS-unsigned.ipa
 - **Windows 64-bit:** open `Setup.exe`. The per-user installer does not require
   administrator access, shows a language selector, creates a Start Menu
   shortcut, and lets you choose whether to create a desktop shortcut. The
-  uninstaller entry is displayed as `Inútil Music` without the version number.
+  uninstaller entry is displayed as `Inutix Music` without the version number.
 - **Ubuntu / Debian / Linux Mint and all `apt`-based distros — easiest way, one command:**
 
   ```bash
@@ -847,10 +847,10 @@ Inútil Music-Music-<version>-iOS-unsigned.ipa
   installing any system package. The installer creates `~/.local/bin/inutil-music`,
   the `.desktop` entry, and the app icon automatically.
 
-- **Mac with Apple Silicon (M1, M2, M3, M4, or later):** open `Inútil Music-Music-<version>-macOS-arm64.pkg`.
-- **Mac with an Intel processor:** open `Inútil Music-Music-<version>-macOS-x64.pkg`.
+- **Mac with Apple Silicon (M1, M2, M3, M4, or later):** open `Inutix-Music-<version>-macOS-arm64.pkg`.
+- **Mac with an Intel processor:** open `Inutix-Music-<version>-macOS-x64.pkg`.
 
-An `.app` is the complete application and should be opened as one unit, not by entering its `Contents`, `Frameworks`, or `Resources` folders. The `.pkg` installer places `Inútil Music.app` in `/Applications` automatically.
+An `.app` is the complete application and should be opened as one unit, not by entering its `Contents`, `Frameworks`, or `Resources` folders. The `.pkg` installer places `Inutix Music.app` in `/Applications` automatically.
 
 The automated installers are not signed with commercial certificates yet. Windows may show a SmartScreen warning and macOS may show a Gatekeeper warning. Public distribution without those warnings requires a Windows code-signing certificate and Apple Developer ID certificates with notarization.
 
@@ -858,7 +858,7 @@ The version is defined in `pubspec.yaml`, while the text shown inside the applic
 
 ## Self-updates and release publishing
 
-Inútil Music compares its own version at start-up and offers the update inside
+Inutix Music compares its own version at start-up and offers the update inside
 the app, so a new build reaches every device without the Play Store or a package
 manager.
 
@@ -990,7 +990,7 @@ bash packaging/linux/build_packages.sh build/linux/x64/release/bundle 2.5.19 dis
 ```
 
 `tool/package_linux.sh` guarda el contenido del bundle en la raíz del tar
-(`Inútil Music`, `inutil_music`, `data/`, `lib/`, `install.sh`, `THIRD_PARTY_NOTICES.md`),
+(`Inutix Music`, `inutil_music`, `data/`, `lib/`, `install.sh`, `THIRD_PARTY_NOTICES.md`),
 incrustando automáticamente `lib/libmpv.so.2` para que la app sea 100 % autónoma sin requerir
 paquetes adicionales en el sistema.
 

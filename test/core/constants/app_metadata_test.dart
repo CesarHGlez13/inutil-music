@@ -245,7 +245,7 @@ void main() {
     expect(workflow, contains('Acquire::Retries=5'));
     expect(workflow, contains('libsecret-1-dev'));
     expect(workflow, contains('Verify Linux installer payloads'));
-    expect(workflow, contains('test -x "\$bundle/Inútil Music"'));
+    expect(workflow, contains('test -x "\$bundle/Inutix Music"'));
     expect(workflow, contains('dpkg-deb --extract'));
     expect(workflow, contains('rpm2cpio'));
     expect(linuxPackages, contains('libsecret-1-0'));
