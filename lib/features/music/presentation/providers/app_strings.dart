@@ -1203,7 +1203,67 @@ class AppStrings {
   String get appleAnimatedArtworkDescription =>
       'Apple Music (m8tec · boidu.dev)';
   String get spotifyCanvas => 'Spotify Canvas';
-  String get spotifyCanvasDescription => 'Canvas (spotycovs.lol)';
+  String get spotifyCanvasDescription => choose(
+    'Clips de video en bucle a pantalla completa cuando estén disponibles',
+    'Full-screen looping video clips when available',
+  );
+  String get playerVisualBackdrop =>
+      choose('Fondo visual del reproductor', 'Player visual backdrop');
+  String get playerVisualBackdropStatic => choose('Estático', 'Static');
+  String get playerVisualBackdropStaticDescription => choose(
+    'Portada fija sin animaciones ni video',
+    'Static artwork without motion or video',
+  );
+  String get playerVisualBackdropMotion =>
+      choose('Movimiento suave', 'Subtle motion');
+  String get playerVisualBackdropMotionDescription => choose(
+    'Efecto cinematográfico suave sobre la carátula',
+    'Subtle cinematic zoom and pan on the cover art',
+  );
+  String get playerVisualBackdropAppleDescription => choose(
+    'Portada animada oficial de Apple Music cuando esté disponible',
+    'Official Apple Music animated cover when available',
+  );
+  String get playerVisualBackdropCanvas => choose('Video Canvas', 'Video Canvas');
+  String get playerArtworkStyleDisabledCanvas => choose(
+    'No aplica mientras Video Canvas a pantalla completa está activo',
+    'Not used while full-screen Video Canvas is active',
+  );
+  String get dynamicPlayerAccent =>
+      choose('Acento dinámico en el reproductor', 'Dynamic player accent');
+  String get dynamicPlayerAccentDescription => choose(
+    'Adapta botones e indicadores al color de la carátula actual',
+    'Match player highlights to the current album artwork color',
+  );
+  String get playerSaveButtonActionTitle =>
+      choose('Botón Guardar (+) en reproductor', 'Player Save (+) button');
+  String get playerSaveButtonSmart =>
+      choose('Inteligente (Favoritos + Playlists)', 'Smart (Favorites + Playlists)');
+  String get playerSaveButtonSmartDescription => choose(
+    '1er toque guarda en Favoritos; tocar ✓ o mantener abre tus playlists',
+    '1st tap saves to Favorites; tapping ✓ or long-pressing opens playlists',
+  );
+  String get playerSaveButtonPicker =>
+      choose('Abrir selector siempre', 'Always open picker');
+  String get playerSaveButtonPickerDescription => choose(
+    'Cada toque abre Favoritos y tus playlists para marcarlas rápido',
+    'Every tap opens Favorites and your playlists for quick selection',
+  );
+  String get playerSaveButtonFavoritesOnly =>
+      choose('Solo Favoritos', 'Favorites only');
+  String get playerSaveButtonFavoritesOnlyDescription => choose(
+    'Solo alterna Favoritos al tocar; mantener pulsado abre playlists',
+    'Tap only toggles Favorites; long-press still opens playlists',
+  );
+  String get saveToLibraryTitle =>
+      choose('Guardar en biblioteca', 'Save to library');
+  String get currentPlaylistBadge => choose('Lista actual', 'Current playlist');
+  String get savedToLibrary =>
+      choose('Guardada en tu biblioteca', 'Saved to your library');
+  String get shareSelectedLinesClip =>
+      choose('Mini clip', 'Mini clip');
+  String get shareSelectedLinesImage =>
+      choose('Imagen', 'Image');
   String get spotifyCanvasUnavailable => choose(
     'No disponible en Linux; se mantiene la portada.',
     'Unavailable on Linux; the cover remains visible.',

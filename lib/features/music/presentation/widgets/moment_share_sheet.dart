@@ -32,6 +32,8 @@ Future<void> showMomentShareSheet({
   String? artworkSource,
   String? artworkFallbackSource,
   Color? accentColor,
+  Duration? initialStart,
+  Duration? initialDuration,
 }) async {
   await Navigator.of(context, rootNavigator: true).push<void>(
     MaterialPageRoute<void>(
@@ -43,6 +45,8 @@ Future<void> showMomentShareSheet({
         artworkSource: artworkSource,
         artworkFallbackSource: artworkFallbackSource,
         accentColor: accentColor,
+        initialStart: initialStart,
+        initialDuration: initialDuration,
       ),
     ),
   );
@@ -56,6 +60,8 @@ class MomentShareSheet extends ConsumerStatefulWidget {
     this.artworkSource,
     this.artworkFallbackSource,
     this.accentColor,
+    this.initialStart,
+    this.initialDuration,
     super.key,
   });
 
@@ -65,6 +71,8 @@ class MomentShareSheet extends ConsumerStatefulWidget {
   final String? artworkSource;
   final String? artworkFallbackSource;
   final Color? accentColor;
+  final Duration? initialStart;
+  final Duration? initialDuration;
 
   @override
   ConsumerState<MomentShareSheet> createState() => _MomentShareSheetState();
@@ -117,10 +125,17 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
     final snapshot =
         _frozenSnapshot ?? const PlayerSnapshot(status: PlayerStatus.idle);
     final trackDuration = _resolveTrackDuration(snapshot);
-    final initialStart = _initialWindowStart(snapshot.position, trackDuration);
+    final initialStart =
+        widget.initialStart ??
+        _initialWindowStart(snapshot.position, trackDuration);
+    final initialDuration =
+        widget.initialDuration ?? MomentClipWindow.defaultDuration;
+    if (widget.initialStart != null || widget.initialDuration != null) {
+      _userAdjustedWindow = true;
+    }
     _window = MomentClipWindow.resolve(
       requestedStart: initialStart,
-      requestedDuration: MomentClipWindow.defaultDuration,
+      requestedDuration: initialDuration,
       trackDuration: trackDuration,
     );
     if (initialSnapshot == null) {

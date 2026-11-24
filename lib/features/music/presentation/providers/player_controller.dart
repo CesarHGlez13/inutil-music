@@ -3501,6 +3501,15 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     return _activeLocalQueueSourceId == sourceId;
   }
 
+  /// Identifier of the currently playing user playlist, when playback originated
+  /// from a playlist queue.
+  String? get activePlaylistId {
+    final sourceId = _activePlaybackIsRemote
+        ? _activeRemoteQueueSourceId
+        : _activeLocalQueueSourceId;
+    return _playlistIdFromQueueSourceId(sourceId);
+  }
+
   Future<bool> syncLocalQueueSource(
     String sourceId,
     List<LocalTrack> tracks,

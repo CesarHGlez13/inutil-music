@@ -61,6 +61,7 @@ import 'player_dismiss_region.dart';
 import 'playlist_picker_dialog.dart';
 import 'source_image.dart';
 import 'spotify_canvas_video.dart';
+import 'track_library_quick_sheet.dart';
 import 'track_change_transition.dart';
 import 'uniform_playback_slider_track_shape.dart';
 import 'wavy_playback_seek_bar.dart';
@@ -738,6 +739,8 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 visualIdentity: visualIdentity,
                                 trackTransitionsEnabled:
                                     widget.trackTransitionsEnabled,
+                                animatedArtworkEnabled:
+                                    widget.animatedArtworkEnabled,
                                 canvasUrl: canvasUrl,
                                 videoStartOffset: videoStartOffset,
                                 videoDurationHint: videoDurationHint,

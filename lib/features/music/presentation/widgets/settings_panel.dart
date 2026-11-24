@@ -465,6 +465,9 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         playerArtworkStyle: state.playerArtworkStyle,
         appleAnimatedArtworkEnabled: state.appleAnimatedArtworkEnabled,
         spotifyCanvasEnabled: state.spotifyCanvasEnabled,
+        visualBackdropMode: state.visualBackdropMode,
+        dynamicPlayerAccent: state.dynamicPlayerAccent,
+        playerSaveButtonAction: state.playerSaveButtonAction,
         miniPlayerMode: state.miniPlayerMode,
         miniPlayerBackgroundMode: state.miniPlayerBackgroundMode,
         strings: strings,
@@ -500,6 +503,15 @@ class _SettingsPanelState extends ConsumerState<SettingsPanel> {
         onSpotifyCanvasEnabledChanged: (enabled) => ref
             .read(settingsControllerProvider.notifier)
             .setSpotifyCanvasEnabled(enabled),
+        onPlayerVisualBackdropModeChanged: (mode) => ref
+            .read(settingsControllerProvider.notifier)
+            .setPlayerVisualBackdropMode(mode),
+        onDynamicPlayerAccentChanged: (enabled) => ref
+            .read(settingsControllerProvider.notifier)
+            .setDynamicPlayerAccent(enabled),
+        onPlayerSaveButtonActionChanged: (action) => ref
+            .read(settingsControllerProvider.notifier)
+            .setPlayerSaveButtonAction(action),
         onMiniPlayerModeChanged: (mode) => ref
             .read(settingsControllerProvider.notifier)
             .setMiniPlayerMode(mode),
@@ -2031,6 +2043,7 @@ class _SettingsDialogOption extends StatelessWidget {
     this.icon,
     this.leading,
     required this.label,
+    this.subtitle,
     required this.onTap,
     super.key,
   }) : assert(icon != null || leading != null);
@@ -2039,6 +2052,7 @@ class _SettingsDialogOption extends StatelessWidget {
   final IconData? icon;
   final Widget? leading;
   final String label;
+  final String? subtitle;
   final VoidCallback onTap;
 
   @override
@@ -2088,12 +2102,34 @@ class _SettingsDialogOption extends StatelessWidget {
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      label,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: selected ? colors.onPrimaryContainer : null,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                color: selected
+                                    ? colors.onPrimaryContainer
+                                    : null,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            subtitle!,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: (selected
+                                          ? colors.onPrimaryContainer
+                                          : colors.onSurfaceVariant)
+                                      .withValues(alpha: 0.8),
+                                ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -2309,6 +2345,150 @@ class _PlayerArtworkStyleSelectorDialog extends StatelessWidget {
       actions: [
         TextButton(
           key: const ValueKey('settings-player-artwork-style-cancel'),
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayerVisualBackdropDialog extends StatelessWidget {
+  const _PlayerVisualBackdropDialog({
+    required this.mode,
+    required this.strings,
+  });
+
+  final PlayerVisualBackdropMode mode;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    final supportsVideo = AppPlatform.supportsRemoteArtworkVideo;
+    return AppAlertDialog(
+      key: const ValueKey('settings-player-visual-backdrop-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.playerVisualBackdrop),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey('settings-backdrop-option-static'),
+              selected: mode == PlayerVisualBackdropMode.staticCover,
+              icon: Icons.crop_original_rounded,
+              label: strings.playerVisualBackdropStatic,
+              subtitle: strings.playerVisualBackdropStaticDescription,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(PlayerVisualBackdropMode.staticCover),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey('settings-backdrop-option-motion'),
+              selected: mode == PlayerVisualBackdropMode.subtleMotion,
+              icon: Icons.motion_photos_auto_rounded,
+              label: strings.playerVisualBackdropMotion,
+              subtitle: strings.playerVisualBackdropMotionDescription,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(PlayerVisualBackdropMode.subtleMotion),
+            ),
+            if (supportsVideo) ...[
+              const SizedBox(height: 8),
+              _SettingsDialogOption(
+                key: const ValueKey('settings-backdrop-option-apple'),
+                selected: mode == PlayerVisualBackdropMode.appleAnimatedArtwork,
+                icon: Icons.live_tv_rounded,
+                label: strings.appleAnimatedArtwork,
+                subtitle: strings.playerVisualBackdropAppleDescription,
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(PlayerVisualBackdropMode.appleAnimatedArtwork),
+              ),
+              const SizedBox(height: 8),
+              _SettingsDialogOption(
+                key: const ValueKey('settings-backdrop-option-canvas'),
+                selected: mode == PlayerVisualBackdropMode.videoCanvas,
+                icon: Icons.movie_filter_rounded,
+                label: strings.playerVisualBackdropCanvas,
+                subtitle: strings.spotifyCanvasDescription,
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(PlayerVisualBackdropMode.videoCanvas),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: Text(strings.cancel),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlayerSaveButtonActionDialog extends StatelessWidget {
+  const _PlayerSaveButtonActionDialog({
+    required this.action,
+    required this.strings,
+  });
+
+  final PlayerSaveButtonAction action;
+  final AppStrings strings;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppAlertDialog(
+      key: const ValueKey('settings-player-save-button-dialog'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: Text(strings.playerSaveButtonActionTitle),
+      content: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _SettingsDialogOption(
+              key: const ValueKey('settings-save-button-option-smart'),
+              selected: action == PlayerSaveButtonAction.smart,
+              icon: Icons.auto_awesome_rounded,
+              label: strings.playerSaveButtonSmart,
+              subtitle: strings.playerSaveButtonSmartDescription,
+              onTap: () =>
+                  Navigator.of(context).pop(PlayerSaveButtonAction.smart),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey('settings-save-button-option-picker'),
+              selected: action == PlayerSaveButtonAction.picker,
+              icon: Icons.playlist_add_check_rounded,
+              label: strings.playerSaveButtonPicker,
+              subtitle: strings.playerSaveButtonPickerDescription,
+              onTap: () =>
+                  Navigator.of(context).pop(PlayerSaveButtonAction.picker),
+            ),
+            const SizedBox(height: 8),
+            _SettingsDialogOption(
+              key: const ValueKey('settings-save-button-option-favorites'),
+              selected: action == PlayerSaveButtonAction.favoritesOnly,
+              icon: Icons.favorite_rounded,
+              label: strings.playerSaveButtonFavoritesOnly,
+              subtitle: strings.playerSaveButtonFavoritesOnlyDescription,
+              onTap: () => Navigator.of(
+                context,
+              ).pop(PlayerSaveButtonAction.favoritesOnly),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
           onPressed: () => Navigator.of(context).pop(),
           child: Text(strings.cancel),
         ),
@@ -2586,6 +2766,9 @@ class _AppearanceSettings extends StatelessWidget {
     required this.playerArtworkStyle,
     required this.appleAnimatedArtworkEnabled,
     required this.spotifyCanvasEnabled,
+    required this.visualBackdropMode,
+    required this.dynamicPlayerAccent,
+    required this.playerSaveButtonAction,
     required this.miniPlayerMode,
     required this.miniPlayerBackgroundMode,
     required this.strings,
@@ -2602,6 +2785,9 @@ class _AppearanceSettings extends StatelessWidget {
     required this.onPlayerArtworkStyleChanged,
     required this.onAppleAnimatedArtworkEnabledChanged,
     required this.onSpotifyCanvasEnabledChanged,
+    required this.onPlayerVisualBackdropModeChanged,
+    required this.onDynamicPlayerAccentChanged,
+    required this.onPlayerSaveButtonActionChanged,
     required this.onMiniPlayerModeChanged,
     required this.onMiniPlayerBackgroundModeChanged,
   });
@@ -2619,6 +2805,9 @@ class _AppearanceSettings extends StatelessWidget {
   final PlayerArtworkStyle playerArtworkStyle;
   final bool appleAnimatedArtworkEnabled;
   final bool spotifyCanvasEnabled;
+  final PlayerVisualBackdropMode visualBackdropMode;
+  final bool dynamicPlayerAccent;
+  final PlayerSaveButtonAction playerSaveButtonAction;
   final MiniPlayerMode miniPlayerMode;
   final MiniPlayerBackgroundMode miniPlayerBackgroundMode;
   final AppStrings strings;
@@ -2636,9 +2825,44 @@ class _AppearanceSettings extends StatelessWidget {
   final Future<void> Function(PlayerArtworkStyle) onPlayerArtworkStyleChanged;
   final Future<void> Function(bool) onAppleAnimatedArtworkEnabledChanged;
   final Future<void> Function(bool) onSpotifyCanvasEnabledChanged;
+  final Future<void> Function(PlayerVisualBackdropMode)
+  onPlayerVisualBackdropModeChanged;
+  final Future<void> Function(bool) onDynamicPlayerAccentChanged;
+  final Future<void> Function(PlayerSaveButtonAction)
+  onPlayerSaveButtonActionChanged;
   final Future<void> Function(MiniPlayerMode) onMiniPlayerModeChanged;
   final Future<void> Function(MiniPlayerBackgroundMode)
   onMiniPlayerBackgroundModeChanged;
+
+  Future<void> _choosePlayerVisualBackdrop(BuildContext context) async {
+    final selected = await showAppDialog<PlayerVisualBackdropMode>(
+      context: context,
+      builder: (_) => _PlayerVisualBackdropDialog(
+        mode: visualBackdropMode,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted || selected == null || selected == visualBackdropMode) {
+      return;
+    }
+    await onPlayerVisualBackdropModeChanged(selected);
+  }
+
+  Future<void> _choosePlayerSaveButtonAction(BuildContext context) async {
+    final selected = await showAppDialog<PlayerSaveButtonAction>(
+      context: context,
+      builder: (_) => _PlayerSaveButtonActionDialog(
+        action: playerSaveButtonAction,
+        strings: strings,
+      ),
+    );
+    if (!context.mounted ||
+        selected == null ||
+        selected == playerSaveButtonAction) {
+      return;
+    }
+    await onPlayerSaveButtonActionChanged(selected);
+  }
 
   Future<void> _chooseMiniPlayerMode(BuildContext context) async {
     final selected = await showAppDialog<MiniPlayerMode>(
@@ -2889,6 +3113,59 @@ class _AppearanceSettings extends StatelessWidget {
               ),
               const SizedBox(height: appCardGap),
               _SettingsEntryCard(
+                key: const ValueKey('player-visual-backdrop-selector'),
+                icon: switch (visualBackdropMode) {
+                  PlayerVisualBackdropMode.staticCover =>
+                    Icons.crop_original_rounded,
+                  PlayerVisualBackdropMode.subtleMotion =>
+                    Icons.motion_photos_auto_rounded,
+                  PlayerVisualBackdropMode.appleAnimatedArtwork =>
+                    Icons.live_tv_rounded,
+                  PlayerVisualBackdropMode.videoCanvas =>
+                    Icons.movie_filter_rounded,
+                },
+                title: strings.playerVisualBackdrop,
+                subtitle: switch (visualBackdropMode) {
+                  PlayerVisualBackdropMode.staticCover =>
+                    strings.playerVisualBackdropStatic,
+                  PlayerVisualBackdropMode.subtleMotion =>
+                    strings.playerVisualBackdropMotion,
+                  PlayerVisualBackdropMode.appleAnimatedArtwork =>
+                    strings.appleAnimatedArtwork,
+                  PlayerVisualBackdropMode.videoCanvas =>
+                    strings.playerVisualBackdropCanvas,
+                },
+                onTap: () => _choosePlayerVisualBackdrop(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('dynamic-player-accent-toggle'),
+                icon: Icons.palette_outlined,
+                title: strings.dynamicPlayerAccent,
+                subtitle: strings.dynamicPlayerAccentDescription,
+                onTap: () => onDynamicPlayerAccentChanged(!dynamicPlayerAccent),
+                trailing: Switch.adaptive(
+                  key: const ValueKey('dynamic-player-accent-switch'),
+                  value: dynamicPlayerAccent,
+                  onChanged: onDynamicPlayerAccentChanged,
+                ),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
+                key: const ValueKey('player-save-button-action-selector'),
+                icon: Icons.playlist_add_check_circle_outlined,
+                title: strings.playerSaveButtonActionTitle,
+                subtitle: switch (playerSaveButtonAction) {
+                  PlayerSaveButtonAction.smart => strings.playerSaveButtonSmart,
+                  PlayerSaveButtonAction.picker =>
+                    strings.playerSaveButtonPicker,
+                  PlayerSaveButtonAction.favoritesOnly =>
+                    strings.playerSaveButtonFavoritesOnly,
+                },
+                onTap: () => _choosePlayerSaveButtonAction(context),
+              ),
+              const SizedBox(height: appCardGap),
+              _SettingsEntryCard(
                 key: const ValueKey('show-audio-quality-toggle'),
                 icon: Icons.high_quality_rounded,
                 title: strings.showAudioQuality,
@@ -2922,8 +3199,12 @@ class _AppearanceSettings extends StatelessWidget {
                   PlayerArtworkStyle.expanded => Icons.aspect_ratio_rounded,
                 },
                 title: strings.playerArtworkStyle,
-                subtitle: strings.playerArtworkStyleLabel(playerArtworkStyle),
-                onTap: () => _choosePlayerArtworkStyle(context),
+                subtitle: spotifyCanvasEnabled
+                    ? strings.playerArtworkStyleDisabledCanvas
+                    : strings.playerArtworkStyleLabel(playerArtworkStyle),
+                onTap: spotifyCanvasEnabled
+                    ? null
+                    : () => _choosePlayerArtworkStyle(context),
               ),
               const SizedBox(height: appCardGap),
               _SettingsEntryCard(

@@ -91,6 +91,29 @@ const defaultLocalMusicFilters = <LocalMusicFilter>{
   LocalMusicFilter.hideTracksUnder30Seconds,
 };
 
+enum PlayerSaveButtonAction {
+  smart('smart'),
+  picker('picker'),
+  favoritesOnly('favorites_only');
+
+  const PlayerSaveButtonAction(this.code);
+
+  final String code;
+
+  static PlayerSaveButtonAction fromCode(String? code) => switch (code) {
+    'picker' => PlayerSaveButtonAction.picker,
+    'favorites_only' => PlayerSaveButtonAction.favoritesOnly,
+    _ => PlayerSaveButtonAction.smart,
+  };
+}
+
+enum PlayerVisualBackdropMode {
+  staticCover,
+  subtleMotion,
+  appleAnimatedArtwork,
+  videoCanvas,
+}
+
 AudioQualityProfile _audioQualityProfileFromCode(
   String? code, {
   required AudioQualityProfile fallback,
@@ -133,6 +156,8 @@ class SettingsState {
     this.crossfadeEnabled = false,
     this.crossfadeDuration = defaultCrossfadeDuration,
     this.skipSilenceEnabled = false,
+    this.dynamicPlayerAccent = false,
+    this.playerSaveButtonAction = PlayerSaveButtonAction.smart,
   });
 
   final String downloadDirectory;
@@ -170,6 +195,17 @@ class SettingsState {
   final bool crossfadeEnabled;
   final Duration crossfadeDuration;
   final bool skipSilenceEnabled;
+  final bool dynamicPlayerAccent;
+  final PlayerSaveButtonAction playerSaveButtonAction;
+
+  PlayerVisualBackdropMode get visualBackdropMode {
+    if (spotifyCanvasEnabled) return PlayerVisualBackdropMode.videoCanvas;
+    if (appleAnimatedArtworkEnabled) {
+      return PlayerVisualBackdropMode.appleAnimatedArtwork;
+    }
+    if (animatedArtworkEnabled) return PlayerVisualBackdropMode.subtleMotion;
+    return PlayerVisualBackdropMode.staticCover;
+  }
 
   SettingsState copyWith({
     String? downloadDirectory,
@@ -203,6 +239,8 @@ class SettingsState {
     bool? crossfadeEnabled,
     Duration? crossfadeDuration,
     bool? skipSilenceEnabled,
+    bool? dynamicPlayerAccent,
+    PlayerSaveButtonAction? playerSaveButtonAction,
   }) {
     return SettingsState(
       downloadDirectory: downloadDirectory ?? this.downloadDirectory,
@@ -250,6 +288,9 @@ class SettingsState {
       crossfadeEnabled: crossfadeEnabled ?? this.crossfadeEnabled,
       crossfadeDuration: crossfadeDuration ?? this.crossfadeDuration,
       skipSilenceEnabled: skipSilenceEnabled ?? this.skipSilenceEnabled,
+      dynamicPlayerAccent: dynamicPlayerAccent ?? this.dynamicPlayerAccent,
+      playerSaveButtonAction:
+          playerSaveButtonAction ?? this.playerSaveButtonAction,
     );
   }
 }
@@ -302,6 +343,8 @@ class SettingsController extends AsyncNotifier<SettingsState> {
   static const _crossfadeEnabledKey = 'settings.crossfadeEnabled';
   static const _crossfadeSecondsKey = 'settings.crossfadeSeconds';
   static const _skipSilenceEnabledKey = 'settings.skipSilenceEnabled';
+  static const _dynamicPlayerAccentKey = 'settings.dynamicPlayerAccent';
+  static const _playerSaveButtonActionKey = 'settings.playerSaveButtonAction';
   static const _mediaRootDirectoryName = 'Inutil-Music';
   Future<void> _lyricsTextAlignmentWriteTail = Future<void>.value();
   Future<void> _enabledLyricsProvidersWriteTail = Future<void>.value();
@@ -451,6 +494,10 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     );
     final crossfadeEnabled = prefs.getBool(_crossfadeEnabledKey) ?? false;
     final skipSilenceEnabled = prefs.getBool(_skipSilenceEnabledKey) ?? false;
+    final dynamicPlayerAccent = prefs.getBool(_dynamicPlayerAccentKey) ?? false;
+    final playerSaveButtonAction = PlayerSaveButtonAction.fromCode(
+      prefs.getString(_playerSaveButtonActionKey),
+    );
     final storedDirectory = prefs.getString(_downloadDirectoryKey);
     final encodedMigrationJournal = prefs.getString(
       _downloadDirectoryMigrationJournalKey,
@@ -636,6 +683,8 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       crossfadeEnabled: crossfadeEnabled,
       crossfadeDuration: crossfadeDuration,
       skipSilenceEnabled: skipSilenceEnabled,
+      dynamicPlayerAccent: dynamicPlayerAccent,
+      playerSaveButtonAction: playerSaveButtonAction,
     );
   }
 
@@ -1063,6 +1112,51 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     });
     _remoteArtworkWriteTail = write.catchError((_) {});
     await write;
+  }
+
+  Future<void> setPlayerVisualBackdropMode(
+    PlayerVisualBackdropMode mode,
+  ) async {
+    final current = state.asData?.value ?? await future;
+    final animated = mode != PlayerVisualBackdropMode.staticCover;
+    final apple = mode == PlayerVisualBackdropMode.appleAnimatedArtwork;
+    final canvas = mode == PlayerVisualBackdropMode.videoCanvas;
+    if (current.animatedArtworkEnabled == animated &&
+        current.appleAnimatedArtworkEnabled == apple &&
+        current.spotifyCanvasEnabled == canvas) {
+      return;
+    }
+    state = AsyncData(
+      current.copyWith(
+        animatedArtworkEnabled: animated,
+        appleAnimatedArtworkEnabled: apple,
+        spotifyCanvasEnabled: canvas,
+      ),
+    );
+    final write = _remoteArtworkWriteTail.catchError((_) {}).then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_animatedArtworkEnabledKey, animated);
+      await prefs.setBool(_appleAnimatedArtworkEnabledKey, apple);
+      await prefs.setBool(_spotifyCanvasEnabledKey, canvas);
+    });
+    _remoteArtworkWriteTail = write.catchError((_) {});
+    await write;
+  }
+
+  Future<void> setDynamicPlayerAccent(bool enabled) async {
+    final current = state.asData?.value ?? await future;
+    if (current.dynamicPlayerAccent == enabled) return;
+    state = AsyncData(current.copyWith(dynamicPlayerAccent: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_dynamicPlayerAccentKey, enabled);
+  }
+
+  Future<void> setPlayerSaveButtonAction(PlayerSaveButtonAction action) async {
+    final current = state.asData?.value ?? await future;
+    if (current.playerSaveButtonAction == action) return;
+    state = AsyncData(current.copyWith(playerSaveButtonAction: action));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_playerSaveButtonActionKey, action.code);
   }
 
   Future<void> setMiniPlayerMode(MiniPlayerMode mode) async {

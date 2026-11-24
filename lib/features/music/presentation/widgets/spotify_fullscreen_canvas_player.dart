@@ -12,6 +12,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     required this.artworkFallbackSource,
     required this.visualIdentity,
     required this.trackTransitionsEnabled,
+    this.animatedArtworkEnabled = true,
     required this.canvasUrl,
     required this.videoStartOffset,
     required this.videoDurationHint,
@@ -30,13 +31,12 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     required this.strings,
   });
 
-  static const _spotifyGreen = Color(0xFF1DB954);
-
   final PlayerSnapshot snapshot;
   final String? artworkSource;
   final String? artworkFallbackSource;
   final String visualIdentity;
   final bool trackTransitionsEnabled;
+  final bool animatedArtworkEnabled;
   final Uri? canvasUrl;
   final Duration videoStartOffset;
   final Duration videoDurationHint;
@@ -92,6 +92,16 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     final artworkAccentColor = artworkSource?.trim().isNotEmpty == true
         ? ref.watch(artworkProgressColorProvider(artworkSource)).value
         : null;
+    final settings = ref.watch(settingsControllerProvider).value;
+    final dynamicAccentEnabled = settings?.dynamicPlayerAccent ?? false;
+    final themePrimary = Theme.of(context).colorScheme.primary;
+    final rawAccent = dynamicAccentEnabled
+        ? (artworkAccentColor ?? themePrimary)
+        : themePrimary;
+    final effectiveAccent = rawAccent.computeLuminance() < 0.24
+        ? Color.alphaBlend(Colors.white.withValues(alpha: 0.35), rawAccent)
+        : rawAccent;
+    final motionAllowed = !disableAnimations && animatedArtworkEnabled;
 
     return Stack(
       key: const ValueKey('spotify-fullscreen-canvas-player'),
@@ -121,7 +131,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         'canvas-backdrop-${artworkSource ?? visualIdentity}',
                       ),
                       child: AnimatedArtworkMotion(
-                        enabled: !disableAnimations,
+                        enabled: motionAllowed,
                         isPlaying: isPlaying,
                         identity: visualIdentity,
                         borderRadius: BorderRadius.zero,
@@ -155,8 +165,8 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           Positioned.fill(
             child: IgnorePointer(
               child: _CanvasArtworkAmbientAura(
-                accentColor: artworkAccentColor ?? const Color(0xFF1DB954),
-                enabled: !disableAnimations,
+                accentColor: artworkAccentColor ?? effectiveAccent,
+                enabled: motionAllowed,
                 isPlaying: isPlaying,
               ),
             ),
@@ -491,6 +501,10 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                             snapshot: snapshot,
                                             isFavorite: isFavorite,
                                             savedTrackId: savedTrackId,
+                                            artworkSource: artworkSource,
+                                            artworkFallbackSource:
+                                                artworkFallbackSource,
+                                            accentColor: effectiveAccent,
                                             strings: strings,
                                           ),
                                       ],
@@ -518,7 +532,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                                     : strings.activateShuffle,
                                                 icon: Icons.shuffle_rounded,
                                                 active: snapshot.shuffleEnabled,
-                                                activeColor: _spotifyGreen,
+                                                activeColor: effectiveAccent,
                                                 onPressed: hasTrack
                                                     ? () => player.toggleShuffle()
                                                     : null,
@@ -604,7 +618,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                                 active:
                                                     snapshot.repeatMode !=
                                                     PlaybackRepeatMode.off,
-                                                activeColor: _spotifyGreen,
+                                                activeColor: effectiveAccent,
                                                 onPressed: hasTrack
                                                     ? () => player
                                                           .cycleRepeatMode()
@@ -662,7 +676,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                                 size: 21,
                                                 filled: sleepTimer.isActive,
                                                 color: sleepTimer.isActive
-                                                    ? _spotifyGreen
+                                                    ? effectiveAccent
                                                     : Colors.white.withValues(
                                                         alpha: 0.88,
                                                       ),
@@ -671,8 +685,8 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                                 const SizedBox(width: 4),
                                                 Text(
                                                   '${sleepTimer.remaining.inMinutes + 1}m',
-                                                  style: const TextStyle(
-                                                    color: _spotifyGreen,
+                                                  style: TextStyle(
+                                                    color: effectiveAccent,
                                                     fontSize: 11.5,
                                                     fontWeight: FontWeight.w800,
                                                   ),
@@ -689,7 +703,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                             size: 22,
                                             filled: queueVisible,
                                             color: queueVisible
-                                                ? _spotifyGreen
+                                                ? effectiveAccent
                                                 : Colors.white.withValues(
                                                     alpha: 0.88,
                                                   ),
@@ -706,7 +720,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                             size: 21,
                                             filled: pairedDeviceName != null,
                                             color: pairedDeviceName != null
-                                                ? _spotifyGreen
+                                                ? effectiveAccent
                                                 : Colors.white.withValues(
                                                     alpha: 0.88,
                                                   ),
@@ -911,12 +925,23 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                           snapshot: snapshot,
                           isFavorite: isFavorite,
                           savedTrackId: savedTrackId,
+                          artworkSource: artworkSource,
+                          artworkFallbackSource: artworkFallbackSource,
+                          accentColor: effectiveAccent,
                           strings: strings,
                         ),
                     ],
                   ),
 
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
+
+                  // Audio quality pill (honors Apariencia -> Mostrar calidad de audio).
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: _PlaybackTimelineQuality(),
+                  ),
+
+                  const SizedBox(height: 6),
 
                   // Crisp white progress bar with timestamps.
                   _AppleMusicTimeline(
@@ -942,7 +967,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                             : strings.activateShuffle,
                         icon: Icons.shuffle_rounded,
                         active: snapshot.shuffleEnabled,
-                        activeColor: _spotifyGreen,
+                        activeColor: effectiveAccent,
                         onPressed: hasTrack
                             ? () => player.toggleShuffle()
                             : null,
@@ -1002,7 +1027,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                             ? Icons.repeat_one_rounded
                             : Icons.repeat_rounded,
                         active: snapshot.repeatMode != PlaybackRepeatMode.off,
-                        activeColor: _spotifyGreen,
+                        activeColor: effectiveAccent,
                         onPressed: hasTrack
                             ? () => player.cycleRepeatMode()
                             : null,
@@ -1031,7 +1056,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                 size: 21,
                                 filled: pairedDeviceName != null,
                                 color: pairedDeviceName != null
-                                    ? _spotifyGreen
+                                    ? effectiveAccent
                                     : Colors.white.withValues(alpha: 0.88),
                               ),
                               if (pairedDeviceName != null) ...[
@@ -1044,8 +1069,8 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                     pairedDeviceName,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: _spotifyGreen,
+                                    style: TextStyle(
+                                      color: effectiveAccent,
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -1069,15 +1094,15 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                               size: 21,
                               filled: sleepTimer.isActive,
                               color: sleepTimer.isActive
-                                  ? _spotifyGreen
+                                  ? effectiveAccent
                                   : Colors.white.withValues(alpha: 0.88),
                             ),
                             if (sleepTimer.isActive) ...[
                               const SizedBox(width: 4),
                               Text(
                                 '${sleepTimer.remaining.inMinutes + 1}m',
-                                style: const TextStyle(
-                                  color: _spotifyGreen,
+                                style: TextStyle(
+                                  color: effectiveAccent,
                                   fontSize: 11.5,
                                   fontWeight: FontWeight.w800,
                                 ),
@@ -1136,7 +1161,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                           size: 22,
                           filled: queueVisible,
                           color: queueVisible
-                              ? _spotifyGreen
+                              ? effectiveAccent
                               : Colors.white.withValues(alpha: 0.88),
                         ),
                       ),
@@ -1416,14 +1441,18 @@ class _SpotifyCircleFavoriteButton extends ConsumerWidget {
     required this.snapshot,
     required this.isFavorite,
     required this.savedTrackId,
+    required this.artworkSource,
+    required this.artworkFallbackSource,
+    required this.accentColor,
     required this.strings,
   });
-
-  static const _spotifyGreen = Color(0xFF1DB954);
 
   final PlayerSnapshot snapshot;
   final bool isFavorite;
   final String? savedTrackId;
+  final String? artworkSource;
+  final String? artworkFallbackSource;
+  final Color accentColor;
   final AppStrings strings;
 
   @override
@@ -1431,42 +1460,101 @@ class _SpotifyCircleFavoriteButton extends ConsumerWidget {
     final hasIdentity =
         (snapshot.trackId?.trim().isNotEmpty ?? false) ||
         (snapshot.sourceUrl?.trim().isNotEmpty ?? false);
+    final catalogPlaylists =
+        ref.watch(catalogPlaylistsProvider).value ?? const [];
+    final sourceUrl = snapshot.sourceUrl?.trim();
+    final remoteTrack =
+        snapshot.isRemote && sourceUrl != null && sourceUrl.isNotEmpty
+        ? ref
+              .read(playerControllerProvider.notifier)
+              .currentRemoteTrackFor(sourceUrl)
+        : null;
+    final savedInLibrary = isSnapshotSavedInLibrary(
+      catalogPlaylists: catalogPlaylists,
+      snapshot: snapshot,
+      isFavorite: isFavorite,
+      savedTrackId: savedTrackId,
+      remoteTrack: remoteTrack,
+    );
+    final saveAction =
+        ref.watch(
+          settingsControllerProvider.select(
+            (s) => s.value?.playerSaveButtonAction,
+          ),
+        ) ??
+        PlayerSaveButtonAction.smart;
+    final onAccent = accentColor.computeLuminance() > 0.55
+        ? Colors.black
+        : Colors.white;
+
+    Future<void> openQuickSheet() => showTrackLibraryQuickSheet(
+      context: context,
+      ref: ref,
+      snapshot: snapshot,
+      savedTrackId: savedTrackId,
+      artworkSource: artworkSource,
+      artworkFallbackSource: artworkFallbackSource,
+      accentColor: accentColor,
+    );
+
+    void handleTap() {
+      switch (saveAction) {
+        case PlayerSaveButtonAction.picker:
+          unawaited(openQuickSheet());
+        case PlayerSaveButtonAction.favoritesOnly:
+          unawaited(
+            _toggleFavoriteForSnapshot(
+              context: context,
+              ref: ref,
+              snapshot: snapshot,
+              isFavorite: isFavorite,
+              savedTrackId: savedTrackId,
+              strings: strings,
+            ),
+          );
+        case PlayerSaveButtonAction.smart:
+          if (savedInLibrary) {
+            unawaited(openQuickSheet());
+          } else {
+            unawaited(
+              _toggleFavoriteForSnapshot(
+                context: context,
+                ref: ref,
+                snapshot: snapshot,
+                isFavorite: isFavorite,
+                savedTrackId: savedTrackId,
+                strings: strings,
+              ),
+            );
+          }
+      }
+    }
 
     return Tooltip(
-      message: isFavorite
-          ? strings.removeFromFavorites
+      message: savedInLibrary
+          ? strings.saveToLibraryTitle
           : strings.addToFavorites,
       child: InkWell(
         key: const ValueKey('player-favorite-control'),
         customBorder: const CircleBorder(),
-        onTap: hasIdentity
-            ? () => unawaited(
-                _toggleFavoriteForSnapshot(
-                  context: context,
-                  ref: ref,
-                  snapshot: snapshot,
-                  isFavorite: isFavorite,
-                  savedTrackId: savedTrackId,
-                  strings: strings,
-                ),
-              )
-            : null,
+        onTap: hasIdentity ? handleTap : null,
+        onLongPress: hasIdentity ? () => unawaited(openQuickSheet()) : null,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           width: 34,
           height: 34,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: isFavorite ? _spotifyGreen : Colors.transparent,
+            color: savedInLibrary ? accentColor : Colors.transparent,
             border: Border.all(
-              color: isFavorite ? _spotifyGreen : Colors.white,
+              color: savedInLibrary ? accentColor : Colors.white,
               width: 2,
             ),
           ),
           child: Icon(
-            isFavorite ? Icons.check_rounded : Icons.add_rounded,
+            savedInLibrary ? Icons.check_rounded : Icons.add_rounded,
             size: 20,
-            color: isFavorite ? Colors.black : Colors.white,
+            color: savedInLibrary ? onAccent : Colors.white,
           ),
         ),
       ),

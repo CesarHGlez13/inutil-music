@@ -573,6 +573,35 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (ref.watch(momentClipExportServiceProvider).isSupported &&
+                    (_shareSelectionDocument?.hasSyncedLyrics ?? false)) ...[
+                  if (compact)
+                    IconButton.outlined(
+                      key: const ValueKey('lyrics-line-selection-moment'),
+                      tooltip: strings.shareMoment,
+                      color: Colors.white,
+                      onPressed: _shareSelectedLines.isEmpty
+                          ? null
+                          : _shareSelectedLinesAsMoment,
+                      icon: const Icon(Icons.movie_creation_outlined),
+                    )
+                  else
+                    OutlinedButton.icon(
+                      key: const ValueKey('lyrics-line-selection-moment'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      onPressed: _shareSelectedLines.isEmpty
+                          ? null
+                          : _shareSelectedLinesAsMoment,
+                      icon: const Icon(Icons.movie_creation_outlined, size: 18),
+                      label: Text(strings.shareSelectedLinesClip),
+                    ),
+                  const SizedBox(width: 8),
+                ],
                 if (compact)
                   IconButton.filled(
                     key: const ValueKey('lyrics-line-selection-share'),
@@ -731,7 +760,29 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
     });
   }
 
-  Future<void> _openShareMomentFromLyrics() async {
+  Future<void> _shareSelectedLinesAsMoment() async {
+    final lyrics = _shareSelectionDocument;
+    if (lyrics == null || _shareSelectedLines.isEmpty || !lyrics.hasSyncedLyrics) {
+      return;
+    }
+    final indices = _shareSelectedLines.toList()..sort();
+    final firstIdx = indices.first.clamp(0, lyrics.lines.length - 1);
+    final lastIdx = indices.last.clamp(0, lyrics.lines.length - 1);
+    final start = lyrics.lines[firstIdx].timestamp;
+    final rawEnd = lastIdx + 1 < lyrics.lines.length
+        ? lyrics.lines[lastIdx + 1].timestamp
+        : lyrics.lines[lastIdx].timestamp + const Duration(seconds: 5);
+    final duration = rawEnd - start;
+    await _openShareMomentFromLyrics(
+      initialStart: start,
+      initialDuration: duration,
+    );
+  }
+
+  Future<void> _openShareMomentFromLyrics({
+    Duration? initialStart,
+    Duration? initialDuration,
+  }) async {
     final snapshot = ref.read(playerControllerProvider).value;
     if (snapshot == null ||
         snapshot.status == PlayerStatus.idle ||
@@ -776,6 +827,8 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
       artworkSource: artworkSource,
       artworkFallbackSource: artwork.fallback,
       accentColor: ref.read(playbackArtworkColorProvider),
+      initialStart: initialStart,
+      initialDuration: initialDuration,
     );
   }
 

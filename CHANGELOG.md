@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.24+4282 — 2026-11-24
+
+### Improved — Apariencia funcional y configurable, botón Guardar (+) para Favoritos y Playlists, y mini clips desde frases seleccionadas
+
+- **Apariencia corregida y sin opciones muertas en el reproductor fullscreen.**
+  El reproductor a pantalla completa ahora respeta el **Color de acento** elegido (en lugar del verde fijo), incorpora un toggle configurable de **Acento dinámico en el reproductor** (que adapta los controles al color de la carátula actual), respeta el interruptor **Portada animada** y muestra el indicador de **Calidad de audio** cuando está activado. Se agregó además un selector unificado de **Fondo visual del reproductor** (`Estático`, `Movimiento suave`, `Apple Animated Artwork`, `Video Canvas`), se limpió la descripción de Spotify Canvas y se indica claramente cuando *Estilo de portada* no aplica al modo Video Canvas.
+- **Botón Guardar (`+` / `✓`) unificado para Favoritos y Playlists (configurable).**
+  El botón circular del reproductor ahora refleja si la canción está guardada en Favoritos o en cualquier playlist, y permite abrir una hoja rápida con checkboxes para gestionar Favoritos, la **lista de reproducción actual** (fijada arriba), todas tus playlists y crear nuevas listas al instante. Su comportamiento es configurable en Apariencia (`Inteligente`, `Abrir selector siempre` o `Solo Favoritos`).
+- **Mini clip directo desde líneas seleccionadas en Letras.**
+  Al mantener pulsadas de 1 a 5 líneas en Letras, ahora aparece la opción **Mini clip** junto a **Compartir letras**, abriendo *Compartir momento* con el inicio y duración recortados automáticamente a las frases seleccionadas.
+
 ## 2.5.23+4281 — 2026-11-24
 
 ### Added — Compartir momento (mini clips HD 1080p60 para WhatsApp y redes)

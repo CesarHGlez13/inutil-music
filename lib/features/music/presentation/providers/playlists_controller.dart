@@ -283,6 +283,37 @@ class PlaylistsController extends AsyncNotifier<List<Playlist>> {
     return entry;
   }
 
+  Future<bool> removeRemoteTrackFromPlaylist(
+    String playlistId,
+    TrackInfo track,
+  ) async {
+    final videoId = _youtubeVideoId(track);
+    if (videoId == null) return false;
+    final database = ref.read(databaseServiceProvider);
+    final catalog = await database.getCatalogPlaylist(playlistId);
+    if (catalog == null) return false;
+    final matches = catalog.entries
+        .where(
+          (entry) =>
+              !entry.isDeleted &&
+              (entry.videoId == videoId ||
+                  entry.track.key == 'youtube:$videoId'),
+        )
+        .toList(growable: false);
+    if (matches.isEmpty) return false;
+    for (final entry in matches) {
+      await database.tombstoneCatalogEntry(
+        playlistId: playlistId,
+        entryId: entry.id,
+        now: DateTime.now(),
+      );
+    }
+    await _mutateAndReload();
+    await _syncActivePlaybackQueueById(playlistId);
+    _requestYouTubeMusicSync();
+    return true;
+  }
+
   /// Adds a remote collection as catalog-only playlist entries.
   ///
   /// Whole playlists can contain dozens or hundreds of songs, so downloads
