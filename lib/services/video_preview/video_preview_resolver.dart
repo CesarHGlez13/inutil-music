@@ -108,6 +108,32 @@ class VideoPreviewResolver {
             break;
           }
         }
+
+        // Widen the search net with title-only and artist-only queries so that
+        // tracks whose iTunes entry uses a different spelling than the combined
+        // "Artist Title" query are still found. The strict sameVisualTitle +
+        // sameVisualArtist guard is applied to every result — no wrong song can
+        // ever pass through.
+        if (resolved == null) {
+          final byTitle = await _searchMusicVideos(cleanTitle, limit: 6);
+          for (final clip in byTitle) {
+            if (sameVisualTitle(cleanTitle, clip.title) &&
+                sameVisualArtist(artist, clip.artist)) {
+              resolved = clip;
+              break;
+            }
+          }
+        }
+        if (resolved == null) {
+          final byArtist = await _searchMusicVideos(cleanArtist, limit: 8);
+          for (final clip in byArtist) {
+            if (sameVisualTitle(cleanTitle, clip.title) &&
+                sameVisualArtist(artist, clip.artist)) {
+              resolved = clip;
+              break;
+            }
+          }
+        }
       } catch (_) {
         resolved = null;
       } finally {

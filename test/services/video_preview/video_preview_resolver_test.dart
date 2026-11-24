@@ -165,5 +165,110 @@ void main() {
         expect(resolved, isNull);
       },
     );
+
+    test(
+      'resolveForTrack finds exact match via title-only search when combined query returns nothing',
+      () async {
+        var queryCount = 0;
+        // Combined "Artist Title" → empty; title-only → has the exact match.
+        final resolver = VideoPreviewResolver(
+          fetchJson: (uri) async {
+            queryCount++;
+            final term = uri.queryParameters['term'] ?? '';
+            if (term == 'Christian Nodal Perdonarte Para Que' ||
+                term == 'Christian Nodal') {
+              return {'results': <dynamic>[]};
+            }
+            // title-only query
+            return {
+              'results': [
+                {
+                  'trackName': 'Perdonarte Para Que',
+                  'artistName': 'Christian Nodal',
+                  'previewUrl':
+                      'https://video-ssl.itunes.apple.com/perdonarte.m4v',
+                },
+              ],
+            };
+          },
+        );
+
+        final resolved = await resolver.resolveForTrack(
+          title: 'Perdonarte Para Que',
+          artist: 'Christian Nodal',
+        );
+
+        expect(
+          resolved?.videoUrl.toString(),
+          'https://video-ssl.itunes.apple.com/perdonarte.m4v',
+        );
+        // Combined + title-only searches fired (artist-only not needed).
+        expect(queryCount, 2);
+      },
+    );
+
+    test(
+      'resolveForTrack finds exact match via artist-only search when combined and title queries return nothing',
+      () async {
+        var queryCount = 0;
+        final resolver = VideoPreviewResolver(
+          fetchJson: (uri) async {
+            queryCount++;
+            final term = uri.queryParameters['term'] ?? '';
+            if (term.contains('Nodal') && term.contains('Besos')) {
+              return {'results': <dynamic>[]};
+            }
+            if (term == 'De Los Besos Que Te Di') {
+              return {'results': <dynamic>[]};
+            }
+            // artist-only query returns the right clip
+            return {
+              'results': [
+                {
+                  'trackName': 'De Los Besos Que Te Di',
+                  'artistName': 'Christian Nodal',
+                  'previewUrl': 'https://video-ssl.itunes.apple.com/besos.m4v',
+                },
+              ],
+            };
+          },
+        );
+
+        final resolved = await resolver.resolveForTrack(
+          title: 'De Los Besos Que Te Di',
+          artist: 'Christian Nodal',
+        );
+
+        expect(
+          resolved?.videoUrl.toString(),
+          'https://video-ssl.itunes.apple.com/besos.m4v',
+        );
+        expect(queryCount, 3); // combined + title-only + artist-only
+      },
+    );
+
+    test(
+      'resolveForTrack still returns null when extended searches return only wrong artist',
+      () async {
+        final resolver = VideoPreviewResolver(
+          fetchJson: (_) async => {
+            'results': [
+              {
+                'trackName': 'De Los Besos Que Te Di',
+                'artistName': 'Artista Incorrecto',
+                'previewUrl': 'https://video-ssl.itunes.apple.com/wrong.m4v',
+              },
+            ],
+          },
+        );
+
+        final resolved = await resolver.resolveForTrack(
+          title: 'De Los Besos Que Te Di',
+          artist: 'Christian Nodal',
+        );
+
+        expect(resolved, isNull);
+      },
+    );
   });
 }
