@@ -23,6 +23,7 @@ fi
 mkdir -p "$(dirname "$output")"
 tar -czf "$output" -C "$bundle" \
   "Inútil Music" \
+  inutil_music \
   data \
   lib \
   THIRD_PARTY_NOTICES.md

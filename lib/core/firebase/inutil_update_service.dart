@@ -883,13 +883,23 @@ class InutilUpdateService {
       '-C',
       staging.path,
     ]);
-    final stagedExecutable = File(p.join(staging.path, executableName));
+    File stagedExecutable = File(p.join(staging.path, executableName));
+    if (!stagedExecutable.existsSync()) {
+      for (final altName in const ['Inútil Music', 'inutil_music']) {
+        final alt = File(p.join(staging.path, altName));
+        if (alt.existsSync()) {
+          stagedExecutable = alt;
+          break;
+        }
+      }
+    }
     if (extracted.exitCode != 0 || !stagedExecutable.existsSync()) {
       await staging.delete(recursive: true).catchError((_) => staging);
       return false;
     }
 
-    final launcher = File(p.join(installRoot.path, executableName));
+    final targetBinaryName = p.basename(stagedExecutable.path);
+    final launcher = File(p.join(installRoot.path, targetBinaryName));
     final helper = File(p.join(staging.path, 'inutil_update_apply.sh'));
     await helper.writeAsString(r'''#!/bin/sh
 # Aplicación diferida de la actualización de Inútil Music.
@@ -915,7 +925,7 @@ done
 rm -f "$DEST/inutil_update_apply.sh"
 chmod +x "$EXEC"
 rm -rf "$STAGING"
-"$EXEC" >/dev/null 2>&1 &
+exec "$EXEC" >/tmp/inutil_relaunch.log 2>&1
 ''');
     await Process.run('chmod', ['+x', helper.path]);
 
@@ -1122,6 +1132,12 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
         _downloading = false;
         _downloadedPath = path;
       });
+      if (Platform.isLinux) {
+        // En Linux la instalación diferida espera a que este proceso cierre
+        // para reemplazar los binarios y volver a abrir la aplicación.
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        exit(0);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -1326,7 +1342,9 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
-                              'Actualización descargada y lista para instalar.',
+                              Platform.isLinux
+                                  ? 'Actualización descargada. Reiniciando aplicación para aplicar cambios...'
+                                  : 'Actualización descargada y lista para instalar.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colors.onSurface,
                                 fontWeight: FontWeight.w600,
@@ -1374,12 +1392,23 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                       ),
                     if (hasUpdate && release.platformDownloadUrl.isNotEmpty)
                       FilledButton.icon(
-                        onPressed: _downloading ? null : _startDownload,
-                        icon: const Icon(Icons.download_rounded, size: 18),
+                        onPressed: _downloading
+                            ? null
+                            : (_downloadedPath != null && Platform.isLinux)
+                                ? () => exit(0)
+                                : _startDownload,
+                        icon: Icon(
+                          (_downloadedPath != null && Platform.isLinux)
+                              ? Icons.restart_alt_rounded
+                              : Icons.download_rounded,
+                          size: 18,
+                        ),
                         label: Text(
                           _downloading
                               ? 'Descargando...'
-                              : 'Actualizar v${release.latestVersion}',
+                              : (_downloadedPath != null && Platform.isLinux)
+                                  ? 'Reiniciar ahora'
+                                  : 'Actualizar v${release.latestVersion}',
                         ),
                       ),
                   ],
