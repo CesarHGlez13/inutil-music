@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Inútil Music - Instalador automático para Linux (Ubuntu, Debian, Fedora, Arch, etc.)
+# Inutix Music - Instalador automático para Linux (Ubuntu, Debian, Fedora, Arch, etc.)
 # No requiere privilegios de root (instala en el espacio de usuario ~/.local).
 # Compatible con ejecución directa (bash install.sh) y por pipe (curl | bash).
 set -euo pipefail
 
-APP_NAME="Inútil Music"
-VERSION="2.5.19"
+APP_NAME="Inutix Music"
+VERSION="2.5.28"
 INSTALL_DIR="$HOME/.local/share/inutil-music"
 BIN_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"
@@ -33,9 +33,9 @@ mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 LOCAL_BUNDLE=""
 if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
   _SDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
-  if [[ -n "$_SDIR" && -x "$_SDIR/build/linux/x64/release/bundle/Inútil Music" ]]; then
+  if [[ -n "$_SDIR" && -x "$_SDIR/build/linux/x64/release/bundle/Inutix Music" ]]; then
     LOCAL_BUNDLE="$_SDIR/build/linux/x64/release/bundle"
-  elif [[ -n "$_SDIR" && -x "$_SDIR/Inútil Music" ]]; then
+  elif [[ -n "$_SDIR" && -x "$_SDIR/Inutix Music" ]]; then
     LOCAL_BUNDLE="$_SDIR"
   fi
 fi
@@ -60,7 +60,7 @@ else
 fi
 
 # 4. Asegurar permisos de ejecución
-chmod +x "$INSTALL_DIR/Inútil Music" 2>/dev/null || true
+chmod +x "$INSTALL_DIR/Inutix Music" 2>/dev/null || true
 if [[ -f "$INSTALL_DIR/inutil_music" ]]; then
   chmod +x "$INSTALL_DIR/inutil_music"
 fi
@@ -73,7 +73,7 @@ export LD_LIBRARY_PATH="$DIR/lib:$DIR/mpv_libs:${LD_LIBRARY_PATH:-}"
 if [ -f "$DIR/lib/libmpv.so.2" ]; then
   export LIBMPV_LIBRARY_PATH="$DIR/lib/libmpv.so.2"
 fi
-exec "$DIR/Inútil Music" "$@"
+exec "$DIR/Inutix Music" "$@"
 EOF
 chmod 0755 "$BIN_DIR/inutil-music"
 
@@ -95,7 +95,7 @@ cat >"$DESKTOP_DIR/inutil-music.desktop" <<EOF
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Inútil Music
+Name=Inutix Music
 Comment=Reproductor y gestor musical multiplataforma
 Exec=$BIN_DIR/inutil-music %u
 Icon=com.inutilmusic.app
