@@ -114,6 +114,22 @@ if command -v gtk-update-icon-cache >/dev/null 2>&1; then
   gtk-update-icon-cache -q -f -t "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 fi
 
+# 9. Verificar dependencia de reproducción de audio (libmpv)
+if ! ldconfig -p 2>/dev/null | grep -q 'libmpv\.so'; then
+  if [[ ! -d "$INSTALL_DIR/mpv_libs" && ! -f "$INSTALL_DIR/lib/libmpv.so.2" ]]; then
+    echo "-----------------------------------------"
+    echo " Nota: Se requiere libmpv para reproducir audio."
+    if command -v apt-get >/dev/null 2>&1; then
+      echo " Instálala fácilmente con: sudo apt install -y libmpv2"
+    elif command -v dnf >/dev/null 2>&1; then
+      echo " Instálala fácilmente con: sudo dnf install -y mpv-libs"
+    elif command -v pacman >/dev/null 2>&1; then
+      echo " Instálala fácilmente con: sudo pacman -S mpv"
+    fi
+    echo "-----------------------------------------"
+  fi
+fi
+
 echo "========================================="
 echo " ¡Instalación completada con éxito!"
 echo " Inútil Music ya está disponible en tu menú de aplicaciones."
