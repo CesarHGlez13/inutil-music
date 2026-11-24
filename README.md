@@ -604,10 +604,15 @@ The native macOS window uses the same `960 × 600` minimum as Windows.
 
 ## Linux runtime dependencies
 
-Linux bundles contain no external YouTube resolver or JavaScript runtime. The
-target system must provide GTK 3, libmpv, SQLite, and libsecret runtime
-libraries for the application, secure storage, and its `media_kit` player. The
-DEB and RPM declare these dependencies so the package manager installs them.
+The release tarball (`inutil_music_linux_x64.tar.gz`) is **self-contained**: it
+bundles `libmpv.so.2` inside `lib/` and ships a ready-to-run `install.sh` at its
+root. No system package manager steps are required after download.
+
+A `.deb` package (`InutilMusic-<version>-linux-amd64.deb`) is also published for
+users who prefer a system-level installation managed by `apt`/`dpkg`. Its
+`Depends` field lists `libgtk-3-0 | libgtk-3-0t64, libmpv2 | libmpv1,
+libsqlite3-0, libsecret-1-0` and the package manager installs any missing ones
+automatically.
 
 ## TikTok LIVE client
 
@@ -789,9 +794,9 @@ Inútil Music-Music-<version>-iOS-unsigned.ipa
 
 ### Which file should I install?
 
-- **Most Android phones and tablets:** install `Inútil Music-Music-<version>-Android-arm64-v8a.apk`.
-- **Older 32-bit ARM Android devices:** install `Inútil Music-Music-<version>-Android-armeabi-v7a.apk`.
-- **Android x86_64 devices and emulators:** install `Inútil Music-Music-<version>-Android-x86_64.apk`.
+- **Most Android phones and tablets:** install `app-arm64-v8a-release.apk`.
+- **Older 32-bit ARM Android devices:** install `app-armeabi-v7a-release.apk`.
+- **Android x86_64 devices and emulators:** install `app-x86_64-release.apk`.
 - **iPhone and iPad:** download
   `Inútil Music-Music-<version>-iOS-unsigned.ipa` from the artifacts of a successful
   **Release installers** run in GitHub Actions, then supply it to GBox or
@@ -803,8 +808,45 @@ Inútil Music-Music-<version>-iOS-unsigned.ipa
   administrator access, shows a language selector, creates a Start Menu
   shortcut, and lets you choose whether to create a desktop shortcut. The
   uninstaller entry is displayed as `Inútil Music` without the version number.
-- **Ubuntu, Debian, Linux Mint, and derivatives:** install the `.deb` with `sudo apt install ./Inútil Music-Music-<version>-linux-amd64.deb`.
-- **Fedora, RHEL, and derivatives:** install the `.rpm` with `sudo dnf install ./Inútil Music-Music-<version>-linux-x86_64.rpm`.
+- **Ubuntu / Debian / Linux Mint and all `apt`-based distros — easiest way, one command:**
+
+  ```bash
+  # Requires curl or wget (curl is not installed on all Ubuntu images by default)
+  wget -qO- https://raw.githubusercontent.com/CesarHGlez13/inutil-music/master/install.sh | bash
+  ```
+
+  This downloads the full release tarball, installs the app under `~/.local/`
+  (no root required), registers the icon, and creates a desktop entry that
+  appears in GNOME / KDE immediately.
+
+- **Ubuntu / Debian — `.deb` package (double-click install):**
+
+  Download `InutilMusic-<version>-linux-amd64.deb` from the
+  [latest release](https://github.com/CesarHGlez13/inutil-music/releases/latest)
+  and install it with:
+
+  ```bash
+  sudo dpkg -i InutilMusic-<version>-linux-amd64.deb
+  sudo apt-get install -f    # installs libmpv2 and other missing deps if needed
+  ```
+
+  Or open it with Ubuntu's Software Center (double-click the file).
+
+- **Any Linux distro — download & run (no root, no package manager):**
+
+  ```bash
+  # Download the tarball
+  wget https://github.com/CesarHGlez13/inutil-music/releases/latest/download/inutil_music_linux_x64.tar.gz
+  # Extract
+  tar -xzf inutil_music_linux_x64.tar.gz
+  # Install (places everything under ~/.local, no root needed)
+  bash install.sh
+  ```
+
+  `libmpv.so.2` is bundled inside `lib/` so the app works on any distro without
+  installing any system package. The installer creates `~/.local/bin/inutil-music`,
+  the `.desktop` entry, and the app icon automatically.
+
 - **Mac with Apple Silicon (M1, M2, M3, M4, or later):** open `Inútil Music-Music-<version>-macOS-arm64.pkg`.
 - **Mac with an Intel processor:** open `Inútil Music-Music-<version>-macOS-x64.pkg`.
 
@@ -939,16 +981,18 @@ flutter build apk --release --split-per-abi
 ```
 
 Linux (el `.tar.gz` es el paquete que la app descomprime y reemplanta dentro de
-`~/.local/share/inutil-music`):
+`~/.local/share/inutil-music`, y el `.deb` es el paquete de instalación para Debian/Ubuntu):
 
 ```bash
 flutter build linux --release
-bash tool/package_linux.sh          # → dist/inutil_music_linux_x64.tar.gz
+bash tool/package_linux.sh          # → dist/inutil_music_linux_x64.tar.gz (incluye libmpv e install.sh)
+bash packaging/linux/build_packages.sh build/linux/x64/release/bundle 2.5.19 dist # → dist/InutilMusic-2.5.19-linux-amd64.deb
 ```
 
 `tool/package_linux.sh` guarda el contenido del bundle en la raíz del tar
-(`Inútil Music`, `data/`, `lib/`, `THIRD_PARTY_NOTICES.md`), sin carpetas
-intermedias; por eso el instalador puede reemplantar directo.
+(`Inútil Music`, `inutil_music`, `data/`, `lib/`, `install.sh`, `THIRD_PARTY_NOTICES.md`),
+incrustando automáticamente `lib/libmpv.so.2` para que la app sea 100 % autónoma sin requerir
+paquetes adicionales en el sistema.
 
 APK universal opcional (todas las ABIs, ~121 MB): `flutter build apk --release`
 genera `app-release.apk`, pero `publish_release.sh` busca
