@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.21+4279 — 2026-11-23
+
+### Improved — Adaptación del reproductor completo en laptop al estilo y proporciones del mini reproductor
+
+- **Diseño adaptado para escritorio y laptop en Canvas a pantalla completa.**
+  Se eliminó la restricción de ancho móvil (`maxWidth: 560px`) en pantallas de escritorio. La vista del reproductor a pantalla completa ahora aprovecha todo el espacio disponible sin compactar los controles ni forzar la interfaz vertical de teléfono.
+- **Bandeja de controles estilo mini reproductor (cápsula liquidGlass).**
+  La botonera y controles inferiores adoptan la estética del mini reproductor: cápsula translúcida flotante con desenfoque `liquidGlass` (radio de 40px), carátula de 60px con metadatos a la izquierda, controles de transporte completos y barra de tiempo en el centro, y accesos rápidos a letras, temporizador de sueño, cola, dispositivos y control deslizante de volumen a la derecha.
+- **Letras sincronizadas centradas y eliminación de controles redundantes en escritorio.**
+  La línea de letra sincronizada en vivo se centra en pantalla con tipografía optimizada (26px) sobre el Canvas de fondo. Se oculta el botón móvil de colapso hacia abajo (`v`) y la tarjeta inferior redundante de letras.
+
 ## 2.5.19+4277 — 2026-11-23
 
 ### Fixed — Canvas de video de artista y sincronización de letra restaurados (estilo v2.5.15)
