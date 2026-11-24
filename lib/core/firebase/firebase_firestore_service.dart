@@ -87,23 +87,57 @@ class InutilFirestoreService {
   /// idempotente: los PATCH llevan `updateMask.fieldPaths`, los DELETE van por
   /// path, y un error de conexión significa que la petición nunca recibió
   /// respuesta. Un error con código HTTP se propaga tal cual.
+  static bool _isTunnelUnavailableStatus(int statusCode) =>
+      statusCode == 502 ||
+      statusCode == 503 ||
+      statusCode == 521 ||
+      statusCode == 522 ||
+      statusCode == 524 ||
+      statusCode == 530;
+
   Future<http.Response> _sendWithRelayFallback({
     required String label,
     required Uri Function() urlBuilder,
     required Future<http.Response> Function(Uri url) send,
   }) async {
-    final relayWasUsable = FirebaseConfig.relayUsable;
-    try {
-      return await send(urlBuilder());
-    } catch (error) {
-      if (!relayWasUsable || !isConnectionFailure(error)) rethrow;
-      FirebaseConfig.markRelayUnreachable();
-      debugPrint(
-        'Relay del S7 sin respuesta en $label: '
-        'reintento directo a Google.',
-      );
-      return await send(urlBuilder());
+    for (var attempt = 0; attempt < 3; attempt++) {
+      final lanWasUsable = FirebaseConfig.relayUsable;
+      final cloudWasUsable = !lanWasUsable && FirebaseConfig.cloudRelayUsable;
+      try {
+        final resp = await send(urlBuilder());
+        if (cloudWasUsable &&
+            FirebaseConfig.backupRelayUsable &&
+            _isTunnelUnavailableStatus(resp.statusCode)) {
+          FirebaseConfig.markCloudRelayUnreachable();
+          debugPrint(
+            'Nodo principal inutix.com respondió HTTP ${resp.statusCode} en '
+            '$label: conmutando a respaldo ${FirebaseConfig.backupRelayHost}.',
+          );
+          continue;
+        }
+        return resp;
+      } catch (error) {
+        if (!isConnectionFailure(error)) rethrow;
+        if (lanWasUsable) {
+          FirebaseConfig.markRelayUnreachable();
+          debugPrint(
+            'Relay LAN del S7 sin respuesta en $label: '
+            'reintentando en siguiente capa (${FirebaseConfig.dataTier.name}).',
+          );
+          continue;
+        }
+        if (cloudWasUsable && FirebaseConfig.backupRelayUsable) {
+          FirebaseConfig.markCloudRelayUnreachable();
+          debugPrint(
+            'Nodo principal inutix.com sin respuesta en $label: '
+            'conmutando a respaldo ${FirebaseConfig.backupRelayHost}.',
+          );
+          continue;
+        }
+        rethrow;
+      }
     }
+    return await send(urlBuilder());
   }
 
   /// Misma ayuda, expuesta para pruebas (el binario de pruebas se compila sin
@@ -219,7 +253,8 @@ class InutilFirestoreService {
         normalized == 'listening_rooms';
   }
 
-  static String _baseUrlForPath(String path) => shouldBypassRelay(path)
+  static String _baseUrlForPath(String path) =>
+      shouldBypassRelay(path) && !FirebaseConfig.isAuthoritativeInutixRelay
       ? FirebaseConfig.directFirestoreBaseUrl
       : FirebaseConfig.firestoreBaseUrl;
 

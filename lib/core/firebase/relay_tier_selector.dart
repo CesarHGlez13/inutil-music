@@ -22,7 +22,7 @@ library;
 import 'package:flutter/foundation.dart';
 
 /// Qué endpoint de datos va a usar la app en este instante.
-enum RelayTier { lanRelay, cloudRelay, google }
+enum RelayTier { lanRelay, cloudRelay, backupRelay, google }
 
 /// Parámetros de la decisión. `[lanReachable]` es `bool?` porque el estado de
 /// la sonda arranca `null` (= todavía sin medir) y eso NO es lo mismo que
@@ -39,6 +39,10 @@ class RelayTierInputs {
     required this.cloudHost,
     this.cloudScheme = 'https',
     this.cloudPort = '',
+    this.cloudReachable = true,
+    this.backupHost = '',
+    this.backupScheme = 'https',
+    this.backupPort = '',
   });
 
   /// Host del relay LAN (el S7). Vacío = build sin relay horneado.
@@ -55,20 +59,29 @@ class RelayTierInputs {
   /// `false` = no respondió.
   final bool? lanReachable;
 
-  /// Host del Worker cloud (p. ej.
-  /// `inutil-cloud-relay.scada-xiaomi-server.workers.dev`). Vacío = build sin
-  /// capa cloud.
+  /// Host del endpoint HTTPS principal (p. ej. `api.inutix.com` hacia el S7 Edge
+  /// vía Cloudflare Tunnel). Vacío = build sin capa cloud.
   final String cloudHost;
 
-  /// Esquema del endpoint cloud. `https` por defecto porque el Worker vive en
-  /// `workers.dev` con TLS; se puede bajar a `http` solo para `wrangler dev`
-  /// en local.
+  /// Esquema del endpoint cloud. `https` por defecto; se puede bajar a `http`
+  /// solo para `wrangler dev` en local.
   final String cloudScheme;
 
   /// Puerto cloud. Vacío = usar el puerto por defecto del esquema (443 en
-  /// https), o sea NO se escribe `:puerto` en la URL. Un `https://host:443`
-  /// explícito funciona pero ensucia y rompe comparaciones de string.
+  /// https), o sea NO se escribe `:puerto` en la URL.
   final String cloudPort;
+
+  /// `false` cuando el nodo HTTPS principal (`api.inutix.com`) acaba de fallar
+  /// por red o 502/530 (S7 reiniciando/caído), habilitando el salto a
+  /// `[backupHost]`.
+  final bool cloudReachable;
+
+  /// Host de respaldo automático (`backup.inutix.com`: nodo móvil standby como
+  /// Xiaomi rooteado o Worker `inutil-cloud-relay`).
+  final String backupHost;
+
+  final String backupScheme;
+  final String backupPort;
 }
 
 /// Constructor de URLs de tier, puro.
@@ -101,7 +114,12 @@ class RelayTierSelector {
     if (i.lanHost.trim().isNotEmpty && i.lanReachable == true) {
       return RelayTier.lanRelay;
     }
-    if (i.cloudHost.trim().isNotEmpty) return RelayTier.cloudRelay;
+    if (i.cloudHost.trim().isNotEmpty && i.cloudReachable) {
+      return RelayTier.cloudRelay;
+    }
+    if (i.backupHost.trim().isNotEmpty) {
+      return RelayTier.backupRelay;
+    }
     return RelayTier.google;
   }
 
@@ -126,6 +144,9 @@ class RelayTierSelector {
     if (tier == RelayTier.cloudRelay) {
       return cloudUrl(i, googleUrl, projectId, storageBucket);
     }
+    if (tier == RelayTier.backupRelay) {
+      return backupUrl(i, googleUrl, projectId, storageBucket);
+    }
     return googleUrl;
   }
 
@@ -140,6 +161,21 @@ class RelayTierSelector {
     final host = i.cloudHost.trim();
     final scheme = _scheme(i.cloudScheme);
     final port = i.cloudPort.trim();
+    final authority = port.isEmpty ? host : '$host:$port';
+    return '$scheme://$authority'
+        '${_path(googleUrl, projectId, storageBucket)}';
+  }
+
+  /// URL del tier de respaldo (`backup.inutix.com`: Xiaomi standby o Worker).
+  static String backupUrl(
+    RelayTierInputs i,
+    String googleUrl,
+    String projectId,
+    String storageBucket,
+  ) {
+    final host = i.backupHost.trim();
+    final scheme = _scheme(i.backupScheme);
+    final port = i.backupPort.trim();
     final authority = port.isEmpty ? host : '$host:$port';
     return '$scheme://$authority'
         '${_path(googleUrl, projectId, storageBucket)}';

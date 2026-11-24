@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.26+4284 — 2026-11-24
+
+### Infrastructure — Migración completa a infraestructura propia `inutix.com` con failover automático
+
+- **Backend propio en `https://api.inutix.com` (0 cuota Firestore).**
+  Toda la capa de datos (cuentas, licencias, playlists, Echo Memory, Connect, emparejamiento QR y **Listening Rooms**) se enruta ahora a nuestra infraestructura propia en el Galaxy S7 Edge vía Cloudflare Tunnel (con acceso directo en LAN `192.168.100.27:8080` cuando estás en casa), manteniendo Firebase únicamente para autenticación.
+- **Failover automático de respaldo (`https://backup.inutix.com`).**
+  Si el nodo principal se reinicia o deja de responder (`502`/`503`/`530` o corte de red), la app conmuta automáticamente al nodo de respaldo `backup.inutix.com` sin interrumpir la sesión ni requerir recompilación cuando se active el segundo teléfono de respaldo.
+- **Publicación OTA sincronizada con `api.inutix.com`.**
+  `tool/publish_release.sh` actualiza simultáneamente `app_config/release` en `api.inutix.com`, purga caché en `backup.inutix.com` y mantiene compatibilidad con clientes anteriores.
+
 ## 2.5.25+4283 — 2026-11-24
 
 ### Added — Top 5 innovaciones de Inútil Music (Algoritmo configurable, Echo Memory, Versiones, Máquina del Tiempo y Listening Rooms)

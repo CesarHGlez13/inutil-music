@@ -120,12 +120,65 @@ class FirebaseConfig {
     defaultValue: '',
   );
 
+  /// Host de respaldo automático (`backup.inutix.com`) si el túnel principal
+  /// (`api.inutix.com`, S7 Edge) se reinicia o queda temporalmente fuera de
+  /// línea. Permite conmutar al nodo móvil standby (Xiaomi rooteado) o Worker
+  /// sin recompilar la app.
+  static const String backupRelayHost = String.fromEnvironment(
+    'FB_BACKUP_RELAY_HOST',
+    defaultValue: '',
+  );
+  static const String backupRelayScheme = String.fromEnvironment(
+    'FB_BACKUP_RELAY_SCHEME',
+    defaultValue: 'https',
+  );
+  static const String backupRelayPort = String.fromEnvironment(
+    'FB_BACKUP_RELAY_PORT',
+    defaultValue: '',
+  );
+
+  static DateTime? _cloudRelayFailedAt;
+  static const Duration _cloudRelayCooldown = Duration(seconds: 90);
+
+  static bool get _cloudRelayCurrentlyReachable {
+    final failedAt = _cloudRelayFailedAt;
+    if (failedAt == null) return true;
+    if (DateTime.now().difference(failedAt) >= _cloudRelayCooldown) {
+      _cloudRelayFailedAt = null;
+      return true;
+    }
+    return false;
+  }
+
+  /// Marca el nodo HTTPS principal (`api.inutix.com`) como temporalmente
+  /// caído durante 90 s para enrutar tráfico al respaldo (`backup.inutix.com`).
+  static void markCloudRelayUnreachable() {
+    _cloudRelayFailedAt = DateTime.now();
+  }
+
+  @visibleForTesting
+  static void resetCloudRelayReachability() {
+    _cloudRelayFailedAt = null;
+  }
+
+  /// `true` cuando el build apunta a nuestro servidor autoritativo `inutix.com`
+  /// (S7 Edge / standby Xiaomi), que soporta nativamente `listening_rooms/*`,
+  /// `tv_pairing/*` y `music_pairing/*` con 0 cuota en Firestore.
+  static bool get isAuthoritativeInutixRelay {
+    final h = cloudRelayHost.trim().toLowerCase();
+    return !useEmulator &&
+        (h == 'api.inutix.com' || h == 's7.inutix.com' || h.endsWith('.inutix.com'));
+  }
+
   /// La capa cloud no necesita sonda de TCP: vive en internet y el propio
-  /// request fallido es la señal. Por eso NO se sondea — sondear un
-  /// `workers.dev` desde cada arranque costaría requests del plan gratuito
-  /// del Worker (100k/día) y no aportaría nada.
+  /// request fallido es la señal.
   static bool get cloudRelayUsable =>
-      !useEmulator && cloudRelayHost.trim().isNotEmpty;
+      !useEmulator &&
+      cloudRelayHost.trim().isNotEmpty &&
+      _cloudRelayCurrentlyReachable;
+
+  static bool get backupRelayUsable =>
+      !useEmulator && backupRelayHost.trim().isNotEmpty;
 
   // ---------------------------------------------------------------------------
   // Fallback de alcance del relay (decidido por Cesar el 2026-11-20)
@@ -303,6 +356,10 @@ class FirebaseConfig {
     cloudHost: cloudRelayHost,
     cloudScheme: cloudRelayScheme,
     cloudPort: cloudRelayPort,
+    cloudReachable: _cloudRelayCurrentlyReachable,
+    backupHost: backupRelayHost,
+    backupScheme: backupRelayScheme,
+    backupPort: backupRelayPort,
   );
 
   /// Tier de datos efectivo ahora mismo.

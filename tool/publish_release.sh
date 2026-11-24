@@ -514,4 +514,29 @@ if [ -n "$TOKEN" ]; then
     echo "  AVISO: no se pudo actualizar Firestore (¿Auth/Storage habilitado o token sin permisos?)" >&2
 fi
 
+# --- sincronizar nodo autoritativo inutix.com (S7 Edge) + purgar respaldo -----
+INUTIX_ADMIN_SECRET="${RELAY_ADMIN_SECRET:-}"
+if [ -z "$INUTIX_ADMIN_SECRET" ] && [ -f "$HOME/.config/inutil_relay/admin_secret.txt" ]; then
+  INUTIX_ADMIN_SECRET="$(tr -d '\r\n' < "$HOME/.config/inutil_relay/admin_secret.txt")"
+fi
+if [ -n "$INUTIX_ADMIN_SECRET" ]; then
+  INUTIX_PRIMARY="${INUTIX_API_BASE:-https://api.inutix.com}"
+  INUTIX_RELEASE_URL="${INUTIX_PRIMARY%/}/v1/projects/$PROJECT_ID/databases/(default)/documents/app_config/release"
+  echo "actualizando nodo autoritativo $INUTIX_PRIMARY app_config/release ..."
+  if curl -sf -X PATCH "$INUTIX_RELEASE_URL" \
+      -H "X-Admin-Secret: $INUTIX_ADMIN_SECRET" \
+      -H "Content-Type: application/json" \
+      --data @"$BODY_FILE" > /dev/null; then
+    echo "  ok: $INUTIX_PRIMARY actualizado"
+  else
+    echo "  AVISO: no se pudo actualizar $INUTIX_PRIMARY" >&2
+  fi
+  INUTIX_BACKUP="${INUTIX_BACKUP_BASE:-https://backup.inutix.com}"
+  curl -sf -X POST "${INUTIX_BACKUP%/}/admin/invalidate" \
+    -H "X-Admin-Secret: $INUTIX_ADMIN_SECRET" \
+    -H "Content-Type: application/json" \
+    -d '{"path":"app_config/release"}' > /dev/null && \
+    echo "  ok: caché purgado en $INUTIX_BACKUP" || true
+fi
+
 echo "publicado v$VERSION"

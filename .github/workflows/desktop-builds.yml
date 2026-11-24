@@ -36,7 +36,8 @@ env:
   # Android, Windows, Linux y macOS repiten la misma medición sobre su propio
   # artefacto, así un build sin endpoints no puede salir a publicarse.
   FB_RELAY_HOST: "192.168.100.27"
-  FB_CLOUD_RELAY_HOST: "inutil-cloud-relay.scada-xiaomi-server.workers.dev"
+  FB_CLOUD_RELAY_HOST: "api.inutix.com"
+  FB_BACKUP_RELAY_HOST: "backup.inutix.com"
 
 jobs:
   quality:
@@ -223,12 +224,14 @@ jobs:
           flutter build ios --simulator --no-codesign
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Build unsigned iOS device app
         run: >-
           flutter build ios --release --no-codesign
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Package unsigned iOS IPA
         shell: bash
@@ -399,6 +402,7 @@ jobs:
           --target-platform android-arm,android-arm64,android-x64
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Verify and name Android APKs
         shell: bash
@@ -590,6 +594,7 @@ jobs:
           flutter build windows --release
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the Windows bundle
         shell: bash
@@ -794,6 +799,7 @@ jobs:
           flutter build linux --release
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the Linux bundle
         shell: bash
@@ -954,6 +960,7 @@ jobs:
           flutter build macos --release
           --dart-define=FB_RELAY_HOST=${{ env.FB_RELAY_HOST }}
           --dart-define=FB_CLOUD_RELAY_HOST=${{ env.FB_CLOUD_RELAY_HOST }}
+          --dart-define=FB_BACKUP_RELAY_HOST=${{ env.FB_BACKUP_RELAY_HOST }}
 
       - name: Verify baked server endpoints in the macOS bundle
         shell: bash
