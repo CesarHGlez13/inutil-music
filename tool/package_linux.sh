@@ -20,6 +20,33 @@ if [[ ! -x "$executable" ]]; then
   exit 1
 fi
 
+# Copiar libmpv.so.2 dentro de bundle/lib si existe en el sistema para que el paquete sea 100% autónomo
+if [[ ! -f "$bundle/lib/libmpv.so.2" ]]; then
+  for candidate in \
+    /usr/lib/x86_64-linux-gnu/libmpv.so.2 \
+    /usr/lib64/libmpv.so.2 \
+    /usr/lib/libmpv.so.2; do
+    if [[ -f "$candidate" ]]; then
+      cp -L "$candidate" "$bundle/lib/libmpv.so.2"
+      echo "Incustrada librería libmpv: $candidate -> $bundle/lib/libmpv.so.2"
+      break
+    fi
+  done
+fi
+
+# Actualizar el lanzador inutil_music para cargar las librerías locales
+cat >"$bundle/inutil_music" <<'EOF'
+#!/bin/sh
+set -e
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export LD_LIBRARY_PATH="$DIR/lib:$DIR/mpv_libs:${LD_LIBRARY_PATH:-}"
+if [ -f "$DIR/lib/libmpv.so.2" ]; then
+  export LIBMPV_LIBRARY_PATH="$DIR/lib/libmpv.so.2"
+fi
+exec "$DIR/Inútil Music" "$@"
+EOF
+chmod 0755 "$bundle/inutil_music"
+
 mkdir -p "$(dirname "$output")"
 tar -czf "$output" -C "$bundle" \
   "Inútil Music" \

@@ -121,23 +121,26 @@ dpkg-deb --info "$deb_path"
 dpkg-deb --contents "$deb_path" >/dev/null
 
 rpm_top="$work_dir/rpmbuild"
-mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
-rpmbuild -bb \
-  --define "_topdir $rpm_top" \
-  --define "app_version $version" \
-  --define "staging_root $stage" \
-  "$repo_root/packaging/linux/inutil-music.spec"
+if command -v rpmbuild >/dev/null 2>&1; then
+  mkdir -p "$rpm_top"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+  rpmbuild -bb \
+    --define "_topdir $rpm_top" \
+    --define "app_version $version" \
+    --define "staging_root $stage" \
+    "$repo_root/packaging/linux/inutil-music.spec"
 
-rpm_source="$(find "$rpm_top/RPMS" -type f -name '*.rpm' -print -quit)"
-if [[ -z "$rpm_source" ]]; then
-  echo "rpmbuild did not produce an RPM package" >&2
-  exit 1
+  rpm_source="$(find "$rpm_top/RPMS" -type f -name '*.rpm' -print -quit)"
+  if [[ -z "$rpm_source" ]]; then
+    echo "rpmbuild did not produce an RPM package" >&2
+    exit 1
+  fi
+
+  rpm_path="$output_dir/InutilMusic-$version-linux-x86_64.rpm"
+  cp "$rpm_source" "$rpm_path"
+  rpm -qip "$rpm_path"
+  rpm -qlp "$rpm_path" >/dev/null
+  rpm -qpR "$rpm_path"
+  printf 'Created:\n  %s\n  %s\n' "$deb_path" "$rpm_path"
+else
+  printf 'Created:\n  %s\n(rpmbuild omitido por no estar instalado)\n' "$deb_path"
 fi
-
-rpm_path="$output_dir/InutilMusic-$version-linux-x86_64.rpm"
-cp "$rpm_source" "$rpm_path"
-rpm -qip "$rpm_path"
-rpm -qlp "$rpm_path" >/dev/null
-rpm -qpR "$rpm_path"
-
-printf 'Created:\n  %s\n  %s\n' "$deb_path" "$rpm_path"

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' as developer;
+import 'dart:io';
 
 import 'package:media_kit/media_kit.dart';
 
@@ -1983,7 +1984,24 @@ class MediaKitPlayerService
     if (_initialized) {
       return;
     }
-    MediaKit.ensureInitialized();
+    String? libmpv;
+    if (AppPlatform.isLinux) {
+      try {
+        final exeDir = File(Platform.resolvedExecutable).parent.path;
+        final candidates = [
+          '$exeDir/lib/libmpv.so.2',
+          '$exeDir/lib/libmpv.so',
+          '$exeDir/mpv_libs/libmpv.so.2',
+        ];
+        for (final candidate in candidates) {
+          if (File(candidate).existsSync()) {
+            libmpv = candidate;
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+    MediaKit.ensureInitialized(libmpv: libmpv);
     _initialized = true;
   }
 
