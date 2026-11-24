@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Inútil Music - Instalador automático para Linux (Ubuntu, Debian, Fedora, Arch, etc.)
 # No requiere privilegios de root (instala en el espacio de usuario ~/.local).
+# Compatible con ejecución directa (bash install.sh) y por pipe (curl | bash).
 set -euo pipefail
 
 APP_NAME="Inútil Music"
@@ -26,10 +27,12 @@ fi
 mkdir -p "$INSTALL_DIR" "$BIN_DIR" "$DESKTOP_DIR" "$ICON_DIR"
 
 # 3. Obtener los archivos de la app
+# BASH_SOURCE[0] puede no estar definido cuando se ejecuta por pipe (curl|bash).
+# En ese caso, se descarga directamente desde GitHub. Si se ejecuta como archivo
+# y el bundle ya existe junto al script, se instala desde local.
 LOCAL_BUNDLE=""
-_SRC="${BASH_SOURCE[0]:-}"
-if [[ -n "$_SRC" ]]; then
-  _SDIR="$(cd "$(dirname "$_SRC")" 2>/dev/null && pwd || echo "")"
+if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+  _SDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || echo "")"
   if [[ -n "$_SDIR" && -x "$_SDIR/build/linux/x64/release/bundle/Inútil Music" ]]; then
     LOCAL_BUNDLE="$_SDIR/build/linux/x64/release/bundle"
   elif [[ -n "$_SDIR" && -x "$_SDIR/Inútil Music" ]]; then
