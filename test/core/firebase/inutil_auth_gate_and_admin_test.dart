@@ -321,7 +321,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(InutilAuthScreen), findsOneWidget);
-      expect(find.text('INÚTIL MUSIC'), findsOneWidget);
+      expect(find.text('INUTIX MUSIC'), findsOneWidget);
       expect(find.text('Iniciar Sesión'), findsWidgets);
       expect(find.text('APP_INTERIOR'), findsNothing);
 
