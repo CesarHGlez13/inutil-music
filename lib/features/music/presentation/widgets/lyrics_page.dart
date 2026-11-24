@@ -18,8 +18,10 @@ import '../../../../services/lyrics/lyrics_romanization_service.dart';
 import '../../../../services/lyrics/lyrics_translation_service.dart';
 import '../../../../services/lyrics/lyrics_service.dart';
 import '../../../../services/player/player_service.dart';
+import '../../../../services/sharing/moment_clip_models.dart';
 import '../../../../services/spotify_canvas/spotify_canvas_resolver.dart';
 import '../../domain/entities/lyrics.dart';
+import '../providers/moment_clip_providers.dart';
 import '../providers/music_providers.dart';
 import '../providers/playback_visual_cache_provider.dart';
 import '../providers/spotify_canvas_provider.dart';
@@ -31,6 +33,7 @@ import 'lyrics_share_preview.dart';
 import 'lyrics_text_style_transition.dart';
 import 'lyrics_word_timing_text.dart';
 import 'mini_player.dart';
+import 'moment_share_sheet.dart';
 import 'playback_gradient_background.dart';
 import 'playback_menu_bottom_sheet.dart';
 import 'playback_progress_line.dart';
@@ -705,20 +708,75 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
   }
 
   Future<void> _showLyricsSettings() async {
-    final selectLines = await showPlaybackMenuBottomSheet<bool>(
+    final action = await showPlaybackMenuBottomSheet<_LyricsSettingsAction>(
       context: context,
       useRootNavigator: true,
       builder: (menuContext) => _LyricsSettingsMenu(
-        onSelectLines: () => Navigator.of(menuContext).pop(true),
+        onSelectLines: () =>
+            Navigator.of(menuContext).pop(_LyricsSettingsAction.selectLines),
+        onShareMoment: () =>
+            Navigator.of(menuContext).pop(_LyricsSettingsAction.shareMoment),
       ),
     );
-    if (!mounted || selectLines != true) return;
+    if (!mounted || action == null) return;
+    if (action == _LyricsSettingsAction.shareMoment) {
+      await _openShareMomentFromLyrics();
+      return;
+    }
     final lyrics = ref.read(currentLyricsDocumentProvider);
     if (lyrics == null || lyrics.instrumental || !lyrics.hasContent) return;
     setState(() {
       _shareSelectionDocument = lyrics;
       _shareSelectedLines = const {};
     });
+  }
+
+  Future<void> _openShareMomentFromLyrics() async {
+    final snapshot = ref.read(playerControllerProvider).value;
+    if (snapshot == null ||
+        snapshot.status == PlayerStatus.idle ||
+        snapshot.status == PlayerStatus.failed) {
+      return;
+    }
+    final visualCache = ref.read(playbackVisualCacheProvider);
+    final artwork = ref.read(playbackArtworkProvider);
+    final artworkSource = artwork.source ?? snapshot.thumbnailUrl;
+    final visualIdentity =
+        snapshot.trackId ??
+        snapshot.sourceUrl ??
+        '${snapshot.title ?? ''}|${snapshot.artist ?? ''}';
+    final canvasTrack = SpotifyCanvasTrack(
+      snapshot.title ?? '',
+      snapshot.artist ?? '',
+      snapshot.duration ?? Duration.zero,
+    );
+    final spotifyCanvasUrl = ref.read(spotifyCanvasUrlProvider(canvasTrack)).value;
+    final fallbackVideoUrl = spotifyCanvasUrl == null
+        ? ref
+              .read(
+                trackVideoPreviewProvider((
+                  title: snapshot.title ?? '',
+                  artist: snapshot.artist ?? '',
+                )),
+              )
+              .value
+              ?.videoUrl
+        : null;
+    final effectiveVideoUrl = spotifyCanvasUrl ?? fallbackVideoUrl;
+    final playableUri =
+        (effectiveVideoUrl != null
+            ? visualCache.videoFileFor(visualIdentity, effectiveVideoUrl)
+            : null) ??
+        effectiveVideoUrl;
+
+    await showMomentShareSheet(
+      context: context,
+      initialMode: MomentClipMode.lyrics,
+      videoUri: playableUri,
+      artworkSource: artworkSource,
+      artworkFallbackSource: artwork.fallback,
+      accentColor: ref.read(playbackArtworkColorProvider),
+    );
   }
 
   Widget _buildLyrics(
@@ -3127,10 +3185,16 @@ class _LyricLineTile extends StatelessWidget {
   }
 }
 
+enum _LyricsSettingsAction { selectLines, shareMoment }
+
 class _LyricsSettingsMenu extends ConsumerWidget {
-  const _LyricsSettingsMenu({required this.onSelectLines});
+  const _LyricsSettingsMenu({
+    required this.onSelectLines,
+    required this.onShareMoment,
+  });
 
   final VoidCallback onSelectLines;
+  final VoidCallback onShareMoment;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -3334,6 +3398,21 @@ class _LyricsSettingsMenu extends ConsumerWidget {
               enabled: canTranslate,
               onTap: canTranslate ? onSelectLines : null,
             ),
+            if (ref.watch(momentClipExportServiceProvider).isSupported)
+              ListTile(
+                key: const ValueKey('lyrics-menu-share-moment'),
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.movie_creation_outlined, color: foreground),
+                title: Text(
+                  strings.shareMoment,
+                  style: TextStyle(color: foreground),
+                ),
+                subtitle: Text(
+                  strings.shareMomentSubtitle,
+                  style: TextStyle(color: foreground.withValues(alpha: .7)),
+                ),
+                onTap: onShareMoment,
+              ),
           ],
         ),
       ),

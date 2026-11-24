@@ -1086,19 +1086,46 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      if (shareTrack != null)
+                      if (shareTrack != null ||
+                          (ref.watch(momentClipExportServiceProvider).isSupported &&
+                              hasTrack))
                         IconButton(
+                          key: const ValueKey('spotify-canvas-share-button'),
                           tooltip: strings.shareSong,
                           color: Colors.white.withValues(alpha: 0.88),
                           iconSize: 21,
-                          onPressed: () => unawaited(
-                            _shareTrack(
-                              context: context,
-                              ref: ref,
-                              track: shareTrack,
-                              strings: strings,
-                            ),
-                          ),
+                          onPressed: () {
+                            final momentSupported = ref
+                                .read(momentClipExportServiceProvider)
+                                .isSupported;
+                            if (!momentSupported || !hasTrack) {
+                              if (shareTrack != null) {
+                                unawaited(
+                                  _shareTrack(
+                                    context: context,
+                                    ref: ref,
+                                    track: shareTrack,
+                                    strings: strings,
+                                  ),
+                                );
+                              }
+                              return;
+                            }
+                            unawaited(
+                              _showCanvasSharePicker(
+                                context: context,
+                                ref: ref,
+                                strings: strings,
+                                shareTrack: shareTrack,
+                                snapshot: snapshot,
+                                activeCanvasUrl: activeCanvasUrl,
+                                videoStartOffset: videoStartOffset,
+                                artworkSource: artworkSource,
+                                artworkFallbackSource: artworkFallbackSource,
+                                artworkAccentColor: artworkAccentColor,
+                              ),
+                            );
+                          },
                           icon: const Icon(Icons.share_outlined),
                         ),
                       IconButton(
@@ -1536,5 +1563,119 @@ class _CanvasArtworkAmbientAuraState extends State<_CanvasArtworkAmbientAura>
         },
       ),
     );
+  }
+}
+
+enum _CanvasShareChoice { moment, song }
+
+Future<void> _showCanvasSharePicker({
+  required BuildContext context,
+  required WidgetRef ref,
+  required AppStrings strings,
+  required TrackInfo? shareTrack,
+  required PlayerSnapshot snapshot,
+  required Uri? activeCanvasUrl,
+  required Duration videoStartOffset,
+  required String? artworkSource,
+  required String? artworkFallbackSource,
+  required Color? artworkAccentColor,
+}) async {
+  final choice = await showPlaybackMenuBottomSheet<_CanvasShareChoice>(
+    context: context,
+    useRootNavigator: true,
+    builder: (menuContext) {
+      final foreground = AppColors.menuForegroundFor(menuContext);
+      final iconColor = AppColors.menuIconFor(menuContext);
+      return SafeArea(
+        top: false,
+        child: Padding(
+          key: const ValueKey('canvas-share-picker-sheet'),
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      strings.shareSong,
+                      style: Theme.of(menuContext)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(color: foreground),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: strings.close,
+                    color: foreground,
+                    icon: const Icon(Icons.close_rounded),
+                    onPressed: () => Navigator.of(menuContext).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                key: const ValueKey('canvas-share-option-moment'),
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.movie_creation_outlined, color: iconColor),
+                title: Text(
+                  strings.shareMoment,
+                  style: TextStyle(
+                    color: foreground,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  strings.shareMomentSubtitle,
+                  style: TextStyle(color: foreground.withValues(alpha: .7)),
+                ),
+                onTap: () =>
+                    Navigator.of(menuContext).pop(_CanvasShareChoice.moment),
+              ),
+              if (shareTrack != null)
+                ListTile(
+                  key: const ValueKey('canvas-share-option-song'),
+                  contentPadding: EdgeInsets.zero,
+                  leading: Icon(Icons.share_rounded, color: iconColor),
+                  title: Text(
+                    strings.shareSong,
+                    style: TextStyle(color: foreground),
+                  ),
+                  subtitle: Text(
+                    strings.shareSongSubtitle,
+                    style: TextStyle(color: foreground.withValues(alpha: .7)),
+                  ),
+                  onTap: () =>
+                      Navigator.of(menuContext).pop(_CanvasShareChoice.song),
+                ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+  if (choice == null || !context.mounted) return;
+  switch (choice) {
+    case _CanvasShareChoice.moment:
+      await _openShareMomentFromPlayer(
+        context: context,
+        ref: ref,
+        snapshot: snapshot,
+        videoUri: activeCanvasUrl,
+        videoStartOffset: videoStartOffset,
+        artworkSource: artworkSource,
+        artworkFallbackSource: artworkFallbackSource,
+        accentColor: artworkAccentColor,
+      );
+    case _CanvasShareChoice.song:
+      if (shareTrack != null) {
+        await _shareTrack(
+          context: context,
+          ref: ref,
+          track: shareTrack,
+          strings: strings,
+        );
+      }
   }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.23+4281 — 2026-11-24
+
+### Added — Compartir momento (mini clips HD 1080p60 para WhatsApp y redes)
+
+- **Opción Compartir momento en ambas pantallas (Letras y Reproductor fullscreen).**
+  Disponible en el menú de opciones de Letras junto a *Compartir letras* (imagen PNG) y en el botón de compartir y menú `⋮` del reproductor a pantalla completa junto a *Compartir canción* (enlace).
+- **Mini clips verticales 9:16 en calidad tipo iPhone sin permisos de grabación de pantalla.**
+  Motor nativo Android basado en Media3 Transformer + OpenGL ES + MediaCodec H.264 High Profile (`1080×1920`, 60 fps constantes, BT.709, AAC-LC 48 kHz estéreo y MP4 faststart) que compone el Canvas/Video Preview en bucle (o carátula difuminada con movimiento sutil), las letras sincronizadas (incluido resaltado palabra por palabra) y la marca de agua translúcida elegante con el logo de Inútil Music.
+- **Selector de tramo estilo Reels/Estados (5–30 s) con vista previa.**
+  Permite elegir el rango exacto con barra deslizable, presets `10s / 15s / 20s / 30s`, anclaje rápido a líneas de la letra, cambio entre vista Letras y Reproductor, escucha previa del tramo y acciones directas de Compartir y Guardar.
+
 ## 2.5.22+4280 — 2026-11-23
 
 ### Fixed — Botón Atrás y tecla Escape para salir del reproductor en escritorio y laptop

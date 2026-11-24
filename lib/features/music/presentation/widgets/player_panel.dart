@@ -27,11 +27,13 @@ import '../../../../services/player/player_service.dart';
 import '../../../../services/player/local_audio_quality_service.dart';
 import '../../../../services/spotify_canvas/spotify_canvas_resolver.dart';
 import '../../../../services/sharing/inutil_track_link.dart';
+import '../../../../services/sharing/moment_clip_models.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
 import '../../domain/entities/local_track.dart';
 import '../../domain/entities/lyrics_document.dart';
 import '../../domain/entities/track_info.dart';
 import '../providers/artwork_progress_color_provider.dart';
+import '../providers/moment_clip_providers.dart';
 import '../providers/music_providers.dart';
 import '../providers/audio_source_providers.dart';
 import '../providers/playback_artwork_provider.dart';
@@ -49,6 +51,7 @@ import 'favorite_star_badge.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_sleep_timer_sheet.dart';
 import 'lyrics_page_route.dart';
+import 'moment_share_sheet.dart';
 import 'now_playing_equalizer.dart';
 import 'playback_audio_quality.dart';
 import 'playback_dark_theme.dart';
@@ -5821,6 +5824,9 @@ class _PlayerMenu extends ConsumerWidget {
         : null;
     final shareService = ref.read(trackShareServiceProvider);
     final canShare = shareTrack != null && shareService.canShare(shareTrack);
+    final canShareMoment =
+        ref.watch(momentClipExportServiceProvider).isSupported &&
+        snapshot.trackId != null;
     Widget buildButton(BuildContext actionContext) {
       final appleIcon = PlayerActionSurface(
         key: const ValueKey('apple-player-menu-surface'),
@@ -5855,6 +5861,7 @@ class _PlayerMenu extends ConsumerWidget {
                     builder: (_) => _PlayerOptionsMenu(
                       strings: strings,
                       canShare: canShare,
+                      canShareMoment: canShareMoment,
                       canOpenArtist: onOpenArtist != null,
                       canOpenAlbum: onOpenAlbum != null,
                       canDownload:
@@ -5878,6 +5885,15 @@ class _PlayerMenu extends ConsumerWidget {
                           ),
                         );
                       }
+                      return;
+                    case 'share-moment':
+                      unawaited(
+                        _openShareMomentFromPlayer(
+                          context: actionContext,
+                          ref: ref,
+                          snapshot: snapshot,
+                        ),
+                      );
                       return;
                     case 'audio-output':
                       unawaited(showAudioOutputPicker(actionContext, ref));
@@ -6071,6 +6087,7 @@ class _PlayerOptionsMenu extends StatelessWidget {
   const _PlayerOptionsMenu({
     required this.strings,
     required this.canShare,
+    required this.canShareMoment,
     required this.canOpenArtist,
     required this.canOpenAlbum,
     required this.canDownload,
@@ -6080,6 +6097,7 @@ class _PlayerOptionsMenu extends StatelessWidget {
 
   final AppStrings strings;
   final bool canShare;
+  final bool canShareMoment;
   final bool canOpenArtist;
   final bool canOpenAlbum;
   final bool canDownload;
@@ -6177,6 +6195,13 @@ class _PlayerOptionsMenu extends StatelessWidget {
               label: strings.shareSong,
               enabled: canShare,
             ),
+            if (canShareMoment)
+              action(
+                key: 'player-menu-share-moment',
+                value: 'share-moment',
+                icon: Icons.movie_creation_outlined,
+                label: strings.shareMoment,
+              ),
             if (canOpenArtist)
               action(
                 key: 'player-menu-go-to-artist',
@@ -6224,6 +6249,61 @@ class _PlayerOptionsMenu extends StatelessWidget {
       ),
     );
   }
+}
+
+Future<void> _openShareMomentFromPlayer({
+  required BuildContext context,
+  required WidgetRef ref,
+  required PlayerSnapshot snapshot,
+  Uri? videoUri,
+  Duration videoStartOffset = Duration.zero,
+  String? artworkSource,
+  String? artworkFallbackSource,
+  Color? accentColor,
+}) async {
+  final visualCache = ref.read(playbackVisualCacheProvider);
+  final artwork = ref.read(playbackArtworkProvider);
+  final resolvedArtwork = artworkSource ?? artwork.source ?? snapshot.thumbnailUrl;
+  final visualIdentity =
+      snapshot.trackId ??
+      snapshot.sourceUrl ??
+      '${snapshot.title ?? ''}|${snapshot.artist ?? ''}';
+  Uri? resolvedVideo = videoUri;
+  if (resolvedVideo == null) {
+    final canvasTrack = SpotifyCanvasTrack(
+      snapshot.title ?? '',
+      snapshot.artist ?? '',
+      snapshot.duration ?? Duration.zero,
+    );
+    final spotifyCanvasUrl = ref.read(spotifyCanvasUrlProvider(canvasTrack)).value;
+    final fallbackVideoUrl = spotifyCanvasUrl == null
+        ? ref
+              .read(
+                trackVideoPreviewProvider((
+                  title: snapshot.title ?? '',
+                  artist: snapshot.artist ?? '',
+                )),
+              )
+              .value
+              ?.videoUrl
+        : null;
+    final effective = spotifyCanvasUrl ?? fallbackVideoUrl;
+    resolvedVideo =
+        (effective != null
+            ? visualCache.videoFileFor(visualIdentity, effective)
+            : null) ??
+        effective;
+  }
+
+  await showMomentShareSheet(
+    context: context,
+    initialMode: MomentClipMode.player,
+    videoUri: resolvedVideo,
+    videoStartOffset: videoStartOffset,
+    artworkSource: resolvedArtwork,
+    artworkFallbackSource: artworkFallbackSource ?? artwork.fallback,
+    accentColor: accentColor ?? ref.read(playbackArtworkColorProvider),
+  );
 }
 
 Future<void> _toggleFavoriteForSnapshot({

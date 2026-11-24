@@ -646,6 +646,42 @@ class AppStrings {
   String get moreOptions => choose('Más opciones', 'More options');
   String get shareSong => choose('Compartir canción', 'Share song');
   String get shareSongTitle => shareSong;
+  String get shareSongSubtitle => choose(
+    'Enviar enlace de la canción',
+    'Send a link to this song',
+  );
+  String get shareMoment => choose('Compartir momento', 'Share moment');
+  String get shareMomentSubtitle => choose(
+    'Mini clip HD listo para WhatsApp y redes',
+    'HD mini clip ready for WhatsApp & socials',
+  );
+  String get shareMomentModeLyrics => choose('Letras', 'Lyrics');
+  String get shareMomentModePlayer => choose('Reproductor', 'Player');
+  String get shareMomentPreviewAudition =>
+      choose('Escuchar tramo', 'Preview clip');
+  String get shareMomentPauseAudition => choose('Pausar', 'Pause');
+  String get shareMomentSnapToLyric =>
+      choose('Anclar a una frase', 'Snap to a lyric');
+  String get shareMomentShareAction => choose('Compartir', 'Share');
+  String get shareMomentSaveAction => choose('Guardar', 'Save');
+  String get shareMomentStagePreparing =>
+      choose('Preparando...', 'Preparing...');
+  String get shareMomentStageAudio =>
+      choose('Audio HD...', 'HD audio...');
+  String get shareMomentStageVideo =>
+      choose('Renderizando HD...', 'Rendering HD...');
+  String get shareMomentStageFinalizing =>
+      choose('Optimizando...', 'Optimizing...');
+  String get shareMomentSaved =>
+      choose('Clip guardado en el dispositivo', 'Clip saved to device');
+  String get shareMomentNoAudio => choose(
+    'Espera a que la canción termine de cargar el audio.',
+    'Wait for the song audio to finish loading.',
+  );
+  String get shareMomentFailed => choose(
+    'No se pudo generar el clip. Inténtalo de nuevo.',
+    'Could not generate the clip. Please try again.',
+  );
   String shareSongMessage(String title, String artist) =>
       choose('Escucha "$title" de $artist.', 'Listen to "$title" by $artist.');
   String get shareFailed => choose(
