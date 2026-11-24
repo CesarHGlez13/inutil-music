@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.5.18+4276 — 2026-11-23
+
+### Fixed — Fallback de Video Preview ampliado y Canvas resiliente
+
+- **Fallback de Video Preview ampliado con validación estricta.**
+  Se amplió la cobertura de búsqueda en iTunes/Apple Music mediante consultas escalonadas por título y catálogo de artista manteniendo validación estricta de título y artista (`sameVisualTitle` y `sameVisualArtist`) para no mostrar videos de canciones o artistas erróneos.
+- **Soporte de identificadores de Canvas de proveedor.**
+  Se aceptan identificadores de Canvas con prefijo `t_1.*` para resolver Canvas oficial en cuanto el servicio de proveedor se reanude.
+- **Actualización opcional.**
+  Actualización opcional: no hay versión mínima soportada (`minSupportedVersion ""` cancela la OTA obligatoria).
+
 ## 2.5.17+4275 — 2026-11-22
 
 ### Fixed — Resolución y reproducción exacta en Video Preview Reel
