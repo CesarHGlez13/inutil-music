@@ -497,10 +497,40 @@ class InutilUpdateService {
   String get _defaultManifestUrl =>
       '${FirebaseConfig.storageBaseUrl}/releases%2Frelease.json?alt=media';
 
+  /// Espejo Cloudflare Edge para manifiestos y descargas OTA de Inutix Music
+  /// cuando la red local bloquea o estrangula `github.com`.
+  static const String otaEdgeBaseUrl = String.fromEnvironment(
+    'OTA_EDGE_BASE_URL',
+    defaultValue: 'https://ota.inutix.com',
+  );
+
   /// Manifiesto publicado como asset de la última Release de GitHub
   /// (`releases/latest/download/release.json`); redirige al asset real.
   String get _githubManifestUrl =>
       'https://github.com/$releaseRepo/releases/latest/download/release.json';
+
+  /// Espejo Edge del manifiesto OTA en Cloudflare (`ota.inutix.com`).
+  String get _edgeManifestUrl {
+    final base = otaEdgeBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+    return base.isEmpty ? '' : '$base/music/release.json';
+  }
+
+  /// Convierte un enlace de descarga de GitHub Releases en su espejo Edge
+  /// (`https://ota.inutix.com/music/download/<tag>/<asset>`) para redes que
+  /// bloquean o estrangulan `github.com`.
+  static String otaFallbackUrlFor(String url, {String? otaBaseUrl}) {
+    final uri = Uri.tryParse(url.trim());
+    if (uri == null || uri.host.toLowerCase() != 'github.com') return '';
+    final match = RegExp(
+      r'^/[^/]+/[^/]+/releases/download/(v[0-9]+\.[0-9]+\.[0-9]+)/([A-Za-z0-9._-]+(?:\.apk|\.tar\.gz|\.deb|\.rpm|\.exe|\.pkg|\.AppImage))$',
+    ).firstMatch(uri.path);
+    if (match == null) return '';
+    final base = (otaBaseUrl ?? otaEdgeBaseUrl)
+        .trim()
+        .replaceAll(RegExp(r'/+$'), '');
+    if (base.isEmpty) return '';
+    return '$base/music/download/${match.group(1)}/${match.group(2)}';
+  }
 
   /// Manifiesto forzado por el entorno (`INUTIL_RELEASE_MANIFEST_URL`).
   static String? get _manifestUrlOverride {
@@ -617,8 +647,11 @@ class InutilUpdateService {
     }
     final override = _manifestUrlOverride;
     if (override != null) candidates.add(override);
-    // GitHub Releases: asset `release.json` de la última versión publicada.
-    if (!FirebaseConfig.useEmulator) candidates.add(_githubManifestUrl);
+    // GitHub Releases + espejo Cloudflare Edge (`ota.inutix.com/music/release.json`).
+    if (!FirebaseConfig.useEmulator) {
+      candidates.add(_githubManifestUrl);
+      if (_edgeManifestUrl.isNotEmpty) candidates.add(_edgeManifestUrl);
+    }
     candidates.add(_defaultManifestUrl);
 
     for (final url in candidates) {
@@ -777,7 +810,6 @@ class InutilUpdateService {
       );
     }
 
-    final uri = Uri.parse(url);
     final extension = InutilReleaseInfo.extensionForDownloadUrl(url);
     final sanitizedVersion = release.latestVersion.replaceAll(
       RegExp(r'[^A-Za-z0-9._-]'),
@@ -787,42 +819,66 @@ class InutilUpdateService {
     final targetPath = p.join(Directory.systemTemp.path, fileName);
     final file = File(targetPath);
 
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 15);
-    try {
-      final request = await client.getUrl(uri);
-      request.headers.set(
-        HttpHeaders.userAgentHeader,
-        'InutilMusic-Updater/${AppConstants.appVersion}',
-      );
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw HttpException(
-          'El servidor devolvió el código HTTP ${response.statusCode}.',
-          uri: uri,
-        );
-      }
+    final edgeFallback = otaFallbackUrlFor(url);
+    final candidateUrls = <String>[
+      url,
+      if (edgeFallback.isNotEmpty && edgeFallback != url) edgeFallback,
+    ];
 
-      final totalBytes = response.contentLength;
-      var receivedBytes = 0;
-      final sink = file.openWrite();
-
+    Object? lastError;
+    Uri? usedUri;
+    for (final candidateUrl in candidateUrls) {
+      final uri = Uri.parse(candidateUrl);
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 15);
       try {
-        await for (final chunk in response) {
-          sink.add(chunk);
-          receivedBytes += chunk.length;
-          onProgress(receivedBytes, totalBytes);
+        final request = await client.getUrl(uri);
+        request.headers.set(
+          HttpHeaders.userAgentHeader,
+          'InutilMusic-Updater/${AppConstants.appVersion}',
+        );
+        final response = await request.close();
+        if (response.statusCode < 200 || response.statusCode >= 300) {
+          throw HttpException(
+            'El servidor devolvió el código HTTP ${response.statusCode}.',
+            uri: uri,
+          );
         }
-      } finally {
-        await sink.flush();
-        await sink.close();
-      }
 
-      await _openDownloadedArtifact(file, fallbackUrl: uri);
-      return file.path;
-    } finally {
-      client.close(force: true);
+        final totalBytes = response.contentLength;
+        var receivedBytes = 0;
+        final sink = file.openWrite();
+
+        try {
+          await for (final chunk in response) {
+            sink.add(chunk);
+            receivedBytes += chunk.length;
+            onProgress(receivedBytes, totalBytes);
+          }
+        } finally {
+          await sink.flush();
+          await sink.close();
+        }
+
+        usedUri = uri;
+        break;
+      } catch (e) {
+        lastError = e;
+        debugPrint(
+          'InutilUpdateService: fallo descarga desde $candidateUrl ($e)',
+        );
+      } finally {
+        client.close(force: true);
+      }
     }
+
+    if (usedUri == null) {
+      throw lastError ??
+          const HttpException('No se pudo descargar el paquete OTA.');
+    }
+
+    await _openDownloadedArtifact(file, fallbackUrl: usedUri);
+    return file.path;
   }
 
   Future<void> _openDownloadedArtifact(
