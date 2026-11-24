@@ -386,7 +386,7 @@ if [ "$MODE" = "github" ]; then
   python3 - "$MANIFEST" "$NOTES_MD" <<'PY'
 import json, sys
 m = json.load(open(sys.argv[1], encoding="utf-8"))
-lines = [f"# Inútil Music {m['latestVersion']}", ""]
+lines = [f"# Inutix Music {m['latestVersion']}", ""]
 lines += [f"- {n}" for n in m.get("releaseNotes", [])]
 if m.get("mandatory", False):
     lines += ["", "Actualización obligatoria: las versiones anteriores a "
@@ -405,7 +405,7 @@ PY
   else
     gh release create "$TAG" "${FILES_ARGS[@]}" --repo "$RELEASE_REPO" \
       --target "$RELEASE_TARGET" \
-      --title "Inútil Music $TAG" --notes-file "$NOTES_MD"
+      --title "Inutix Music $TAG" --notes-file "$NOTES_MD"
     echo "  etiqueta $TAG anclada en $RELEASE_TARGET (no en el branch default)"
   fi
   echo "publicado en https://github.com/$RELEASE_REPO/releases/tag/$TAG"
