@@ -448,7 +448,7 @@ final incomingTrackLinkProvider = StreamProvider<InutilTrackLink>((ref) async* {
 ///
 /// This is deliberately separate from [incomingTrackLinkProvider] so app
 /// `inutilmusic://` links keep their exact contract while
-/// regular YouTube links can also be offered to Inútil Music by the operating
+/// regular YouTube links can also be offered to Inutix Music by the operating
 /// system.
 final incomingYouTubeMusicLinkProvider = StreamProvider<YouTubeMusicLink>((
   ref,
@@ -2159,7 +2159,7 @@ final homeRecommendationsProvider =
       List<HomeRecommendationSection>
     >(HomeRecommendationsController.new, retry: (_, _) => null);
 
-/// Cache-first controller for Inútil Music's personalized feed plus the generic
+/// Cache-first controller for Inutix Music's personalized feed plus the generic
 /// YouTube Music home. Both inputs refresh independently and the last usable
 /// combined value remains visible through loading and failures.
 class HomeRecommendationsController
@@ -2743,7 +2743,7 @@ List<HomeRecommendationSection> _combineHomeRecommendationSections(
   final orderedSections = personalized.toList(growable: true);
   // The artist shelf replaces the removed personalized mixes shelf. Keep it
   // near the top (after Continue listening when present), while the ordinary
-  // YouTube Music feed remains below all of Inútil Music's existing sections.
+  // YouTube Music feed remains below all of Inutix Music's existing sections.
   final continueIndex = orderedSections.indexWhere(
     (section) => section.isContinueListening,
   );

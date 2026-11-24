@@ -1,9 +1,9 @@
 #ifndef MyAppVersion
-  #define MyAppVersion "2.5.26"
+  #define MyAppVersion "2.5.27"
 #endif
 
-#define MyAppName "Inútil Music"
-#define MyAppPublisher "Inútil Music"
+#define MyAppName "Inutix Music"
+#define MyAppPublisher "Inutix Music"
 #define MyAppURL "https://github.com/CesarHGlez13/inutil-music"
 #define MyAppExeName "inutil_music.exe"
 #define MyAppUserModelId "InutilMusic.Desktop"
@@ -19,8 +19,8 @@ AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
 AppSupportURL={#MyAppURL}/issues
 AppUpdatesURL={#MyAppURL}/releases
-DefaultDirName={autopf}\Inútil Music
-DefaultGroupName=Inútil Music
+DefaultDirName={autopf}\Inutix Music
+DefaultGroupName=Inutix Music
 DisableProgramGroupPage=yes
 AllowNoIcons=no
 PrivilegesRequired=lowest
@@ -80,7 +80,7 @@ Root: HKCU; Subkey: "Software\Classes\.csv\OpenWithProgids"; ValueType: string; 
 Root: HKCU; Subkey: "Software\Classes\InutilMusic.Csv"; ValueType: string; ValueName: ""; ValueData: "CSV playlist"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\InutilMusic.Csv\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",0"
 Root: HKCU; Subkey: "Software\Classes\InutilMusic.Csv\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
-Root: HKCU; Subkey: "Software\Classes\inutilmusic"; ValueType: string; ValueName: ""; ValueData: "URL:Inútil Music Protocol"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\inutilmusic"; ValueType: string; ValueName: ""; ValueData: "URL:Inutix Music Protocol"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\inutilmusic"; ValueType: string; ValueName: "URL Protocol"; ValueData: ""
 Root: HKCU; Subkey: "Software\Classes\inutilmusic\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"",0"
 Root: HKCU; Subkey: "Software\Classes\inutilmusic\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#MyAppExeName}"" ""%1"""
@@ -89,5 +89,5 @@ Root: HKCU; Subkey: "Software\Classes\inutilmusic\shell\open\command"; ValueType
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-; Migration cleanup for releases that created Inútil Music's localhost certificate.
+; Migration cleanup for releases that created Inutix Music's localhost certificate.
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand JABFAHIAcgBvAHIAQQBjAHQAaQBvAG4AUAByAGUAZgBlAHIAZQBuAGMAZQAgAD0AIAAnAFMAaQBsAGUAbgB0AGwAeQBDAG8AbgB0AGkAbgB1AGUAJwAKACQAYwBlAHIAdABpAGYAaQBjAGEAdABlAHMAIAA9ACAAQAAoAEcAZQB0AC0AQwBoAGkAbABkAEkAdABlAG0AIAAtAFAAYQB0AGgAIAAnAEMAZQByAHQAOgBcAEMAdQByAHIAZQBuAHQAVQBzAGUAcgBcAE0AeQAnACAAfAAgAFcAaABlAHIAZQAtAE8AYgBqAGUAYwB0ACAAewAgACQAXwAuAEYAcgBpAGUAbgBkAGwAeQBOAGEAbQBlACAALQBlAHEAIAAnAEIAUwB0AHIAZQBhAG0AIABMAG8AYwBhAGwAIABMAGkAdgBlACAATwB2AGUAcgBsAGEAeQAnACAALQBhAG4AZAAgACQAXwAuAFMAdQBiAGoAZQBjAHQAIAAtAGUAcQAgACcAQwBOAD0AbABvAGMAYQBsAGgAbwBzAHQAJwAgAC0AYQBuAGQAIAAkAF8ALgBJAHMAcwB1AGUAcgAgAC0AZQBxACAAJABfAC4AUwB1AGIAagBlAGMAdAAgAH0AKQAKAGYAbwByAGUAYQBjAGgAIAAoACQAYwBlAHIAdABpAGYAaQBjAGEAdABlACAAaQBuACAAJABjAGUAcgB0AGkAZgBpAGMAYQB0AGUAcwApACAAewAKACAAIAAkAHQAcgB1AHMAdABlAGQAUABhAHQAaAAgAD0AIAAnAEMAZQByAHQAOgBcAEMAdQByAHIAZQBuAHQAVQBzAGUAcgBcAFIAbwBvAHQAXAAnACAAKwAgACQAYwBlAHIAdABpAGYAaQBjAGEAdABlAC4AVABoAHUAbQBiAHAAcgBpAG4AdAAKACAAIABpAGYAIAAoAFQAZQBzAHQALQBQAGEAdABoACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAkAHQAcgB1AHMAdABlAGQAUABhAHQAaAApACAAewAgAFIAZQBtAG8AdgBlAC0ASQB0AGUAbQAgAC0ATABpAHQAZQByAGEAbABQAGEAdABoACAAJAB0AHIAdQBzAHQAZQBkAFAAYQB0AGgAIAAtAEYAbwByAGMAZQAgAH0ACgAgACAAUgBlAG0AbwB2AGUALQBJAHQAZQBtACAALQBMAGkAdABlAHIAYQBsAFAAYQB0AGgAIAAkAGMAZQByAHQAaQBmAGkAYwBhAHQAZQAuAFAAUwBQAGEAdABoACAALQBGAG8AcgBjAGUACgB9AA=="; Flags: runhidden waituntilterminated

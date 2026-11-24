@@ -35,7 +35,7 @@ class TikTokLiveDartRawEvent {
   final String roomId;
 }
 
-/// Direct Dart implementation of Inútil Music's TikTok LIVE command transport.
+/// Direct Dart implementation of Inutix Music's TikTok LIVE command transport.
 ///
 /// The audited transport reports its `connected` event after the WebSocket
 /// handshake. The adapter also accepts the first decoded traffic event as a

@@ -52,7 +52,7 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
         final track = TrackInfo(
           id: session.trackId,
           title: session.title.isNotEmpty ? session.title : 'Canción',
-          artist: session.artist.isNotEmpty ? session.artist : 'Inútil Music',
+          artist: session.artist.isNotEmpty ? session.artist : 'Inutix Music',
           url: 'https://music.youtube.com/watch?v=${session.trackId}',
           thumbnailUrl: session.thumbnailUrl.isEmpty
               ? null
@@ -194,7 +194,7 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
               final track = TrackInfo(
                 id: trackId,
                 title: title.isNotEmpty ? title : 'Canción',
-                artist: artist.isNotEmpty ? artist : 'Inútil Music',
+                artist: artist.isNotEmpty ? artist : 'Inutix Music',
                 url: canonicalUrl,
                 thumbnailUrl: thumbnailUrl,
                 album: album,
@@ -240,7 +240,7 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
       final routed = await syncService.playTrackOnPeer(
         trackId: snapshot.trackId!,
         title: snapshot.title ?? 'Canción',
-        artist: snapshot.artist ?? 'Inútil Music',
+        artist: snapshot.artist ?? 'Inutix Music',
         album: snapshot.album,
         thumbnailUrl: snapshot.thumbnailUrl,
         positionMs: snapshot.position.inMilliseconds,
@@ -333,7 +333,7 @@ final inutilPlaybackSyncProvider = ChangeNotifierProvider<InutilPlaybackSyncServ
           syncService.notifyPlaybackProgress(
             trackId: snapshot.trackId!,
             title: snapshot.title ?? 'Canción sin título',
-            artist: snapshot.artist ?? 'Inútil Music',
+            artist: snapshot.artist ?? 'Inutix Music',
             album: snapshot.album,
             thumbnailUrl: snapshot.thumbnailUrl,
             positionMs: snapshot.position.inMilliseconds,
@@ -379,7 +379,7 @@ TrackInfo? _trackInfoFromRemoteMap(Map<String, dynamic> raw) {
   return TrackInfo(
     id: id,
     title: title.isNotEmpty ? title : 'Canción',
-    artist: artist.isNotEmpty ? artist : 'Inútil Music',
+    artist: artist.isNotEmpty ? artist : 'Inutix Music',
     album: album.isEmpty ? null : album,
     thumbnailUrl: thumb.isEmpty ? null : thumb,
     url: url.isNotEmpty ? url : 'https://music.youtube.com/watch?v=$id',

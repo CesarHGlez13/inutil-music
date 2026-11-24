@@ -270,11 +270,11 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
-    gtk_header_bar_set_title(header_bar, "Inútil Music");
+    gtk_header_bar_set_title(header_bar, "Inutix Music");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
-    gtk_window_set_title(window, "Inútil Music");
+    gtk_window_set_title(window, "Inutix Music");
   }
 
   // No explicit position here. GTK_WIN_POS_CENTER makes GTK publish a
@@ -350,9 +350,9 @@ static void my_application_startup(GApplication* application) {
   // audio stream. GTK forwards these values to PulseAudio/PipeWire, allowing
   // volume controls to show the application name and its XDG icon instead of
   // the executable and package defaults.
-  g_set_application_name("Inútil Music");
+  g_set_application_name("Inutix Music");
   gtk_window_set_default_icon_name(APPLICATION_ID);
-  g_setenv("PULSE_PROP_application.name", "Inútil Music", TRUE);
+  g_setenv("PULSE_PROP_application.name", "Inutix Music", TRUE);
   g_setenv("PULSE_PROP_application.icon_name", APPLICATION_ID, TRUE);
   g_setenv("PULSE_PROP_media.role", "music", TRUE);
   // Fedora commonly uses mpv's native PipeWire backend instead of
@@ -360,7 +360,7 @@ static void my_application_startup(GApplication* application) {
   // stream metadata independent of the executable name.
   g_setenv(
       "PIPEWIRE_PROPS",
-      "{ application.name = \"Inútil Music\" application.icon-name = "
+      "{ application.name = \"Inutix Music\" application.icon-name = "
       "\"com.inutilmusic.app\" application.id = "
       "\"com.inutilmusic.app\" }",
       TRUE);

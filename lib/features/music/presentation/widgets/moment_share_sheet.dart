@@ -24,7 +24,7 @@ import 'spotify_canvas_video.dart';
 
 /// Opens the fullscreen "Compartir momento" clip studio modal where the user
 /// chooses the moment window (5–30s), previews Lyrics or Player visual style
-/// with the translucent Inútil Music watermark, and exports a high-quality MP4
+/// with the translucent Inutix Music watermark, and exports a high-quality MP4
 /// ready for WhatsApp HD, Instagram, and TikTok without screen recording.
 Future<void> showMomentShareSheet({
   required BuildContext context,
@@ -370,8 +370,8 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
           controller.currentRemoteTrackFor(trackUrl) ??
           TrackInfo(
             id: snapshot.trackId ?? trackUrl,
-            title: snapshot.title ?? 'Inútil Music',
-            artist: snapshot.artist ?? 'Inútil Music',
+            title: snapshot.title ?? 'Inutix Music',
+            artist: snapshot.artist ?? 'Inutix Music',
             url: trackUrl,
             thumbnailUrl: snapshot.thumbnailUrl,
             duration: snapshot.duration,
@@ -469,10 +469,10 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
 
     final title = (snapshot.title ?? '').trim().isNotEmpty
         ? snapshot.title!.trim()
-        : 'Inútil Music';
+        : 'Inutix Music';
     final baseArtist = (snapshot.artist ?? '').trim().isNotEmpty
         ? snapshot.artist!.trim()
-        : 'Inútil Music';
+        : 'Inutix Music';
     final artist = _effectiveArtistCaption(baseArtist);
     final effectiveSignature = '$signature|mem:$_includeEchoMemory';
 
@@ -634,10 +634,10 @@ class _MomentShareSheetState extends ConsumerState<MomentShareSheet> {
         const Color(0xFF6C8CFF);
     final title = (snapshot.title ?? '').trim().isNotEmpty
         ? snapshot.title!.trim()
-        : 'Inútil Music';
+        : 'Inutix Music';
     final baseArtist = (snapshot.artist ?? '').trim().isNotEmpty
         ? snapshot.artist!.trim()
-        : 'Inútil Music';
+        : 'Inutix Music';
     final artist = _effectiveArtistCaption(baseArtist);
     final artworkSource =
         _frozenArtworkSource ?? widget.artworkSource ?? artwork.source;
@@ -1267,7 +1267,7 @@ class _MomentLivePreviewCard extends StatelessWidget {
         else
           _buildPlayerPreview(activeIdx, progress),
 
-        // 5. Subtle translucent Inútil Music watermark pill at bottom-center.
+        // 5. Subtle translucent Inutix Music watermark pill at bottom-center.
         Positioned(
           left: 8,
           right: 8,
@@ -1301,7 +1301,7 @@ class _MomentLivePreviewCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      'Inútil Music',
+                      'Inutix Music',
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.56),
                         fontSize: 10.5,

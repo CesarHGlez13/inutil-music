@@ -9,7 +9,7 @@ import '../../../../core/theme/app_dialog.dart';
 import '../../../../core/theme/app_ui.dart';
 import '../providers/music_providers.dart';
 
-/// Diálogo de cuenta de usuario de Inútil Music, integrado con el tema nativo
+/// Diálogo de cuenta de usuario de Inutix Music, integrado con el tema nativo
 /// de la app. Sin controles administrativos (la administración vive en el
 /// portal web).
 class InutilAccountDialog extends ConsumerStatefulWidget {
@@ -333,7 +333,7 @@ class _InutilAccountDialogState extends ConsumerState<InutilAccountDialog> {
               ),
               const SizedBox(height: 8),
               Text(
-                'Abre Inútil Music en tu computadora y escanea el QR (o escribe su código) para entrar sin contraseña.',
+                'Abre Inutix Music en tu computadora y escanea el QR (o escribe su código) para entrar sin contraseña.',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),

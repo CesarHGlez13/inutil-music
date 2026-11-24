@@ -16,8 +16,8 @@ const _windowsCommandLineSafetyMargin = 512;
 const _windowsOperationCancelledExitCode = 1223;
 const _powerShellPolicyBlockedExitCode = 125;
 
-const _ownedBlockBegin = '# BEGIN Inútil Music LIVE Overlay';
-const _ownedBlockEnd = '# END Inútil Music LIVE Overlay';
+const _ownedBlockBegin = '# BEGIN Inutix Music LIVE Overlay';
+const _ownedBlockEnd = '# END Inutix Music LIVE Overlay';
 
 /// Ensures that the stable LIVE overlay hostname resolves to IPv4 loopback.
 abstract interface class LocalOverlayHostProvisioner {
@@ -580,7 +580,7 @@ final class WindowsLocalOverlayHostProvisioner
                 bytes[2] == 0xFE &&
                 bytes[3] == 0xFF))) {
       throw const LocalOverlayHostsException(
-        'Inútil Music will not modify a UTF-32 Windows hosts file.',
+        'Inutix Music will not modify a UTF-32 Windows hosts file.',
       );
     }
     if (bytes.length >= 3 &&
@@ -753,7 +753,7 @@ function Get-InutilEncoding([byte[]]$bytes) {
         $bytes[2] -eq 0x00 -and $bytes[3] -eq 0x00) -or
        ($bytes[0] -eq 0x00 -and $bytes[1] -eq 0x00 -and
         $bytes[2] -eq 0xFE -and $bytes[3] -eq 0xFF))) {
-    throw 'Inútil Music will not modify a UTF-32 Windows hosts file.'
+    throw 'Inutix Music will not modify a UTF-32 Windows hosts file.'
   }
   if ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and
       $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF) {

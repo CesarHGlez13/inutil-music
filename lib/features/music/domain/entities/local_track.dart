@@ -42,7 +42,7 @@ class LocalTrack {
   final DateTime? lastPlayedAt;
   final String? lastPlayedPlaylistId;
 
-  /// True for a transient track opened from Android outside Inútil Music's library.
+  /// True for a transient track opened from Android outside Inutix Music's library.
   final bool isExternal;
 
   /// The format of the downloaded payload, recorded when it was resolved.

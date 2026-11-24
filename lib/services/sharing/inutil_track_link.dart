@@ -5,7 +5,7 @@ import '../../features/music/domain/entities/track_info.dart';
 /// Stream URLs are deliberately never represented here: Google Video URLs
 /// are signed, short lived, and may contain request credentials.
 /// New outgoing shares use a recognized HTTPS URL; [appUri] remains available
-/// only so links shared by older versions keep opening in Inútil Music.
+/// only so links shared by older versions keep opening in Inutix Music.
 final class InutilTrackLink {
   const InutilTrackLink({required this.videoId});
 
@@ -24,7 +24,7 @@ final class InutilTrackLink {
       Uri.https('music.youtube.com', '/watch', <String, String>{'v': videoId});
 }
 
-/// Encodes and validates the public link contract used by Inútil Music.
+/// Encodes and validates the public link contract used by Inutix Music.
 class InutilTrackLinkCodec {
   const InutilTrackLinkCodec();
 
@@ -35,7 +35,7 @@ class InutilTrackLinkCodec {
   InutilTrackLink decode(Uri uri) {
     final decoded = tryDecode(uri);
     if (decoded == null) {
-      throw FormatException('Invalid Inútil Music track link.', uri);
+      throw FormatException('Invalid Inutix Music track link.', uri);
     }
     return decoded;
   }

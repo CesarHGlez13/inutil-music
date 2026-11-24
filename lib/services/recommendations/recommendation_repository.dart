@@ -49,7 +49,7 @@ abstract interface class RecommendationRepository {
   });
 }
 
-/// Production adapter over Inútil Music's local database.
+/// Production adapter over Inutix Music's local database.
 class LocalDatabaseRecommendationRepository
     implements RecommendationRepository {
   const LocalDatabaseRecommendationRepository({

@@ -17,7 +17,7 @@ import 'firebase_auth_service.dart';
 import 'firebase_config.dart';
 import 'firebase_playback_sync_service.dart';
 
-/// Información de lanzamiento y actualización OTA de Inútil Music.
+/// Información de lanzamiento y actualización OTA de Inutix Music.
 @immutable
 class InutilReleaseInfo {
   const InutilReleaseInfo({
@@ -469,7 +469,7 @@ class InutilReleaseInfo {
   }
 }
 
-/// Servicio centralizado de actualizaciones OTA e in-app para Inútil Music.
+/// Servicio centralizado de actualizaciones OTA e in-app para Inutix Music.
 class InutilUpdateService {
   InutilUpdateService._();
   static final InutilUpdateService instance = InutilUpdateService._();
@@ -698,7 +698,7 @@ class InutilUpdateService {
   }
 
   /// Permite al SuperAdmin César publicar una nueva versión en Firestore
-  /// para todos los dispositivos conectados a Inútil Music.
+  /// para todos los dispositivos conectados a Inutix Music.
   Future<bool> publishRelease({
     required String version,
     required List<String> notes,
@@ -868,7 +868,7 @@ class InutilUpdateService {
   /// fiable, así que se prepara un directorio auxiliar con el contenido nuevo y
   /// se lanza un script desacoplado que espera a que este proceso termine,
   /// sincroniza los archivos sobre el directorio de instalación y vuelve a
-  /// abrir Inútil Music. Devuelve `true` cuando la instalación quedó programada,
+  /// abrir Inutix Music. Devuelve `true` cuando la instalación quedó programada,
   /// lo que indica a la interfaz que puede cerrar la aplicación.
   Future<bool> _installLinuxArchiveAndRelaunch(File archive) async {
     final executable = File(Platform.resolvedExecutable);
@@ -885,7 +885,7 @@ class InutilUpdateService {
     ]);
     File stagedExecutable = File(p.join(staging.path, executableName));
     if (!stagedExecutable.existsSync()) {
-      for (final altName in const ['Inútil Music', 'inutil_music']) {
+      for (final altName in const ['Inutix Music', 'inutil_music']) {
         final alt = File(p.join(staging.path, altName));
         if (alt.existsSync()) {
           stagedExecutable = alt;
@@ -902,7 +902,7 @@ class InutilUpdateService {
     final launcher = File(p.join(installRoot.path, targetBinaryName));
     final helper = File(p.join(staging.path, 'inutil_update_apply.sh'));
     await helper.writeAsString(r'''#!/bin/sh
-# Aplicación diferida de la actualización de Inútil Music.
+# Aplicación diferida de la actualización de Inutix Music.
 # argv: <pid que debe terminar> <staging> <directorio de instalación> <ejecutable>
 set -u
 PID="$1"; STAGING="$2"; DEST="$3"; EXEC="$4"
@@ -1049,7 +1049,7 @@ exec "$EXEC" >/tmp/inutil_relaunch.log 2>&1
   }
 }
 
-/// Muestra el diálogo modal de actualización de Inútil Music integrado con el
+/// Muestra el diálogo modal de actualización de Inutix Music integrado con el
 /// tema nativo de la app.
 Future<void> showInutilUpdateDialog(
   BuildContext context,
@@ -1225,7 +1225,7 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                           Text(
                             hasUpdate
                                 ? 'Versión ${release.latestVersion} disponible · Tienes v${release.currentVersion}'
-                                : 'Inútil Music v${release.currentVersion}',
+                                : 'Inutix Music v${release.currentVersion}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),
@@ -1306,7 +1306,7 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                           )
                         else
                           Text(
-                            'Ya cuentas con la versión más reciente de Inútil Music.',
+                            'Ya cuentas con la versión más reciente de Inutix Music.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: colors.onSurfaceVariant,
                             ),
@@ -1463,7 +1463,7 @@ class _InutilAdminPublishUpdateModalState
   final TextEditingController _minVersionController = TextEditingController();
   final TextEditingController _notesController = TextEditingController(
     text:
-        'Mejoras de rendimiento y estabilidad en Inútil Music.\n'
+        'Mejoras de rendimiento y estabilidad en Inutix Music.\n'
         'Sincronización instantánea de playlists y favoritos en la nube.',
   );
   bool _mandatory = false;

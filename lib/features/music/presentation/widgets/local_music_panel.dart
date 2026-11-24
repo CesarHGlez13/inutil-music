@@ -66,7 +66,7 @@ class LocalMusicNavigationController extends ChangeNotifier {
   }
 }
 
-/// Browses device audio without adding it to Inútil Music's Library.
+/// Browses device audio without adding it to Inutix Music's Library.
 class LocalMusicPanel extends ConsumerStatefulWidget {
   const LocalMusicPanel({
     required this.onOpenPlayer,

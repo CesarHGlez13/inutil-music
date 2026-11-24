@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Sistema de diseño centralizado de INÚTIL MUSIC.
+/// Sistema de diseño centralizado de INUTIX MUSIC.
 /// Permite modificar colores, tipografías, bordes, espaciados,
 /// animaciones y efectos glassmorphism/glow desde una única fuente de verdad.
 class InutilDesignSystem {

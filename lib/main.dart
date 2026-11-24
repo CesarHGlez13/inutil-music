@@ -442,7 +442,7 @@ class InutilMusicApp extends ConsumerWidget {
         );
         // `settingsControllerProvider` hace I/O real de plataforma, así que el
         // primer frame siempre lo encuentra sin resolver y `HomePage` cae a sus
-        // defaults (reproductor "Inútil Music" clásico, artwork square, Canvas
+        // defaults (reproductor "Inutix Music" clásico, artwork square, Canvas
         // apagado). Ver esos defaults y luego lo que el usuario eligió es el
         // salto de "primero sale la interfaz vieja y luego la correcta": el
         // lienzo de hidratación pinta el esqueleto esos frames iniciales y

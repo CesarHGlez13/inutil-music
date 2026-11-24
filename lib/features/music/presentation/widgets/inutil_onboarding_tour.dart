@@ -93,7 +93,7 @@ class _InutilOnboardingTourState extends State<InutilOnboardingTour> {
       accent: const Color(0xFF34D399),
       background: const Color(0xFF0B1A16),
       eyebrow: 'BIENVENIDO',
-      title: 'Hola, esto es\nInútil Music',
+      title: 'Hola, esto es\nInutix Music',
       body:
           'En menos de un minuto te mostramos lo esencial. Toca y desliza las '
           'demos: funcionan igual que en la app.',
@@ -145,7 +145,7 @@ class _InutilOnboardingTourState extends State<InutilOnboardingTour> {
       eyebrow: 'SIN INTERNET Y EN TU PC',
       title: 'Descarga y conecta\ntus dispositivos',
       body:
-          'Descarga canciones para escucharlas sin datos y abre Inútil Music en '
+          'Descarga canciones para escucharlas sin datos y abre Inutix Music en '
           'tu PC con la misma cuenta para controlarla desde el teléfono.',
       demo: (_) => const _OfflineDemo(accent: Color(0xFF22D3EE)),
     ),

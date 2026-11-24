@@ -14,7 +14,7 @@ Offset _rotated(Offset v, double grados) {
   return Offset(v.dx * c - v.dy * s, v.dx * s + v.dy * c);
 }
 
-/// Bespoke geometric vector glyphs exclusive to Inútil Music.
+/// Bespoke geometric vector glyphs exclusive to Inutix Music.
 ///
 /// Each glyph renders cleanly on a 24×24 coordinate space in two distinct
 /// optical weights:

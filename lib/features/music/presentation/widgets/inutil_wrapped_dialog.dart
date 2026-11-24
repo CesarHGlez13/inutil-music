@@ -13,7 +13,7 @@ import 'inutil_support_popup.dart';
 import 'source_image.dart';
 
 /// Pop-up animado a pantalla completa estilo Spotify Wrapped («Tu Año en
-/// Inútil Music»).
+/// Inutix Music»).
 ///
 /// 6 diapositivas interactivas con barra de progreso superior tipo Stories:
 /// - Toca a la derecha / izquierda para avanzar o retroceder.
@@ -143,7 +143,7 @@ class _InutilWrappedDialogState extends State<InutilWrappedDialog>
     final hoursText = s.totalHours >= 1
         ? '${s.totalHours.toStringAsFixed(1)} horas'
         : '${math.max(1, s.totalMinutes)} minutos';
-    final topArtist = s.topArtist?.name ?? 'Inútil Music';
+    final topArtist = s.topArtist?.name ?? 'Inutix Music';
     final topSong = s.topTrack != null
         ? '${s.topTrack!.title} — ${s.topTrack!.artist}'
         : 'Mi música favorita';
@@ -297,7 +297,7 @@ class _InutilWrappedDialogState extends State<InutilWrappedDialog>
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                'INÚTIL WRAPPED ${widget.summary.year}',
+                                'INUTIX WRAPPED ${widget.summary.year}',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 10.5,
@@ -884,7 +884,7 @@ class _InutilWrappedDialogState extends State<InutilWrappedDialog>
                   ],
                 ),
                 const SizedBox(height: 14),
-                _summaryRow('Artista #1', s.topArtist?.name ?? 'Inútil Music'),
+                _summaryRow('Artista #1', s.topArtist?.name ?? 'Inutix Music'),
                 const SizedBox(height: 10),
                 _summaryRow(
                   'Canción favorita',
@@ -899,7 +899,7 @@ class _InutilWrappedDialogState extends State<InutilWrappedDialog>
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'Gracias por ser parte de Inútil Music. ¡Vamos por un año todavía mejor lleno de música! 💛',
+                  'Gracias por ser parte de Inutix Music. ¡Vamos por un año todavía mejor lleno de música! 💛',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.78),
                     fontSize: 13,

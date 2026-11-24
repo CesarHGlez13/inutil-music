@@ -10,7 +10,7 @@ const liveOverlayHtml = r'''<!doctype html>
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Inútil Music LIVE</title>
+  <title>Inutix Music LIVE</title>
   <style>
     :root {
       color-scheme: dark;

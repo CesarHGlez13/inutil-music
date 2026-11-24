@@ -28,7 +28,7 @@ void main() {
       r'#define MyAppVersion "([0-9]+\.[0-9]+\.[0-9]+)"',
     ).firstMatch(windowsInstaller)?.group(1);
 
-    expect(pubspecVersion, '2.5.26+4284');
+    expect(pubspecVersion, '2.5.27+4285');
     expect(readmeVersion, pubspecVersion);
     expect(changelogVersion, pubspecVersion);
     expect(runtimeVersion, AppConstants.appVersion);
@@ -62,7 +62,7 @@ void main() {
     expect(AppConstants.supportDevelopmentUrl, isNot(contains('ko-fi')));
   });
 
-  test('brand strings point at Inútil Music, not the upstream project', () {
+  test('brand strings point at Inutix Music, not the upstream project', () {
     final constants = File(
       'lib/core/constants/app_constants.dart',
     ).readAsStringSync();
@@ -76,7 +76,7 @@ void main() {
       'android/app/src/main/res/values-en/widget_strings.xml',
     ).readAsStringSync();
 
-    expect(AppConstants.appName, 'Inútil Music');
+    expect(AppConstants.appName, 'Inutix Music');
     // Ninguna URL del repositorio, las descargas o el contacto debe apuntar ya
     // al proyecto original.
     for (final stale in <String>[
@@ -89,13 +89,13 @@ void main() {
     // El pie de Ajustes muestra unicamente la marca y soporte propios.
     expect(
       settingsPanel,
-      contains("'Inútil Music v\${AppConstants.appVersion} · '"),
+      contains("'Inutix Music v\${AppConstants.appVersion} · '"),
     );
     expect(settingsPanel, contains('AppConstants.supportEmail'));
     // El nombre del widget visible en el launcher debe ser el nuestro.
     for (final xml in <String>[widgetEs, widgetEn]) {
       expect(xml, isNot(contains('BStream Music')));
-      expect(xml, contains('Inútil Music'));
+      expect(xml, contains('Inutix Music'));
     }
     // Sin mojibake en las cadenas en español.
     expect(widgetEs, isNot(contains('canciÃ³n')));

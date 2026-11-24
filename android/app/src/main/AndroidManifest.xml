@@ -23,7 +23,7 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:label="Inútil Music"
+        android:label="Inutix Music"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -36,7 +36,7 @@
         <meta-data
             android:name="inutil_music.notification_icon"
             android:resource="@drawable/ic_stat_inutil_music" />
-        <!-- Declara Inútil Music como aplicación multimedia compatible con Android Auto. -->
+        <!-- Declara Inutix Music como aplicación multimedia compatible con Android Auto. -->
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
@@ -62,7 +62,7 @@
             android:exported="false" />
         <activity
             android:name=".MainActivity"
-            android:label="Inútil Music"
+            android:label="Inutix Music"
             android:exported="true"
             android:launchMode="singleTask"
             android:taskAffinity=""
@@ -193,7 +193,7 @@
         </provider>
         <service
             android:name="com.ryanheise.audioservice.AudioService"
-            android:label="Inútil Music"
+            android:label="Inutix Music"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true"
             tools:ignore="Instantiatable">

@@ -10,7 +10,7 @@ import 'firebase_sync_providers.dart';
 import 'inutil_inactivity_paused_screen.dart';
 import 'music_qr_login_panel.dart';
 
-/// Barrera de autenticación obligatoria (Gatekeeper) para INÚTIL MUSIC.
+/// Barrera de autenticación obligatoria (Gatekeeper) para INUTIX MUSIC.
 /// Bloquea el uso de la aplicación a usuarios no registrados o sin licencia activa
 /// y detiene inmediatamente cualquier reproducción activa si se cierra la sesión.
 class InutilAuthGate extends ConsumerStatefulWidget {
@@ -361,7 +361,7 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
                             ),
                             const SizedBox(height: 16),
                             const Text(
-                              'INÚTIL MUSIC',
+                              'INUTIX MUSIC',
                               style: TextStyle(
                                 fontSize: 26,
                                 fontWeight: FontWeight.w900,
@@ -662,7 +662,7 @@ class _InutilAuthScreenState extends ConsumerState<InutilAuthScreen> {
                                         : Text(
                                             _isRegister
                                                 ? 'Crear Cuenta y Empezar'
-                                                : 'Acceder a Inútil Music',
+                                                : 'Acceder a Inutix Music',
                                             style: const TextStyle(
                                               fontSize: 14.5,
                                               fontWeight: FontWeight.bold,
@@ -877,7 +877,7 @@ class _InutilLicenseExpiredScreenState
     } else {
       title = 'LICENCIA VENCIDA';
       message =
-          'Tu periodo de vigencia en Inútil Music ha caducado. Es necesario '
+          'Tu periodo de vigencia en Inutix Music ha caducado. Es necesario '
           'que el Administrador renueve tu licencia para continuar escuchando '
           'música.';
     }

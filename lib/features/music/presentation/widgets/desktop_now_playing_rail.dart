@@ -23,7 +23,7 @@ import 'spotify_canvas_video.dart';
 ///
 /// Muestra el vídeo vertical Spotify Canvas 9:16 (o portada animada con
 /// iluminación ambiental) mientras el usuario navega por Inicio, Búsqueda o
-/// Biblioteca, junto con la tarjeta activa de Inútil Connect y las siguientes
+/// Biblioteca, junto con la tarjeta activa de Inutix Connect y las siguientes
 /// canciones en la cola.
 class DesktopNowPlayingRail extends ConsumerWidget {
   const DesktopNowPlayingRail({
@@ -104,7 +104,7 @@ class DesktopNowPlayingRail extends ConsumerWidget {
               : 'Controlando a distancia · nube')
         : (hasLanPeer
               ? 'Sonando en este equipo · $lanPeerCount en red local'
-              : 'Sonando en este equipo · Inútil Connect');
+              : 'Sonando en este equipo · Inutix Connect');
 
     final upcomingEntries = <({int index, PlaybackQueueEntry entry})>[];
     if (queue.entries.isNotEmpty) {
@@ -134,7 +134,7 @@ class DesktopNowPlayingRail extends ConsumerWidget {
           entry: PlaybackQueueEntry(
             id: (raw['id'] ?? '').toString(),
             title: (raw['title'] ?? 'Canción').toString(),
-            artist: (raw['artist'] ?? 'Inútil Music').toString(),
+            artist: (raw['artist'] ?? 'Inutix Music').toString(),
             album: raw['album']?.toString(),
             thumbnailUrl: raw['thumbnailUrl']?.toString(),
             isRemote: true,
@@ -349,7 +349,7 @@ class DesktopNowPlayingRail extends ConsumerWidget {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    snapshot.artist ?? 'Inútil Music',
+                                    snapshot.artist ?? 'Inutix Music',
                                     key: const ValueKey(
                                       'desktop-now-playing-artist',
                                     ),
@@ -388,7 +388,7 @@ class DesktopNowPlayingRail extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  // Tarjeta Inútil Connect (Spotify Connect Parity)
+                  // Tarjeta Inutix Connect (Spotify Connect Parity)
                   InkWell(
                     key: const ValueKey('desktop-now-playing-connect-card'),
                     borderRadius: BorderRadius.circular(16),

@@ -286,7 +286,7 @@ class MusicQrPairingService {
   Future<String?> approveFromQr(String raw) async {
     final parsed = parseQrUri(raw);
     if (parsed == null) {
-      return 'Este QR no es de Inútil Music. Escanea el código que muestra tu PC.';
+      return 'Este QR no es de Inutix Music. Escanea el código que muestra tu PC.';
     }
     return _approve(parsed.code, parsed.secretKey, mode: 'qr');
   }

@@ -101,7 +101,7 @@ void main() {
     expect(find.text('Inicio'), findsWidgets);
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('home-tab-title'))).data,
-      'Inútil Music',
+      'Inutix Music',
     );
     // Desde `9c38523` (v2.2.0+220, "Inútil Signature UI: iconos vectoriales
     // propios") el shell ya no pinta `Icons.search_rounded`: la barra
@@ -418,7 +418,7 @@ void main() {
 
     expect(
       tester.widget<Text>(find.byKey(const ValueKey('home-tab-title'))).data,
-      'Inútil Music',
+      'Inutix Music',
     );
     expect(find.text('Inicio'), findsWidgets);
     await _drainDeferredHomeRefresh(tester);
@@ -8414,7 +8414,7 @@ void main() {
       find.text(
         // Texto real de `AppStrings.updateAvailableMessage`
         // (`app_strings.dart:1649`) con la `latestVersion` inyectada arriba.
-        'Inútil Music 9.9.9 está disponible. Versión actual: ${AppConstants.appVersion}.',
+        'Inutix Music 9.9.9 está disponible. Versión actual: ${AppConstants.appVersion}.',
       ),
       findsOneWidget,
     );

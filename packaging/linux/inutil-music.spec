@@ -7,7 +7,7 @@ Release:        1
 Summary:        Reproductor y gestor musical multiplataforma
 License:        Proprietary
 URL:            https://github.com/CesarHGlez13/inutil-music
-Vendor:         Inútil Music
+Vendor:         Inutix Music
 BuildArch:      x86_64
 AutoReqProv:    no
 
@@ -19,7 +19,7 @@ Requires:       glibc
 Requires:       libstdc++
 
 %description
-Inútil Music permite buscar, reproducir, descargar y organizar musica,
+Inutix Music permite buscar, reproducir, descargar y organizar musica,
 playlists y favoritos desde una interfaz construida con Flutter.
 
 %install

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Inútil Music
+Name=Inutix Music
 Comment=Reproductor y gestor musical
 Exec=inutil-music %u
 Icon=com.inutilmusic.app

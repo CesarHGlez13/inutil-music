@@ -550,7 +550,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Future<void> _checkForAppUpdateAtStartup() async {
-    // Inútil Music uses independent release channels.
+    // Inutix Music uses independent release channels.
     return;
   }
 
@@ -1181,7 +1181,7 @@ class _HomePageState extends ConsumerState<HomePage>
     _promoPopupTimer = Timer(const Duration(seconds: 22), () async {
       if (!mounted || !_appForeground || !_rootRouteVisible) return;
       // 1. En temporada de fin de año (1 dic – 15 ene o campaña remota),
-      //    prioriza la experiencia animada «Inútil Wrapped».
+      //    prioriza la experiencia animada «Inutix Wrapped».
       final wrappedYear = await InutilWrappedService.instance
           .evaluateAutoWrappedYear();
       if (!mounted || !_appForeground || !_rootRouteVisible) return;

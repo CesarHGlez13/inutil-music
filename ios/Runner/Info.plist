@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Inútil Music</string>
+	<string>Inutix Music</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -15,7 +15,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>Inutil Music</string>
+	<string>Inutix Music</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleURLTypes</key>
@@ -55,13 +55,13 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>Inútil Music necesita acceso para mostrar y reproducir la música guardada en tu dispositivo.</string>
+	<string>Inutix Music necesita acceso para mostrar y reproducir la música guardada en tu dispositivo.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Inútil Music usa la cámara para escanear el código QR de inicio de sesión en tu PC.</string>
+	<string>Inutix Music usa la cámara para escanear el código QR de inicio de sesión en tu PC.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Inútil Music necesita acceso a tus fotos para elegir un fondo personalizado.</string>
+	<string>Inutix Music necesita acceso a tus fotos para elegir un fondo personalizado.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Inútil Music usa tu red local para encontrar dispositivos compatibles y transmitir tu música cuando eliges Transmitir a.</string>
+	<string>Inutix Music usa tu red local para encontrar dispositivos compatibles y transmitir tu música cuando eliges Transmitir a.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_googlecast._tcp</string>

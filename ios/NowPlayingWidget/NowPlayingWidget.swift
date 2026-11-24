@@ -208,7 +208,7 @@ private struct NowPlayingWidgetView: View {
       HStack(spacing: 12) {
         artwork.frame(width: 92, height: 92)
         VStack(alignment: .leading, spacing: 4) {
-          Text("Inútil Music")
+          Text("Inutix Music")
             .font(.system(size: 13)).lineLimit(1)
             .foregroundColor(.white.opacity(0.7))
           Text(entry.title)
@@ -286,7 +286,7 @@ struct InutilNowPlayingWidget: Widget {
     StaticConfiguration(kind: widgetKind, provider: NowPlayingProvider()) { entry in
       NowPlayingWidgetView(entry: entry)
     }
-    .configurationDisplayName("Inútil Music")
+    .configurationDisplayName("Inutix Music")
     .description("Tu canción actual con portada y controles.")
     .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
   }

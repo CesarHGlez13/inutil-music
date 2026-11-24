@@ -1,4 +1,4 @@
-/// Selector de tier de datos para INÚTIL MUSIC.
+/// Selector de tier de datos para INUTIX MUSIC.
 ///
 /// Tres tiers, en este orden estricto:
 ///

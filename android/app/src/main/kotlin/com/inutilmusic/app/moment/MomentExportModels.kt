@@ -65,8 +65,8 @@ data class MomentExportRequest(
                 "moment-${System.currentTimeMillis()}"
             }
             val mode = MomentMode.parse(map["mode"] as? String)
-            val title = (map["title"] as? String)?.trim().orEmpty().ifEmpty { "Inútil Music" }
-            val artist = (map["artist"] as? String)?.trim().orEmpty().ifEmpty { "Inútil Music" }
+            val title = (map["title"] as? String)?.trim().orEmpty().ifEmpty { "Inutix Music" }
+            val artist = (map["artist"] as? String)?.trim().orEmpty().ifEmpty { "Inutix Music" }
             val album = (map["album"] as? String)?.trim()?.takeIf { it.isNotEmpty() }
             val audioUri = (map["audioUri"] as? String)?.trim().orEmpty()
             require(audioUri.isNotEmpty()) { "audioUri is required" }

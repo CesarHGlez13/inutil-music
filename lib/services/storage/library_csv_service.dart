@@ -251,7 +251,7 @@ class LibraryCsvDocument {
     return LibraryCsvDocument(
       tracks: List.unmodifiable(exported.values),
       detectedFormat: LibraryCsvDetectedFormat.inutil,
-      defaultPlaylistName: 'Inútil Music',
+      defaultPlaylistName: 'Inutix Music',
       hasPlaylistColumn: true,
     );
   }

@@ -1,7 +1,7 @@
 class AppConstants {
   const AppConstants._();
 
-  static const appName = 'Inútil Music';
+  static const appName = 'Inutix Music';
 
   /// Fuente única del número de versión mostrado en Ajustes y usado por el
   /// chequeo de actualizaciones OTA. Debe coincidir con la parte de versión de
@@ -9,7 +9,7 @@ class AppConstants {
   /// interno (`+4278`) es el `versionCode` base de Android — Flutter le suma
   /// 2000 al dividir por ABI, medido con `aapt`: `+4268` produce 6268 en el
   /// APK `arm64-v8a` — y no se muestra en la interfaz.
-  static const appVersion = '2.5.26';
+  static const appVersion = '2.5.27';
   static const databaseName = 'inutil_music.db';
   static const databaseVersion = 12;
   static const fileExportChannel = 'inutil_music/file_export';
@@ -28,9 +28,9 @@ class AppConstants {
   /// ese esquema en Android, Linux y Windows.
   static const supportDevelopmentUrl =
       'mailto:cesarmaster133@gmail.com'
-      '?subject=In%C3%BAtil%20Music%20-%20apoyo%20al%20desarrollo';
+      '?subject=Inutix%20Music%20-%20apoyo%20al%20desarrollo';
 
-  /// Repositorio propio de Inútil Music (artefactos publicados y notas de
+  /// Repositorio propio de Inutix Music (artefactos publicados y notas de
   /// versión). Es la fuente del manifiesto OTA `release.json`; ver §10 del
   /// informe y `docs/RELEASES.md`.
   static const githubRepositoryUrl =

@@ -27,7 +27,7 @@ class InutilArtworkCacheManager extends CacheManager {
       InutilArtworkCacheManager._();
 }
 
-/// An [ImageProvider] backed by Inútil Music's persistent artwork cache.
+/// An [ImageProvider] backed by Inutix Music's persistent artwork cache.
 @immutable
 class CachedArtworkImageProvider
     extends ImageProvider<CachedArtworkImageProvider> {

@@ -362,7 +362,7 @@ class _CsvImportProgressDialogState
 
 String _csvDetectedFormatLabel(LibraryCsvDetectedFormat format) =>
     switch (format) {
-      LibraryCsvDetectedFormat.inutil => 'Inútil Music',
+      LibraryCsvDetectedFormat.inutil => 'Inutix Music',
       LibraryCsvDetectedFormat.metroList => 'MetroList',
       LibraryCsvDetectedFormat.harmony => 'Harmony / RiMusic',
       LibraryCsvDetectedFormat.exportify => 'Exportify',

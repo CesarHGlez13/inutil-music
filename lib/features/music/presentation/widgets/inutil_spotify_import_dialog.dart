@@ -17,7 +17,7 @@ import 'library_csv_import_dialog.dart';
 const Color _spotifyNeonGreen = Color(0xFF1DB954);
 
 /// Muestra el diálogo modal ultra-premium de importación de playlists de Spotify,
-/// archivos CSV (Exportify / Soundiiz) y listas en texto libre para Inútil Music.
+/// archivos CSV (Exportify / Soundiiz) y listas en texto libre para Inutix Music.
 Future<void> showInutilSpotifyImportDialog(
   BuildContext context,
   WidgetRef ref,
@@ -822,7 +822,7 @@ class _InutilSpotifyImportModalState
               const SizedBox(height: 6),
               const Text(
                 'Pega el enlace de cualquier playlist o álbum público de Spotify. '
-                'Inútil Music extraerá las canciones y las vinculará automáticamente con el motor de audio de alta fidelidad.',
+                'Inutix Music extraerá las canciones y las vinculará automáticamente con el motor de audio de alta fidelidad.',
                 style: TextStyle(
                   color: InutilDesignSystem.textSecondary,
                   fontSize: 12.5,
@@ -1006,7 +1006,7 @@ class _InutilSpotifyImportModalState
                         fontWeight: FontWeight.w700,
                       ),
                       decoration: InputDecoration(
-                        labelText: 'Nombre de la playlist en Inútil Music',
+                        labelText: 'Nombre de la playlist en Inutix Music',
                         labelStyle: const TextStyle(
                           color: InutilDesignSystem.textSecondary,
                           fontSize: 12,
@@ -1196,7 +1196,7 @@ class _InutilSpotifyImportModalState
                     ),
                     SizedBox(height: 3),
                     Text(
-                      'Compatible con Exportify, Soundiiz, TuneMyMusic y respaldos de Inútil Music',
+                      'Compatible con Exportify, Soundiiz, TuneMyMusic y respaldos de Inutix Music',
                       style: TextStyle(
                         color: InutilDesignSystem.textSecondary,
                         fontSize: 12.5,
@@ -1229,7 +1229,7 @@ class _InutilSpotifyImportModalState
                 InutilDesignSystem.accentCyan,
               ),
               _buildFormatBadge(
-                'Inútil Music Backup',
+                'Inutix Music Backup',
                 InutilDesignSystem.primaryNeon,
               ),
               _buildFormatBadge(

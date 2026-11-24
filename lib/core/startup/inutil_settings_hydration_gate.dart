@@ -14,7 +14,7 @@ import '../../features/music/presentation/widgets/home_loading_content.dart';
 /// encuentra en `AsyncLoading` y los fallbacks de `home_page.dart`
 /// (`?? defaultPlayerStyle`, artwork `classic`, `spotifyCanvasEnabled ??
 /// false`, `appleAnimatedArtworkEnabled ?? false`) pintan el reproductor
-/// "Inútil Music clásico" aunque el usuario haya elegido Spotify/Apple o
+/// "Inutix Music clásico" aunque el usuario haya elegido Spotify/Apple o
 /// activado el Canvas. Ver ese default y luego el valor guardado es el salto
 /// de "primero sale la interfaz vieja y luego la correcta" que se ve a
 /// simple vista, y como `player_panel.dart` elige el layout con `KeyedSubtree`
@@ -77,7 +77,7 @@ class _InutilSettingsHydrationGateState
           physics: const NeverScrollableScrollPhysics(),
           child: HomeLoadingContent(
             key: const ValueKey('settings-hydration-skeleton'),
-            label: 'Cargando Inútil Music',
+            label: 'Cargando Inutix Music',
           ),
         ),
       ),

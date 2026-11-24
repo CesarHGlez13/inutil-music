@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.27+4285 — 2026-11-24
+
+### Branding — Nueva identidad oficial: Inutix Music
+
+- **Cambio de nombre oficial a Inutix Music (alineado con `inutix.com`).**
+  Actualizada toda la marca visible en Android, Linux, Windows, macOS e iOS: icono del launcher, barra superior de Inicio, mini reproductor, Ajustes, onboarding, **Inutix Connect**, **Inutix Wrapped**, widgets de pantalla de inicio, diálogos OTA, tarjetas de letras y la marca de agua translúcida de *Compartir momento*.
+- **Compatibilidad 100 % preservada en actualización OTA.**
+  Se conservan intactos el identificador de paquete (`com.inutilmusic.app`), la base de datos local (`inutil_music.db`), las carpetas de descargas y la sesión activa para actualizar encima sin perder favoritos, playlists ni recuerdos.
+
 ## 2.5.26+4284 — 2026-11-24
 
 ### Infrastructure — Migración completa a infraestructura propia `inutix.com` con failover automático

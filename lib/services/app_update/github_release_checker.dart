@@ -71,7 +71,7 @@ class GitHubReleaseChecker {
   static const Map<String, Object?> _builtinRelease = <String, Object?>{
     'tag_name': '2.0.0',
     'body':
-        '• Motor Inútil Music 2.0.0 Cinema Edition.\n'
+        '• Motor Inutix Music 2.0.0 Cinema Edition.\n'
         '• Importador directo de Playlists desde Spotify, CSV y Texto.\n'
         '• Letras sincronizadas multi-proveedor (LRCLIB + YouLyPlus + BetterLyrics).\n'
         '• Sincronización LAN con la PC e In-App OTA Updates.',

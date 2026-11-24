@@ -76,7 +76,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           );
     final artistLabel = (snapshot.artist ?? '').trim().isNotEmpty
         ? snapshot.artist!.trim()
-        : 'Inútil Music';
+        : 'Inutix Music';
 
     final disableAnimations = MediaQuery.disableAnimationsOf(context);
     final backdropFadeDuration = disableAnimations

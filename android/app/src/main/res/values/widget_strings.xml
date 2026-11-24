@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="widget_player_name">Inútil Music</string>
-    <string name="widget_description">Inútil Music: canción actual y controles</string>
+    <string name="widget_player_name">Inutix Music</string>
+    <string name="widget_description">Inutix Music: canción actual y controles</string>
     <string name="widget_artwork_description">Portada de la canción</string>
     <string name="widget_previous">Anterior</string>
     <string name="widget_play_pause">Reproducir o pausar</string>

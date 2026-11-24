@@ -116,7 +116,7 @@ class OtaPlaybackSnapshot {
 ///
 /// Se guarda en `SharedPreferences` (no en la base de datos) porque debe
 /// sobrevivir al reemplazo del paquete: cuando Android mata el proceso de
-/// Inútil Music para instalar el APK nuevo, la única forma de saber qué se
+/// Inutix Music para instalar el APK nuevo, la única forma de saber qué se
 /// estaba escuchando es un archivo clave-valor que la nueva versión lee en el
 /// arranque.
 class OtaPlaybackResumeStore {

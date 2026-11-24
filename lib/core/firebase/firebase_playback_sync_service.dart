@@ -1799,7 +1799,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         paired.isCloudOnly &&
         !_cloudDevices.containsKey(paired.deviceId)) {
       debugPrint(
-        'Inútil Connect: ${paired.deviceName} dejó de escribir su '
+        'Inutix Connect: ${paired.deviceName} dejó de escribir su '
         'presencia en la nube.',
       );
       _autoPairedPeer = null;
@@ -2128,7 +2128,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
         debugPrint(
-          'Inútil Connect: no se pudo publicar la presencia ($error). '
+          'Inutix Connect: no se pudo publicar la presencia ($error). '
           'Reintentando en $capped s.',
         );
       }
@@ -2191,7 +2191,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
         debugPrint(
-          'Inútil Connect: no se pudo leer la lista de dispositivos '
+          'Inutix Connect: no se pudo leer la lista de dispositivos '
           '($error). Reintentando en $capped s.',
         );
       }
@@ -2210,7 +2210,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (candidate == null) return;
     _autoPairedPeer = candidate;
     debugPrint(
-      'Inútil Connect: vinculado con ${candidate.deviceName} '
+      'Inutix Connect: vinculado con ${candidate.deviceName} '
       '${candidate.isCloudOnly ? '(vía nube)' : '(red local)'}.',
     );
     notifyListeners();
@@ -2261,7 +2261,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       final capped = _noteCloudUnavailable();
       if (_cloudPollFailures == 1) {
         debugPrint(
-          'Inútil Connect: no se pudo leer la cola de comandos '
+          'Inutix Connect: no se pudo leer la cola de comandos '
           '($error). Reintentando en $capped s.',
         );
       }
@@ -2381,7 +2381,7 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } on FirestoreOperationException catch (error) {
       _noteCloudUnavailable();
       debugPrint(
-        'Inútil Connect: comando $commandType no llegó a la nube '
+        'Inutix Connect: comando $commandType no llegó a la nube '
         '($error).',
       );
       return null;

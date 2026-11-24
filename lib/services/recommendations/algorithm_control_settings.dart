@@ -22,7 +22,7 @@ enum AlgorithmWeightSlot { known, discovery, forgotten, wildcard }
 
 const supportedAntiRepetitionDays = <int>[0, 1, 3, 7, 14];
 
-/// User-configurable rules that govern Inútil Music's recommendation engine,
+/// User-configurable rules that govern Inutix Music's recommendation engine,
 /// nostalgia discovery, anti-repetition window, and automatic radio queue.
 @immutable
 class AlgorithmControlSettings {

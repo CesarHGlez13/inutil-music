@@ -433,7 +433,7 @@ class AndroidAutoMediaBrowser {
               (track) => DesktopMediaBrowseItem(
                 id: '$_searchPrefix${Uri.encodeComponent(track.id)}',
                 title: track.title,
-                subtitle: track.artist.isEmpty ? 'Inútil Music' : track.artist,
+                subtitle: track.artist.isEmpty ? 'Inutix Music' : track.artist,
                 album: track.album,
                 thumbnailUrl: _highResArtwork(track.thumbnailUrl),
                 duration: track.duration,
@@ -484,7 +484,7 @@ class AndroidAutoMediaBrowser {
     }
   }
 
-  /// Spotify-style personalized Inicio tab matching Inútil Music mobile:
+  /// Spotify-style personalized Inicio tab matching Inutix Music mobile:
   /// live recommendation sections (*Seguir escuchando*, *Porque escuchaste...*,
   /// *Nuevos para ti*, *Descubrimiento*, *Melodías relajantes / Mixes*,
   /// *Artistas recomendados*) plus *Tus playlists*, with automatic offline
@@ -537,7 +537,7 @@ class AndroidAutoMediaBrowser {
               DesktopMediaBrowseItem(
                 id: '$_recTrackPrefix${Uri.encodeComponent(sectionKey)}|${Uri.encodeComponent(track.id)}',
                 title: track.title,
-                subtitle: track.artist.isEmpty ? 'Inútil Music' : track.artist,
+                subtitle: track.artist.isEmpty ? 'Inutix Music' : track.artist,
                 album: track.album,
                 thumbnailUrl: _highResArtwork(track.thumbnailUrl),
                 duration: track.duration,
@@ -740,7 +740,7 @@ class AndroidAutoMediaBrowser {
           (track) => DesktopMediaBrowseItem(
             id: '$_recCollectionTrackPrefix$encodedBrowseId|${Uri.encodeComponent(track.id)}',
             title: track.title,
-            subtitle: track.artist.isEmpty ? 'Inútil Music' : track.artist,
+            subtitle: track.artist.isEmpty ? 'Inutix Music' : track.artist,
             album: track.album,
             thumbnailUrl: _highResArtwork(track.thumbnailUrl),
             duration: track.duration,
@@ -866,14 +866,14 @@ class AndroidAutoMediaBrowser {
         .map((item) {
           final local = item.localTrack;
           final remote = item.remoteTrack;
-          final title = local?.title ?? remote?.title ?? 'Inútil Music';
+          final title = local?.title ?? remote?.title ?? 'Inutix Music';
           final artist = local?.artist ?? remote?.artist ?? '';
           final album = local?.album ?? remote?.album;
           final duration = local?.duration ?? remote?.duration;
           return DesktopMediaBrowseItem(
             id: '$_playlistItemPrefix$encodedPlaylistId|${Uri.encodeComponent(item.entryId)}',
             title: title,
-            subtitle: artist.isEmpty ? 'Inútil Music' : artist,
+            subtitle: artist.isEmpty ? 'Inutix Music' : artist,
             album: album,
             thumbnailUrl: _bestItemArtwork(item),
             duration: duration,
@@ -909,7 +909,7 @@ class AndroidAutoMediaBrowser {
   }) => DesktopMediaBrowseItem(
     id: '$_historyPrefix${Uri.encodeComponent(track.id)}',
     title: track.title,
-    subtitle: track.artist.isEmpty ? 'Inútil Music' : track.artist,
+    subtitle: track.artist.isEmpty ? 'Inutix Music' : track.artist,
     album: track.album,
     thumbnailUrl: _highResArtwork(
       track.thumbnailUrl ?? track.catalogThumbnailUrl ?? track.thumbnailPath,
@@ -927,7 +927,7 @@ class AndroidAutoMediaBrowser {
   }) => DesktopMediaBrowseItem(
     id: '$_localPrefix${Uri.encodeComponent(track.id)}',
     title: track.title,
-    subtitle: track.artist.isEmpty ? 'Inútil Music' : track.artist,
+    subtitle: track.artist.isEmpty ? 'Inutix Music' : track.artist,
     album: track.album,
     thumbnailUrl: _highResArtwork(
       track.thumbnailUrl ?? track.catalogThumbnailUrl ?? track.thumbnailPath,

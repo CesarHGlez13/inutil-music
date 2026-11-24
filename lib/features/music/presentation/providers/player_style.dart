@@ -23,5 +23,5 @@ enum PlayerStyle {
 }
 
 // Missing values belong to installations created before player styles were
-// configurable, so they must retain Inútil Music's original player.
+// configurable, so they must retain Inutix Music's original player.
 const defaultPlayerStyle = PlayerStyle.inutilMusic;

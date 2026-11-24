@@ -68,7 +68,7 @@ class ListeningRoomTrack {
     return ListeningRoomTrack(
       trackId: id,
       title: title,
-      artist: (map['artist'] ?? 'Inútil Music').toString().trim(),
+      artist: (map['artist'] ?? 'Inutix Music').toString().trim(),
       album: map['album']?.toString(),
       thumbnailUrl: map['thumbnailUrl']?.toString(),
       durationMs: (map['durationMs'] as num?)?.toInt() ?? 0,
@@ -355,7 +355,7 @@ class ListeningRoomState {
     if (code.isEmpty || hostUid.isEmpty) return null;
     return ListeningRoomState(
       code: code,
-      name: (json['name'] ?? 'Sala de Inútil Music').toString(),
+      name: (json['name'] ?? 'Sala de Inutix Music').toString(),
       hostUid: hostUid,
       hostName: (json['hostName'] ?? 'Anfitrión').toString(),
       allowGuestQueue: json['allowGuestQueue'] != false,

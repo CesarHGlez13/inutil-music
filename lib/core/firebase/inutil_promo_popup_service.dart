@@ -105,7 +105,7 @@ class InutilPromoPopupService {
       emoji: '🍜',
       headline: 'Patrocina una Maruchan de lujo para el dev',
       body:
-          'Con lo que cuesta un refresco ayudas a que Inútil Music siga creciendo '
+          'Con lo que cuesta un refresco ayudas a que Inutix Music siga creciendo '
           'con mejor diseño, letras y audio fluido cada semana. Cero suscripciones '
           'obligatorias, puro cariño.',
       primaryCta: 'Aportar mi granito ✨',
@@ -120,7 +120,7 @@ class InutilPromoPopupService {
       headline: 'Plot twist: tu app favorita la hace un humano real',
       body:
           'Sin corporaciones gigantes ni inversionistas detrás: solo madrugadas '
-          'afinando cada detalle para ti. Si Inútil Music ya te salvó el viaje o el '
+          'afinando cada detalle para ti. Si Inutix Music ya te salvó el viaje o el '
           'entreno, considera apoyar su desarrollo.',
       primaryCta: 'Apoyar al creador 💛',
       secondaryCta: 'Seguir escuchando',
@@ -175,7 +175,7 @@ class InutilPromoPopupService {
       emoji: '🌙',
       headline: 'Cada función nueva cuesta 2 tazas de café y 1 siesta',
       body:
-          'Si Inútil Music ya reemplazó a tu app de música de siempre, un pequeño '
+          'Si Inutix Music ya reemplazó a tu app de música de siempre, un pequeño '
           'donativo hace una diferencia enorme para mantenerla libre, rápida y '
           'siempre actualizada.',
       primaryCta: 'Quiero apoyar 💛',
@@ -267,7 +267,7 @@ class InutilPromoPopupService {
             ? readStr('badge')
             : kind == InutilPopupKind.ad
             ? 'PATROCINADO'
-            : 'AVISO DE INÚTIL MUSIC',
+            : 'AVISO DE INUTIX MUSIC',
         emoji: readStr('emoji').isNotEmpty ? readStr('emoji') : '✨',
         headline: headline,
         body: body,
@@ -283,8 +283,8 @@ class InutilPromoPopupService {
         footnote: readStr('footnote').isNotEmpty
             ? readStr('footnote')
             : kind == InutilPopupKind.ad
-            ? 'Anuncio · Ayuda a mantener Inútil Music gratis'
-            : 'Inútil Music · Gracias por ser parte',
+            ? 'Anuncio · Ayuda a mantener Inutix Music gratis'
+            : 'Inutix Music · Gracias por ser parte',
       );
     } catch (_) {
       return null;

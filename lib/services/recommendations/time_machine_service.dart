@@ -163,8 +163,8 @@ class TimeMachineAnalyzer {
       return TimeMachineSnapshot(
         onThisDateTitle: spanish ? 'Hace un año' : 'One year ago',
         onThisDateSubtitle: spanish
-            ? 'Escucha música en Inútil Music para empezar a construir tu cápsula temporal.'
-            : 'Listen to music in Inútil Music to start building your time capsule.',
+            ? 'Escucha música en Inutix Music para empezar a construir tu cápsula temporal.'
+            : 'Listen to music in Inutix Music to start building your time capsule.',
         onThisDateTracks: const <TimeMachineTrack>[],
         forgottenFavorites: const <TimeMachineTrack>[],
         monthlyCapsules: const <TimeMachineMonthCapsule>[],
@@ -316,8 +316,8 @@ class TimeMachineAnalyzer {
           ? 'Tu primer recuerdo · ${earliest.label(spanish: true)}'
           : 'Your earliest capsule · ${earliest.label(spanish: false)}';
       onThisDateSubtitle = spanish
-          ? 'Así sonaban tus primeros días registrados en Inútil Music.'
-          : 'Here is how your earliest recorded days sounded in Inútil Music.';
+          ? 'Así sonaban tus primeros días registrados en Inutix Music.'
+          : 'Here is how your earliest recorded days sounded in Inutix Music.';
     } else {
       final only = monthlyCapsules.first;
       onThisDateTracks = only.tracks;
@@ -355,7 +355,7 @@ class _TrackAccumulator {
       title = event.title,
       artist = event.artists.isNotEmpty
           ? event.artists.join(', ')
-          : 'Inútil Music',
+          : 'Inutix Music',
       album = event.album,
       thumbnailUrl = event.thumbnailUrl,
       durationMs = event.durationMs,

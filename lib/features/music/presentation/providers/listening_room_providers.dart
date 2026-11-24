@@ -84,7 +84,7 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
       title: (snap.title ?? '').trim().isNotEmpty ? snap.title!.trim() : 'Canción',
       artist: (snap.artist ?? '').trim().isNotEmpty
           ? snap.artist!.trim()
-          : 'Inútil Music',
+          : 'Inutix Music',
       album: snap.album,
       thumbnailUrl: snap.thumbnailUrl,
       durationMs: snap.duration?.inMilliseconds ?? 0,

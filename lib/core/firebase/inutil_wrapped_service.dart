@@ -42,7 +42,7 @@ class WrappedTrackStat {
       WrappedTrackStat(
         id: (json['id'] ?? '').toString(),
         title: (json['title'] ?? 'Canción').toString(),
-        artist: (json['artist'] ?? 'Inútil Music').toString(),
+        artist: (json['artist'] ?? 'Inutix Music').toString(),
         thumbnailUrl: json['thumbnailUrl']?.toString(),
         plays: (json['plays'] as num?)?.toInt() ?? 0,
         seconds: (json['seconds'] as num?)?.toInt() ?? 0,
@@ -184,7 +184,7 @@ class InutilWrappedSummary {
   }
 }
 
-/// Motor de estadísticas anuales («Inútil Wrapped») con respaldo automático en
+/// Motor de estadísticas anuales («Inutix Wrapped») con respaldo automático en
 /// Firestore (`users/{uid}/data/wrapped_<year>`).
 ///
 /// Acumula en memoria durante la reproducción (cero I/O en el hilo de audio) y
@@ -239,7 +239,7 @@ class InutilWrappedService {
           : 'Canción';
       _activeArtist = (artist ?? '').trim().isNotEmpty
           ? artist!.trim()
-          : 'Inútil Music';
+          : 'Inutix Music';
       _activeThumb = thumbnailUrl;
       _activePositionMs = positionMs;
       _activeAccumulatedSec = 0;
@@ -341,7 +341,7 @@ class InutilWrappedService {
 
   String _primaryArtistName(String raw) {
     final cleaned = raw.trim();
-    if (cleaned.isEmpty) return 'Inútil Music';
+    if (cleaned.isEmpty) return 'Inutix Music';
     final split = cleaned.split(
       RegExp(r'\s*(?:,|&|feat\.|ft\.|x|•)\s*', caseSensitive: false),
     );

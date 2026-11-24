@@ -240,8 +240,8 @@ class _TimeMachineSheetState extends ConsumerState<TimeMachineSheet>
                               const SizedBox(height: 6),
                               Text(
                                 spanish
-                                    ? 'Reproduce canciones en Inútil Music y aquí aparecerán tus sesiones pasadas y temas olvidados.'
-                                    : 'Play songs in Inútil Music and your past sessions & forgotten favorites will appear here.',
+                                    ? 'Reproduce canciones en Inutix Music y aquí aparecerán tus sesiones pasadas y temas olvidados.'
+                                    : 'Play songs in Inutix Music and your past sessions & forgotten favorites will appear here.',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: colors.onSurfaceVariant,
                                 ),

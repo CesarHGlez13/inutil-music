@@ -145,7 +145,7 @@ class InutilConnectSheet extends ConsumerWidget {
             : 'Canción activa',
         artist: remoteSession.artist.isNotEmpty
             ? remoteSession.artist
-            : 'Inútil Music',
+            : 'Inutix Music',
         album: remoteSession.album.isEmpty ? null : remoteSession.album,
         thumbnailUrl: remoteSession.thumbnailUrl.isEmpty
             ? null
@@ -167,7 +167,7 @@ class InutilConnectSheet extends ConsumerWidget {
           TrackInfo(
             id: id,
             title: (raw['title'] ?? 'Canción').toString(),
-            artist: (raw['artist'] ?? 'Inútil Music').toString(),
+            artist: (raw['artist'] ?? 'Inutix Music').toString(),
             album: (raw['album'] as String?)?.isNotEmpty == true
                 ? raw['album'] as String
                 : null,
@@ -234,7 +234,7 @@ class InutilConnectSheet extends ConsumerWidget {
           currentSnap?.artist ??
           (remoteSession?.artist.isNotEmpty == true
               ? remoteSession!.artist
-              : 'Inútil Music');
+              : 'Inutix Music');
       final album = currentSnap?.album ?? remoteSession?.album;
       final thumb = currentSnap?.thumbnailUrl ?? remoteSession?.thumbnailUrl;
       final posMs = isLocalActive
@@ -570,7 +570,7 @@ class InutilConnectSheet extends ConsumerWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              'Abre Inútil Music en cualquier equipo con tu misma cuenta: se vinculan solos, estén en la misma red o a distancia.',
+                              'Abre Inutix Music en cualquier equipo con tu misma cuenta: se vinculan solos, estén en la misma red o a distancia.',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: colors.onSurfaceVariant,
                               ),

@@ -1,4 +1,4 @@
-/// Configuración cliente de Firebase para INÚTIL MUSIC.
+/// Configuración cliente de Firebase para INUTIX MUSIC.
 ///
 /// Solo contiene identificadores públicos (projectId, apiKey, appId...). Ninguno
 /// de estos valores es secreto: la seguridad real la imponen las reglas de
@@ -19,7 +19,7 @@ import 'relay_tier_selector.dart';
 class FirebaseConfig {
   const FirebaseConfig._();
 
-  // Proyecto dedicado de Inútil Music (cuenta humbertoglez96@gmail.com).
+  // Proyecto dedicado de Inutix Music (cuenta humbertoglez96@gmail.com).
   static const String projectId = String.fromEnvironment(
     'FB_PROJECT_ID',
     defaultValue: 'inutil-music-app',

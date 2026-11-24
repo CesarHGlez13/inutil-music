@@ -102,7 +102,7 @@ class EchoMemoryController extends AsyncNotifier<List<EchoMemory>> {
       ),
       trackTitle: trackTitle.trim().isEmpty ? 'Canción' : trackTitle.trim(),
       trackArtist: trackArtist.trim().isEmpty
-          ? 'Inútil Music'
+          ? 'Inutix Music'
           : trackArtist.trim(),
       trackThumbnailUrl: trackThumbnailUrl?.trim().isNotEmpty == true
           ? trackThumbnailUrl!.trim()

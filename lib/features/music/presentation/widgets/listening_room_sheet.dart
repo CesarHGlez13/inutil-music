@@ -83,7 +83,7 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
       title: (snap.title ?? '').trim().isNotEmpty ? snap.title!.trim() : 'Canción',
       artist: (snap.artist ?? '').trim().isNotEmpty
           ? snap.artist!.trim()
-          : 'Inútil Music',
+          : 'Inutix Music',
       album: snap.album,
       thumbnailUrl: snap.thumbnailUrl,
       durationMs: snap.duration?.inMilliseconds ?? 0,
@@ -174,7 +174,7 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text(
-                      'Apunta al código QR de una sala de Inútil Music',
+                      'Apunta al código QR de una sala de Inutix Music',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white, fontSize: 12.5),
                     ),
@@ -630,8 +630,8 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
                   SharePlus.instance.share(
                     ShareParams(
                       text: spanish
-                          ? 'Únete a mi sala «${room.name}» en Inútil Music 🎧\nCódigo: ${room.code}\n${room.shareUri}'
-                          : 'Join my Listening Room «${room.name}» on Inútil Music 🎧\nCode: ${room.code}\n${room.shareUri}',
+                          ? 'Únete a mi sala «${room.name}» en Inutix Music 🎧\nCódigo: ${room.code}\n${room.shareUri}'
+                          : 'Join my Listening Room «${room.name}» on Inutix Music 🎧\nCode: ${room.code}\n${room.shareUri}',
                     ),
                   );
                 },

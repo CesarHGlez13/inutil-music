@@ -210,7 +210,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     // `AsyncNotifierProvider<PlayerController>` → el mismo proveedor) y
     // `tester.pumpWidget(_testApp())` no retornaba nunca
     // (`timeout 110 flutter test test/widget_test.dart --plain-name 'renders
-    // Inútil Music shell'` → EXIT=124 también sobre el commit sin mis cambios,
+    // Inutix Music shell'` → EXIT=124 también sobre el commit sin mis cambios,
     // o sea la traba era preexistente). El proveedor devuelve
     // `InutilPlaybackSyncService.instance`, así que suscribirse al singleton
     // notifica lo mismo en el mismo momento, pero no registra dependencia

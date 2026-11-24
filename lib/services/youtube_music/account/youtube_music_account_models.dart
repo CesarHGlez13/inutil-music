@@ -1,6 +1,6 @@
 /// Models used by the authenticated YouTube Music account boundary.
 ///
-/// These types intentionally do not depend on Inútil Music's local-library models.
+/// These types intentionally do not depend on Inutix Music's local-library models.
 /// A synchronization layer can therefore decide how remote occurrences map to
 /// local tracks without losing duplicate playlist entries.
 library;

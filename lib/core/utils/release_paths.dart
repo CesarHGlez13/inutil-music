@@ -4,7 +4,7 @@ import 'package:path/path.dart' as p;
 
 /// Rutas compartidas del canal de actualizaciones local.
 ///
-/// Inútil Music puede servir sus propias versiones desde una carpeta del
+/// Inutix Music puede servir sus propias versiones desde una carpeta del
 /// equipo (sin depender de la nube): el PC descubre el manifiesto
 /// `release.json`, lo publica por HTTP en `/api/release` y sirve los
 /// artefactos `.apk` / `.tar.gz` que Cesar deposite en esa carpeta.

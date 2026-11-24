@@ -69,7 +69,7 @@ class OtaDownloadException implements Exception {
 /// Cesar pidió evitar, y antes de Android 15 no existe un
 /// `foregroundServiceType` válido para «descargar archivos». En su lugar la
 /// descarga corre en el isolate de la aplicación con `HttpClient`: el proceso
-/// de Inútil Music ya está vivo mientras la interfaz está abierta, y si hay
+/// de Inutix Music ya está vivo mientras la interfaz está abierta, y si hay
 /// audio sonando el servicio `mediaPlayback` de `audio_service` mantiene el
 /// proceso despierto aunque la pantalla se apague. El progreso se publica
 /// únicamente dentro de la app a través de [OtaDownloadProgress]; no se crea

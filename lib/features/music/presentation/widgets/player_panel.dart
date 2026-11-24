@@ -5918,7 +5918,7 @@ class _PlayerMenu extends ConsumerWidget {
                           actionContext,
                           trackKey: trackKey,
                           trackTitle: snapshot.title ?? 'Canción',
-                          trackArtist: snapshot.artist ?? 'Inútil Music',
+                          trackArtist: snapshot.artist ?? 'Inutix Music',
                           trackThumbnailUrl: snapshot.thumbnailUrl,
                           existing: activeMemory,
                         ),

@@ -15,7 +15,7 @@ const liveOverlayArtworkByteCount =
 
 typedef LiveOverlayArtworkLoader = Future<String?> Function(String source);
 
-/// Resolves artwork through Inútil Music's persistent cache and creates a compact
+/// Resolves artwork through Inutix Music's persistent cache and creates a compact
 /// PNG data URI that a localhost browser source can render without receiving a
 /// private file path or depending on the remote thumbnail staying online.
 class LiveOverlayArtworkService {

@@ -138,7 +138,7 @@ class EchoMemory {
       trackKey: trackKey,
       titleArtistKey: titleArtistKey,
       trackTitle: trackTitle.isEmpty ? 'Canción' : trackTitle,
-      trackArtist: trackArtist.isEmpty ? 'Inútil Music' : trackArtist,
+      trackArtist: trackArtist.isEmpty ? 'Inutix Music' : trackArtist,
       trackThumbnailUrl: _nonEmpty(json['trackThumbnailUrl']?.toString()),
       note: note,
       memoryDate:

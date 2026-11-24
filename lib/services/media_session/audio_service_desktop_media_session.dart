@@ -232,8 +232,8 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
         },
         config: const AudioServiceConfig(
           androidNotificationChannelId: 'com.inutilmusic.app.audio',
-          androidNotificationChannelName: 'Inútil Music',
-          androidNotificationChannelDescription: 'Inútil Music playback',
+          androidNotificationChannelName: 'Inutix Music',
+          androidNotificationChannelDescription: 'Inutix Music playback',
           notificationColor: AppColors.brandGreen,
           androidNotificationIcon: 'drawable/ic_stat_inutil_music',
           androidShowNotificationBadge: true,
@@ -346,11 +346,11 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
             id: snapshot.trackId ?? snapshot.sourceUrl ?? trackKey,
             title: snapshot.title?.trim().isNotEmpty == true
                 ? snapshot.title!.trim()
-                : 'Inútil Music',
+                : 'Inutix Music',
             artist: snapshot.artist?.trim(),
             album: snapshot.album?.trim().isNotEmpty == true
                 ? snapshot.album!.trim()
-                : 'Inútil Music',
+                : 'Inutix Music',
             duration: snapshot.duration,
             artUri: _artUri(snapshot.thumbnailUrl),
           ),
@@ -368,7 +368,7 @@ class AudioServiceDesktopMediaSession implements DesktopMediaSession {
                   artist: item.artist,
                   album: item.album?.trim().isNotEmpty == true
                       ? item.album!.trim()
-                      : 'Inútil Music',
+                      : 'Inutix Music',
                   artUri: _artUri(item.thumbnailUrl),
                 ),
               )

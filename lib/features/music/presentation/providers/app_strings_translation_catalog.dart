@@ -354,13 +354,13 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '音频输出',
     'オーディオ出力',
   ],
-  'Choose where to listen to Inútil Music. Only the player audio is affected.':
+  'Choose where to listen to Inutix Music. Only the player audio is affected.':
       <String>[
-        'Escolha onde ouvir o Inútil Music. Apenas o áudio do reprodutor é afetado.',
-        'Choisissez où écouter Inútil Music. Seul le son du lecteur est modifié.',
-        'Inútil Music을 들을 장치를 선택하세요. 플레이어의 오디오에만 적용됩니다.',
-        '选择播放 Inútil Music 的设备。仅影响播放器的音频。',
-        'Inútil Musicの再生先を選択してください。プレーヤーの音声にのみ適用されます。',
+        'Escolha onde ouvir o Inutix Music. Apenas o áudio do reprodutor é afetado.',
+        'Choisissez où écouter Inutix Music. Seul le son du lecteur est modifié.',
+        'Inutix Music을 들을 장치를 선택하세요. 플레이어의 오디오에만 적용됩니다.',
+        '选择播放 Inutix Music 的设备。仅影响播放器的音频。',
+        'Inutix Musicの再生先を選択してください。プレーヤーの音声にのみ適用されます。',
       ],
   'System default': <String>[
     'Padrão do sistema',
@@ -633,12 +633,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '非官方集成',
     '非公式統合',
   ],
-  'The YouTube Music integration uses unofficial interfaces and is not affiliated with Google. Inútil Music never stores your password. YouTube may change, block, or restrict this feature.': <String>[
-    'A integração do YouTube Music usa interfaces não oficiais e não é afiliada ao Google. Inútil Music nunca armazena sua senha. O YouTube pode alterar, bloquear ou restringir esse recurso.',
-    'L\'intégration YouTube Music utilise des interfaces non officielles et n\'est pas affiliée à Google. Inútil Music ne stocke jamais votre mot de passe. YouTube peut modifier, bloquer ou restreindre cette fonctionnalité.',
-    'YouTube Music 통합은 비공식 인터페이스를 사용하며 Google과 제휴하지 않습니다. Inútil Music은 절대로 귀하의 비밀번호를 저장하지 않습니다. YouTube는 이 기능을 변경, 차단 또는 제한할 수 있습니다.',
-    'YouTube Music 集成使用非官方界面，不隶属于 Google。 Inútil Music 永远不会存储您的密码。 YouTube 可能会更改、阻止或限制此功能。',
-    'YouTube Music の統合は非公式インターフェースを使用しており、Google とは提携していません。 Inútil Music がパスワードを保存することはありません。 YouTube はこの機能を変更、ブロック、または制限する場合があります。',
+  'The YouTube Music integration uses unofficial interfaces and is not affiliated with Google. Inutix Music never stores your password. YouTube may change, block, or restrict this feature.': <String>[
+    'A integração do YouTube Music usa interfaces não oficiais e não é afiliada ao Google. Inutix Music nunca armazena sua senha. O YouTube pode alterar, bloquear ou restringir esse recurso.',
+    'L\'intégration YouTube Music utilise des interfaces non officielles et n\'est pas affiliée à Google. Inutix Music ne stocke jamais votre mot de passe. YouTube peut modifier, bloquer ou restreindre cette fonctionnalité.',
+    'YouTube Music 통합은 비공식 인터페이스를 사용하며 Google과 제휴하지 않습니다. Inutix Music은 절대로 귀하의 비밀번호를 저장하지 않습니다. YouTube는 이 기능을 변경, 차단 또는 제한할 수 있습니다.',
+    'YouTube Music 集成使用非官方界面，不隶属于 Google。 Inutix Music 永远不会存储您的密码。 YouTube 可能会更改、阻止或限制此功能。',
+    'YouTube Music の統合は非公式インターフェースを使用しており、Google とは提携していません。 Inutix Music がパスワードを保存することはありません。 YouTube はこの機能を変更、ブロック、または制限する場合があります。',
   ],
   'I understand, continue': <String>[
     'Eu entendo, continue',
@@ -678,15 +678,15 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
   'Your ZXQPH0X local playlists will stay': <String>[
     'Suas playlists locais ZXQPH0X permanecerão',
     'Vos playlists locales ZXQPH0X resteront',
-    'ZXQPH0X 로컬 재생목록은 Inútil Music에 유지됩니다',
+    'ZXQPH0X 로컬 재생목록은 Inutix Music에 유지됩니다',
     '您的 ZXQPH0X 本地播放列表将保留',
-    'あなたの ZXQPH0X ローカル プレイリストは Inútil Music に残ります',
+    'あなたの ZXQPH0X ローカル プレイリストは Inutix Music に残ります',
   ],
-  'ZXQPH0X in Inútil Music. Favorites will sync with YouTube Music Liked Music; unlinked local playlists are created as private playlists and remote playlists are imported here. This first sync does not delete your local playlists.': <String>[
-    'ZXQPH0X no Inútil Music. Os favoritos serão sincronizados com as músicas curtidas do YouTube Music; playlists locais desvinculadas são criadas como playlists privadas e playlists remotas são importadas aqui. Esta primeira sincronização não exclui suas listas de reprodução locais.',
-    'ZXQPH0X dans Inútil Music. Les favoris seront synchronisés avec YouTube Music Liked Music ; les listes de lecture locales non liées sont créées sous forme de listes de lecture privées et les listes de lecture distantes sont importées ici. Cette première synchronisation ne supprime pas vos playlists locales.',
+  'ZXQPH0X in Inutix Music. Favorites will sync with YouTube Music Liked Music; unlinked local playlists are created as private playlists and remote playlists are imported here. This first sync does not delete your local playlists.': <String>[
+    'ZXQPH0X no Inutix Music. Os favoritos serão sincronizados com as músicas curtidas do YouTube Music; playlists locais desvinculadas são criadas como playlists privadas e playlists remotas são importadas aqui. Esta primeira sincronização não exclui suas listas de reprodução locais.',
+    'ZXQPH0X dans Inutix Music. Les favoris seront synchronisés avec YouTube Music Liked Music ; les listes de lecture locales non liées sont créées sous forme de listes de lecture privées et les listes de lecture distantes sont importées ici. Cette première synchronisation ne supprime pas vos playlists locales.',
     'ZXQPH0X. 즐겨찾기는 YouTube Music이 좋아하는 음악과 동기화됩니다. 연결되지 않은 로컬 재생 목록은 비공개 재생 목록으로 생성되고 원격 재생 목록은 여기로 가져옵니다. 이 첫 번째 동기화는 로컬 재생 목록을 삭제하지 않습니다.',
-    'ZXQPH0X 在 Inútil Music 中。收藏夹将与 YouTube Music 喜欢的音乐同步；未链接的本地播放列表将创建为私有播放列表，远程播放列表将在此处导入。第一次同步不会删除您的本地播放列表。',
+    'ZXQPH0X 在 Inutix Music 中。收藏夹将与 YouTube Music 喜欢的音乐同步；未链接的本地播放列表将创建为私有播放列表，远程播放列表将在此处导入。第一次同步不会删除您的本地播放列表。',
     'ZXQPH0X。お気に入りは YouTube Music の「いいね！」した音楽と同期します。リンクされていないローカル プレイリストはプライベート プレイリストとして作成され、リモート プレイリストはここにインポートされます。この最初の同期では、ローカル プレイリストは削除されません。',
   ],
   'Keep and synchronize': <String>[
@@ -745,19 +745,19 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '解决冲突',
     '競合を解決',
   ],
-  'Inútil Music paused these playlists to avoid repeating or overwriting uncertain changes. Choose which version to keep for each one.': <String>[
-    'Inútil Music pausou essas listas de reprodução para evitar repetição ou substituição incerta mudanças. Escolha qual versão manter para cada um.',
-    'Inútil Music a mis ces listes de lecture en pause pour éviter de répéter ou d\'écraser des modifications incertaines. Choisissez la version à conserver pour chacune.',
-    'Inútil Music은 불확실한 변경 사항이 반복되거나 덮어쓰지 않도록 이 재생 목록을 일시 중지했습니다. 각 버전에 대해 유지할 버전을 선택하세요.',
-    'Inútil Music 暂停了这些播放列表，以避免重复或覆盖不确定的更改。选择要为每个版本保留哪个版本。',
-    'Inútil Music は、不確実な変更の繰り返しや上書きを避けるために、これらのプレイリストを一時停止しました。それぞれにどのバージョンを保持するかを選択してください。',
+  'Inutix Music paused these playlists to avoid repeating or overwriting uncertain changes. Choose which version to keep for each one.': <String>[
+    'Inutix Music pausou essas listas de reprodução para evitar repetição ou substituição incerta mudanças. Escolha qual versão manter para cada um.',
+    'Inutix Music a mis ces listes de lecture en pause pour éviter de répéter ou d\'écraser des modifications incertaines. Choisissez la version à conserver pour chacune.',
+    'Inutix Music은 불확실한 변경 사항이 반복되거나 덮어쓰지 않도록 이 재생 목록을 일시 중지했습니다. 각 버전에 대해 유지할 버전을 선택하세요.',
+    'Inutix Music 暂停了这些播放列表，以避免重复或覆盖不确定的更改。选择要为每个版本保留哪个版本。',
+    'Inutix Music は、不確実な変更の繰り返しや上書きを避けるために、これらのプレイリストを一時停止しました。それぞれにどのバージョンを保持するかを選択してください。',
   ],
-  'Keep Inútil Music': <String>[
-    'Keep Inútil Music',
-    'Conserver Inútil Music',
-    'Keep Inútil Music',
-    '保留 Inútil Music',
-    'Inútil Music を保持する',
+  'Keep Inutix Music': <String>[
+    'Keep Inutix Music',
+    'Conserver Inutix Music',
+    'Keep Inutix Music',
+    '保留 Inutix Music',
+    'Inutix Music を保持する',
   ],
   'Keep YouTube Music': <String>[
     'Keep YouTube Music',
@@ -795,12 +795,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '断开 YouTube Music',
     'YouTube Music の接続を解除します',
   ],
-  'Google blocked sign-in inside the app. For security, Inútil Music cannot copy the session from your browser. You can keep using the app without an account.': <String>[
-    'O Google bloqueou o login dentro do aplicativo. Por segurança, o Inútil Music não pode copiar a sessão do seu navegador. Você pode continuar usando o aplicativo sem uma conta.',
-    'Google a bloqué la connexion dans l\'application. Pour des raisons de sécurité, Inútil Music ne peut pas copier la session depuis votre navigateur. Vous pouvez continuer à utiliser l\'application sans compte.',
-    'Google에서 앱 내부의 로그인을 차단했습니다. 보안을 위해 Inútil Music은 브라우저에서 세션을 복사할 수 없습니다. 계정이 없어도 앱을 계속 사용할 수 있습니다.',
-    'Google 阻止了应用内的登录。为了安全起见，Inútil Music 无法从您的浏览器复制会话。您可以在没有帐户的情况下继续使用该应用程序。',
-    'Google はアプリ内でのサインインをブロックしました。セキュリティのため、Inútil Music はブラウザからセッションをコピーできません。アカウントなしでアプリを使い続けることができます。',
+  'Google blocked sign-in inside the app. For security, Inutix Music cannot copy the session from your browser. You can keep using the app without an account.': <String>[
+    'O Google bloqueou o login dentro do aplicativo. Por segurança, o Inutix Music não pode copiar a sessão do seu navegador. Você pode continuar usando o aplicativo sem uma conta.',
+    'Google a bloqué la connexion dans l\'application. Pour des raisons de sécurité, Inutix Music ne peut pas copier la session depuis votre navigateur. Vous pouvez continuer à utiliser l\'application sans compte.',
+    'Google에서 앱 내부의 로그인을 차단했습니다. 보안을 위해 Inutix Music은 브라우저에서 세션을 복사할 수 없습니다. 계정이 없어도 앱을 계속 사용할 수 있습니다.',
+    'Google 阻止了应用内的登录。为了安全起见，Inutix Music 无法从您的浏览器复制会话。您可以在没有帐户的情况下继续使用该应用程序。',
+    'Google はアプリ内でのサインインをブロックしました。セキュリティのため、Inutix Music はブラウザからセッションをコピーできません。アカウントなしでアプリを使い続けることができます。',
   ],
   'Continue listening': <String>[
     'Continue ouvindo',
@@ -925,13 +925,13 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '允许访问您的音乐',
     '音楽へのアクセスを許可する',
   ],
-  'Inútil Music needs permission to show and play audio files on this device.':
+  'Inutix Music needs permission to show and play audio files on this device.':
       <String>[
-        'Inútil Music precisa de permissão para mostrar e reproduzir arquivos de áudio neste dispositivo.',
-        'Inútil Music a besoin d\'une autorisation pour afficher et lire des fichiers audio sur cet appareil.',
-        'Inútil Music에 이 기기에서 오디오 파일을 표시하고 재생하려면 권한이 필요합니다.',
-        'Inútil Music 需要权限才能在此设备上显示和播放音频文件设备。',
-        'Inútil Music には、このデバイスでオーディオ ファイルを表示および再生する権限が必要です。',
+        'Inutix Music precisa de permissão para mostrar e reproduzir arquivos de áudio neste dispositivo.',
+        'Inutix Music a besoin d\'une autorisation pour afficher et lire des fichiers audio sur cet appareil.',
+        'Inutix Music에 이 기기에서 오디오 파일을 표시하고 재생하려면 권한이 필요합니다.',
+        'Inutix Music 需要权限才能在此设备上显示和播放音频文件设备。',
+        'Inutix Music には、このデバイスでオーディオ ファイルを表示および再生する権限が必要です。',
       ],
   'Allow access': <String>[
     'Permitir acesso',
@@ -2103,12 +2103,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '播放列表已删除。',
     'プレイリストを削除しました。',
   ],
-  'Remove only from Inútil Music': <String>[
-    'Remover apenas do Inútil Music',
-    'Supprimer uniquement de Inútil Music',
-    'Inútil Music에서만 제거',
-    '仅从 Inútil Music 中删除',
-    'Inútil Music からのみ削除',
+  'Remove only from Inutix Music': <String>[
+    'Remover apenas do Inutix Music',
+    'Supprimer uniquement de Inutix Music',
+    'Inutix Music에서만 제거',
+    '仅从 Inutix Music 中删除',
+    'Inutix Music からのみ削除',
   ],
   'Also delete from YouTube Music': <String>[
     'Excluir também do YouTube Music',
@@ -2117,27 +2117,27 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '同时从 YouTube Music 中删除',
     'YouTube Music からも削除します',
   ],
-  'This playlist is synced with YouTube Music. You can remove it only from Inútil Music or also delete the playlist from your account. Downloaded songs will not be deleted.': <String>[
-    'Esta lista de reprodução é sincronizada com o YouTube Music. Você pode removê-lo apenas do Inútil Music ou também excluir a playlist da sua conta. As músicas baixadas não serão excluídas.',
-    'Cette playlist est synchronisée avec YouTube Music. Vous pouvez le supprimer uniquement de Inútil Music ou également supprimer la playlist de votre compte. Les chansons téléchargées ne seront pas supprimées.',
-    '이 재생목록은 YouTube Music과 동기화됩니다. Inútil Music에서만 제거하거나 계정에서 재생 목록을 삭제할 수도 있습니다. 다운로드한 노래는 삭제되지 않습니다.',
-    '此播放列表与 YouTube Music 同步。您只能从 Inútil Music 中删除它，也可以从您的帐户中删除播放列表。下载的歌曲不会被删除。',
-    'このプレイリストは YouTube Music と同期されています。 Inútil Music からのみ削除することも、アカウントからプレイリストを削除することもできます。ダウンロードした曲は削除されません。',
+  'This playlist is synced with YouTube Music. You can remove it only from Inutix Music or also delete the playlist from your account. Downloaded songs will not be deleted.': <String>[
+    'Esta lista de reprodução é sincronizada com o YouTube Music. Você pode removê-lo apenas do Inutix Music ou também excluir a playlist da sua conta. As músicas baixadas não serão excluídas.',
+    'Cette playlist est synchronisée avec YouTube Music. Vous pouvez le supprimer uniquement de Inutix Music ou également supprimer la playlist de votre compte. Les chansons téléchargées ne seront pas supprimées.',
+    '이 재생목록은 YouTube Music과 동기화됩니다. Inutix Music에서만 제거하거나 계정에서 재생 목록을 삭제할 수도 있습니다. 다운로드한 노래는 삭제되지 않습니다.',
+    '此播放列表与 YouTube Music 同步。您只能从 Inutix Music 中删除它，也可以从您的帐户中删除播放列表。下载的歌曲不会被删除。',
+    'このプレイリストは YouTube Music と同期されています。 Inutix Music からのみ削除することも、アカウントからプレイリストを削除することもできます。ダウンロードした曲は削除されません。',
   ],
-  'This playlist is linked to YouTube Music, but the active account cannot delete it there. It will only be removed from Inútil Music and will not be imported automatically again.': <String>[
-    'Esta playlist está vinculada ao YouTube Music, mas a conta ativa não pode excluí-la lá. Ela só será removida do Inútil Music e não será importada automaticamente novamente.',
-    'Cette playlist est liée à YouTube Music, mais le compte actif ne peut pas la supprimer. Elle sera uniquement supprimée de Inútil Music et ne sera plus importée automatiquement.',
-    '이 재생목록은 YouTube Music에 연결되어 있지만 활성 계정에서는 삭제할 수 없습니다. Inútil Music에서만 제거되며 자동으로 다시 가져오지 않습니다.',
-    '此播放列表链接到 YouTube Music，但活动帐户无法在那里删除它。它只会从 Inútil Music 中删除，不会再次自动导入。',
-    'このプレイリストは YouTube Music にリンクされていますが、アクティブなアカウントはそこから削除できません。 Inútil Music から削除されるだけで、自動的に再度インポートされることはありません。',
+  'This playlist is linked to YouTube Music, but the active account cannot delete it there. It will only be removed from Inutix Music and will not be imported automatically again.': <String>[
+    'Esta playlist está vinculada ao YouTube Music, mas a conta ativa não pode excluí-la lá. Ela só será removida do Inutix Music e não será importada automaticamente novamente.',
+    'Cette playlist est liée à YouTube Music, mais le compte actif ne peut pas la supprimer. Elle sera uniquement supprimée de Inutix Music et ne sera plus importée automatiquement.',
+    '이 재생목록은 YouTube Music에 연결되어 있지만 활성 계정에서는 삭제할 수 없습니다. Inutix Music에서만 제거되며 자동으로 다시 가져오지 않습니다.',
+    '此播放列表链接到 YouTube Music，但活动帐户无法在那里删除它。它只会从 Inutix Music 中删除，不会再次自动导入。',
+    'このプレイリストは YouTube Music にリンクされていますが、アクティブなアカウントはそこから削除できません。 Inutix Music から削除されるだけで、自動的に再度インポートされることはありません。',
   ],
-  'The playlist was removed from Inútil Music. Its YouTube Music deletion is scheduled for the next sync.':
+  'The playlist was removed from Inutix Music. Its YouTube Music deletion is scheduled for the next sync.':
       <String>[
-        'A playlist foi removida do Inútil Music. Sua exclusão do YouTube Music está agendada para a próxima sincronização.',
-        'La playlist a été supprimée de Inútil Music. Sa suppression sur YouTube Music est programmée pour la prochaine synchronisation.',
-        '재생 목록이 Inútil Music에서 제거되었습니다. 다음 동기화 시 YouTube Music 삭제가 예정되어 있습니다.',
-        '播放列表已从 Inútil Music 中删除。其 YouTube 音乐删除计划在下次同步时进行。',
-        'プレイリストは Inútil Music から削除されました。 YouTube Music の削除は次回の同期にスケジュールされています。',
+        'A playlist foi removida do Inutix Music. Sua exclusão do YouTube Music está agendada para a próxima sincronização.',
+        'La playlist a été supprimée de Inutix Music. Sa suppression sur YouTube Music est programmée pour la prochaine synchronisation.',
+        '재생 목록이 Inutix Music에서 제거되었습니다. 다음 동기화 시 YouTube Music 삭제가 예정되어 있습니다.',
+        '播放列表已从 Inutix Music 中删除。其 YouTube 音乐删除计划在下次同步时进行。',
+        'プレイリストは Inutix Music から削除されました。 YouTube Music の削除は次回の同期にスケジュールされています。',
       ],
   'This does not delete downloaded songs.': <String>[
     'Isso não exclui músicas baixadas.',
@@ -2652,13 +2652,13 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '推荐历史',
     '推奨履歴',
   ],
-  'Inútil Music learns from the songs you listen to in order to personalize Home.':
+  'Inutix Music learns from the songs you listen to in order to personalize Home.':
       <String>[
-        'Inútil Music aprende com as músicas que você ouve para personalizar a página inicial.',
-        'Inútil Music apprend à partir des chansons que vous écoutez afin de personnaliser la maison.',
-        'Inútil Music은 홈을 개인화하기 위해 사용자가 듣는 노래를 학습합니다.',
-        'Inútil Music 从您收听的歌曲中学习，以便对主页进行个性化设置。',
-        'Inútil Musicは、ホームをカスタマイズするために、あなたが聞いた曲から学習します。',
+        'Inutix Music aprende com as músicas que você ouve para personalizar a página inicial.',
+        'Inutix Music apprend à partir des chansons que vous écoutez afin de personnaliser la maison.',
+        'Inutix Music은 홈을 개인화하기 위해 사용자가 듣는 노래를 학습합니다.',
+        'Inutix Music 从您收听的歌曲中学习，以便对主页进行个性化设置。',
+        'Inutix Musicは、ホームをカスタマイズするために、あなたが聞いた曲から学習します。',
       ],
   'New plays will not be used to personalize Home.': <String>[
     'Novas peças não será usado para personalizar a página inicial.',
@@ -2689,12 +2689,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '清除历史记录和推荐？',
     '履歴と推奨事項を消去しますか?',
   ],
-  'Inútil Music will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.': <String>[
-    'O Inútil Music esquecerá o que aprendeu ao ouvir. Downloads, favoritos e listas de reprodução permanecerão intactos.',
-    'Inútil Music oubliera ce qu\'il a appris de votre écoute. Les téléchargements, les favoris et les listes de lecture resteront intacts.',
-    'Inútil Music은 귀하의 청취를 통해 배운 내용을 잊어버릴 것입니다. 다운로드, 즐겨찾기 및 재생 목록은 그대로 유지됩니다.',
-    'Inútil Music 会忘记它从您的聆听中学到的内容。下载、收藏夹和播放列表将保持不变。',
-    'Inútil Musicは、聞いて学んだことを忘れてしまいます。ダウンロード、お気に入り、プレイリストはそのまま残ります。',
+  'Inutix Music will forget what it learned from your listening. Downloads, favorites, and playlists will remain intact.': <String>[
+    'O Inutix Music esquecerá o que aprendeu ao ouvir. Downloads, favoritos e listas de reprodução permanecerão intactos.',
+    'Inutix Music oubliera ce qu\'il a appris de votre écoute. Les téléchargements, les favoris et les listes de lecture resteront intacts.',
+    'Inutix Music은 귀하의 청취를 통해 배운 내용을 잊어버릴 것입니다. 다운로드, 즐겨찾기 및 재생 목록은 그대로 유지됩니다.',
+    'Inutix Music 会忘记它从您的聆听中学到的内容。下载、收藏夹和播放列表将保持不变。',
+    'Inutix Musicは、聞いて学んだことを忘れてしまいます。ダウンロード、お気に入り、プレイリストはそのまま残ります。',
   ],
   'History and recommendations cleared.': <String>[
     'Histórico e recomendações apagados.',
@@ -2817,12 +2817,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '打开支持的链接',
     'サポートされているリンクを開く',
   ],
-  'Choose Inútil Music to open YouTube and YouTube Music links.': <String>[
-    'Escolha Inútil Music para abrir links do YouTube e do YouTube Music.',
-    'Choisissez Inútil Music pour ouvrir les liens YouTube et YouTube Music.',
-    'YouTube 및 YouTube Music 링크를 열려면 Inútil Music을 선택하세요.',
-    '选择 Inútil Music 打开 YouTube 和 YouTube Music 链接。',
-    'Inútil Music を選択してくださいYouTube と YouTube Music のリンクを開くことができます。',
+  'Choose Inutix Music to open YouTube and YouTube Music links.': <String>[
+    'Escolha Inutix Music para abrir links do YouTube e do YouTube Music.',
+    'Choisissez Inutix Music pour ouvrir les liens YouTube et YouTube Music.',
+    'YouTube 및 YouTube Music 링크를 열려면 Inutix Music을 선택하세요.',
+    '选择 Inutix Music 打开 YouTube 和 YouTube Music 链接。',
+    'Inutix Music を選択してくださいYouTube と YouTube Music のリンクを開くことができます。',
   ],
   'Could not open the supported links settings.': <String>[
     'Não foi possível abrir as configurações de links suportados.',
@@ -3102,20 +3102,20 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
         '覆盖配置与主机文件冲突。更正 ZXQPH0X 条目并重试。',
         'オーバーレイ構成はホスト ファイルと競合します。 ZXQPH0X エントリを修正して、再試行してください。',
       ],
-  'Windows could not verify the local domain. Restart Inútil Music and try again.':
+  'Windows could not verify the local domain. Restart Inutix Music and try again.':
       <String>[
-        'O Windows não conseguiu verificar o domínio local. Reinicie o Inútil Music e tente novamente.',
-        'Windows n\'a pas pu vérifier le domaine local. Redémarrez Inútil Music et réessayez.',
-        'Windows에서 로컬 도메인을 확인할 수 없습니다. Inútil Music을 다시 시작하고 다시 시도하세요.',
-        'Windows 无法验证本地域。重新启动 Inútil Music 并重试。',
-        'Windows はローカル ドメインを確認できませんでした。 Inútil Music を再起動して、もう一度お試しください。',
+        'O Windows não conseguiu verificar o domínio local. Reinicie o Inutix Music e tente novamente.',
+        'Windows n\'a pas pu vérifier le domaine local. Redémarrez Inutix Music et réessayez.',
+        'Windows에서 로컬 도메인을 확인할 수 없습니다. Inutix Music을 다시 시작하고 다시 시도하세요.',
+        'Windows 无法验证本地域。重新启动 Inutix Music 并重试。',
+        'Windows はローカル ドメインを確認できませんでした。 Inutix Music を再起動して、もう一度お試しください。',
       ],
-  'The domain was configured, but Inútil Music could not open the overlay through DNS or HTTP. Check the proxy, VPN, or antivirus and try again.': <String>[
-    'O domínio foi configurado, mas o Inútil Music não conseguiu abrir a sobreposição por meio de DNS ou HTTP. Verifique o proxy, VPN ou antivírus e tente novamente.',
-    'Le domaine a été configuré, mais Inútil Music n\'a pas pu ouvrir la superposition via DNS ou HTTP. Vérifiez le proxy, le VPN ou l\'antivirus et réessayez.',
-    '도메인이 구성되었지만 Inútil Music이 DNS 또는 HTTP를 통해 오버레이를 열 수 없습니다. 프록시, VPN 또는 바이러스 백신을 확인하고 다시 시도하세요.',
-    '域已配置，但 Inútil Music 无法通过 DNS 或 HTTP 打开覆盖。检查代理、VPN 或防病毒软件，然后重试。',
-    'ドメインは構成されましたが、Inútil Music は DNS または HTTP 経由でオーバーレイを開くことができませんでした。プロキシ、VPN、またはウイルス対策ソフトウェアを確認して、再試行してください。',
+  'The domain was configured, but Inutix Music could not open the overlay through DNS or HTTP. Check the proxy, VPN, or antivirus and try again.': <String>[
+    'O domínio foi configurado, mas o Inutix Music não conseguiu abrir a sobreposição por meio de DNS ou HTTP. Verifique o proxy, VPN ou antivírus e tente novamente.',
+    'Le domaine a été configuré, mais Inutix Music n\'a pas pu ouvrir la superposition via DNS ou HTTP. Vérifiez le proxy, le VPN ou l\'antivirus et réessayez.',
+    '도메인이 구성되었지만 Inutix Music이 DNS 또는 HTTP를 통해 오버레이를 열 수 없습니다. 프록시, VPN 또는 바이러스 백신을 확인하고 다시 시도하세요.',
+    '域已配置，但 Inutix Music 无法通过 DNS 或 HTTP 打开覆盖。检查代理、VPN 或防病毒软件，然后重试。',
+    'ドメインは構成されましたが、Inutix Music は DNS または HTTP 経由でオーバーレイを開くことができませんでした。プロキシ、VPN、またはウイルス対策ソフトウェアを確認して、再試行してください。',
   ],
   'Another application is already using port 80. Close it and enable the overlay again.':
       <String>[
@@ -3297,12 +3297,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '可用新版本',
     '新しいバージョンが利用可能',
   ],
-  'Inútil Music ZXQPH0X is available. Current version: ZXQPH1X.': <String>[
-    'Inútil Music ZXQPH0X está disponível. Versão atual: ZXQPH1X.',
-    'Inútil Music ZXQPH0X est disponible. Version actuelle : ZXQPH1X.',
-    'Inútil Music ZXQPH0X를 사용할 수 있습니다. 현재 버전: ZXQPH1X.',
-    'Inútil Music ZXQPH0X 已发布。当前版本：ZXQPH1X。',
-    'Inútil Music ZXQPH0X が利用可能です。現在のバージョン: ZXQPH1X。',
+  'Inutix Music ZXQPH0X is available. Current version: ZXQPH1X.': <String>[
+    'Inutix Music ZXQPH0X está disponível. Versão atual: ZXQPH1X.',
+    'Inutix Music ZXQPH0X est disponible. Version actuelle : ZXQPH1X.',
+    'Inutix Music ZXQPH0X를 사용할 수 있습니다. 현재 버전: ZXQPH1X.',
+    'Inutix Music ZXQPH0X 已发布。当前版本：ZXQPH1X。',
+    'Inutix Music ZXQPH0X が利用可能です。現在のバージョン: ZXQPH1X。',
   ],
   'What’s new in ZXQPH0X': <String>[
     'Novidades da versão ZXQPH0X',
@@ -3360,12 +3360,12 @@ const Map<String, List<String>> _appStringTranslations = <String, List<String>>{
     '支持开发',
     'サポート開発',
   ],
-  'Help maintain Inútil Music and keep adding features.': <String>[
-    'Ajude a manter o Inútil Music e continue adicionando recursos.',
-    'Aide à maintenir Inútil Music et continuer à ajouter des fonctionnalités.',
-    'Inútil Music을 유지 관리하고 기능을 계속 추가하도록 도와주세요.',
-    '帮助维护Inútil Music并不断添加功能。',
-    'Inútil Music の保守と機能の追加を支援します。',
+  'Help maintain Inutix Music and keep adding features.': <String>[
+    'Ajude a manter o Inutix Music e continue adicionando recursos.',
+    'Aide à maintenir Inutix Music et continuer à ajouter des fonctionnalités.',
+    'Inutix Music을 유지 관리하고 기능을 계속 추가하도록 도와주세요.',
+    '帮助维护Inutix Music并不断添加功能。',
+    'Inutix Music の保守と機能の追加を支援します。',
   ],
   'The support page could not be opened.': <String>[
     'A página de suporte não pôde ser aberto.',

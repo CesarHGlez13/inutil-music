@@ -2944,7 +2944,7 @@ class JustAudioPlayerService
     final artworkSource = track.thumbnailUrl?.trim();
     return MediaItem(
       id: track.id.isEmpty ? track.url : track.id,
-      album: track.album ?? 'Inútil Music',
+      album: track.album ?? 'Inutix Music',
       title: track.title,
       artist: track.artist,
       artUri: _notificationArtUri(artworkSource),
@@ -2963,7 +2963,7 @@ class JustAudioPlayerService
     final artworkSource = (track.thumbnailPath ?? track.thumbnailUrl)?.trim();
     return MediaItem(
       id: track.id,
-      album: track.album ?? 'Inútil Music',
+      album: track.album ?? 'Inutix Music',
       title: track.title,
       artist: track.artist,
       artUri: _notificationArtUri(artworkSource),

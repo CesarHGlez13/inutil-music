@@ -8,7 +8,7 @@ import 'inutil_update_service.dart';
 
 /// Puerta del kill switch de actualizaciones (OTA forzosa).
 ///
-/// INÚTIL MUSIC publica su versión en `app_config/release` (o `release.json`),
+/// INUTIX MUSIC publica su versión en `app_config/release` (o `release.json`),
 /// y el administrador puede fijar ahí un `minSupportedVersion`. Cuando la
 /// versión instalada queda por debajo de ese mínimo —o el manifiesto marca la
 /// actualización como obligatoria— esta puerta reemplaza TODA la interfaz por

@@ -423,7 +423,7 @@ class _SpotifyPlayerControls extends ConsumerWidget {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Text(
-                          snapshot.artist ?? 'Inútil Music',
+                          snapshot.artist ?? 'Inutix Music',
                           key: const ValueKey('player-track-artist'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,

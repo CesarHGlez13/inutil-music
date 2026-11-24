@@ -490,7 +490,7 @@ class LocalDatabaseService {
         track.id,
         'track',
         'External device audio is transient and cannot be persisted in the '
-            'Inútil Music library.',
+            'Inutix Music library.',
       );
     }
     final db = await database;

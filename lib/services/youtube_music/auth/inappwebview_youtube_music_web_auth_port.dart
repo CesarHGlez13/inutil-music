@@ -101,7 +101,7 @@ class InAppWebViewYouTubeMusicWebAuthPort implements YouTubeMusicWebAuthPort {
 
   Future<void> _preparePrivateSession() async {
     // Android's cookie jar is app-global. Login sessions are serialized and
-    // begin by deleting only Google/YouTube cookies visible to Inútil Music's
+    // begin by deleting only Google/YouTube cookies visible to Inutix Music's
     // WebView profile. Browser and system cookies are not touched.
     final result = await _clearPrivateBrowserData();
     // Cookies are the authentication boundary. DOM storage and cache are

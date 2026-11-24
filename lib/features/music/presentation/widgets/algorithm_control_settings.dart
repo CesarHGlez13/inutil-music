@@ -146,8 +146,8 @@ class AlgorithmControlSettingsView extends ConsumerWidget {
                 const SizedBox(height: 4),
                 Text(
                   spanish
-                      ? 'Decide cómo equilibra Inútil Music tus canciones conocidas, descubrimientos y nostalgia.'
-                      : 'Choose how Inútil Music balances familiar tracks, discovery, and nostalgia.',
+                      ? 'Decide cómo equilibra Inutix Music tus canciones conocidas, descubrimientos y nostalgia.'
+                      : 'Choose how Inutix Music balances familiar tracks, discovery, and nostalgia.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colors.onSurfaceVariant,
                   ),

@@ -29,7 +29,7 @@ import kotlin.math.sin
 
 /**
  * Renders razor-sharp, anti-aliased 9:16 overlays for both "Letras" and
- * "Reproductor" moment clips, including the subtle translucent Inútil Music
+ * "Reproductor" moment clips, including the subtle translucent Inutix Music
  * logo watermark. All coordinates are authored in a 1080x1920 design grid and
  * scaled cleanly when targeting 720x1280 fallback devices.
  */
@@ -771,12 +771,12 @@ class MomentOverlayRenderer(
     }
 
     /**
-     * Subtle, refined translucent Inútil Music watermark anchored cleanly at the
+     * Subtle, refined translucent Inutix Music watermark anchored cleanly at the
      * bottom-center safe zone so it looks premium and stays clear of TikTok /
      * Reels / WhatsApp edge overlays.
      */
     private fun drawTranslucentWatermark(canvas: Canvas) {
-        val label = "Inútil Music"
+        val label = "Inutix Music"
         val iconSize = 38f
         val gap = 14f
         val textW = watermarkTextPaint.measureText(label)

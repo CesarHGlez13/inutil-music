@@ -13,7 +13,7 @@ import '../constants/app_constants.dart';
 import 'firebase_config.dart';
 import 'firebase_firestore_service.dart';
 
-/// Modelo de usuario autenticado en INÚTIL MUSIC.
+/// Modelo de usuario autenticado en INUTIX MUSIC.
 ///
 /// Las credenciales (idToken/refreshToken) provienen exclusivamente de
 /// Firebase Auth; esta clase solo refleja la identidad y la LICENCIA que el
@@ -169,7 +169,7 @@ class InutilUser {
   }
 }
 
-/// Servicio integral de autenticación y gestión de usuarios para INÚTIL MUSIC.
+/// Servicio integral de autenticación y gestión de usuarios para INUTIX MUSIC.
 ///
 /// Autenticación REAL contra Firebase Auth (Identity Toolkit REST v1):
 ///   * El único lugar donde existe la contraseña es Firebase; la app nunca la

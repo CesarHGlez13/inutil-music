@@ -1897,7 +1897,7 @@ class _AboutApplicationSettings extends StatelessWidget {
         const SizedBox(height: 24),
         Center(
           child: Text(
-            'Inútil Music v${AppConstants.appVersion} · '
+            'Inutix Music v${AppConstants.appVersion} · '
             '${AppConstants.supportEmail}',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -6153,7 +6153,7 @@ class _WrappedPreviewEntryCard extends ConsumerWidget {
       key: const ValueKey('settings-about-wrapped'),
       glyph: InutilGlyph.player,
       title: 'Tu Resumen del Año ($year)',
-      subtitle: 'Inútil Wrapped: horas, artista #1, canción favorita y más',
+      subtitle: 'Inutix Wrapped: horas, artista #1, canción favorita y más',
       onTap: () async {
         final history = ref.read(historyProvider).value ?? const [];
         final playlists =

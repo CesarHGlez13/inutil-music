@@ -691,7 +691,7 @@ class InutilCloudBackupService {
     return LocalTrack(
       id: id,
       title: map['title'] as String? ?? 'Canción',
-      artist: map['artist'] as String? ?? 'Inútil Music',
+      artist: map['artist'] as String? ?? 'Inutix Music',
       filePath: map['filePath'] as String? ?? '',
       addedAt:
           DateTime.tryParse(map['addedAt']?.toString() ?? '') ?? DateTime.now(),
