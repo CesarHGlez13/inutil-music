@@ -305,12 +305,32 @@ class ListeningRoomState {
     return List<ListeningRoomQueueItem>.unmodifiable(copy);
   }
 
+  /// Host inactivity timeout after which a room with no host heartbeat or
+  /// playback update is treated as abandoned/expired.
+  static const int staleHostTtlMs = 10 * 60 * 1000;
+
   /// Active listeners seen within the last 90 seconds.
   List<ListeningRoomMember> activeMembersAt(DateTime now) {
     final cutoff = now.millisecondsSinceEpoch - 90000;
     return members
         .where((m) => m.isHost || m.lastSeenMs >= cutoff)
         .toList(growable: false);
+  }
+
+  /// True when the host has stopped sending heartbeats/updates for longer than
+  /// [staleHostTtlMs] (e.g., host force-closed the app without tapping "End").
+  bool isHostStaleAt(DateTime now) {
+    final nowMs = now.millisecondsSinceEpoch;
+    var latestHostSignalMs = playbackUpdatedAtMs > createdAtMs
+        ? playbackUpdatedAtMs
+        : createdAtMs;
+    for (final member in members) {
+      if (member.isHost && member.lastSeenMs > latestHostSignalMs) {
+        latestHostSignalMs = member.lastSeenMs;
+      }
+    }
+    if (latestHostSignalMs <= 0) return false;
+    return (nowMs - latestHostSignalMs) > staleHostTtlMs;
   }
 
   /// Drift-compensated target playback position for guests.
@@ -406,6 +426,7 @@ class ListeningRoomService extends ChangeNotifier {
   static const Duration _pollInterval = Duration(milliseconds: 2500);
   static const int _maxReactions = 20;
   static const int _maxMessages = 40;
+  static const int _maxMissingPollsBeforeClose = 3;
 
   final RoomDocGetter _getDocument;
   final RoomDocSetter _setDocument;
@@ -420,6 +441,7 @@ class ListeningRoomService extends ChangeNotifier {
   bool _busy = false;
   Timer? _pollTimer;
   int _lastHeartbeatMs = 0;
+  int _consecutiveMissingPolls = 0;
   final Set<String> _seenReactionIds = <String>{};
   final List<ListeningRoomReaction> _recentBurstReactions =
       <ListeningRoomReaction>[];
@@ -541,6 +563,7 @@ class ListeningRoomService extends ChangeNotifier {
         return false;
       }
       _room = state;
+      _consecutiveMissingPolls = 0;
       _seenReactionIds.clear();
       _recentBurstReactions.clear();
       _lastHeartbeatMs = nowMs;
@@ -579,7 +602,12 @@ class ListeningRoomService extends ChangeNotifier {
         _lastError = 'No existe ninguna sala activa con el código $code.';
         return false;
       }
-      final nowMs = _clock().millisecondsSinceEpoch;
+      final now = _clock();
+      if (parsed.hostUid != uid && parsed.isHostStaleAt(now)) {
+        _lastError = 'Esta sala ya finalizó por inactividad del anfitrión.';
+        return false;
+      }
+      final nowMs = now.millisecondsSinceEpoch;
       final updatedMembers = _upsertMember(
         parsed.members,
         ListeningRoomMember(
@@ -615,6 +643,7 @@ class ListeningRoomService extends ChangeNotifier {
         messages: parsed.messages,
         createdAtMs: parsed.createdAtMs,
       );
+      _consecutiveMissingPolls = 0;
       _seenReactionIds
         ..clear()
         ..addAll(parsed.reactions.map((r) => r.id));
@@ -832,18 +861,33 @@ class ListeningRoomService extends ChangeNotifier {
     try {
       final fetched = await _fetchLatestState(current.code);
       if (fetched == null) {
-        // Host closed the room.
+        // Tolerate brief transient network blips before assuming the host
+        // closed the room.
+        _consecutiveMissingPolls++;
+        if (_consecutiveMissingPolls < _maxMissingPollsBeforeClose) {
+          return;
+        }
         _stopPolling();
         _room = null;
+        _consecutiveMissingPolls = 0;
         _lastError = 'El anfitrión cerró la sala.';
+        notifyListeners();
+        return;
+      }
+      _consecutiveMissingPolls = 0;
+      final now = _clock();
+      final uid = myUid;
+      if (uid != null && fetched.hostUid != uid && fetched.isHostStaleAt(now)) {
+        _stopPolling();
+        _room = null;
+        _lastError = 'La sala finalizó por inactividad del anfitrión.';
         notifyListeners();
         return;
       }
       _room = fetched;
       _ingestReactions(fetched.reactions);
 
-      final uid = myUid;
-      final nowMs = _clock().millisecondsSinceEpoch;
+      final nowMs = now.millisecondsSinceEpoch;
       if (uid != null && nowMs - _lastHeartbeatMs >= 30000) {
         _lastHeartbeatMs = nowMs;
         final updatedMembers = _upsertMember(

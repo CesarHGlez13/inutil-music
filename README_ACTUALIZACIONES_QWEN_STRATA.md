@@ -3,7 +3,7 @@
 > **App Oficial:** **Inutix Music** (ecosistema **inutix.com** junto con **Inutix TV** / **Familia Inutix**)
 > **Package ID Android:** `com.inutilmusic.app` *(namespace interno; NO cambiar para no romper OTAs)*
 > **Repo:** `/home/cesar/Escritorio/alo/inutil_music` → `CesarHGlez13/inutil-music` (rama `master`)
-> **Versión base actual:** `2.5.31+4289`
+> **Versión base actual:** `2.5.32+4290`
 
 ---
 
@@ -41,6 +41,8 @@ Varios archivos superan 5,000 líneas (`home_page.dart`, `player_panel.dart`, `s
 | Auth, licencias, recuperación de sesión y Panel Admin | `lib/core/firebase/firebase_auth_service.dart`, `inutil_auth_gate.dart`, `inutil_admin_panel.dart` |
 | Infra `inutix.com` y failover LAN→api→backup | `lib/core/firebase/firebase_config.dart`, `firebase_firestore_service.dart` |
 | Inutix Connect (LAN + nube, aislamiento por cuenta) | `lib/core/firebase/firebase_playback_sync_service.dart`, `inutil_connect_sheet.dart` |
+| Persistencia de última canción y posición (min:seg) | `lib/features/music/data/datasources/playback_resume_store.dart`, `player_controller.dart` |
+| Listening Rooms (sync host/invitado, cola votada, deep links) | `lib/core/firebase/listening_room_service.dart`, `listening_room_providers.dart`, `listening_room_sheet.dart` |
 | Ajustes y Acerca de | `lib/features/music/presentation/widgets/settings_panel.dart` |
 | Relay autoritativo S7 Edge | `/home/cesar/Escritorio/alo/inutil_relay/relay.py` |
 

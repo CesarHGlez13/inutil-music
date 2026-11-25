@@ -83,6 +83,27 @@ double miniArtworkRingProgress(Duration position, Duration? duration) {
   return (wholeSeconds * 1000 / totalMilliseconds).clamp(0.0, 1.0).toDouble();
 }
 
+/// Returns `true` only when [snapshot] represents an active or restored track
+/// (or a visible playback error) that should display the mini-player.
+///
+/// Fresh installs (`PlayerStatus.idle`) and explicit stops (`PlayerStatus.stopped`)
+/// return `false` so the mini-player remains hidden until the user plays a song
+/// or a previously saved session is restored.
+bool hasMiniPlayerPlayback(PlayerSnapshot? snapshot) {
+  if (snapshot == null) return false;
+  final hasTrackIdentity =
+      snapshot.trackId?.trim().isNotEmpty == true ||
+      snapshot.title?.trim().isNotEmpty == true;
+  if (!hasTrackIdentity) {
+    return snapshot.errorMessage?.trim().isNotEmpty == true;
+  }
+  if (snapshot.status == PlayerStatus.idle ||
+      snapshot.status == PlayerStatus.stopped) {
+    return false;
+  }
+  return true;
+}
+
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({
     this.onOpenPlayer,

@@ -88,6 +88,9 @@
                 <data
                     android:scheme="inutilmusic"
                     android:host="track" />
+                <data
+                    android:scheme="inutilmusic"
+                    android:host="room" />
             </intent-filter>
             <!--
                  Offer Inutil as an option for public YouTube links. This is

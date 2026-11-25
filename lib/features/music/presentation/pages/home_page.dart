@@ -25,7 +25,6 @@ import '../../../../core/utils/image_source.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../platform_channels/android_app_activation_channel.dart';
 import '../../../../platform_channels/android_external_audio_channel.dart';
-import '../../../../services/player/player_service.dart';
 import '../../../../services/recommendations/recommendation_feed_models.dart';
 import '../../../../services/sharing/inutil_track_link.dart';
 import '../../../../services/sharing/incoming_csv_file_service.dart';
@@ -207,6 +206,8 @@ class _HomePageState extends ConsumerState<HomePage>
   _incomingTrackLinkSubscription;
   ProviderSubscription<AsyncValue<YouTubeMusicLink>>?
   _incomingYouTubeMusicLinkSubscription;
+  ProviderSubscription<AsyncValue<String>>?
+  _incomingListeningRoomLinkSubscription;
   ProviderSubscription<AsyncValue<IncomingCsvFile>>?
   _incomingCsvFileSubscription;
   Future<void> _externalAudioWork = Future<void>.value();
@@ -318,6 +319,12 @@ class _HomePageState extends ConsumerState<HomePage>
           (_, next) => next.whenData(_queueIncomingYouTubeMusicLink),
           fireImmediately: true,
         );
+    _incomingListeningRoomLinkSubscription = ref
+        .listenManual<AsyncValue<String>>(
+          incomingListeningRoomLinkProvider,
+          (_, next) => next.whenData(_handleIncomingListeningRoomCode),
+          fireImmediately: true,
+        );
     _incomingCsvFileSubscription = ref
         .listenManual<AsyncValue<IncomingCsvFile>>(incomingCsvFileProvider, (
           _,
@@ -384,6 +391,20 @@ class _HomePageState extends ConsumerState<HomePage>
             ),
           ),
         );
+    });
+  }
+
+  void _handleIncomingListeningRoomCode(String roomCode) {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      unawaited(
+        ListeningRoomSheet.show(
+          context,
+          initialRoomCode: roomCode,
+          autoJoin: true,
+        ),
+      );
     });
   }
 
@@ -751,6 +772,14 @@ class _HomePageState extends ConsumerState<HomePage>
     if (_appForeground) {
       unawaited(
         ref.read(youtubeMusicAuthControllerProvider.notifier).refreshProfile(),
+      );
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      unawaited(
+        ref
+            .read(playerControllerProvider.notifier)
+            .persistPlaybackSessionNow(force: true),
       );
     }
     ref
@@ -1276,6 +1305,7 @@ class _HomePageState extends ConsumerState<HomePage>
     unawaited(_appActivationSubscription?.cancel());
     _incomingTrackLinkSubscription?.close();
     _incomingYouTubeMusicLinkSubscription?.close();
+    _incomingListeningRoomLinkSubscription?.close();
     _incomingCsvFileSubscription?.close();
     _localMusicNavigationController.dispose();
     _libraryNavigationController.dispose();
@@ -1449,14 +1479,9 @@ class _HomePageState extends ConsumerState<HomePage>
         AppColors.surfaceBackgroundModeFor(context);
     final transparentSurfaces = surfaceMode.usesBackdrop;
     final hasActivePlayback = ref.watch(
-      playerControllerProvider.select((player) {
-        final snapshot = player.value;
-        if (snapshot == null) return false;
-        return snapshot.status != PlayerStatus.idle ||
-            snapshot.title?.trim().isNotEmpty == true ||
-            snapshot.artist?.trim().isNotEmpty == true ||
-            snapshot.errorMessage?.trim().isNotEmpty == true;
-      }),
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
     );
     final miniPlayerVisible = !_isPlayerSelected && hasActivePlayback;
     final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
@@ -2057,29 +2082,33 @@ class _ShellVisibilityTransition extends StatelessWidget {
                     ),
                   ),
                 );
-                return ClipRect(
-                  key: clipKey,
-                  clipper:
-                      fixedHorizontalClipWidth == null && clipTopOutset == 0
-                      ? null
-                      : _ShellBoundsClipper(
-                          fixedHorizontalClipWidth,
-                          topOutset: clipTopOutset,
-                        ),
-                  // Keep Liquid Glass out of an Opacity save layer: fading the
-                  // complete BackdropFilter also fades its sampled background and
-                  // makes the material look like a flat overlay. Its full-height
-                  // translation exits through this clip instead. Other surface
-                  // modes retain their established fade.
-                  child: preserveBackdropMaterial
-                      ? KeyedSubtree(key: opacityKey, child: movingChild)
-                      : Opacity(
-                          key: opacityKey,
-                          opacity:
-                              1 -
-                              math.pow(1 - value.clamp(0.0, 1.0), 3).toDouble(),
-                          child: movingChild,
-                        ),
+                final isCompletelyHidden = !visible && value <= 0.001;
+                return Offstage(
+                  offstage: isCompletelyHidden,
+                  child: ClipRect(
+                    key: clipKey,
+                    clipper:
+                        fixedHorizontalClipWidth == null && clipTopOutset == 0
+                        ? null
+                        : _ShellBoundsClipper(
+                            fixedHorizontalClipWidth,
+                            topOutset: clipTopOutset,
+                          ),
+                    // Keep Liquid Glass out of an Opacity save layer: fading the
+                    // complete BackdropFilter also fades its sampled background and
+                    // makes the material look like a flat overlay. Its full-height
+                    // translation exits through this clip instead. Other surface
+                    // modes retain their established fade.
+                    child: preserveBackdropMaterial
+                        ? KeyedSubtree(key: opacityKey, child: movingChild)
+                        : Opacity(
+                            key: opacityKey,
+                            opacity:
+                                1 -
+                                math.pow(1 - value.clamp(0.0, 1.0), 3).toDouble(),
+                            child: movingChild,
+                          ),
+                  ),
                 );
               },
               child: child,

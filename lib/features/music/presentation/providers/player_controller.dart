@@ -84,6 +84,10 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   bool _nativeLoadIntentObserved = false;
   bool _resumeNeedsReload = false;
   Duration? _resumePlaybackPosition;
+  DateTime _lastResumePersistAt = DateTime.fromMillisecondsSinceEpoch(0);
+  String? _lastPersistedTrackKey;
+  int _lastPersistedPositionMs = -1;
+  PlayerSnapshot? _lastSnapshotForPersist;
   ({int requestId, Duration position})? _pendingLiveRestorePosition;
   Timer? _playbackRecoveryTimer;
   Timer? _remoteClockTimer;
@@ -560,6 +564,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         }
         _observePlaybackHistory(decorated);
         state = AsyncData(decorated);
+        _maybePersistPlaybackSession(decorated);
         _maybeStartAudioQualityUpgrade(decorated);
       }
       if (queueIndexChanged && decorated.isRemote) {
@@ -576,6 +581,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         _maybeHandleCompletion(decorated);
       }
     });
+    final resumeStore = ref.read(playbackResumeStoreProvider);
     ref.onDispose(() {
       // Every asynchronous continuation checks this generation before it can
       // publish or persist work. Invalidate it before the provider and player
@@ -599,10 +605,192 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
         restoration.complete();
       }
       _changingLocalTrackRequestId = null;
+      final cachedSession = _buildSavedPlaybackSession(
+        _lastSnapshotForPersist,
+      );
+      if (cachedSession != null) {
+        unawaited(resumeStore.save(cachedSession));
+      }
       unawaited(historyShutdownRegistration.dispose());
       unawaited(subscription.cancel());
     });
-    return initialSnapshot;
+    final restoredSnapshot = await _restoreSavedPlaybackSessionIfEmpty(
+      initialSnapshot,
+    );
+    return restoredSnapshot ?? initialSnapshot;
+  }
+
+  Future<PlayerSnapshot?> _restoreSavedPlaybackSessionIfEmpty(
+    PlayerSnapshot initialSnapshot,
+  ) async {
+    if (_disposed ||
+        _queue.isNotEmpty ||
+        initialSnapshot.status != PlayerStatus.idle ||
+        !InutilPlaybackSyncService.instance.isCurrentDeviceActive) {
+      return null;
+    }
+    final store = ref.read(playbackResumeStoreProvider);
+    final saved = await store.load(
+      expectedAccountUid: InutilAuthService.instance.currentUser?.uid,
+    );
+    if (saved == null || _disposed || _queue.isNotEmpty) return null;
+
+    final restoredItems = <_QueueItem>[
+      for (final entry in saved.queue)
+        if (entry.local != null && entry.remote != null)
+          _QueueItem.hybrid(local: entry.local!, remote: entry.remote!)
+        else if (entry.local != null)
+          _QueueItem.local(entry.local!)
+        else if (entry.remote != null)
+          _QueueItem.remote(entry.remote!),
+    ];
+    if (restoredItems.isEmpty) return null;
+
+    final safeIndex = saved.currentIndex.clamp(0, restoredItems.length - 1);
+    final currentItem = restoredItems[safeIndex];
+    final clampedPosition = saved.clampedPosition;
+
+    _queue = List<_QueueItem>.unmodifiable(restoredItems);
+    _queueIndex = safeIndex;
+    _repeatMode = saved.repeatMode;
+    _shuffleEnabled = saved.shuffleEnabled;
+    _activePlaybackIsRemote = currentItem.local == null;
+    _resumeNeedsReload = true;
+    _resumePlaybackPosition = clampedPosition;
+    _userPaused = true;
+    _playWhenReady = false;
+    _explicitlyStopped = false;
+    _publishPlaybackQueue();
+
+    final remote = currentItem.remote;
+    final local = currentItem.local;
+    final trackId = remote?.id ?? local?.id;
+    final title = remote?.title ?? local?.title;
+    final artist = remote?.artist ?? local?.artist;
+    final album = remote?.album ?? local?.album;
+    final thumbnailUrl =
+        remote?.thumbnailUrl ?? local?.thumbnailPath ?? local?.thumbnailUrl;
+    final sourceUrl = remote?.url ?? local?.sourceUrl ?? local?.filePath;
+    final duration = saved.durationMs > 0
+        ? Duration(milliseconds: saved.durationMs)
+        : (remote?.duration ?? local?.duration);
+
+    _lastPersistedTrackKey = trackId;
+    _lastPersistedPositionMs = clampedPosition.inMilliseconds;
+    _lastResumePersistAt = DateTime.now();
+
+    final restoredDecorated = _decorateSnapshot(
+      initialSnapshot.copyWith(
+        status: PlayerStatus.paused,
+        playWhenReady: false,
+        trackId: trackId,
+        title: title,
+        artist: artist,
+        album: album,
+        thumbnailUrl: thumbnailUrl,
+        sourceUrl: sourceUrl,
+        isRemote: currentItem.local == null,
+        position: clampedPosition,
+        duration: duration,
+        repeatMode: _repeatMode,
+        shuffleEnabled: _shuffleEnabled,
+      ),
+    );
+    _lastSnapshotForPersist = restoredDecorated;
+    return restoredDecorated;
+  }
+
+  SavedPlaybackSession? _buildSavedPlaybackSession(PlayerSnapshot? snapshot) {
+    if (snapshot == null ||
+        isLiveQueueActive ||
+        _queue.isEmpty ||
+        _queueIndex < 0 ||
+        _queueIndex >= _queue.length) {
+      return null;
+    }
+    final trackKey = snapshot.trackId?.trim() ?? snapshot.title?.trim() ?? '';
+    if (trackKey.isEmpty) return null;
+    final effectivePosMs = (_resumeNeedsReload && _resumePlaybackPosition != null
+            ? _resumePlaybackPosition!
+            : snapshot.position)
+        .inMilliseconds
+        .clamp(0, 1 << 30);
+    return SavedPlaybackSession(
+      accountUid: InutilAuthService.instance.currentUser?.uid,
+      queue: <SavedPlaybackQueueEntry>[
+        for (final item in _queue)
+          SavedPlaybackQueueEntry(remote: item.remote, local: item.local),
+      ],
+      currentIndex: _queueIndex,
+      positionMs: effectivePosMs,
+      durationMs: snapshot.duration?.inMilliseconds ?? 0,
+      repeatMode: _repeatMode,
+      shuffleEnabled: _shuffleEnabled,
+      savedAtMs: DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  void _maybePersistPlaybackSession(
+    PlayerSnapshot snapshot, {
+    bool force = false,
+  }) {
+    _lastSnapshotForPersist = snapshot;
+    if (_disposed ||
+        isLiveQueueActive ||
+        _queue.isEmpty ||
+        _queueIndex < 0 ||
+        _queueIndex >= _queue.length) {
+      return;
+    }
+    if (!InutilPlaybackSyncService.instance.isCurrentDeviceActive) return;
+    if (snapshot.status == PlayerStatus.idle ||
+        snapshot.status == PlayerStatus.failed) {
+      return;
+    }
+    final trackKey = snapshot.trackId?.trim() ?? snapshot.title?.trim() ?? '';
+    if (trackKey.isEmpty) return;
+
+    final effectivePosMs = (_resumeNeedsReload && _resumePlaybackPosition != null
+            ? _resumePlaybackPosition!
+            : snapshot.position)
+        .inMilliseconds
+        .clamp(0, 1 << 30);
+    final now = DateTime.now();
+    final trackChanged = trackKey != _lastPersistedTrackKey;
+    final movedEnough = (effectivePosMs - _lastPersistedPositionMs).abs() >= 2000;
+    final elapsedEnough =
+        now.difference(_lastResumePersistAt) >= const Duration(seconds: 5);
+
+    if (!force && !trackChanged && !(movedEnough && elapsedEnough)) {
+      return;
+    }
+
+    _lastPersistedTrackKey = trackKey;
+    _lastPersistedPositionMs = effectivePosMs;
+    _lastResumePersistAt = now;
+
+    final session = _buildSavedPlaybackSession(snapshot);
+    if (session != null) {
+      unawaited(ref.read(playbackResumeStoreProvider).save(session));
+    }
+  }
+
+  /// Flushes the current song and exact playback timestamp to local storage so
+  /// cold restarts reopen directly at the exact minute and second.
+  Future<void> persistPlaybackSessionNow({bool force = true}) async {
+    if (_disposed) return;
+    final snapshot =
+        state.value ??
+        _lastSnapshotForPersist ??
+        ref.read(playerServiceProvider).currentSnapshot;
+    _lastSnapshotForPersist = snapshot;
+    final session = _buildSavedPlaybackSession(snapshot);
+    if (session == null) return;
+    _lastPersistedTrackKey =
+        snapshot.trackId?.trim() ?? snapshot.title?.trim() ?? '';
+    _lastPersistedPositionMs = session.positionMs;
+    _lastResumePersistAt = DateTime.now();
+    await ref.read(playbackResumeStoreProvider).save(session);
   }
 
   void _prepareQueueSourceTransition(String? sourceId) {
@@ -3984,13 +4172,13 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     if (pending) _cancelPendingPlaybackForPause();
     _remotePrefetch.invalidate();
     ref.read(remotePlaybackCacheProvider).cancelPlaybackWarmups();
-    state = AsyncData(
-      current.copyWith(
-        status: PlayerStatus.paused,
-        playWhenReady: false,
-        position: _resumePlaybackPosition ?? current.position,
-      ),
+    final pausedSnapshot = current.copyWith(
+      status: PlayerStatus.paused,
+      playWhenReady: false,
+      position: _resumePlaybackPosition ?? current.position,
     );
+    state = AsyncData(pausedSnapshot);
+    _maybePersistPlaybackSession(pausedSnapshot, force: true);
     await service.pause();
   }
 
@@ -4335,6 +4523,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   }
 
   Future<void> stop() async {
+    await persistPlaybackSessionNow(force: true);
     _releasePlaybackIntent();
     _userPaused = false;
     _resumeNeedsReload = false;
@@ -4386,13 +4575,22 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
       );
       _resumePlaybackPosition = clamped;
       if (current != null) {
-        state = AsyncData(current.copyWith(position: clamped));
+        final updated = current.copyWith(position: clamped);
+        state = AsyncData(updated);
+        _maybePersistPlaybackSession(updated, force: true);
       }
       return;
     }
     final seekRequestId = ++_seekRequestId;
     final playRequestId = _playRequestId;
     await ref.read(playerServiceProvider).seek(position);
+    final afterSeek = state.value;
+    if (!_disposed && afterSeek != null) {
+      _maybePersistPlaybackSession(
+        afterSeek.copyWith(position: position),
+        force: true,
+      );
+    }
     if (_disposed ||
         seekRequestId != _seekRequestId ||
         playRequestId != _playRequestId) {

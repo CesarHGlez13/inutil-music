@@ -169,7 +169,14 @@ void main() {
             catalogPlaylistsProvider.overrideWith((ref) async => []),
           ],
           child: _detailApp(
-            player: _RecordingPlayerController(),
+            player: _RecordingPlayerController(
+              initialSnapshot: const PlayerSnapshot(
+                status: PlayerStatus.playing,
+                trackId: 'song-1',
+                title: 'Primera cancion',
+                artist: 'Artista principal',
+              ),
+            ),
             tracksProvider: tracksProvider,
           ),
         ),
@@ -273,7 +280,7 @@ void main() {
       expect(find.text('Segunda cancion'), findsOneWidget);
       expect(
         find.byKey(const ValueKey('remote-collection-mini-player')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const ValueKey('track-result-play-song-1')),
@@ -466,7 +473,14 @@ void main() {
             viewPadding: EdgeInsets.only(bottom: bottomInset),
           ),
           child: _detailApp(
-            player: _RecordingPlayerController(),
+            player: _RecordingPlayerController(
+              initialSnapshot: const PlayerSnapshot(
+                status: PlayerStatus.playing,
+                trackId: 'song-1',
+                title: 'Primera cancion',
+                artist: 'Artista principal',
+              ),
+            ),
             tracksProvider: tracksProvider,
           ),
         ),
@@ -537,7 +551,14 @@ void main() {
           viewPadding: EdgeInsets.only(bottom: 24),
         ),
         child: _detailApp(
-          player: _RecordingPlayerController(),
+          player: _RecordingPlayerController(
+            initialSnapshot: const PlayerSnapshot(
+              status: PlayerStatus.playing,
+              trackId: 'long-song-1',
+              title: 'Cancion 1',
+              artist: 'Artista principal',
+            ),
+          ),
           tracksProvider: tracksProvider,
         ),
       ),
@@ -1203,14 +1224,18 @@ class _PickerPlaylistsController extends PlaylistsController {
 }
 
 class _RecordingPlayerController extends PlayerController {
+  _RecordingPlayerController({
+    this.initialSnapshot = const PlayerSnapshot(status: PlayerStatus.idle),
+  });
+
+  final PlayerSnapshot initialSnapshot;
   int playCalls = 0;
   TrackInfo? lastTrack;
   List<TrackInfo>? lastQueue;
   String? lastQueueSourceId;
 
   @override
-  Future<PlayerSnapshot> build() async =>
-      const PlayerSnapshot(status: PlayerStatus.idle);
+  Future<PlayerSnapshot> build() async => initialSnapshot;
 
   @override
   Future<void> playRemote(

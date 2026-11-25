@@ -1156,7 +1156,14 @@ void main() {
         ),
         child: _artistProfileApp(
           service: service,
-          player: _RecordingPlayerController(),
+          player: _RecordingPlayerController(
+            initialSnapshot: const PlayerSnapshot(
+              status: PlayerStatus.playing,
+              trackId: 'longPopular1',
+              title: 'Popular 1',
+              artist: 'Artista de prueba',
+            ),
+          ),
         ),
       ),
     );
@@ -1912,6 +1919,11 @@ class _RecordingArtistAccount implements YouTubeMusicArtistAccount {
 }
 
 class _RecordingPlayerController extends PlayerController {
+  _RecordingPlayerController({
+    this.initialSnapshot = const PlayerSnapshot(status: PlayerStatus.idle),
+  });
+
+  final PlayerSnapshot initialSnapshot;
   int playCalls = 0;
   TrackInfo? lastTrack;
   List<TrackInfo>? lastQueue;
@@ -1919,8 +1931,7 @@ class _RecordingPlayerController extends PlayerController {
   Completer<void>? playBlocker;
 
   @override
-  Future<PlayerSnapshot> build() async =>
-      const PlayerSnapshot(status: PlayerStatus.idle);
+  Future<PlayerSnapshot> build() async => initialSnapshot;
 
   @override
   Future<void> playRemote(

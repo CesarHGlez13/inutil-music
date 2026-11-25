@@ -67,6 +67,11 @@ class _SearchBrowseCategoryPageState
         ),
       ),
     );
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
+    );
     return NotificationListener<ScrollNotification>(
       onNotification: _scrollMotion.handleNotification,
       child: Scaffold(
@@ -149,17 +154,19 @@ class _SearchBrowseCategoryPageState
             );
           },
         ),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: miniPlayerHeightFor(context, mode: appearance.mode),
-            child: MiniPlayer(
-              mode: appearance.mode,
-              backgroundMode: appearance.background,
-              onOpenPlayer: _openPlayer,
-            ),
-          ),
-        ),
+        bottomNavigationBar: hasActivePlayback
+            ? SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: miniPlayerHeightFor(context, mode: appearance.mode),
+                  child: MiniPlayer(
+                    mode: appearance.mode,
+                    backgroundMode: appearance.background,
+                    onOpenPlayer: _openPlayer,
+                  ),
+                ),
+              )
+            : null,
       ),
     );
   }

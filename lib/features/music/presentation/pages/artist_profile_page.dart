@@ -138,14 +138,20 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
         ),
       ),
     );
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
+    );
     final miniPlayerMode = miniPlayerAppearance.mode;
     final underlayMiniPlayer =
-        miniPlayerMode == MiniPlayerMode.capsule ||
-        miniPlayerAppearance.backgroundMode.usesBackdrop;
+        hasActivePlayback &&
+        (miniPlayerMode == MiniPlayerMode.capsule ||
+            miniPlayerAppearance.backgroundMode.usesBackdrop);
     final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
     final bottomContentPadding = underlayMiniPlayer
         ? miniPlayerHeight + MediaQuery.viewPaddingOf(context).bottom
-        : 0.0;
+        : MediaQuery.viewPaddingOf(context).bottom;
     final profile =
         profileState.value ??
         InnerTubeArtistProfile(
@@ -187,22 +193,24 @@ class _ArtistProfilePageState extends ConsumerState<ArtistProfilePage> {
           ),
         ],
       ),
-      bottomNavigationBar: ColoredBox(
-        color: underlayMiniPlayer
-            ? Colors.transparent
-            : Theme.of(context).colorScheme.surface,
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: miniPlayerHeight,
-            child: MiniPlayer(
-              mode: miniPlayerMode,
-              backgroundMode: miniPlayerAppearance.backgroundMode,
-              onOpenPlayer: _returnToPlayer,
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar: hasActivePlayback
+          ? ColoredBox(
+              color: underlayMiniPlayer
+                  ? Colors.transparent
+                  : Theme.of(context).colorScheme.surface,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: miniPlayerHeight,
+                  child: MiniPlayer(
+                    mode: miniPlayerMode,
+                    backgroundMode: miniPlayerAppearance.backgroundMode,
+                    onOpenPlayer: _returnToPlayer,
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
   }
 

@@ -542,10 +542,23 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   static bool get isDesktopHost =>
       Platform.isLinux || Platform.isWindows || Platform.isMacOS;
 
-  /// true si acabamos de ejecutar un comando remoto: nuestra reproducción
-  /// local es "heredada" y no debe reenviarse a otro dispositivo.
+  bool _listeningRoomGuestMode = false;
+
+  bool get isListeningRoomGuestMode => _listeningRoomGuestMode;
+
+  /// Activa o desactiva la supresión de Inutix Connect mientras este dispositivo
+  /// sigue como invitado una Listening Room sincronizada.
+  void setListeningRoomGuestMode(bool active) {
+    if (_listeningRoomGuestMode == active) return;
+    _listeningRoomGuestMode = active;
+    notifyListeners();
+  }
+
+  /// true si acabamos de ejecutar un comando remoto o estamos como invitado en
+  /// una Listening Room: nuestra reproducción local no debe reenviarse a otro
+  /// dispositivo por Inutix Connect.
   bool get isPlaybackRouteSuppressed =>
-      DateTime.now().isBefore(_routeSuppressedUntil);
+      _listeningRoomGuestMode || DateTime.now().isBefore(_routeSuppressedUntil);
 
   static bool isPeerOnline(LanDevicePeer peer) =>
       DateTime.now().difference(peer.lastSeen) < lanPeerTtl;

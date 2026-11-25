@@ -955,6 +955,7 @@ class InutilAuthService extends ChangeNotifier {
     _validateTimer = null;
     _kickedOutReason = '';
     _inactivityPaused = false;
+    await prefs.remove('inutix.playback.resume_session.v1');
     _inactiveDays = 0;
     _lastHeartbeatAt = null;
     _currentUser = null;

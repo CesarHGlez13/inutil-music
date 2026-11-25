@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.32+4290 — 2026-11-24
+- **Mini-reproductor inteligente en primer arranque:** al instalar la app por primera vez, el mini-reproductor permanece completamente oculto en Inicio y en todas las páginas de artistas, álbumes, playlists y categorías hasta que reproduzcas tu primera canción.
+- **Reanudación exacta donde te quedaste:** al cerrar y volver a abrir Inutix Music, tu última canción y su cola reaparecen listas en pausa exactamente en el minuto y segundo donde la dejaste para continuar al instante con un toque.
+- **Listening Rooms renovado y sincronizado:** ahora los enlaces compartidos (`inutilmusic://room/…`) abren y te unen automáticamente a la sala, la cola colaborativa votada avanza sola al terminar cada canción, los invitados se sincronizan sin saltos ni cortes por microcortes de red y el control del anfitrión queda protegido.
+
 ## 2.5.31+4289 — 2026-11-24
 - **Compartir momento en el recorrido interactivo en vivo:** el recorrido ahora abre el reproductor a pantalla completa en tiempo real y destaca el estudio de **Compartir momento** (clips MP4 de 5 a 30 s en 1080p 60 fps con letras karaoke, Canvas animado o Echo Memory listos para WhatsApp HD, Instagram y TikTok sin grabar pantalla).
 - **Inutix Connect privado por cuenta:** los dispositivos en la misma red Wi-Fi ahora solo se descubren, muestran y controlan cuando ambos tienen iniciada la misma cuenta Inutix, eliminando cualquier cruce entre cuentas distintas.

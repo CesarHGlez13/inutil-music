@@ -18,17 +18,29 @@ import 'source_image.dart';
 /// Interactive modal for Listening Rooms (create, join by code/QR, share invite,
 /// live synchronized playback, collaborative upvoted queue, reactions & chat).
 class ListeningRoomSheet extends ConsumerStatefulWidget {
-  const ListeningRoomSheet({this.initialRoomCode, super.key});
+  const ListeningRoomSheet({
+    this.initialRoomCode,
+    this.autoJoin = false,
+    super.key,
+  });
 
   final String? initialRoomCode;
+  final bool autoJoin;
 
-  static Future<void> show(BuildContext context, {String? initialRoomCode}) {
+  static Future<void> show(
+    BuildContext context, {
+    String? initialRoomCode,
+    bool autoJoin = false,
+  }) {
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ListeningRoomSheet(initialRoomCode: initialRoomCode),
+      builder: (_) => ListeningRoomSheet(
+        initialRoomCode: initialRoomCode,
+        autoJoin: autoJoin,
+      ),
     );
   }
 
@@ -56,6 +68,15 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
     if (widget.initialRoomCode != null &&
         widget.initialRoomCode!.trim().isNotEmpty) {
       _joinCodeController.text = widget.initialRoomCode!.trim();
+      if (widget.autoJoin) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final service = ref.read(listeningRoomServiceProvider);
+          if (!service.isInRoom && !service.isBusy) {
+            unawaited(_joinRoom(widget.initialRoomCode));
+          }
+        });
+      }
     }
   }
 

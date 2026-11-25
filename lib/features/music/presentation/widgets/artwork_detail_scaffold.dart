@@ -11,8 +11,8 @@ import '../../../../core/widgets/painted_glass_button_style.dart';
 class ArtworkDetailScaffold extends StatefulWidget {
   const ArtworkDetailScaffold({
     required this.body,
-    required this.bottomNavigationBar,
     required this.backButtonKey,
+    this.bottomNavigationBar,
     this.extendBody = false,
     this.onBack,
     this.backTooltip,
@@ -23,7 +23,7 @@ class ArtworkDetailScaffold extends StatefulWidget {
   });
 
   final Widget body;
-  final Widget bottomNavigationBar;
+  final Widget? bottomNavigationBar;
   final Key backButtonKey;
   final bool extendBody;
   final VoidCallback? onBack;

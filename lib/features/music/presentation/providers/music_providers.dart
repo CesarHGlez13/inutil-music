@@ -17,8 +17,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
+import '../../../../core/firebase/firebase_auth_service.dart';
 import '../../../../core/firebase/firebase_playback_sync_service.dart';
 import '../../../../core/firebase/firebase_sync_providers.dart';
+import '../../../../core/firebase/listening_room_service.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/platform/app_platform.dart';
 import '../../../../services/player/cast_aware_player_service.dart';
@@ -84,6 +86,7 @@ import '../../../../services/youtube_music/playlist_sync/playlist_three_way_merg
 import '../../../../services/youtube_music/playlist_sync/sqlite_playlist_sync_store.dart';
 import '../../../../services/youtube_music/playlist_sync/youtube_music_account_playlist_gateway.dart';
 import '../../data/datasources/local_music_datasource.dart';
+import '../../data/datasources/playback_resume_store.dart';
 import '../../data/datasources/remote_music_datasource.dart';
 import '../../data/models/track_info_model.dart';
 import '../../data/repositories/catalog_playlist_repository_impl.dart';
@@ -477,6 +480,43 @@ final incomingYouTubeMusicLinkProvider = StreamProvider<YouTubeMusicLink>((
     yield link;
   }
 });
+
+/// Incoming Listening Room invite links (`inutilmusic://room/<CODE>` or
+/// `https://.../room/<CODE>`).
+final incomingListeningRoomLinkProvider = StreamProvider<String>((ref) async* {
+  final source = ref.watch(incomingTrackLinkServiceProvider);
+  String? previousCode;
+  DateTime? previousAt;
+
+  await for (final uri in source.links) {
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'inutilmusic' && scheme != 'http' && scheme != 'https') {
+      continue;
+    }
+    final isRoomHost = uri.host.toLowerCase() == 'room';
+    final hasRoomSegment = uri.pathSegments.any(
+      (s) => s.toLowerCase() == 'room',
+    );
+    final hasRoomQuery = uri.queryParameters.containsKey('room');
+    if (!isRoomHost && !hasRoomSegment && !hasRoomQuery) continue;
+
+    final code = ListeningRoomService.parseRoomCode(uri.toString());
+    if (code == null) continue;
+    final now = DateTime.now();
+    if (code == previousCode &&
+        previousAt != null &&
+        now.difference(previousAt) <= const Duration(seconds: 2)) {
+      continue;
+    }
+    previousCode = code;
+    previousAt = now;
+    yield code;
+  }
+});
+
+final playbackResumeStoreProvider = Provider<PlaybackResumeStore>(
+  (ref) => const PlaybackResumeStore(),
+);
 
 const _lyricsUserAgent =
     'InutilMusic/${AppConstants.appVersion} '
@@ -927,7 +967,11 @@ final desktopMediaSessionProvider = Provider<DesktopMediaSession?>((ref) {
     next: () => ref.read(playerControllerProvider.notifier).playNext(),
     previous: () => ref.read(playerControllerProvider.notifier).playPrevious(),
     stop: () => ref.read(playerControllerProvider.notifier).stop(),
-    taskRemoved: () => ref.read(playerControllerProvider.notifier).stop(),
+    taskRemoved: () async {
+      final player = ref.read(playerControllerProvider.notifier);
+      await player.persistPlaybackSessionNow(force: true);
+      await player.stop();
+    },
     seek: (position) =>
         ref.read(playerControllerProvider.notifier).seek(position),
     seekBy: (offset) => ref

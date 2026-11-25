@@ -122,14 +122,20 @@ class _RemoteCollectionDetailPageState
         ),
       ),
     );
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
+    );
     final miniPlayerMode = miniPlayerAppearance.mode;
     final underlayMiniPlayer =
-        miniPlayerMode == MiniPlayerMode.capsule ||
-        miniPlayerAppearance.backgroundMode.usesBackdrop;
+        hasActivePlayback &&
+        (miniPlayerMode == MiniPlayerMode.capsule ||
+            miniPlayerAppearance.backgroundMode.usesBackdrop);
     final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
     final bottomContentPadding = underlayMiniPlayer
         ? miniPlayerHeight + MediaQuery.viewPaddingOf(context).bottom
-        : 0.0;
+        : MediaQuery.viewPaddingOf(context).bottom;
     final animatedArtworkEnabled = ref.watch(
       settingsControllerProvider.select(
         (settings) =>
@@ -392,23 +398,25 @@ class _RemoteCollectionDetailPageState
       // This route has its own Scaffold, outside HomePage's shell. Reserve
       // the gesture/three-button navigation area here without duplicating it
       // while the keyboard is visible.
-      bottomNavigationBar: ColoredBox(
-        key: const ValueKey('remote-collection-mini-player'),
-        color: underlayMiniPlayer
-            ? Colors.transparent
-            : Theme.of(context).colorScheme.surface,
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: miniPlayerHeight,
-            child: MiniPlayer(
-              mode: miniPlayerMode,
-              backgroundMode: miniPlayerAppearance.backgroundMode,
-              onOpenPlayer: () => _openPlayer(context),
-            ),
-          ),
-        ),
-      ),
+      bottomNavigationBar: hasActivePlayback
+          ? ColoredBox(
+              key: const ValueKey('remote-collection-mini-player'),
+              color: underlayMiniPlayer
+                  ? Colors.transparent
+                  : Theme.of(context).colorScheme.surface,
+              child: SafeArea(
+                top: false,
+                child: SizedBox(
+                  height: miniPlayerHeight,
+                  child: MiniPlayer(
+                    mode: miniPlayerMode,
+                    backgroundMode: miniPlayerAppearance.backgroundMode,
+                    onOpenPlayer: () => _openPlayer(context),
+                  ),
+                ),
+              ),
+            )
+          : null,
     );
     return PopScope(
       canPop: !selection.active,

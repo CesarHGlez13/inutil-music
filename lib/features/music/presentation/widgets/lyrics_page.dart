@@ -320,7 +320,13 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
     final mediaSize = MediaQuery.sizeOf(context);
     final landscape = mediaSize.width > mediaSize.height;
     final showSideCompanion = mobileLayout ? landscape : true;
-    final showBottomMiniPlayer = !mobileLayout && !showSideCompanion;
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
+    );
+    final showBottomMiniPlayer =
+        !mobileLayout && !showSideCompanion && hasActivePlayback;
     final sideCompanionGap = showSideCompanion
         ? _lyricsDesktopCompanionGapFor(
             mediaSize.width,

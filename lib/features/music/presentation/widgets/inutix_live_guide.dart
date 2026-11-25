@@ -827,6 +827,16 @@ class _InutixLiveSpotlightOverlayState
   }
 
   Rect? _measureContext(BuildContext ctx, EdgeInsets padding) {
+    var hiddenByOffstage = false;
+    ctx.visitAncestorElements((ancestor) {
+      final widget = ancestor.widget;
+      if (widget is Offstage && widget.offstage) {
+        hiddenByOffstage = true;
+        return false;
+      }
+      return true;
+    });
+    if (hiddenByOffstage) return null;
     final renderObj = ctx.findRenderObject();
     if (renderObj is! RenderBox || !renderObj.hasSize || !renderObj.attached) {
       return null;

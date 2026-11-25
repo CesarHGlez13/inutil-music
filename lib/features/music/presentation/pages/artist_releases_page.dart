@@ -66,14 +66,20 @@ class ArtistReleasesPage extends ConsumerWidget {
         ),
       ),
     );
+    final hasActivePlayback = ref.watch(
+      playerControllerProvider.select(
+        (player) => hasMiniPlayerPlayback(player.value),
+      ),
+    );
     final miniPlayerMode = appearance.mode;
     final underlayMiniPlayer =
-        miniPlayerMode == MiniPlayerMode.capsule ||
-        appearance.background.usesBackdrop;
+        hasActivePlayback &&
+        (miniPlayerMode == MiniPlayerMode.capsule ||
+            appearance.background.usesBackdrop);
     final miniPlayerHeight = miniPlayerHeightFor(context, mode: miniPlayerMode);
     final bottomInset = underlayMiniPlayer
         ? miniPlayerHeight + MediaQuery.viewPaddingOf(context).bottom
-        : 0.0;
+        : MediaQuery.viewPaddingOf(context).bottom;
     final fetchedCatalog = catalog?.value;
     final fetchedReleases = fetchedCatalog?.releases;
     // A profile shelf can already contain the entire category, in which case
@@ -315,17 +321,19 @@ class ArtistReleasesPage extends ConsumerWidget {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: miniPlayerHeight,
-          child: MiniPlayer(
-            mode: miniPlayerMode,
-            backgroundMode: appearance.background,
-            onOpenPlayer: onOpenPlayer,
-          ),
-        ),
-      ),
+      bottomNavigationBar: hasActivePlayback
+          ? SafeArea(
+              top: false,
+              child: SizedBox(
+                height: miniPlayerHeight,
+                child: MiniPlayer(
+                  mode: miniPlayerMode,
+                  backgroundMode: appearance.background,
+                  onOpenPlayer: onOpenPlayer,
+                ),
+              ),
+            )
+          : null,
     );
   }
 
