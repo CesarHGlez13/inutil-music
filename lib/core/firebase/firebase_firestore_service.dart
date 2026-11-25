@@ -279,6 +279,26 @@ class InutilFirestoreService {
     return _decodeDocument(json);
   }
 
+  /// Lee un documento directamente contra Google Firestore sin pasar por
+  /// relays/respaldo. Se usa como doble verificación antes de declarar que una
+  /// cuenta ya no existe (404).
+  Future<Map<String, dynamic>?> getDocumentDirect(String path) async {
+    final url = Uri.parse('${FirebaseConfig.directFirestoreBaseUrl}/$path');
+    final response = await http
+        .get(url, headers: _headers())
+        .timeout(const Duration(seconds: 8));
+    if (response.statusCode == 404) return null;
+    if (response.statusCode != 200) {
+      throw FirestoreOperationException(
+        path,
+        response.statusCode,
+        response.body,
+      );
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    return _decodeDocument(json);
+  }
+
   /// Construye la URI de PATCH con `updateMask.fieldPaths` para actualizaciones
   /// parciales seguras (preservando `email`, `displayName`, `role`, etc.).
   @visibleForTesting
@@ -439,6 +459,10 @@ class InutilFirestoreService {
 
   Future<Map<String, dynamic>?> getUserProfile(String uid) async {
     return await getDocument('users/$uid');
+  }
+
+  Future<Map<String, dynamic>?> getUserProfileDirect(String uid) async {
+    return await getDocumentDirect('users/$uid');
   }
 
   Future<bool> adminUpdateUser(String uid, Map<String, dynamic> updates) async {

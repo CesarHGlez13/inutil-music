@@ -53,6 +53,7 @@ import 'echo_memory_sheet.dart';
 import 'favorite_star_badge.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_sleep_timer_sheet.dart';
+import 'inutix_live_guide.dart';
 import 'listening_room_sheet.dart';
 import 'lyrics_page_route.dart';
 import 'moment_share_sheet.dart';
@@ -5981,12 +5982,15 @@ class _PlayerMenu extends ConsumerWidget {
     }
 
     final surroundingTheme = _PlayerSurroundingTheme.maybeOf(context);
-    if (surroundingTheme == null) {
-      return buildButton(context);
-    }
-    return Theme(
-      data: surroundingTheme,
-      child: Builder(builder: buildButton),
+    final Widget menuButton = surroundingTheme == null
+        ? buildButton(context)
+        : Theme(
+            data: surroundingTheme,
+            child: Builder(builder: buildButton),
+          );
+    return InutixGuideAnchorTarget(
+      id: InutixGuideAnchors.playerMenuId,
+      child: menuButton,
     );
   }
 

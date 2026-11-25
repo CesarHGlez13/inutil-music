@@ -6189,7 +6189,7 @@ class _OnboardingTourEntryCard extends ConsumerWidget {
           glyph: InutilGlyph.sparkles,
           title: 'Recorrido interactivo en vivo',
           subtitle:
-              'Guía cinemática con foco luminoso sobre Inutix Connect, Máquina del Tiempo, Echo Memory, Algoritmo y Salas',
+              'Guía cinemática con foco luminoso sobre Inutix Connect, Compartir Momento, Máquina del Tiempo, Echo Memory, Algoritmo y Salas',
           onTap: () async {
             final days = ref.read(inutilAuthProvider).inactivityPolicyDays;
             await InutilOnboardingTour.show(context, inactivityDays: days);

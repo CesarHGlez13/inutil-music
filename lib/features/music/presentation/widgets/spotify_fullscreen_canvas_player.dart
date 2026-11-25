@@ -1121,44 +1121,47 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                       if (shareTrack != null ||
                           (ref.watch(momentClipExportServiceProvider).isSupported &&
                               hasTrack))
-                        IconButton(
-                          key: const ValueKey('spotify-canvas-share-button'),
-                          tooltip: strings.shareSong,
-                          color: Colors.white.withValues(alpha: 0.88),
-                          iconSize: 21,
-                          onPressed: () {
-                            final momentSupported = ref
-                                .read(momentClipExportServiceProvider)
-                                .isSupported;
-                            if (!momentSupported || !hasTrack) {
-                              if (shareTrack != null) {
-                                unawaited(
-                                  _shareTrack(
-                                    context: context,
-                                    ref: ref,
-                                    track: shareTrack,
-                                    strings: strings,
-                                  ),
-                                );
+                        InutixGuideAnchorTarget(
+                          id: InutixGuideAnchors.playerShareMomentId,
+                          child: IconButton(
+                            key: const ValueKey('spotify-canvas-share-button'),
+                            tooltip: strings.shareSong,
+                            color: Colors.white.withValues(alpha: 0.88),
+                            iconSize: 21,
+                            onPressed: () {
+                              final momentSupported = ref
+                                  .read(momentClipExportServiceProvider)
+                                  .isSupported;
+                              if (!momentSupported || !hasTrack) {
+                                if (shareTrack != null) {
+                                  unawaited(
+                                    _shareTrack(
+                                      context: context,
+                                      ref: ref,
+                                      track: shareTrack,
+                                      strings: strings,
+                                    ),
+                                  );
+                                }
+                                return;
                               }
-                              return;
-                            }
-                            unawaited(
-                              _showCanvasSharePicker(
-                                context: context,
-                                ref: ref,
-                                strings: strings,
-                                shareTrack: shareTrack,
-                                snapshot: snapshot,
-                                activeCanvasUrl: activeCanvasUrl,
-                                videoStartOffset: videoStartOffset,
-                                artworkSource: artworkSource,
-                                artworkFallbackSource: artworkFallbackSource,
-                                artworkAccentColor: artworkAccentColor,
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.share_outlined),
+                              unawaited(
+                                _showCanvasSharePicker(
+                                  context: context,
+                                  ref: ref,
+                                  strings: strings,
+                                  shareTrack: shareTrack,
+                                  snapshot: snapshot,
+                                  activeCanvasUrl: activeCanvasUrl,
+                                  videoStartOffset: videoStartOffset,
+                                  artworkSource: artworkSource,
+                                  artworkFallbackSource: artworkFallbackSource,
+                                  artworkAccentColor: artworkAccentColor,
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.share_outlined),
+                          ),
                         ),
                       IconButton(
                         tooltip: 'Cola de reproducción',

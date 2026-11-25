@@ -65,17 +65,41 @@ class LanDevicePeer {
       : DateTime.now().difference(lastSeen) <
             InutilPlaybackSyncService.lanPeerTtl;
 
-  /// Determina si el dispositivo pertenece al mismo usuario/cuenta.
-  bool isSameAccount(String? myEmail, String? myUid) {
-    if (userEmail.isNotEmpty && myEmail != null && myEmail.isNotEmpty) {
-      if (userEmail.trim().toLowerCase() == myEmail.trim().toLowerCase()) {
-        return true;
-      }
+  /// Determina estrictamente si dos identidades pertenecen a la MISMA cuenta.
+  /// - Si falta cuenta local o remota -> `false` (nunca emparejar sin sesión).
+  /// - Si ambos UID están presentes -> deben coincidir exactamente.
+  /// - Sólo si falta uno de los UID se compara el correo en minúsculas.
+  static bool isSameAccountIdentity({
+    required String? myUid,
+    required String? myEmail,
+    required String? otherUid,
+    required String? otherEmail,
+  }) {
+    final localUid = (myUid ?? '').trim();
+    final localEmail = (myEmail ?? '').trim().toLowerCase();
+    final remoteUid = (otherUid ?? '').trim();
+    final remoteEmail = (otherEmail ?? '').trim().toLowerCase();
+
+    if (localUid.isEmpty && localEmail.isEmpty) return false;
+    if (remoteUid.isEmpty && remoteEmail.isEmpty) return false;
+
+    if (localUid.isNotEmpty && remoteUid.isNotEmpty) {
+      return localUid == remoteUid;
     }
-    if (uid.isNotEmpty && myUid != null && myUid.isNotEmpty) {
-      if (uid.trim() == myUid.trim()) return true;
+    if (localEmail.isNotEmpty && remoteEmail.isNotEmpty) {
+      return localEmail == remoteEmail;
     }
     return false;
+  }
+
+  /// Determina si el dispositivo pertenece al mismo usuario/cuenta.
+  bool isSameAccount(String? myEmail, String? myUid) {
+    return isSameAccountIdentity(
+      myUid: myUid,
+      myEmail: myEmail,
+      otherUid: uid,
+      otherEmail: userEmail,
+    );
   }
 
   Map<String, dynamic> toJson() => {
@@ -488,17 +512,26 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     now: DateTime.now(),
   );
 
-  LanDevicePeer? get autoPairedPeer => _autoPairedPeer;
-  List<LanDevicePeer> get discoveredPeers =>
-      _discoveredPeers.values.where(isPeerOnline).toList();
+  LanDevicePeer? get autoPairedPeer {
+    final paired = _autoPairedPeer;
+    if (paired == null) return null;
+    return isSameAccountAsPeer(paired) ? paired : null;
+  }
+
+  List<LanDevicePeer> get discoveredPeers => _discoveredPeers.values
+      .where((peer) => isPeerOnline(peer) && isSameAccountAsPeer(peer))
+      .toList();
 
   /// Todos los destinos posibles del mando a distancia: los equipos de la red
   /// local y los que sólo se ven por Firestore, deduplicados y ordenados
-  /// (primero los que suenan). Así la lista funciona sin abrir puertos y
-  /// aunque el móvil esté conectado por datos y no por Wi-Fi.
+  /// (primero los que suenan). Sólo expone dispositivos de la MISMA cuenta.
   List<LanDevicePeer> get connectTargets => mergeConnectTargets(
-    lanPeers: _discoveredPeers.values.where(isPeerOnline),
-    cloudPeers: _cloudDevices.values.where((peer) => peer.isOnlineNow),
+    lanPeers: _discoveredPeers.values.where(
+      (peer) => isPeerOnline(peer) && isSameAccountAsPeer(peer),
+    ),
+    cloudPeers: _cloudDevices.values.where(
+      (peer) => peer.isOnlineNow && isSameAccountAsPeer(peer),
+    ),
   );
 
   bool get autoPlayOnPc => _autoPlayOnPc;
@@ -582,6 +615,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     Map<String, dynamic> doc, {
     required String myDeviceId,
     required DateTime now,
+    String ownerUid = '',
+    String ownerEmail = '',
   }) {
     final deviceId = (doc['deviceId'] ?? '').toString();
     if (deviceId.isEmpty || deviceId == myDeviceId) return null;
@@ -607,6 +642,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       deviceId: deviceId,
       deviceName: (doc['name'] ?? 'Dispositivo Inútil').toString(),
       platform: (doc['platform'] ?? 'generic').toString(),
+      userEmail: ownerEmail,
+      uid: ownerUid,
       isHost: doc['isHost'] as bool? ?? false,
       fromCloud: true,
       appVersion: (doc['appVersion'] ?? '').toString(),
@@ -1094,8 +1131,43 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     return const Duration(seconds: 15);
   }
 
+  String _boundAuthUid = '';
+  String _boundAuthEmail = '';
+  bool _authListenerAttached = false;
+
+  void _handleAuthIdentityChanged() {
+    final nextUid = (_auth.currentUser?.uid ?? '').trim();
+    final nextEmail = (_auth.currentUser?.email ?? '').trim().toLowerCase();
+    if (nextUid == _boundAuthUid && nextEmail == _boundAuthEmail) return;
+    _boundAuthUid = nextUid;
+    _boundAuthEmail = nextEmail;
+
+    // Al cambiar de cuenta o cerrar sesión, purgar por completo peers y
+    // sesiones remotas de la cuenta anterior para evitar cualquier cruce.
+    _discoveredPeers.clear();
+    _cloudDevices.clear();
+    _autoPairedPeer = null;
+    _currentRemoteSession = null;
+    _clearHandoffAuthority();
+    _liveHosts.clear();
+    notifyListeners();
+
+    if (nextUid.isNotEmpty || nextEmail.isNotEmpty) {
+      unawaited(_announceUdp());
+      unawaited(_performLanDiscovery());
+      unawaited(_publishPresence(online: true));
+      unawaited(_pollCloudDevices());
+    }
+  }
+
   /// Inicia el servidor LAN y la sincronización automática.
   void startSync() {
+    _boundAuthUid = (_auth.currentUser?.uid ?? '').trim();
+    _boundAuthEmail = (_auth.currentUser?.email ?? '').trim().toLowerCase();
+    if (!_authListenerAttached) {
+      _auth.addListener(_handleAuthIdentityChanged);
+      _authListenerAttached = true;
+    }
     _loadPreferences();
     _startLanServer();
     _startUdpAnnouncer();
@@ -1186,6 +1258,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }
 
   void stopSync() {
+    if (_authListenerAttached) {
+      _auth.removeListener(_handleAuthIdentityChanged);
+      _authListenerAttached = false;
+    }
     _syncPollingTimer?.cancel();
     _syncPollingTimer = null;
     _lanSessionTimer?.cancel();
@@ -1323,6 +1399,40 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       }
 
       if (path == '/api/session') {
+        final myUid = (_auth.currentUser?.uid ?? '').trim();
+        final myEmail = (_auth.currentUser?.email ?? '').trim().toLowerCase();
+        final requesterUid =
+            (request.headers.value('x-inutix-uid') ??
+                    request.uri.queryParameters['uid'] ??
+                    '')
+                .trim();
+        final requesterEmail =
+            (request.headers.value('x-inutix-email') ??
+                    request.uri.queryParameters['email'] ??
+                    '')
+                .trim()
+                .toLowerCase();
+        // Sin cuenta iniciada en este equipo, o si pregunta una cuenta distinta,
+        // no exponemos la sesión de reproducción a otros usuarios de la LAN.
+        final hasLocalAccount = myUid.isNotEmpty || myEmail.isNotEmpty;
+        final requesterProvided =
+            requesterUid.isNotEmpty || requesterEmail.isNotEmpty;
+        final requesterMatches =
+            !requesterProvided ||
+            LanDevicePeer.isSameAccountIdentity(
+              myUid: myUid,
+              myEmail: myEmail,
+              otherUid: requesterUid,
+              otherEmail: requesterEmail,
+            );
+        if (!hasLocalAccount || !requesterMatches) {
+          request.response
+            ..statusCode = HttpStatus.forbidden
+            ..headers.contentType = ContentType.json
+            ..write(jsonEncode({'status': 'unauthorized'}));
+          await request.response.close();
+          return;
+        }
         // Respondemos con **lo que este equipo muestra**, no con su snapshot
         // local congelado: si somos el mando, la sesión del altavoz. Y con la
         // posición estimada a este instante, para que el otro mando no vea la
@@ -1346,6 +1456,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           // vuelve a sumar `(now - updatedAt)` y la barra corre a 2x-10x.
           payload['updatedAt'] = now.toUtc().toIso8601String();
         }
+        payload['ownerUid'] = myUid;
+        payload['ownerEmail'] = myEmail;
         request.response
           ..statusCode = HttpStatus.ok
           ..headers.contentType = ContentType.json
@@ -1378,19 +1490,19 @@ class InutilPlaybackSyncService extends ChangeNotifier {
             json['commandType'] as String? ?? json['command'] as String? ?? '';
         final param = json['param'];
 
-        // Control de acceso: sólo mandan dispositivos de la MISMA cuenta.
-        // Si este host no tiene sesión iniciada no hay nada que comparar.
+        // Control de acceso estricto: sólo mandan dispositivos con la MISMA
+        // cuenta iniciada en ambos extremos. Si este equipo no tiene sesión
+        // iniciada o los UID/correos no coinciden, se rechaza con 403.
         final myUid = _auth.currentUser?.uid ?? '';
         final myEmail = _auth.currentUser?.email ?? '';
         final issuerUid = json['issuerUid'] as String? ?? '';
         final issuerEmail = json['issuerEmail'] as String? ?? '';
-        final sameAccount =
-            myUid.isEmpty && myEmail.isEmpty ||
-            (issuerUid.isNotEmpty && issuerUid == myUid) ||
-            (issuerEmail.isNotEmpty &&
-                myEmail.isNotEmpty &&
-                issuerEmail.trim().toLowerCase() ==
-                    myEmail.trim().toLowerCase());
+        final sameAccount = LanDevicePeer.isSameAccountIdentity(
+          myUid: myUid,
+          myEmail: myEmail,
+          otherUid: issuerUid,
+          otherEmail: issuerEmail,
+        );
         if (!sameAccount) {
           debugPrint(
             'Inútil LAN: comando $commandType descartado (otra cuenta).',
@@ -1551,16 +1663,21 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     return null;
   }
 
-  /// true si el par pertenece a la misma cuenta que este dispositivo.
+  /// true si el par pertenece estrictamente a la misma cuenta que este equipo.
   bool isSameAccountAsPeer(LanDevicePeer peer) {
-    if (peer.deviceId == _autoPairedPeer?.deviceId) return true;
     return peer.isSameAccount(_auth.currentUser?.email, _auth.currentUser?.uid);
   }
 
   /// Convierte [peer] en el destino preferido de los comandos remotos y carga
   /// la sesión que está sonando allí (el usuario elige el dispositivo desde el
-  /// panel "Conectar a un dispositivo").
+  /// panel "Conectar a un dispositivo"). Sólo permite peers de la misma cuenta.
   void selectPeer(LanDevicePeer peer) {
+    if (!isSameAccountAsPeer(peer)) {
+      debugPrint(
+        'Inutix Connect: selección de ${peer.deviceName} ignorada (otra cuenta).',
+      );
+      return;
+    }
     if (_autoPairedPeer?.deviceId == peer.deviceId) return;
     _autoPairedPeer = peer;
     _currentRemoteSession = null;
@@ -1622,6 +1739,9 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     if (socket == null) return;
 
     final user = _auth.currentUser;
+    if (user == null || (user.uid.trim().isEmpty && user.email.trim().isEmpty)) {
+      return;
+    }
     final payload = utf8.encode(
       jsonEncode({
         'app': 'inutil_music',
@@ -1629,8 +1749,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         'deviceName': _auth.deviceName,
         'platform': _auth.devicePlatform,
         'port': _currentLanPort,
-        'uid': user?.uid ?? '',
-        'email': user?.email ?? '',
+        'uid': user.uid,
+        'email': user.email,
         'isHost': isDesktopHost,
       }),
     );
@@ -1680,6 +1800,22 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       final deviceId = decoded['deviceId'] as String? ?? '';
       if (deviceId.isEmpty || deviceId == _auth.deviceId) return;
 
+      final myUser = _auth.currentUser;
+      if (myUser == null) return;
+
+      final remoteUid = decoded['uid'] as String? ?? '';
+      final remoteEmail = decoded['email'] as String? ?? '';
+      if (!LanDevicePeer.isSameAccountIdentity(
+        myUid: myUser.uid,
+        myEmail: myUser.email,
+        otherUid: remoteUid,
+        otherEmail: remoteEmail,
+      )) {
+        // Si este equipo estaba emparejado antes y cambió a otra cuenta, purgarlo.
+        _purgeMismatchedPeer(deviceId);
+        return;
+      }
+
       final port = decoded['port'] is int
           ? decoded['port'] as int
           : int.tryParse(decoded['port']?.toString() ?? '') ?? _defaultPort;
@@ -1689,6 +1825,20 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     } catch (e) {
       debugPrint('InutilSync: paquete UDP de descubrimiento inválido: $e');
     }
+  }
+
+  void _purgeMismatchedPeer(String deviceId) {
+    var changed = _discoveredPeers.remove(deviceId) != null;
+    if (_autoPairedPeer?.deviceId == deviceId) {
+      _autoPairedPeer = null;
+      changed = true;
+    }
+    if (_currentRemoteSession?.activeDeviceId == deviceId) {
+      _currentRemoteSession = null;
+      _clearHandoffAuthority();
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   // ---------------------------------------------------------------------------
@@ -1704,6 +1854,8 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }
 
   Future<void> _performLanDiscovery() async {
+    if (_auth.currentUser == null) return;
+
     // 1. Emulador de Android -> host de la máquina física (10.0.2.2).
     if (Platform.isAndroid) {
       unawaited(_probePeer('10.0.2.2', _defaultPort));
@@ -1717,9 +1869,13 @@ class InutilPlaybackSyncService extends ChangeNotifier {
       unawaited(_sweepLocalSubnets());
     }
 
-    // 3. Refrescar la sesión de los peers que siguen en línea.
+    // 3. Refrescar la sesión únicamente de los peers de la MISMA cuenta.
     for (final peer in _discoveredPeers.values.toList()) {
       if (!isPeerOnline(peer)) continue;
+      if (!isSameAccountAsPeer(peer)) {
+        _purgeMismatchedPeer(peer.deviceId);
+        continue;
+      }
       unawaited(_fetchSessionFromPeer(peer));
     }
 
@@ -1862,6 +2018,16 @@ class InutilPlaybackSyncService extends ChangeNotifier {
           appVersion: map['appVersion'] as String? ?? '',
         );
 
+        // AISLAMIENTO ESTRICTO DE CUENTAS: jamás registrar, mostrar ni sondear
+        // dispositivos de otra cuenta aunque estén en el mismo Wi-Fi.
+        final myEmail = _auth.currentUser?.email;
+        final myUid = _auth.currentUser?.uid;
+        final isSame = peer.isSameAccount(myEmail, myUid);
+        if (!isSame) {
+          _purgeMismatchedPeer(deviceId);
+          return;
+        }
+
         _discoveredPeers[deviceId] = peer;
         _liveHosts.add('$ip:$port');
         unawaited(_persistLiveHosts());
@@ -1870,9 +2036,6 @@ class InutilPlaybackSyncService extends ChangeNotifier {
         // Estabilidad: si ya estamos vinculados a un peer LAN vivo (especialmente
         // una PC/Laptop host o el altavoz activo), NO dejamos que un segundo
         // celular inactivo en la misma red secuestre `_autoPairedPeer`.
-        final myEmail = _auth.currentUser?.email;
-        final myUid = _auth.currentUser?.uid;
-        final isSame = peer.isSameAccount(myEmail, myUid);
         final currentPaired = _autoPairedPeer;
         final currentStillOnline =
             currentPaired != null &&
@@ -1929,18 +2092,42 @@ class InutilPlaybackSyncService extends ChangeNotifier {
   }
 
   Future<void> _fetchSessionFromPeer(LanDevicePeer peer) async {
+    if (!isSameAccountAsPeer(peer)) {
+      _purgeMismatchedPeer(peer.deviceId);
+      return;
+    }
+    final myUid = (_auth.currentUser?.uid ?? '').trim();
+    final myEmail = (_auth.currentUser?.email ?? '').trim().toLowerCase();
     final client = HttpClient()
       ..connectionTimeout = const Duration(milliseconds: 1200);
     try {
       final request = await client.getUrl(
         Uri.parse('${peer.httpBaseUrl}/api/session'),
       );
+      if (myUid.isNotEmpty) request.headers.set('x-inutix-uid', myUid);
+      if (myEmail.isNotEmpty) request.headers.set('x-inutix-email', myEmail);
       final response = await request.close().timeout(
         const Duration(milliseconds: 1500),
       );
+      if (response.statusCode == HttpStatus.forbidden) {
+        _purgeMismatchedPeer(peer.deviceId);
+        return;
+      }
       if (response.statusCode == 200) {
         final bodyStr = await utf8.decodeStream(response);
         final map = jsonDecode(bodyStr) as Map<String, dynamic>;
+        final ownerUid = (map['ownerUid'] as String? ?? '').trim();
+        final ownerEmail = (map['ownerEmail'] as String? ?? '').trim();
+        if ((ownerUid.isNotEmpty || ownerEmail.isNotEmpty) &&
+            !LanDevicePeer.isSameAccountIdentity(
+              myUid: myUid,
+              myEmail: myEmail,
+              otherUid: ownerUid,
+              otherEmail: ownerEmail,
+            )) {
+          _purgeMismatchedPeer(peer.deviceId);
+          return;
+        }
         final session = PlaybackSyncSession.fromJson(map);
 
         if (session.trackId.isNotEmpty) {
@@ -2153,11 +2340,14 @@ class InutilPlaybackSyncService extends ChangeNotifier {
 
       final now = DateTime.now();
       final fresh = <String, LanDevicePeer>{};
+      final ownerEmail = _auth.currentUser?.email ?? '';
       for (final doc in docs) {
         final peer = peerFromCloudDoc(
           doc,
           myDeviceId: _auth.deviceId,
           now: now,
+          ownerUid: uid,
+          ownerEmail: ownerEmail,
         );
         if (peer == null) continue;
         fresh[peer.deviceId] = peer;
@@ -2487,8 +2677,12 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     dynamic param,
     LanDevicePeer? targetPeer,
   }) async {
-    final peer = targetPeer ?? _autoPairedPeer;
+    final peer = targetPeer ?? autoPairedPeer;
     if (peer == null) return false;
+    if (!isSameAccountAsPeer(peer)) {
+      _purgeMismatchedPeer(peer.deviceId);
+      return false;
+    }
     // Un peer visto sólo en la nube no tiene IP útil: su comando viaja por
     // Firestore, y el llamador (sendRemoteControlCommand) se encarga de ello.
     if (peer.isCloudOnly) return false;
@@ -2558,6 +2752,10 @@ class InutilPlaybackSyncService extends ChangeNotifier {
             : null) ??
         pickAutoPairCandidate(connectTargets);
     if (peer == null) return false;
+    if (!isSameAccountAsPeer(peer)) {
+      _purgeMismatchedPeer(peer.deviceId);
+      return false;
+    }
     _autoPairedPeer = peer;
 
     // GUARD: Evitar reenvíos duplicados de `playTrack` al mismo altavoz

@@ -87,16 +87,27 @@ void main() {
                         ),
                       ),
                       Expanded(
-                        child: Center(
-                          child: ElevatedButton(
-                            key: const ValueKey('launch-live-tour'),
-                            onPressed: () => InutilOnboardingTour.show(
-                              context,
-                              inactivityDays: 15,
-                            ),
-                            child: Text('Sección: ${currentSection.name}'),
-                          ),
-                        ),
+                        child: currentSection == InutixGuideSection.player
+                            ? Align(
+                                alignment: Alignment.bottomRight,
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: InutixGuideAnchorTarget(
+                                    id: InutixGuideAnchors.playerShareMomentId,
+                                    child: const Icon(Icons.share_outlined),
+                                  ),
+                                ),
+                              )
+                            : Center(
+                                child: ElevatedButton(
+                                  key: const ValueKey('launch-live-tour'),
+                                  onPressed: () => InutilOnboardingTour.show(
+                                    context,
+                                    inactivityDays: 15,
+                                  ),
+                                  child: Text('Sección: ${currentSection.name}'),
+                                ),
+                              ),
                       ),
                       KeyedSubtree(
                         key: InutixGuideAnchors.miniPlayer,
@@ -132,22 +143,35 @@ void main() {
         find.byKey(const ValueKey('inutix-live-spotlight-tour')),
         findsOneWidget,
       );
-      expect(find.text('Paso 1 de 10'), findsOneWidget);
+      expect(find.text('Paso 1 de 11'), findsOneWidget);
       expect(find.text('Comenzar recorrido'), findsOneWidget);
 
       Future<void> tapNext() async {
         await tester.tap(find.byKey(const ValueKey('live-tour-next')));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
+        await tester.pump(const Duration(milliseconds: 400));
       }
 
-      // Recorrer pasos 2..10 verificando transiciones reales.
-      for (var step = 2; step <= 10; step++) {
+      // Recorrer pasos 2..11 verificando transiciones reales (incluyendo reproductor abierto).
+      for (var step = 2; step <= 11; step++) {
         await tapNext();
-        expect(find.text('Paso $step de 10'), findsOneWidget);
+        expect(find.text('Paso $step de 11'), findsOneWidget);
+        if (step == 7) {
+          expect(find.text('Abrir reproductor'), findsOneWidget);
+        }
+        if (step == 8) {
+          expect(currentSection, InutixGuideSection.player);
+          expect(find.text('COMPARTIR MOMENTO · STUDIO'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('share-moment-studio-preview')),
+            findsOneWidget,
+          );
+        }
       }
 
-      // Debe haber navegado realmente por search, library y settings.
+      // Debe haber navegado realmente por player, search, library y settings.
+      expect(visitedSections, contains(InutixGuideSection.player));
       expect(visitedSections, contains(InutixGuideSection.search));
       expect(visitedSections, contains(InutixGuideSection.library));
       expect(visitedSections, contains(InutixGuideSection.settings));
@@ -235,7 +259,7 @@ void main() {
       await guide.notifySectionEntered(InutixGuideSection.player);
       await tester.pump(const Duration(milliseconds: 300));
       expect(
-        find.byKey(const ValueKey('contextual-tip-player_power_tools')),
+        find.byKey(const ValueKey('contextual-tip-player_share_moment')),
         findsNothing,
       );
     },

@@ -302,7 +302,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Inútil Music'), findsWidgets);
+      expect(find.text('Inutix Music'), findsWidgets);
       expect(find.byKey(const ValueKey('moment-mode-lyrics')), findsOneWidget);
       expect(find.byKey(const ValueKey('moment-mode-player')), findsOneWidget);
       expect(find.byKey(const ValueKey('moment-duration-15s')), findsOneWidget);

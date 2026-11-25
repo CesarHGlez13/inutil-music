@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inutil_music/core/firebase/firebase_auth_service.dart';
 import 'package:inutil_music/core/firebase/firebase_playback_sync_service.dart';
@@ -14,12 +15,31 @@ void main() {
   });
 
   setUp(() async {
-    SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues(<String, String>{});
+    InutilAuthService.testSkipOnlineValidation = true;
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      'inutil_music_auth_user_v3': jsonEncode(<String, dynamic>{
+        'uid': 'admin_cesar_001',
+        'email': 'cesar@inutilmusic.com',
+        'displayName': 'Cesar',
+        'role': 'admin',
+        'status': 'active',
+        'isActive': true,
+        'accountExpiresAt': DateTime(2099, 12, 31).toIso8601String(),
+      }),
+      'inutil_music_auth_session_v3': jsonEncode(<String, dynamic>{
+        'uid': 'admin_cesar_001',
+        'email': 'cesar@inutilmusic.com',
+        'idToken': 'fake-token',
+        'refreshToken': 'fake-refresh',
+      }),
+    });
     await InutilAuthService.instance.initialize();
   });
 
-  tearDown(() {
+  tearDown(() async {
     InutilPlaybackSyncService.instance.stopSync();
+    await InutilAuthService.instance.signOut();
   });
 
   group('LanDevicePeer & Auto-Pairing Tests', () {
@@ -108,6 +128,34 @@ void main() {
       };
 
       final client = HttpClient();
+
+      // 1. Comando de OTRA cuenta debe ser rechazado con 403 Forbidden.
+      final foreignReq = await client.postUrl(
+        Uri.parse('http://127.0.0.1:$port/api/command'),
+      );
+      foreignReq.headers.contentType = ContentType.json;
+      foreignReq.write(
+        jsonEncode({
+          'commandType': 'playTrack',
+          'issuerUid': 'otro_usuario_999',
+          'issuerEmail': 'otro@correo.com',
+          'param': {'trackId': 'intruder_1'},
+        }),
+      );
+      final foreignRes = await foreignReq.close();
+      expect(foreignRes.statusCode, HttpStatus.forbidden);
+      expect(receivedCommand, isEmpty);
+
+      // 2. Consulta de sesión desde OTRA cuenta también recibe 403 Forbidden.
+      final foreignSessionReq = await client.getUrl(
+        Uri.parse('http://127.0.0.1:$port/api/session'),
+      );
+      foreignSessionReq.headers.set('x-inutix-uid', 'otro_usuario_999');
+      foreignSessionReq.headers.set('x-inutix-email', 'otro@correo.com');
+      final foreignSessionRes = await foreignSessionReq.close();
+      expect(foreignSessionRes.statusCode, HttpStatus.forbidden);
+
+      // 3. Comando de la MISMA cuenta sí se ejecuta en tiempo real.
       final request = await client.postUrl(
         Uri.parse('http://127.0.0.1:$port/api/command'),
       );
@@ -115,6 +163,8 @@ void main() {
       request.write(
         jsonEncode({
           'commandType': 'playTrack',
+          'issuerUid': 'admin_cesar_001',
+          'issuerEmail': 'cesar@inutilmusic.com',
           'param': {
             'trackId': 'test_video_123',
             'title': 'Y Que',

@@ -1001,9 +1001,7 @@ class InutilAuthService extends ChangeNotifier {
     final user = _currentUser;
     if (user == null || user.uid.isEmpty || user.idToken.isEmpty) return;
     try {
-      final remote = await InutilFirestoreService.instance.getUserProfile(
-        user.uid,
-      );
+      final remote = await _fetchVerifiedUserProfile(user.uid);
       if (remote == null || remote.isEmpty) {
         if (!createIfMissing) return;
         final isAdminSeed = isBootstrapAdminEmail(user.email);
@@ -1193,6 +1191,60 @@ class InutilAuthService extends ChangeNotifier {
   static String _monthKey(DateTime dt) =>
       '${dt.year.toString().padLeft(4, '0')}-${dt.month.toString().padLeft(2, '0')}';
 
+  static const String _accountDeletedReason =
+      'Tu cuenta ya no existe. Contacta al administrador.';
+
+  /// Consulta el perfil `users/{uid}` en el tier activo (S7/backup) y, si
+  /// recibe un 404 (`null`) mientras algún relay está configurado, hace una
+  /// doble verificación directa contra Google Firestore antes de aceptar que
+  /// la cuenta fue borrada. Evita bloqueos falsos cuando el nodo de respaldo o
+  /// la caché aún no tiene el documento de una cuenta autorizada.
+  Future<Map<String, dynamic>?> _fetchVerifiedUserProfile(String uid) async {
+    final remote = await InutilFirestoreService.instance.getUserProfile(uid);
+    if (remote != null && remote.isNotEmpty) return remote;
+    final usingRelay =
+        FirebaseConfig.relayUsable ||
+        FirebaseConfig.cloudRelayUsable ||
+        FirebaseConfig.backupRelayUsable;
+    if (!usingRelay || FirebaseConfig.useEmulator) {
+      return remote;
+    }
+    return await InutilFirestoreService.instance.getUserProfileDirect(uid);
+  }
+
+  /// Reconcilia `_kickedOutReason` con el estado real recién leído de la nube.
+  /// Antes, una vez que `_kickedOutReason` se llenaba (p. ej. por un 404
+  /// transitorio de un nodo de respaldo), nunca se limpiaba aunque el usuario
+  /// estuviera autorizado y pulsara «Comprobar Estado».
+  Future<void> _reconcileRemoteProfile(Map<String, dynamic> remote) async {
+    await _applyRemoteDoc(remote);
+    final updated = _currentUser;
+    if (updated == null) return;
+    if (_isPhoneDevice && !_phoneSessionOk(updated)) {
+      _kickedOutReason =
+          'Otro teléfono tomó el control de esta cuenta. '
+          'Esta sesión quedó bloqueada.';
+      notifyListeners();
+      return;
+    }
+    if (!updated.licenseValid) {
+      if (_kickedOutReason == _accountDeletedReason ||
+          _kickedOutReason.contains('Otro teléfono')) {
+        _kickedOutReason = '';
+      }
+      notifyListeners();
+      return;
+    }
+    final clearedKick = _kickedOutReason.isNotEmpty;
+    if (clearedKick) {
+      _kickedOutReason = '';
+    }
+    await _enforceInactivityPolicy(remote);
+    if (clearedKick) {
+      notifyListeners();
+    }
+  }
+
   /// Revalida la licencia contra Firestore (arranque, temporizador, reanudar).
   Future<void> _validateSession({required String reason}) async {
     final user = _currentUser;
@@ -1202,31 +1254,17 @@ class InutilAuthService extends ChangeNotifier {
     _validating = true;
     try {
       await _ensureFreshIdToken();
-      final remote = await InutilFirestoreService.instance.getUserProfile(
-        user.uid,
-      );
+      final remote = await _fetchVerifiedUserProfile(user.uid);
       if (remote == null) {
-        // Documento eliminado por el administrador o cuenta borrada en Auth.
+        // Confirmado 404 (incluyendo verificación directa contra Firestore si
+        // se usaba relay): documento eliminado por el administrador.
         if (_kickedOutReason.isEmpty) {
-          _kickedOutReason =
-              'Tu cuenta ya no existe. Contacta al administrador.';
+          _kickedOutReason = _accountDeletedReason;
         }
         notifyListeners();
         return;
       }
-      await _applyRemoteDoc(remote);
-      if (_isPhoneDevice && !_phoneSessionOk(_currentUser!)) {
-        _kickedOutReason =
-            'Otro teléfono tomó el control de esta cuenta. '
-            'Esta sesión quedó bloqueada.';
-        notifyListeners();
-        return;
-      }
-      if (!_currentUser!.licenseValid) {
-        _kickedOutReason = blockedReason;
-      } else {
-        await _enforceInactivityPolicy(remote);
-      }
+      await _reconcileRemoteProfile(remote);
     } catch (e) {
       debugPrint('Validación de sesión ($reason) sin conexión: $e');
       // Sin red: la ventana de gracia decide (ver canPlay).
@@ -1241,18 +1279,28 @@ class InutilAuthService extends ChangeNotifier {
     if (testSkipOnlineValidation) return;
     try {
       await _ensureFreshIdToken();
-      final remoteDoc = await InutilFirestoreService.instance.getUserProfile(
-        _currentUser!.uid,
-      );
+      final remoteDoc = await _fetchVerifiedUserProfile(_currentUser!.uid);
       if (remoteDoc != null && remoteDoc.isNotEmpty) {
-        await _applyRemoteDoc(remoteDoc);
-        if (_currentUser?.licenseValid == true) {
-          await _enforceInactivityPolicy(remoteDoc);
+        await _reconcileRemoteProfile(remoteDoc);
+      } else if (remoteDoc == null) {
+        if (_kickedOutReason.isEmpty) {
+          _kickedOutReason = _accountDeletedReason;
+          notifyListeners();
         }
       }
     } catch (e) {
       debugPrint('Error refrescando perfil de usuario: $e');
     }
+  }
+
+  @visibleForTesting
+  Future<void> testReconcileRemoteProfile(Map<String, dynamic> remote) =>
+      _reconcileRemoteProfile(remote);
+
+  @visibleForTesting
+  void testSetKickedOutReason(String reason) {
+    _kickedOutReason = reason;
+    notifyListeners();
   }
 
   // ---------------------------------------------------------------------------

@@ -16,10 +16,14 @@ enum InutixGuideSection {
   player,
 }
 
-/// Anclas (`GlobalKey`) montadas sobre widgets reales de `HomePage` para que el
-/// foco luminoso (*spotlight*) persiga los botones auténticos de la interfaz.
+/// Anclas (`GlobalKey` y objetivos dinámicos) montadas sobre widgets reales de
+/// `HomePage` y `PlayerPanel` para que el foco luminoso (*spotlight*) persiga
+/// los botones auténticos de la interfaz.
 class InutixGuideAnchors {
   InutixGuideAnchors._();
+
+  static const String playerShareMomentId = 'player-share-moment';
+  static const String playerMenuId = 'player-menu';
 
   static final GlobalKey connectButton = GlobalKey(debugLabel: 'guide-connect');
   static final GlobalKey accountButton = GlobalKey(debugLabel: 'guide-account');
@@ -40,6 +44,78 @@ class InutixGuideAnchors {
   );
   static final GlobalKey bottomNav = GlobalKey(debugLabel: 'guide-bottom-nav');
   static final GlobalKey sideNav = GlobalKey(debugLabel: 'guide-side-nav');
+
+  static final Map<String, List<BuildContext>> _dynamicTargets =
+      <String, List<BuildContext>>{};
+
+  static void registerTarget(String id, BuildContext context) {
+    final list = _dynamicTargets.putIfAbsent(id, () => <BuildContext>[]);
+    list.remove(context);
+    list.add(context);
+  }
+
+  static void unregisterTarget(String id, BuildContext context) {
+    final list = _dynamicTargets[id];
+    if (list == null) return;
+    list.remove(context);
+    if (list.isEmpty) {
+      _dynamicTargets.remove(id);
+    }
+  }
+
+  static List<BuildContext> targetsFor(String id) {
+    final list = _dynamicTargets[id];
+    if (list == null || list.isEmpty) return const <BuildContext>[];
+    return List<BuildContext>.unmodifiable(list.reversed);
+  }
+
+  @visibleForTesting
+  static void clearDynamicTargetsForTesting() {
+    _dynamicTargets.clear();
+  }
+}
+
+/// Registra un widget real como objetivo de foco sin riesgo de colisiones de
+/// `GlobalKey` cuando coexisten transiciones (`AnimatedSwitcher`, desktop/móvil).
+class InutixGuideAnchorTarget extends StatefulWidget {
+  const InutixGuideAnchorTarget({
+    super.key,
+    required this.id,
+    required this.child,
+  });
+
+  final String id;
+  final Widget child;
+
+  @override
+  State<InutixGuideAnchorTarget> createState() =>
+      _InutixGuideAnchorTargetState();
+}
+
+class _InutixGuideAnchorTargetState extends State<InutixGuideAnchorTarget> {
+  @override
+  void initState() {
+    super.initState();
+    InutixGuideAnchors.registerTarget(widget.id, context);
+  }
+
+  @override
+  void didUpdateWidget(covariant InutixGuideAnchorTarget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.id != widget.id) {
+      InutixGuideAnchors.unregisterTarget(oldWidget.id, context);
+      InutixGuideAnchors.registerTarget(widget.id, context);
+    }
+  }
+
+  @override
+  void dispose() {
+    InutixGuideAnchors.unregisterTarget(widget.id, context);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Consejo contextual en tiempo real que aparece una sola vez al descubrir una
@@ -110,13 +186,14 @@ class InutixLiveGuideController extends ChangeNotifier {
           'Trae tus playlists externas en segundos. Tus favoritos y listas se sincronizan automáticamente en tu cuenta Inutix.',
     ),
     InutixContextualTip(
-      id: 'player_power_tools',
+      id: 'player_share_moment',
       section: InutixGuideSection.player,
-      icon: Icons.auto_awesome_rounded,
-      accent: Color(0xFFF472B6),
-      title: 'Poder oculto del reproductor',
+      icon: Icons.movie_creation_rounded,
+      accent: Color(0xFFFF3D71),
+      badge: 'FUNCIÓN ESTRELLA',
+      title: 'Compartir momento en 1080p 60 fps',
       body:
-          'Desde aquí puedes abrir letras palabra por palabra, cambiar a versiones Acústica/En vivo, guardar un Echo Memory o exportar un clip de video.',
+          'Toca Compartir o el menú ⋯ → «Compartir momento» para exportar un video de 5–30 s con letras karaoke, Canvas animado o tu Echo Memory listo para WhatsApp HD, Instagram y TikTok sin grabar pantalla.',
     ),
   ];
 
@@ -348,6 +425,7 @@ class InutixLiveGuideController extends ChangeNotifier {
     _seenTipIds.clear();
     _tipsEnabled = true;
     _prefsLoaded = false;
+    InutixGuideAnchors.clearDynamicTargetsForTesting();
   }
 }
 
@@ -364,10 +442,14 @@ class _LiveTourStep {
     required this.highlights,
     this.anchorKey,
     this.fallbackAnchorKey,
+    this.anchorId,
+    this.fallbackAnchorId,
     this.padding = const EdgeInsets.all(8),
     this.borderRadius = 22,
     this.ensureHorizontalScroll = false,
     this.isHeroWelcome = false,
+    this.showShareMomentStudioPreview = false,
+    this.nextLabel,
     this.actionHint,
   });
 
@@ -381,10 +463,14 @@ class _LiveTourStep {
   final List<String> highlights;
   final GlobalKey? anchorKey;
   final GlobalKey? fallbackAnchorKey;
+  final String? anchorId;
+  final String? fallbackAnchorId;
   final EdgeInsets padding;
   final double borderRadius;
   final bool ensureHorizontalScroll;
   final bool isHeroWelcome;
+  final bool showShareMomentStudioPreview;
+  final String? nextLabel;
   final String? actionHint;
 }
 
@@ -410,6 +496,7 @@ class _InutixLiveSpotlightOverlayState
   late final AnimationController _ambientCtrl;
 
   int _index = 0;
+  int _prepareGeneration = 0;
   Rect? _fromRect;
   Rect? _targetRect;
   double _fromRadius = 26;
@@ -429,6 +516,7 @@ class _InutixLiveSpotlightOverlayState
           'para enseñarte sus funciones más épicas en menos de un minuto.',
       highlights: <String>[
         'Inutix Connect',
+        'Compartir Momento',
         'Máquina del Tiempo',
         'Echo Memory',
         'Salas en vivo',
@@ -521,19 +609,43 @@ class _InutixLiveSpotlightOverlayState
       accent: const Color(0xFFFB923C),
       icon: Icons.music_note_rounded,
       eyebrow: 'REPRODUCTOR CINEMÁTICO',
-      title: 'Letras en vivo, Versiones\ny Compartir Momento',
+      title: 'Letras karaoke en vivo\ny Detector de versiones',
       body:
-          'Toca el mini-reproductor para abrir letras sincronizadas palabra por '
-          'palabra, cambiar a versión Acústica/En vivo o exportar clips de video.',
+          'Toca el mini-reproductor para expandir la vista completa con Canvas '
+          'animado, letras sincronizadas palabra por palabra y versiones '
+          'Acústica, En vivo o Remix.',
       highlights: <String>[
-        'Detector de versiones',
-        'Clips de video',
         'Letras karaoke',
+        'Detector de versiones',
+        'Canvas animado',
       ],
       anchorKey: InutixGuideAnchors.miniPlayer,
       fallbackAnchorKey: InutixGuideAnchors.bottomNav,
       padding: const EdgeInsets.all(6),
       borderRadius: 28,
+      nextLabel: 'Abrir reproductor',
+    ),
+    const _LiveTourStep(
+      id: 'share_moment',
+      section: InutixGuideSection.player,
+      accent: Color(0xFFFF3D71),
+      icon: Icons.movie_creation_rounded,
+      eyebrow: 'COMPARTIR MOMENTO · STUDIO',
+      title: 'Exporta clips en 1080p\n60 fps desde el reproductor',
+      body:
+          'Toca Compartir (o el menú ⋯) → «Compartir momento». Recorta 5–30 s '
+          'con letras karaoke, Canvas o tu Echo Memory para WhatsApp HD, '
+          'Instagram y TikTok sin grabar pantalla.',
+      highlights: <String>[
+        '5–30 s · MP4 1080p 60 fps',
+        'Letras o Canvas',
+        'WhatsApp HD · Reels · TikTok',
+      ],
+      anchorId: InutixGuideAnchors.playerShareMomentId,
+      fallbackAnchorId: InutixGuideAnchors.playerMenuId,
+      padding: EdgeInsets.all(8),
+      borderRadius: 999,
+      showShareMomentStudioPreview: true,
     ),
     _LiveTourStep(
       id: 'search_tab',
@@ -624,20 +736,34 @@ class _InutixLiveSpotlightOverlayState
 
   Future<void> _prepareStep(int index, {bool initial = false}) async {
     if (!mounted) return;
+    final gen = ++_prepareGeneration;
     final step = _steps[index];
     final guide = InutixLiveGuideController.instance;
+    final previousSection = guide.currentSection;
+    final sectionChanged = previousSection != step.section;
+    final involvesPlayerTransition =
+        sectionChanged &&
+        (previousSection == InutixGuideSection.player ||
+            step.section == InutixGuideSection.player);
 
     // 1. Navegar realmente a la sección de este paso.
-    if (guide.currentSection != step.section) {
+    if (sectionChanged) {
       guide.navigateTo(step.section);
     }
     if (step.section == InutixGuideSection.home && !step.ensureHorizontalScroll) {
       guide.scrollHomeToTop();
     }
 
+    // Esperar a que termine la transición del reproductor abierto (320 ms)
+    // antes de medir las coordenadas finales de sus botones reales.
+    if (involvesPlayerTransition) {
+      await Future<void>.delayed(const Duration(milliseconds: 380));
+      if (!mounted || gen != _prepareGeneration) return;
+    }
+
     // Esperar un frame para que el árbol destino termine su layout.
     await _waitNextFrame();
-    if (!mounted) return;
+    if (!mounted || gen != _prepareGeneration) return;
 
     // 2. Si el chip está en una barra horizontal, llevarlo al centro visible.
     if (step.ensureHorizontalScroll && step.anchorKey?.currentContext != null) {
@@ -650,13 +776,15 @@ class _InutixLiveSpotlightOverlayState
         );
       } catch (_) {}
       await _waitNextFrame();
-      if (!mounted) return;
+      if (!mounted || gen != _prepareGeneration) return;
     }
 
-    // 3. Medir el Rect real en pantalla del widget objetivo.
+    // 3. Medir el Rect real en pantalla del widget objetivo (GlobalKey o ID dinámico).
     final measured = step.isHeroWelcome
         ? null
-        : _measureAnchor(step.anchorKey, step.padding) ??
+        : _measureAnchorById(step.anchorId, step.padding) ??
+            _measureAnchor(step.anchorKey, step.padding) ??
+            _measureAnchorById(step.fallbackAnchorId, step.padding) ??
             _measureAnchor(step.fallbackAnchorKey, step.padding);
 
     final prevRect = _currentAnimatedRect();
@@ -682,9 +810,23 @@ class _InutixLiveSpotlightOverlayState
     return completer.future;
   }
 
+  Rect? _measureAnchorById(String? id, EdgeInsets padding) {
+    if (id == null) return null;
+    for (final ctx in InutixGuideAnchors.targetsFor(id)) {
+      if (!ctx.mounted) continue;
+      final measured = _measureContext(ctx, padding);
+      if (measured != null) return measured;
+    }
+    return null;
+  }
+
   Rect? _measureAnchor(GlobalKey? key, EdgeInsets padding) {
     final ctx = key?.currentContext;
     if (ctx == null) return null;
+    return _measureContext(ctx, padding);
+  }
+
+  Rect? _measureContext(BuildContext ctx, EdgeInsets padding) {
     final renderObj = ctx.findRenderObject();
     if (renderObj is! RenderBox || !renderObj.hasSize || !renderObj.attached) {
       return null;
@@ -851,7 +993,7 @@ class _InutixLiveSpotlightOverlayState
                 maxWidth: maxCardWidth,
                 maxHeight: size.height - padding.vertical - 32,
               ),
-              child: SingleChildScrollView(child: card),
+              child: card,
             ),
           ),
         ),
@@ -913,10 +1055,7 @@ class _InutixLiveSpotlightOverlayState
                 pointingUp: true,
               ),
             Flexible(
-              child: SingleChildScrollView(
-                physics: const ClampingScrollPhysics(),
-                child: card,
-              ),
+              child: card,
             ),
             if (!placeBelow)
               _SpotlightConnector(
@@ -1279,101 +1418,123 @@ class _GlassTourCard extends StatelessWidget {
                   ],
                 ),
 
-                // Emblema hero animado en la pantalla de bienvenida
-                if (step.isHeroWelcome) ...<Widget>[
-                  const SizedBox(height: 18),
-                  Center(
-                    child: _HeroBrandEmblem(
-                      accent: accent,
-                      phase: ambientPhase,
-                    ),
-                  ),
-                ],
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const ClampingScrollPhysics(),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        // Emblema hero animado en la pantalla de bienvenida
+                        if (step.isHeroWelcome) ...<Widget>[
+                          const SizedBox(height: 18),
+                          Center(
+                            child: _HeroBrandEmblem(
+                              accent: accent,
+                              phase: ambientPhase,
+                            ),
+                          ),
+                        ],
 
-                const SizedBox(height: 14),
+                        // Vista previa animada del estudio «Compartir momento»
+                        if (step.showShareMomentStudioPreview) ...<Widget>[
+                          const SizedBox(height: 12),
+                          _ShareMomentStudioPreview(
+                            accent: accent,
+                            phase: ambientPhase,
+                          ),
+                        ],
 
-                // Título editorial con animación suave al cambiar paso
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 260),
-                  switchInCurve: Curves.easeOutCubic,
-                  child: Column(
-                    key: ValueKey(step.id),
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        step.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 21,
-                          fontWeight: FontWeight.w900,
-                          height: 1.15,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        step.body,
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.78),
-                          fontSize: 13.5,
-                          height: 1.45,
-                        ),
-                      ),
-                      if (step.highlights.isNotEmpty) ...<Widget>[
                         const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: <Widget>[
-                            for (final tag in step.highlights)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 5,
-                                ),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(999),
-                                  color: accent.withValues(alpha: 0.13),
-                                  border: Border.all(
-                                    color: accent.withValues(alpha: 0.34),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: <Widget>[
-                                    Container(
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: accent,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Flexible(
-                                      child: Text(
-                                        tag,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.9),
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+
+                        // Título editorial con animación suave al cambiar paso
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          switchInCurve: Curves.easeOutCubic,
+                          child: Column(
+                            key: ValueKey(step.id),
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                step.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.15,
+                                  letterSpacing: -0.4,
                                 ),
                               ),
-                          ],
+                              const SizedBox(height: 7),
+                              Text(
+                                step.body,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.78),
+                                  fontSize: 13,
+                                  height: 1.42,
+                                ),
+                              ),
+                              if (step.highlights.isNotEmpty) ...<Widget>[
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: <Widget>[
+                                    for (final tag in step.highlights)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 5,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                          color: accent.withValues(alpha: 0.13),
+                                          border: Border.all(
+                                            color:
+                                                accent.withValues(alpha: 0.34),
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: <Widget>[
+                                            Container(
+                                              width: 5,
+                                              height: 5,
+                                              decoration: BoxDecoration(
+                                                color: accent,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                tag,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: Colors.white
+                                                      .withValues(alpha: 0.9),
+                                                  fontSize: 11.5,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
 
-                const SizedBox(height: 18),
+                const SizedBox(height: 14),
 
                 // Controles inferiores
                 Row(
@@ -1441,11 +1602,12 @@ class _GlassTourCard extends StatelessWidget {
                               children: <Widget>[
                                 Flexible(
                                   child: Text(
-                                    step.isHeroWelcome
-                                        ? 'Comenzar recorrido'
-                                        : isLast
-                                            ? '¡Listo, a escuchar!'
-                                            : 'Siguiente',
+                                    step.nextLabel ??
+                                        (step.isHeroWelcome
+                                            ? 'Comenzar recorrido'
+                                            : isLast
+                                                ? '¡Listo, a escuchar!'
+                                                : 'Siguiente'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
@@ -1547,6 +1709,255 @@ class _HeroBrandEmblem extends StatelessWidget {
                   size: 40,
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mini vista previa animada del estudio «Compartir momento» dentro de la
+/// tarjeta Liquid Glass del paso sobre el reproductor abierto.
+class _ShareMomentStudioPreview extends StatelessWidget {
+  const _ShareMomentStudioPreview({
+    required this.accent,
+    required this.phase,
+  });
+
+  final Color accent;
+  final double phase;
+
+  @override
+  Widget build(BuildContext context) {
+    final slideWave = 0.5 + 0.5 * math.sin(phase * math.pi * 2);
+    final windowStart = 0.12 + slideWave * 0.34;
+    const windowWidth = 0.42;
+
+    return Container(
+      key: const ValueKey('share-moment-studio-preview'),
+      height: 68,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: <Color>[
+            accent.withValues(alpha: 0.18),
+            const Color(0xFF0E1320).withValues(alpha: 0.92),
+          ],
+        ),
+        border: Border.all(
+          color: accent.withValues(alpha: 0.36),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          // Mini marco vertical 9:16 con ondas + letras karaoke animadas
+          Container(
+            width: 36,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[
+                  accent.withValues(alpha: 0.85),
+                  const Color(0xFF6366F1),
+                  const Color(0xFF0B0F1A),
+                ],
+              ),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.28),
+                width: 0.9,
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.35),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: <Widget>[
+                SizedBox(
+                  height: 12,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: List<Widget>.generate(4, (i) {
+                      final h =
+                          4.0 +
+                          7.0 *
+                              (0.5 +
+                                  0.5 *
+                                      math.sin(
+                                        phase * math.pi * 2 + i * 1.15,
+                                      ));
+                      return Container(
+                        width: 3,
+                        height: h,
+                        margin: const EdgeInsets.symmetric(horizontal: 1),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Container(
+                      height: 2,
+                      width: 22,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Container(
+                      height: 2,
+                      width: 15,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.52),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '9:16',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    fontSize: 7,
+                    height: 1.0,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 11),
+          // Línea de recorte 5–30 s animada
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Icon(Icons.content_cut_rounded, size: 12, color: accent),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        'Recorte 5–30 s · MP4',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.88),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final totalW = constraints.maxWidth;
+                    final leftPx = totalW * windowStart;
+                    final boxW = totalW * windowWidth;
+                    return SizedBox(
+                      height: 16,
+                      child: Stack(
+                        alignment: Alignment.centerLeft,
+                        children: <Widget>[
+                          // Pista de onda de fondo
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: List<Widget>.generate(22, (i) {
+                              final barH =
+                                  4.0 +
+                                  7.0 *
+                                      (0.5 +
+                                          0.5 * math.sin(i * 0.85 + 0.4));
+                              return Container(
+                                width: 2.2,
+                                height: barH,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.22),
+                                  borderRadius: BorderRadius.circular(99),
+                                ),
+                              );
+                            }),
+                          ),
+                          // Ventana activa del recorte deslizándose suavemente
+                          Positioned(
+                            left: leftPx,
+                            width: boxW,
+                            top: 0,
+                            bottom: 0,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(5),
+                                color: accent.withValues(alpha: 0.24),
+                                border: Border.all(
+                                  color: accent,
+                                  width: 1.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 9),
+          // Sello MP4 1080p 60 FPS
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              color: accent.withValues(alpha: 0.16),
+              border: Border.all(color: accent.withValues(alpha: 0.45)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  '1080p',
+                  style: TextStyle(
+                    color: accent,
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                  ),
+                ),
+                Text(
+                  '60 FPS',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 8.5,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
