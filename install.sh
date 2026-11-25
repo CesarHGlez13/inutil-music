@@ -5,7 +5,7 @@
 set -euo pipefail
 
 APP_NAME="Inutix Music"
-VERSION="2.5.32"
+VERSION="2.5.33"
 INSTALL_DIR="$HOME/.local/share/inutil-music"
 BIN_DIR="$HOME/.local/bin"
 DESKTOP_DIR="$HOME/.local/share/applications"

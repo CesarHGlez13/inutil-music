@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.33+4291 — 2026-11-25
+- **Panel de administración con datos reales:** la app ahora registra el uso del día (minutos reproducidos, reproducciones, aperturas, playlists y favoritos) y lo envía al cerrar la sesión, para que el panel de Inutix muestre estadísticas reales por cuenta. Tu forma de usar la app no cambia.
+- **Sin reintentos constantes ni consumo extra:** el resumen se manda una sola vez por día por el mismo canal seguro de tus datos; si estabas sin conexión, se guarda en el teléfono y se envía al regreso.
+
 ## 2.5.32+4290 — 2026-11-24
 - **Mini-reproductor inteligente en primer arranque:** al instalar la app por primera vez, el mini-reproductor permanece completamente oculto en Inicio y en todas las páginas de artistas, álbumes, playlists y categorías hasta que reproduzcas tu primera canción.
 - **Reanudación exacta donde te quedaste:** al cerrar y volver a abrir Inutix Music, tu última canción y su cola reaparecen listas en pausa exactamente en el minuto y segundo donde la dejaste para continuar al instante con un toque.

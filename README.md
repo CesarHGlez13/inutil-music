@@ -11,7 +11,7 @@ Inutix Music is a cross-platform music player and library manager built with Flu
 Published artifacts and the update channel live in
 <https://github.com/CesarHGlez13/inutil-music>.
 
-Current version: **2.5.32+4290**.
+Current version: **2.5.33+4291**.
 
 > The repository does not store media content. YouTube search, playback, and
 > downloads use Inutix Music's self-contained Dart InnerTube pipeline. Supported

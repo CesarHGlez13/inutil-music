@@ -157,6 +157,38 @@ if [ -f "$APPIMAGE" ] && [ -f "$TARGZ" ]; then
   FILES[linux]="$APPIMAGE"
 fi
 
+# --- validacion de version en artefactos Linux (2026-11-25) --------------------
+# Medido el 2026-11-24: el `inutil_music_linux_x64.tar.gz` que se publico con
+# v2.5.32 traia el binario de 2.5.31 porque el bloque de arriba solo verificaba
+# los APK, y el re-emboisado del bundle no recompila. Se verifica la MISMA cadena
+# 'InutilMusic/$VERSION' en el `libapp.so` de cada artefacto Linux que va a
+# publicarse, extrayendolo; un paquete desactualizado tiene que reventar aqui, no
+# en la laptop del usuario dos dias despues.
+verify_linux_artifact() { # clave ruta
+  local key="$1" f="$2" out
+  case "$f" in
+    *.tar.gz)  out="$(tar xzf "$f" -O lib/libapp.so 2>/dev/null | strings | grep -c "InutilMusic/$VERSION" || true)" ;;
+    *.AppImage) out="$(strings "$f" 2>/dev/null | grep -c "InutilMusic/$VERSION" || true)" ;;
+    *.deb)     out="$(ar p "$f" data.tar.gz 2>/dev/null | tar xz -O --wildcards '*libapp.so' 2>/dev/null | strings | grep -c "InutilMusic/$VERSION" || true)" ;;
+    *.rpm)     out="$(rpm2cpio "$f" 2>/dev/null | cpio -i --to-stdout '*libapp.so' 2>/dev/null | strings | grep -c "InutilMusic/$VERSION" || true)" ;;
+    *) return 0 ;;
+  esac
+  if [ "${out:-0}" -eq 0 ]; then
+    echo "ERROR CRITICO: $(basename "$f") (artefacto '$key') no contiene la cadena" >&2
+    echo "'InutilMusic/$VERSION' en su libapp.so compilado." >&2
+    echo "El paquete trae binario de una version anterior. Recompila el bundle" >&2
+    echo "('flutter build linux --release') y vuelve a emboisarlo antes de publicar." >&2
+    exit 1
+  fi
+  echo "  ok  $(basename "$f") [$key] -> InutilMusic/$VERSION"
+}
+for key in "${!FILES[@]}"; do
+  case "${FILES[$key]}" in
+    *.apk) ;;   # los APK ya fueron verificados arriba, con firma incluida
+    *) verify_linux_artifact "$key" "${FILES[$key]}" ;;
+  esac
+done
+
 if [ ${#FILES[@]} -eq 0 ]; then
   echo "no hay artefactos construidos (buscados en $APK_DIR y $DIST_DIR)" >&2
   exit 3
