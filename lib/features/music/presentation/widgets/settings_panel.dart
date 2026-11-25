@@ -37,6 +37,7 @@ import 'youtube_music_settings_account_card.dart';
 import 'inutil_account_dialog.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_onboarding_tour.dart';
+import 'inutix_live_guide.dart';
 import 'inutil_spotify_import_dialog.dart';
 import 'inutil_support_popup.dart';
 import 'inutil_wrapped_dialog.dart';
@@ -6180,15 +6181,42 @@ class _OnboardingTourEntryCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return _SettingsEntryCard(
-      key: const ValueKey('settings-about-onboarding-tour'),
-      glyph: InutilGlyph.info,
-      title: 'Recorrido guiado interactivo',
-      subtitle: 'Repasa gestos, letras, descargas y ajustes paso a paso',
-      onTap: () async {
-        final days = ref.read(inutilAuthProvider).inactivityPolicyDays;
-        await InutilOnboardingTour.show(context, inactivityDays: days);
-      },
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-onboarding-tour'),
+          glyph: InutilGlyph.sparkles,
+          title: 'Recorrido interactivo en vivo',
+          subtitle:
+              'Guía cinemática con foco luminoso sobre Inutix Connect, Máquina del Tiempo, Echo Memory, Algoritmo y Salas',
+          onTap: () async {
+            final days = ref.read(inutilAuthProvider).inactivityPolicyDays;
+            await InutilOnboardingTour.show(context, inactivityDays: days);
+          },
+        ),
+        const SizedBox(height: appCardGap),
+        _SettingsEntryCard(
+          key: const ValueKey('settings-about-reset-live-tips'),
+          glyph: InutilGlyph.info,
+          title: 'Reiniciar consejos en tiempo real',
+          subtitle:
+              'Vuelve a activar los tips contextuales al navegar por Buscar, Local, Biblioteca y Reproductor',
+          onTap: () async {
+            await InutixLiveGuideController.instance.resetContextualTips();
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Consejos en tiempo real reactivados. Explora la app para verlos.',
+                  ),
+                ),
+              );
+          },
+        ),
+      ],
     );
   }
 }

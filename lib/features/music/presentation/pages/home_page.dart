@@ -54,6 +54,7 @@ import '../widgets/inutil_logo.dart';
 import '../widgets/favorite_star_badge.dart';
 import '../widgets/home_loading_content.dart';
 import '../widgets/inutil_onboarding_tour.dart';
+import '../widgets/inutix_live_guide.dart';
 import '../widgets/library_panel.dart';
 import '../widgets/library_csv_import_dialog.dart';
 import '../widgets/local_music_panel.dart';
@@ -252,6 +253,23 @@ class _HomePageState extends ConsumerState<HomePage>
       HomeInitialDestination.home => _homeIndex,
       HomeInitialDestination.player => _playerIndex,
     };
+    InutixLiveGuideController.instance.attachHost(
+      onSelectSection: _navigateForGuide,
+      readCurrentSection: () => _guideSectionForIndex(_selectedIndex),
+      onScrollHomeToTop: () {
+        final ctx = InutixGuideAnchors.timeMachineChip.currentContext;
+        if (ctx != null) {
+          unawaited(
+            Scrollable.ensureVisible(
+              ctx,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              alignment: 0.1,
+            ),
+          );
+        }
+      },
+    );
     unawaited(
       Future.wait([
         ref.read(downloaderWarmupProvider.future),
@@ -1030,6 +1048,13 @@ class _HomePageState extends ConsumerState<HomePage>
     if (index == _playerIndex) {
       _schedulePlayerHistoryEntry();
     }
+    if (widget.enableFirstRunExperience) {
+      unawaited(
+        InutixLiveGuideController.instance.notifySectionEntered(
+          _guideSectionForIndex(index),
+        ),
+      );
+    }
   }
 
   void _openPlayer() {
@@ -1218,8 +1243,31 @@ class _HomePageState extends ConsumerState<HomePage>
     });
   }
 
+  InutixGuideSection _guideSectionForIndex(int index) {
+    if (index == _searchIndex) return InutixGuideSection.search;
+    if (index == _localIndex) return InutixGuideSection.local;
+    if (index == _libraryIndex) return InutixGuideSection.library;
+    if (index == _settingsIndex) return InutixGuideSection.settings;
+    if (index == _playerIndex) return InutixGuideSection.player;
+    return InutixGuideSection.home;
+  }
+
+  void _navigateForGuide(InutixGuideSection section) {
+    if (!mounted) return;
+    final target = switch (section) {
+      InutixGuideSection.home => _homeIndex,
+      InutixGuideSection.search => _searchIndex,
+      InutixGuideSection.local => _localIndex,
+      InutixGuideSection.library => _libraryIndex,
+      InutixGuideSection.settings => _settingsIndex,
+      InutixGuideSection.player => _playerIndex,
+    };
+    _setSelectedIndex(target, recordHistory: false);
+  }
+
   @override
   void dispose() {
+    InutixLiveGuideController.instance.detachHost(_navigateForGuide);
     _promoPopupTimer?.cancel();
     _promoPopupTimer = null;
     WidgetsBinding.instance.removeObserver(this);
@@ -1652,20 +1700,23 @@ class _HomePageState extends ConsumerState<HomePage>
                               !(_isPlayerSelected &&
                                   spotifyCanvasEnabled &&
                                   !AppPlatform.isFlutterTest))
-                            _SideNavigation(
-                              selectedIndex: _selectedIndex,
-                              dimPlaybackBackground: _isPlayerSelected,
-                              transitionDuration: shellTransitionDuration,
-                              onSelected: _selectIndex,
-                              destinations: destinations,
-                              showNowPlayingToggle:
-                                  width >= 1120 &&
-                                  hasActivePlayback &&
-                                  !_isPlayerSelected,
-                              nowPlayingRailOpen: _desktopNowPlayingRailOpen,
-                              onToggleNowPlayingRail: () => setState(
-                                () => _desktopNowPlayingRailOpen =
-                                    !_desktopNowPlayingRailOpen,
+                            KeyedSubtree(
+                              key: InutixGuideAnchors.sideNav,
+                              child: _SideNavigation(
+                                selectedIndex: _selectedIndex,
+                                dimPlaybackBackground: _isPlayerSelected,
+                                transitionDuration: shellTransitionDuration,
+                                onSelected: _selectIndex,
+                                destinations: destinations,
+                                showNowPlayingToggle:
+                                    width >= 1120 &&
+                                    hasActivePlayback &&
+                                    !_isPlayerSelected,
+                                nowPlayingRailOpen: _desktopNowPlayingRailOpen,
+                                onToggleNowPlayingRail: () => setState(
+                                  () => _desktopNowPlayingRailOpen =
+                                      !_desktopNowPlayingRailOpen,
+                                ),
                               ),
                             ),
                           Expanded(
@@ -1752,30 +1803,35 @@ class _HomePageState extends ConsumerState<HomePage>
                                             : 0,
                                         preserveBackdropMaterial:
                                             useLiquidBottomNavigation,
-                                        child: _BottomNavigation(
-                                          selectedIndex: _selectedIndex,
-                                          onDestinationSelected:
-                                              selectBottomNavigationDestination,
-                                          onExpandLiquidNavigation: () =>
-                                              _setBottomNavigationRevealed(
-                                                true,
-                                              ),
-                                          destinations:
-                                              bottomNavigationDestinations,
-                                          detachedSearchDestination:
-                                              detachedSearchDestination,
-                                          liquidGlass:
-                                              useLiquidBottomNavigation,
-                                          liquidCollapsed:
-                                              liquidBottomNavigationCollapsed,
-                                          backdropGroupKey:
-                                              _liquidGlassChromeBackdropKey,
-                                          backdropMotion:
-                                              _liquidGlassChromeMoving,
-                                          transitionDuration:
-                                              shellTransitionDuration,
-                                          glassyCompact: _usesMobileNavigation,
-                                          systemBottomInset: systemBottomInset,
+                                        child: KeyedSubtree(
+                                          key: InutixGuideAnchors.bottomNav,
+                                          child: _BottomNavigation(
+                                            selectedIndex: _selectedIndex,
+                                            onDestinationSelected:
+                                                selectBottomNavigationDestination,
+                                            onExpandLiquidNavigation: () =>
+                                                _setBottomNavigationRevealed(
+                                                  true,
+                                                ),
+                                            destinations:
+                                                bottomNavigationDestinations,
+                                            detachedSearchDestination:
+                                                detachedSearchDestination,
+                                            liquidGlass:
+                                                useLiquidBottomNavigation,
+                                            liquidCollapsed:
+                                                liquidBottomNavigationCollapsed,
+                                            backdropGroupKey:
+                                                _liquidGlassChromeBackdropKey,
+                                            backdropMotion:
+                                                _liquidGlassChromeMoving,
+                                            transitionDuration:
+                                                shellTransitionDuration,
+                                            glassyCompact:
+                                                _usesMobileNavigation,
+                                            systemBottomInset:
+                                                systemBottomInset,
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1878,18 +1934,23 @@ class _HomePageState extends ConsumerState<HomePage>
                                 ),
                                 child: SizedBox(
                                   height: miniPlayerHeight,
-                                  child: MiniPlayer(
-                                    mode: miniPlayerMode,
-                                    backgroundMode:
-                                        miniPlayerAppearance.backgroundMode,
-                                    liquidGlassBackdropGroupKey:
-                                        _liquidGlassMiniPlayerBackdropKey,
-                                    liquidGlassBackdropMotion:
-                                        _liquidGlassChromeMoving,
-                                    liquidGlassBackdropEnvelopeWidth:
-                                        stableMiniGlassEnvelope ? width : null,
-                                    onOpenPlayer: _openPlayer,
-                                    onOpenLyrics: _openLyrics,
+                                  child: KeyedSubtree(
+                                    key: InutixGuideAnchors.miniPlayer,
+                                    child: MiniPlayer(
+                                      mode: miniPlayerMode,
+                                      backgroundMode:
+                                          miniPlayerAppearance.backgroundMode,
+                                      liquidGlassBackdropGroupKey:
+                                          _liquidGlassMiniPlayerBackdropKey,
+                                      liquidGlassBackdropMotion:
+                                          _liquidGlassChromeMoving,
+                                      liquidGlassBackdropEnvelopeWidth:
+                                          stableMiniGlassEnvelope
+                                              ? width
+                                              : null,
+                                      onOpenPlayer: _openPlayer,
+                                      onOpenLyrics: _openLyrics,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -1898,6 +1959,16 @@ class _HomePageState extends ConsumerState<HomePage>
                         ),
                       ),
                     ),
+                    if (widget.enableFirstRunExperience)
+                      Positioned.fill(
+                        child: InutixContextualCoachBanner(
+                          topAligned: _isPlayerSelected,
+                          bottomOffset:
+                              bottomNavigationHeight +
+                              (miniPlayerVisible ? miniPlayerHeight : 0) +
+                              12,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -4038,23 +4109,29 @@ class _HomeViewState extends ConsumerState<_HomeView> {
                     ),
             ),
             const SizedBox(width: 7),
-            _headerActionPill(
-              tooltip: 'Dispositivos',
-              onPressed: () => InutilConnectSheet.show(context),
-              child: InutilIcon(
-                InutilGlyph.devices,
-                size: 18,
-                color: colors.onSurface.withValues(alpha: 0.88),
+            KeyedSubtree(
+              key: InutixGuideAnchors.connectButton,
+              child: _headerActionPill(
+                tooltip: 'Dispositivos',
+                onPressed: () => InutilConnectSheet.show(context),
+                child: InutilIcon(
+                  InutilGlyph.devices,
+                  size: 18,
+                  color: colors.onSurface.withValues(alpha: 0.88),
+                ),
               ),
             ),
             const SizedBox(width: 7),
-            _headerActionPill(
-              tooltip: 'Mi cuenta',
-              onPressed: () => InutilAccountDialog.show(context),
-              child: InutilIcon(
-                InutilGlyph.profile,
-                size: 18,
-                color: colors.onSurface.withValues(alpha: 0.88),
+            KeyedSubtree(
+              key: InutixGuideAnchors.accountButton,
+              child: _headerActionPill(
+                tooltip: 'Mi cuenta',
+                onPressed: () => InutilAccountDialog.show(context),
+                child: InutilIcon(
+                  InutilGlyph.profile,
+                  size: 18,
+                  color: colors.onSurface.withValues(alpha: 0.88),
+                ),
               ),
             ),
           ],
@@ -4275,40 +4352,52 @@ class _HomeSmartToolsStrip extends ConsumerWidget {
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 2),
         children: [
-          buildTool(
-            keyName: 'home-tool-time-machine',
-            icon: Icons.history_toggle_off_rounded,
-            label: spanish ? 'Máquina del Tiempo' : 'Time Machine',
-            onTap: () => TimeMachineSheet.show(context),
+          KeyedSubtree(
+            key: InutixGuideAnchors.timeMachineChip,
+            child: buildTool(
+              keyName: 'home-tool-time-machine',
+              icon: Icons.history_toggle_off_rounded,
+              label: spanish ? 'Máquina del Tiempo' : 'Time Machine',
+              onTap: () => TimeMachineSheet.show(context),
+            ),
           ),
           const SizedBox(width: 8),
-          buildTool(
-            keyName: 'home-tool-echo-memory',
-            icon: Icons.auto_stories_rounded,
-            label: 'Echo Memory',
-            onTap: () => EchoMemoriesGallerySheet.show(context),
+          KeyedSubtree(
+            key: InutixGuideAnchors.echoMemoryChip,
+            child: buildTool(
+              keyName: 'home-tool-echo-memory',
+              icon: Icons.auto_stories_rounded,
+              label: 'Echo Memory',
+              onTap: () => EchoMemoriesGallerySheet.show(context),
+            ),
           ),
           const SizedBox(width: 8),
-          buildTool(
-            keyName: 'home-tool-algorithm',
-            icon: Icons.tune_rounded,
-            label: isNoAlgorithm
-                ? (spanish ? 'Sin algoritmo' : 'No algorithm')
-                : (spanish ? 'Algoritmo' : 'Algorithm'),
-            highlightColor: isNoAlgorithm ? colors.primary : null,
-            onTap: () => AlgorithmControlSettingsView.showSheet(context),
+          KeyedSubtree(
+            key: InutixGuideAnchors.algorithmChip,
+            child: buildTool(
+              keyName: 'home-tool-algorithm',
+              icon: Icons.tune_rounded,
+              label: isNoAlgorithm
+                  ? (spanish ? 'Sin algoritmo' : 'No algorithm')
+                  : (spanish ? 'Algoritmo' : 'Algorithm'),
+              highlightColor: isNoAlgorithm ? colors.primary : null,
+              onTap: () => AlgorithmControlSettingsView.showSheet(context),
+            ),
           ),
           const SizedBox(width: 8),
-          buildTool(
-            keyName: 'home-tool-listening-rooms',
-            icon: Icons.groups_rounded,
-            label: activeRoom != null
-                ? '${spanish ? 'Sala' : 'Room'} · ${activeRoom.code}'
-                : (spanish ? 'Salas en vivo' : 'Listening Rooms'),
-            highlightColor: activeRoom != null
-                ? const Color(0xFF1ED760)
-                : null,
-            onTap: () => ListeningRoomSheet.show(context),
+          KeyedSubtree(
+            key: InutixGuideAnchors.listeningRoomsChip,
+            child: buildTool(
+              keyName: 'home-tool-listening-rooms',
+              icon: Icons.groups_rounded,
+              label: activeRoom != null
+                  ? '${spanish ? 'Sala' : 'Room'} · ${activeRoom.code}'
+                  : (spanish ? 'Salas en vivo' : 'Listening Rooms'),
+              highlightColor: activeRoom != null
+                  ? const Color(0xFF1ED760)
+                  : null,
+              onTap: () => ListeningRoomSheet.show(context),
+            ),
           ),
         ],
       ),

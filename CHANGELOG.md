@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.5.30+4288 — 2026-11-24
+- Nuevo **Recorrido Interactivo Cinemático en Vivo** con foco luminoso *Liquid Glass* que se desplaza y transforma en tiempo real sobre los botones y pestañas reales de Inutix Music (Inutix Connect, Máquina del Tiempo, Echo Memory, Control del Algoritmo, Salas en vivo, Reproductor Cinemático, Buscar, Biblioteca y Ajustes).
+- Nuevos **Consejos Contextuales en Tiempo Real** no intrusivos que acompañan al usuario al entrar por primera vez a Buscar, Local, Biblioteca y Reproductor, con opción de reinicio desde Ajustes → Acerca de.
+
 ## 2.5.29+4287 — 2026-11-24
 - Ajuste de proporción y zona segura del icono adaptativo Android (`iX MUSIC` + fondo carbono degradado) para encuadrar con simetría exacta 1:1 junto al icono de Inutix TV en launchers circulares y *squircle*.
 

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/theme/inutil_icons.dart';
+import 'inutix_live_guide.dart';
 
 /// Guía interactiva de bienvenida que se muestra una sola vez al entrar por
 /// primera vez (y se puede repetir desde Ajustes → Acerca de).
@@ -36,6 +37,21 @@ class InutilOnboardingTour extends StatefulWidget {
     BuildContext context, {
     int inactivityDays = 15,
   }) async {
+    // Cuando la app real (`HomePage`) está montada, lanzamos el recorrido
+    // interactivo cinemático en vivo con foco luminoso desplazándose por los
+    // botones y pestañas reales. En arneses aislados sin HomePage conservamos
+    // el recorrido autocontenido para pruebas y pantallas independientes.
+    if (InutixLiveGuideController.instance.isAttached) {
+      final started = await InutixLiveGuideController.instance.startLiveTour(
+        context,
+        inactivityDays: inactivityDays,
+      );
+      if (started) {
+        await markCompleted();
+        return;
+      }
+    }
+    if (!context.mounted) return;
     await Navigator.of(context, rootNavigator: true).push<void>(
       PageRouteBuilder<void>(
         opaque: true,
