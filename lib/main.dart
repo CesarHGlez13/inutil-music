@@ -22,6 +22,7 @@ import 'core/firebase/firebase_auth_service.dart';
 import 'core/firebase/firebase_playback_sync_service.dart';
 import 'core/firebase/firebase_sync_providers.dart';
 import 'core/firebase/inutil_auth_gate.dart';
+import 'core/firebase/inutil_wrapped_service.dart';
 import 'core/firebase/inutil_update_gate.dart';
 import 'core/startup/inutil_settings_hydration_gate.dart';
 
@@ -226,6 +227,10 @@ class _LocalArtworkMaintenanceState
     // auto-respaldo periódico mientras la app vive.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        // Arranque en frío: es la primera apertura del día y el momento que ya
+        // existe para contarla. El store lo marca sucio y el flush diferido de
+        // siempre lo baja a disco; no hay timers nuevos.
+        InutilWrappedService.instance.recordAppOpen();
         final backup = ref.read(inutilCloudBackupProvider);
         backup.startAutoSync();
         unawaited(_restoreCloudBackupAndRefresh());
@@ -261,6 +266,10 @@ class _LocalArtworkMaintenanceState
       // plano e intenta restaurar un respaldo recién publicado en la nube.
       unawaited(InutilAuthService.instance.onAppResumed());
       unawaited(_restoreCloudBackupAndRefresh());
+      // Volver a primer plano cuenta como una apertura de la app: es el número
+      // `musicOpens` del reporte diario, y el contador ya está armado porque el
+      // bloque de `paused`/`detached` lo preparó al salir.
+      InutilWrappedService.instance.recordAppOpen();
       // A legacy download may have started while offline or before artwork
       // persistence existed. Resuming gives the cache/network repair another
       // chance without touching its already downloaded audio.
@@ -269,7 +278,11 @@ class _LocalArtworkMaintenanceState
             state == AppLifecycleState.detached) &&
         mounted) {
       // Al salir de la app se fuerza el respaldo pendiente: es el momento
-      // crítico antes de que el usuario desinstale o borre datos.
+      // crítico antes de que el usuario desinstale o borre datos. El mismo
+      // camino lleva el reporte diario de telemetría al relay (una escritura al
+      // día), y el contador de aperturas se arma para que la próxima visita en
+      // primer plano cuente como apertura nueva.
+      InutilWrappedService.instance.noteAppBackgrounded();
       unawaited(ref.read(inutilCloudBackupProvider).pushNow());
     }
   }

@@ -13,6 +13,7 @@ import '../../services/memories/echo_memory.dart';
 import '../../services/storage/local_database_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
+import 'daily_usage_report_service.dart';
 import 'inutil_wrapped_service.dart';
 
 typedef CloudDocumentGetter =
@@ -59,11 +60,16 @@ class InutilCloudBackupService {
   InutilCloudBackupService({
     required LocalDatabaseService database,
     @visibleForTesting this.hooks,
+    this.dailyReport,
   }) : _db = database;
 
   final LocalDatabaseService _db;
   @visibleForTesting
   final InutilCloudBackupHooks? hooks;
+
+  /// Reporte diario de telemetría al relay. `null` = no se manda (los builds de
+  /// prueba y las cuentas sin relay siguen exactamente como antes).
+  final DailyUsageReportService? dailyReport;
 
   CloudDocumentGetter get _getDocument =>
       hooks?.getDocument ?? InutilFirestoreService.instance.getDocument;
@@ -271,6 +277,14 @@ class InutilCloudBackupService {
       }
 
       await _syncWrappedToCloud();
+
+      // Reporte diario de telemetría al relay, en el momento de cierre que ya
+      // existe (el flush diferido del respaldo). Máximo 1 escritura por día: el
+      // servicio ya lleva el marker en prefs, y si la escritura falla por red el
+      // día queda pendiente y se reintenta en el siguiente cierre. Sin relay
+      // horneado (`dailyReport == null`) este paso es un no-op y el
+      // comportamiento queda byte a byte como antes.
+      await dailyReport?.reportNow();
 
       _lastPushAt = DateTime.now();
       _lastError = metaOk && tracksOk && entriesOk

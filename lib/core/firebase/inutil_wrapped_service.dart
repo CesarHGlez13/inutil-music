@@ -80,6 +80,35 @@ class WrappedArtistStat {
       );
 }
 
+/// Totales acumulados de un día calendario UTC, la unidad que lee el relay.
+///
+/// Es la vista pública del store diario: `[minutes]` son minutas escuchadas,
+/// `[plays]` reproducciones contadas y `[opens]` aperturas de la app. El relay
+/// las guarda como `musicMinutes` (double), `musicPlays` y `musicOpens`, así
+/// que este tipo devuelve exactamente lo que el contrato pide, en el mismo
+/// orden de magnitud (`YYYYMMDD` como clave).
+@immutable
+class WrappedDayTotals {
+  const WrappedDayTotals({
+    required this.dayKey,
+    required this.minutes,
+    required this.plays,
+    required this.opens,
+  });
+
+  /// `YYYYMMDD` en UTC, la misma convención que traen los IDs de
+  /// `metrics_daily` del relay.
+  final String dayKey;
+
+  /// Minutas escuchadas ese día, redondeadas a un decimal: la precisión con la
+  /// que el relay las guarda (`ROUND(...,1)`).
+  final double minutes;
+  final int plays;
+  final int opens;
+
+  bool get hasActivity => minutes > 0 || plays > 0 || opens > 0;
+}
+
 @immutable
 class InutilWrappedSummary {
   const InutilWrappedSummary({
@@ -198,6 +227,9 @@ class InutilWrappedService {
   static const _maxStoredTracks = 120;
   static const _maxStoredArtists = 80;
   static const _minSecondsForPlay = 15;
+  // Tope del store diario: un año completo cabe holgado, y el tope evita que
+  // el documento de preferencias crezca sin límite.
+  static const _maxStoredDays = 400;
 
   final Map<int, _YearBucket> _buckets = <int, _YearBucket>{};
   String? _activeTrackId;
@@ -210,6 +242,20 @@ class InutilWrappedService {
   bool _dirty = false;
   Timer? _persistTimer;
   Timer? _cloudPushTimer;
+
+  /// Reloj del motor. Es `DateTime.now` en producción; las pruebas lo fijan
+  /// para poder medir la contabilidad diaria en UTC sin depender de la hora de
+  /// la máquina.
+  DateTime Function() _clock = DateTime.now;
+
+  /// true cuando la apertura del primer plano de esta sesión ya se contó:
+  /// evita que cada regreso de `resumed` sume una apertura de más.
+  bool _openCountedThisForeground = false;
+
+  @visibleForTesting
+  set clockForTesting(DateTime Function()? clock) {
+    _clock = clock ?? DateTime.now;
+  }
 
   bool get _canSyncCloud =>
       InutilAuthService.instance.currentUser?.idToken.isNotEmpty == true &&
@@ -266,7 +312,7 @@ class InutilWrappedService {
     final deltaSec = (deltaMs / 1000).round();
     if (deltaSec <= 0) return;
 
-    final now = DateTime.now();
+    final now = _clock();
     final bucket = _ensureBucketInMemory(now.year);
     _addListeningDelta(
       bucket: bucket,
@@ -295,12 +341,19 @@ class InutilWrappedService {
         '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     bucket.activeDays.add(dayKey);
 
+    // Contabilidad diaria en UTC, clave `YYYYMMDD`: es la unidad que lee el
+    // relay. NO se reusa la clave de `activeDays` (hora local), que alimenta el
+    // Wrapped y no se debe mover.
+    final utcDay = bucket.dayFor(_utcDayKey(now));
+    utcDay.seconds += deltaSec;
+
     _activeAccumulatedSec += deltaSec;
     var incrementPlay = 0;
     if (!_activePlayCounted && _activeAccumulatedSec >= _minSecondsForPlay) {
       _activePlayCounted = true;
       incrementPlay = 1;
       bucket.totalPlays += 1;
+      utcDay.plays += 1;
     }
 
     final existingTrack = bucket.tracks[trackId];
@@ -584,11 +637,60 @@ class InutilWrappedService {
     }
   }
 
+  /// Contador de aperturas de la app del día calendario UTC. Lo llaman los
+  /// momentos que ya existen (el arranque y cada regreso a primer plano en
+  /// `main.dart`); `[noteAppBackgrounded]` arma el contador para que el
+  /// siguiente primer plano cuente, así se registra una apertura por visita en
+  /// primer plano y no una por cada evento `resumed`.
+  ///
+  /// Es el mismo camino de siempre: se marca sucio y el flush diferido existente
+  /// lo baja a disco. No hay timers nuevos.
+  void recordAppOpen() {
+    if (_openCountedThisForeground) return;
+    _openCountedThisForeground = true;
+    final bucket = _ensureBucketInMemory(_clock().toUtc().year);
+    bucket.dayFor(_utcDayKey(_clock().toUtc())).opens += 1;
+    _dirty = true;
+    _schedulePersist();
+  }
+
+  /// Arma el contador de aperturas al irse a segundo plano: la próxima vez que
+  /// la app vuelva a primer plano cuenta como una apertura nueva.
+  void noteAppBackgrounded() {
+    _openCountedThisForeground = false;
+  }
+
+  /// Totales acumulados del día calendario UTC (`YYYYMMDD`), la unidad que lee
+  /// el relay. Hidrata el bucket desde disco si hace falta, o sea el número es
+  /// completo incluso después de reiniciar la app.
+  Future<WrappedDayTotals> dayTotals(String dayKey) async {
+    final year = int.tryParse(dayKey.substring(0, 4)) ?? _clock().toUtc().year;
+    final bucket = await _loadBucket(year);
+    final counters = bucket.days[dayKey];
+    return WrappedDayTotals(
+      dayKey: dayKey,
+      minutes: counters == null
+          ? 0.0
+          : double.parse((counters.seconds / 60).toStringAsFixed(1)),
+      plays: counters?.plays ?? 0,
+      opens: counters?.opens ?? 0,
+    );
+  }
+
+  /// Clave `YYYYMMDD` del día calendario UTC, la convención del relay.
+  static String _utcDayKey(DateTime moment) {
+    final utc = moment.toUtc();
+    final month = utc.month.toString().padLeft(2, '0');
+    final day = utc.day.toString().padLeft(2, '0');
+    return '${utc.year}$month$day';
+  }
+
   @visibleForTesting
   void resetForTesting() {
     _persistTimer?.cancel();
     _cloudPushTimer?.cancel();
     _buckets.clear();
+    _openCountedThisForeground = false;
     _activeTrackId = null;
     _activePositionMs = 0;
     _activeAccumulatedSec = 0;
@@ -607,7 +709,16 @@ class _YearBucket {
   final Map<String, WrappedArtistStat> artists = <String, WrappedArtistStat>{};
   final Map<int, int> hourBuckets = <int, int>{};
   final Set<String> activeDays = <String>{};
+
+  /// Contabilidad diaria en UTC, clave `YYYYMMDD` (la convención del relay).
+  /// Es lo que alimenta el reporte diario de telemetría; los contadores del
+  /// Wrapped (`totalSeconds`, `totalPlays`) siguen intactos.
+  final Map<String, _DayCounters> days = <String, _DayCounters>{};
   bool hydratedFromDisk = false;
+
+  /// Devuelve el contenedor del día, creándolo si no existe.
+  _DayCounters dayFor(String dayKey) =>
+      days.putIfAbsent(dayKey, () => _DayCounters(dayKey: dayKey));
 
   void mergeFrom(_YearBucket other) {
     totalSeconds += other.totalSeconds;
@@ -636,6 +747,12 @@ class _YearBucket {
         seconds: (cur?.seconds ?? 0) + stat.seconds,
       );
     });
+    other.days.forEach((key, counters) {
+      final cur = dayFor(key);
+      cur.seconds += counters.seconds;
+      cur.plays += counters.plays;
+      cur.opens += counters.opens;
+    });
   }
 
   /// Al restaurar desde la nube, toma el máximo por clave para evitar duplicar
@@ -660,9 +777,23 @@ class _YearBucket {
         artists[key] = stat;
       }
     });
+    // Misma semántica que arriba, pero aplicada día por día: el máximo por
+    // clave, para no duplicar si parte del día ya estaba en local.
+    remote.days.forEach((key, counters) {
+      final cur = dayFor(key);
+      cur.seconds = counters.seconds > cur.seconds
+          ? counters.seconds
+          : cur.seconds;
+      cur.plays = counters.plays > cur.plays ? counters.plays : cur.plays;
+      cur.opens = counters.opens > cur.opens ? counters.opens : cur.opens;
+    });
   }
 
-  void prune(int maxTracks, int maxArtists) {
+  void prune(
+    int maxTracks,
+    int maxArtists, {
+    int maxDays = InutilWrappedService._maxStoredDays,
+  }) {
     if (tracks.length > maxTracks) {
       final sorted = tracks.entries.toList()
         ..sort((a, b) => b.value.seconds.compareTo(a.value.seconds));
@@ -676,6 +807,15 @@ class _YearBucket {
       artists
         ..clear()
         ..addEntries(sorted.take(maxArtists));
+    }
+    if (days.length > maxDays) {
+      // `YYYYMMDD` ordena bien como texto, así que el más reciente es el último
+      // y se conserva de los más nuevos hacia atrás.
+      final sorted = days.entries.toList()
+        ..sort((a, b) => b.key.compareTo(a.key));
+      days
+        ..clear()
+        ..addEntries(sorted.take(maxDays));
     }
   }
 
@@ -720,6 +860,16 @@ class _YearBucket {
       'hourBuckets': <String, int>{
         for (final entry in hourBuckets.entries) '${entry.key}': entry.value,
       },
+      'dailyCounters': days.values
+          .map(
+            (c) => <String, dynamic>{
+              'day': c.dayKey,
+              'seconds': c.seconds,
+              'plays': c.plays,
+              'opens': c.opens,
+            },
+          )
+          .toList(growable: false),
       'topArtistName': summary.topArtist?.name ?? '',
       'topTrackTitle': summary.topTrack?.title ?? '',
       'tracks': tracks.values.map((t) => t.toJson()).toList(growable: false),
@@ -786,6 +936,35 @@ class _YearBucket {
         }
       }
     }
+    final rawDays = map['dailyCounters'];
+    if (rawDays is List) {
+      for (final item in rawDays) {
+        if (item is! Map) continue;
+        final dayKey = item['day']?.toString().trim() ?? '';
+        if (dayKey.length != 8) continue;
+        final counters = bucket.dayFor(dayKey)
+          ..seconds = (item['seconds'] as num?)?.toInt() ?? 0
+          ..plays = (item['plays'] as num?)?.toInt() ?? 0
+          ..opens = (item['opens'] as num?)?.toInt() ?? 0;
+        if (counters.seconds == 0 &&
+            counters.plays == 0 &&
+            counters.opens == 0) {
+          bucket.days.remove(dayKey);
+        }
+      }
+    }
     return bucket;
   }
+}
+
+/// Contadores de un día calendario UTC (`YYYYMMDD`), la unidad que lee el
+/// relay. Mutable a propósito: es el libro contable del bucket, no la vista
+/// pública (`WrappedDayTotals`), que es inmutable.
+class _DayCounters {
+  _DayCounters({required this.dayKey});
+
+  final String dayKey;
+  int seconds = 0;
+  int plays = 0;
+  int opens = 0;
 }

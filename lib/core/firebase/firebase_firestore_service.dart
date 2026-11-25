@@ -346,6 +346,25 @@ class InutilFirestoreService {
     return response.statusCode >= 200 && response.statusCode < 300;
   }
 
+  /// POST de JSON plano al endpoint de métricas del relay
+  /// (`{BASE}/metrics/<uid>/daily`), el reporte diario de telemetría.
+  ///
+  /// JSON plano, NO la codificación `fields` de Firestore: es un endpoint
+  /// propio de `relay.py`, no un documento, y por eso su respuesta es
+  /// `{"ok": true, ...}`. Va por el canal de siempre: la misma resolución de
+  /// endpoint por path (`_baseUrlForPath`, que respeta el tier del relay), los
+  /// headers de siempre (mismo Bearer que ya se usa para escribir en Firestore)
+  /// y el fallback de relay de `_sendWithRelayFallback`, que ya conmuta a la
+  /// siguiente capa cuando el destino no responde. Reenviar el mismo total es
+  /// seguro: el relay hace merge por columna.
+  Future<http.Response> postJsonToRelay(String path, String jsonBody) {
+    return _sendWithRelayFallback(
+      label: 'POST $path',
+      urlBuilder: () => Uri.parse('${_baseUrlForPath(path)}/$path'),
+      send: (url) => http.post(url, headers: _headers(), body: jsonBody),
+    );
+  }
+
   /// Lista los documentos de una colección/subcolección (`users/{uid}/devices`).
   ///
   /// Cada documento llega con sus campos decodificados y el id bajo [idField],

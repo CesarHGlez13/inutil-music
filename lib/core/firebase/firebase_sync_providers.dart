@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import '../../features/music/domain/entities/track_info.dart';
 import '../../features/music/presentation/providers/music_providers.dart';
 import '../../services/player/player_service.dart';
+import 'daily_usage_report_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_playback_sync_service.dart';
 import 'inutil_cloud_backup_service.dart';
@@ -22,11 +23,21 @@ final inutilAuthProvider = ChangeNotifierProvider<InutilAuthService>((ref) {
   return service;
 }, disposeNotifier: false);
 
+/// Reporte diario de telemetría de la app hacia el relay
+/// (`POST {BASE}/metrics/<uid>/daily`). Lee los totales del día del mismo store
+/// que alimenta el Wrapped y los conteos de playlists/favoritos de la base
+/// local; no tiene dueño de ciclo de vida porque lo llama el respaldo en la
+/// nube, que ya vive en el contenedor.
+final dailyUsageReportProvider = Provider<DailyUsageReportService>((ref) {
+  return DailyUsageReportService(database: ref.watch(databaseServiceProvider));
+});
+
 /// Respaldo en la nube de playlists, biblioteca y ajustes (users/{uid}/data).
 /// Depende del proveedor de la base local para leer/escribir los datos.
 final inutilCloudBackupProvider = Provider<InutilCloudBackupService>((ref) {
   final service = InutilCloudBackupService(
     database: ref.watch(databaseServiceProvider),
+    dailyReport: ref.watch(dailyUsageReportProvider),
   );
   ref.onDispose(service.stopAutoSync);
   return service;
