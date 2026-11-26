@@ -1015,12 +1015,6 @@ class _HomePageState extends ConsumerState<HomePage>
 
     final leavingPlayer = _isPlayerSelected && index != _playerIndex;
     final enteringPlayer = !_isPlayerSelected && index == _playerIndex;
-    if (!AppPlatform.isFlutterTest &&
-        _usesMobileNavigation &&
-        !enteringPlayer &&
-        !leavingPlayer) {
-      HapticFeedback.selectionClick();
-    }
     final revealsBottomNavigation =
         index != _playerIndex &&
         revealBottomNavigation &&
@@ -2524,11 +2518,7 @@ class _BottomNavigation extends StatelessWidget {
         ),
       );
     }
-    final selectedOrdinal = destinations.indexWhere(
-      (destination) => destination.index == selectedIndex,
-    );
     final isDark = theme.brightness == Brightness.dark;
-    final navAccent = theme.colorScheme.primary;
     final content = SafeArea(
       top: false,
       bottom: false,
@@ -2539,28 +2529,7 @@ class _BottomNavigation extends StatelessWidget {
           constraints: BoxConstraints(
             minHeight: baseHeight(glassyCompact: glassyCompact),
           ),
-          child: SizedBox(
-            height: baseHeight(glassyCompact: glassyCompact),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                if (selectedOrdinal >= 0 && destinations.isNotEmpty)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: _SlidingBottomNavIndicator(
-                        selectedOrdinal: selectedOrdinal,
-                        itemCount: destinations.length,
-                        accentColor: navAccent,
-                        isDark: isDark,
-                        disableAnimations:
-                            transitionDuration == Duration.zero,
-                      ),
-                    ),
-                  ),
-                navigationItems,
-              ],
-            ),
-          ),
+          child: navigationItems,
         ),
       ),
     );
@@ -2569,58 +2538,16 @@ class _BottomNavigation extends StatelessWidget {
       end: Alignment.bottomCenter,
       colors: isDark
           ? [
-              Color.lerp(
-                const Color(0xFF10131A),
-                navAccent,
-                0.14,
-              )!.withValues(alpha: transparent ? 0.62 : 0.88),
-              Color.lerp(
-                const Color(0xFF0A0C10),
-                navAccent,
-                0.08,
-              )!.withValues(alpha: transparent ? 0.80 : 0.96),
-              const Color(0xFF050608).withValues(
-                alpha: transparent ? 0.92 : 0.99,
-              ),
+              const Color(0x0008090C),
+              const Color(0xCC07080B),
+              const Color(0xF8040507),
             ]
           : [
-              Color.lerp(
-                Colors.white,
-                navAccent,
-                0.07,
-              )!.withValues(alpha: transparent ? 0.68 : 0.90),
-              Color.lerp(
-                const Color(0xFFF6F7F9),
-                navAccent,
-                0.04,
-              )!.withValues(alpha: transparent ? 0.84 : 0.96),
-              const Color(0xFFF2F4F7).withValues(
-                alpha: transparent ? 0.94 : 0.99,
-              ),
+              const Color(0x00FFFFFF),
+              const Color(0xD8F5F6F8),
+              const Color(0xFAF0F2F5),
             ],
-      stops: const [0.0, 0.45, 1.0],
-    );
-    final topRimHairline = Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 1.0,
-      child: IgnorePointer(
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                Colors.transparent,
-                navAccent.withValues(alpha: isDark ? 0.34 : 0.24),
-                Colors.white.withValues(alpha: isDark ? 0.28 : 0.72),
-                navAccent.withValues(alpha: isDark ? 0.34 : 0.24),
-                Colors.transparent,
-              ],
-              stops: const [0.0, 0.22, 0.5, 0.78, 1.0],
-            ),
-          ),
-        ),
-      ),
+      stops: const [0.0, 0.42, 1.0],
     );
     if (!glassyCompact && !transparent) {
       return DecoratedBox(
@@ -2632,12 +2559,7 @@ class _BottomNavigation extends StatelessWidget {
         ),
         child: DecoratedBox(
           decoration: BoxDecoration(gradient: navGradient),
-          child: Stack(
-            children: [
-              content,
-              topRimHairline,
-            ],
-          ),
+          child: content,
         ),
       );
     }
@@ -2658,198 +2580,18 @@ class _BottomNavigation extends StatelessWidget {
       ),
       child: DecoratedBox(
         decoration: BoxDecoration(gradient: navGradient),
-        child: Stack(
-          children: [
-            content,
-            topRimHairline,
-          ],
-        ),
+        child: content,
       ),
     );
     return ClipRect(
       key: const ValueKey('bottom-navigation-glass'),
       child: BackdropFilter(
         filter: ImageFilter.blur(
-          sigmaX: transparent ? 16 : 20,
-          sigmaY: transparent ? 16 : 20,
+          sigmaX: transparent ? 14 : 16,
+          sigmaY: transparent ? 14 : 16,
         ),
         child: surface,
       ),
-    );
-  }
-}
-
-class _SlidingBottomNavIndicator extends StatefulWidget {
-  const _SlidingBottomNavIndicator({
-    required this.selectedOrdinal,
-    required this.itemCount,
-    required this.accentColor,
-    required this.isDark,
-    required this.disableAnimations,
-  });
-
-  final int selectedOrdinal;
-  final int itemCount;
-  final Color accentColor;
-  final bool isDark;
-  final bool disableAnimations;
-
-  @override
-  State<_SlidingBottomNavIndicator> createState() =>
-      _SlidingBottomNavIndicatorState();
-}
-
-class _SlidingBottomNavIndicatorState extends State<_SlidingBottomNavIndicator>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  late double _fromOrdinal;
-  late double _toOrdinal;
-
-  @override
-  void initState() {
-    super.initState();
-    _fromOrdinal = widget.selectedOrdinal.toDouble();
-    _toOrdinal = widget.selectedOrdinal.toDouble();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-      value: 1.0,
-      animationBehavior: AppPlatform.isFlutterTest
-          ? AnimationBehavior.normal
-          : AnimationBehavior.preserve,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _SlidingBottomNavIndicator oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedOrdinal != widget.selectedOrdinal) {
-      final current = lerpDouble(
-        _fromOrdinal,
-        _toOrdinal,
-        Curves.easeOutCubic.transform(_controller.value),
-      )!;
-      _fromOrdinal = current;
-      _toOrdinal = widget.selectedOrdinal.toDouble();
-      if (widget.disableAnimations) {
-        _controller.value = 1.0;
-      } else {
-        _controller.forward(from: 0.0);
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (widget.itemCount <= 0) return const SizedBox.shrink();
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final slotWidth = constraints.maxWidth / widget.itemCount;
-        final pillWidth = math.max(44.0, slotWidth - 10.0);
-        return AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final t = Curves.easeOutCubic.transform(_controller.value);
-            final ordinal = lerpDouble(_fromOrdinal, _toOrdinal, t)!;
-            final centerX = (ordinal + 0.5) * slotWidth;
-            final left = centerX - pillWidth / 2;
-            final highlightColor = Color.alphaBlend(
-              Colors.white.withValues(alpha: widget.isDark ? 0.35 : 0.25),
-              widget.accentColor,
-            );
-            return Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Subtle ambient glow pool tracking the active tab
-                Positioned(
-                  left: centerX - slotWidth * 0.75,
-                  top: -8,
-                  width: slotWidth * 1.5,
-                  height: constraints.maxHeight + 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: const Alignment(0, -0.35),
-                        radius: 0.9,
-                        colors: [
-                          widget.accentColor.withValues(
-                            alpha: widget.isDark ? 0.24 : 0.14,
-                          ),
-                          widget.accentColor.withValues(alpha: 0.0),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // Sliding translucent gradient pill behind active icon+label
-                Positioned(
-                  left: left,
-                  top: 6,
-                  bottom: 6,
-                  width: pillWidth,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(18),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          widget.accentColor.withValues(
-                            alpha: widget.isDark ? 0.22 : 0.15,
-                          ),
-                          widget.accentColor.withValues(
-                            alpha: widget.isDark ? 0.08 : 0.05,
-                          ),
-                        ],
-                      ),
-                      border: Border.all(
-                        color: highlightColor.withValues(
-                          alpha: widget.isDark ? 0.26 : 0.20,
-                        ),
-                        width: 0.75,
-                      ),
-                    ),
-                  ),
-                ),
-                // Crisp luminous top beacon aligned to the active slot
-                Positioned(
-                  left: centerX - 15,
-                  top: 0,
-                  width: 30,
-                  height: 2.4,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(99),
-                      ),
-                      gradient: LinearGradient(
-                        colors: [
-                          widget.accentColor.withValues(alpha: 0.2),
-                          highlightColor,
-                          widget.accentColor.withValues(alpha: 0.2),
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: widget.accentColor.withValues(alpha: 0.65),
-                          blurRadius: 8,
-                          spreadRadius: 0.5,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
     );
   }
 }
@@ -3326,7 +3068,7 @@ class _DetachedSearchButton extends StatelessWidget {
   }
 }
 
-class _BottomNavigationItem extends StatefulWidget {
+class _BottomNavigationItem extends StatelessWidget {
   const _BottomNavigationItem({
     required this.destinationIndex,
     required this.glyph,
@@ -3352,110 +3094,65 @@ class _BottomNavigationItem extends StatefulWidget {
   final bool iconOnly;
 
   @override
-  State<_BottomNavigationItem> createState() => _BottomNavigationItemState();
-}
-
-class _BottomNavigationItemState extends State<_BottomNavigationItem>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-      reverseDuration: const Duration(milliseconds: 200),
-      value: widget.selected ? 1.0 : 0.0,
-      animationBehavior: AppPlatform.isFlutterTest
-          ? AnimationBehavior.normal
-          : AnimationBehavior.preserve,
-    );
-  }
-
-  @override
-  void didUpdateWidget(covariant _BottomNavigationItem oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selected != widget.selected) {
-      final disableAnimations =
-          AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
-      if (disableAnimations) {
-        _controller.value = widget.selected ? 1.0 : 0.0;
-      } else if (widget.selected) {
-        _controller.forward();
-      } else {
-        _controller.reverse();
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final active = colors.primary;
     final inactive = colors.onSurfaceVariant.withValues(alpha: 0.72);
-    final animatedSelection = AnimatedBuilder(
-      key: ValueKey('bottom-navigation-selection-${widget.destinationIndex}'),
-      animation: _controller,
-      builder: (context, _) {
-        final raw = _controller.value;
-        final value = Curves.easeOutCubic.transform(raw);
-        final pop = widget.selected
-            ? const Cubic(0.22, 1.24, 0.34, 1.0).transform(raw)
-            : value;
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 260);
+    final animatedSelection = TweenAnimationBuilder<double>(
+      key: ValueKey('bottom-navigation-selection-$destinationIndex'),
+      tween: Tween<double>(end: selected ? 1 : 0),
+      duration: duration,
+      curve: Curves.easeOutCubic,
+      builder: (context, value, _) {
         final foreground = Color.lerp(inactive, active, value)!;
-        if (widget.iconOnly) {
+        if (iconOnly) {
           return Center(
             child: Transform.scale(
-              key: ValueKey(
-                'bottom-navigation-icon-scale-${widget.destinationIndex}',
-              ),
-              scale: lerpDouble(1.0, 1.14, pop)!,
+              key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
+              scale: lerpDouble(1, 1.12, value)!,
               child: InutilIcon(
-                widget.glyph,
+                glyph,
                 color: foreground,
                 size: 26,
-                filled: widget.selected,
+                filled: selected,
               ),
             ),
           );
         }
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            color: liquidGlass
+                ? Colors.transparent
+                : active.withValues(alpha: 0.08 * value),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Transform.translate(
-                offset: Offset(0, lerpDouble(0.0, -2.0, pop)!),
-                child: Transform.scale(
-                  key: ValueKey(
-                    'bottom-navigation-icon-scale-${widget.destinationIndex}',
-                  ),
-                  scale: lerpDouble(1.0, 1.14, pop)!,
-                  child: InutilIcon(
-                    widget.glyph,
-                    color: foreground,
-                    size: 25,
-                    filled: value > 0.45,
-                  ),
+              Transform.scale(
+                key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
+                scale: lerpDouble(1, 1.12, value)!,
+                child: InutilIcon(
+                  glyph,
+                  color: foreground,
+                  size: 25,
+                  filled: value > 0.5,
                 ),
               ),
               const SizedBox(height: 3),
               Text(
-                widget.label,
+                label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall!.copyWith(
                   color: foreground,
                   fontSize: 11.2,
-                  letterSpacing: lerpDouble(0.05, 0.18, value),
+                  letterSpacing: 0.1,
                   fontWeight: FontWeight.lerp(
                     FontWeight.w500,
                     FontWeight.w800,
@@ -3463,30 +3160,13 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem>
                   ),
                 ),
               ),
-              const SizedBox(height: 2.5),
+              const SizedBox(height: 2),
               Container(
-                width: lerpDouble(0, 18, value)!,
+                width: lerpDouble(0, 16, value)!,
                 height: 2.5,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      active.withValues(alpha: 0.45 * value),
-                      Color.alphaBlend(
-                        Colors.white.withValues(alpha: 0.35),
-                        active,
-                      ).withValues(alpha: value),
-                      active.withValues(alpha: 0.45 * value),
-                    ],
-                  ),
+                  color: active.withValues(alpha: value),
                   borderRadius: BorderRadius.circular(99),
-                  boxShadow: value > 0.2
-                      ? [
-                          BoxShadow(
-                            color: active.withValues(alpha: 0.45 * value),
-                            blurRadius: 6,
-                          ),
-                        ]
-                      : null,
                 ),
               ),
             ],
@@ -3494,18 +3174,16 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem>
         );
       },
     );
-    final scaledSelection = widget.liquidGlass
+    final scaledSelection = liquidGlass
         ? MediaQuery.withClampedTextScaling(
             maxScaleFactor: 1.35,
             child: animatedSelection,
           )
         : animatedSelection;
-    final item = widget.liquidGlass
+    final item = liquidGlass
         ? LiquidGlassHoverTarget(
-            key: ValueKey(
-              'bottom-navigation-hover-glass-${widget.destinationIndex}',
-            ),
-            borderRadius: BorderRadius.circular(widget.iconOnly ? 32 : 22),
+            key: ValueKey('bottom-navigation-hover-glass-$destinationIndex'),
+            borderRadius: BorderRadius.circular(iconOnly ? 32 : 22),
             intensity: 0.72,
             // Bottom navigation is touch chrome on Android, including when it
             // is hosted by an emulator with a desktop mouse attached. Keeping
@@ -3516,51 +3194,42 @@ class _BottomNavigationItemState extends State<_BottomNavigationItem>
           )
         : scaledSelection;
     final control = InkWell(
-      key: ValueKey('bottom-navigation-item-${widget.destinationIndex}'),
-      onTap: widget.onTap,
-      borderRadius: widget.iconOnly
-          ? null
-          : BorderRadius.circular(appNavItemRadius),
-      customBorder: widget.iconOnly ? const CircleBorder() : null,
-      splashFactory: widget.liquidGlass ? NoSplash.splashFactory : null,
-      overlayColor: widget.liquidGlass
+      key: ValueKey('bottom-navigation-item-$destinationIndex'),
+      onTap: onTap,
+      borderRadius: iconOnly ? null : BorderRadius.circular(appNavItemRadius),
+      customBorder: iconOnly ? const CircleBorder() : null,
+      splashFactory: liquidGlass ? NoSplash.splashFactory : null,
+      overlayColor: liquidGlass
           ? WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.focused)) {
                 return active.withValues(alpha: 0.12);
               }
               return Colors.transparent;
             })
-          : WidgetStateProperty.resolveWith((states) {
-              if (states.contains(WidgetState.pressed)) {
-                return active.withValues(alpha: 0.14);
-              }
-              return Colors.transparent;
-            }),
+          : null,
       child: item,
     );
-    if (!widget.liquidGlass) {
+    if (!liquidGlass) {
       return control;
     }
     final semantics = Semantics(
       key:
-          widget.semanticsKey ??
-          ValueKey(
-            'bottom-navigation-primary-destination-${widget.destinationIndex}',
-          ),
-      label: widget.label,
-      hint: widget.semanticsHint,
+          semanticsKey ??
+          ValueKey('bottom-navigation-primary-destination-$destinationIndex'),
+      label: label,
+      hint: semanticsHint,
       button: true,
-      selected: widget.selected,
-      expanded: widget.semanticsExpanded,
-      onTap: widget.onTap,
+      selected: selected,
+      expanded: semanticsExpanded,
+      onTap: onTap,
       excludeSemantics: true,
       child: control,
     );
-    if (!widget.iconOnly) {
+    if (!iconOnly) {
       return semantics;
     }
     return Tooltip(
-      message: widget.label,
+      message: label,
       excludeFromSemantics: true,
       child: semantics,
     );
