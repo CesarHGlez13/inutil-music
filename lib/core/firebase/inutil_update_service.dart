@@ -9,6 +9,8 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../services/app_update/android_package_installer.dart';
+import '../../services/app_update/ota_download_manager.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_ui.dart';
@@ -127,6 +129,30 @@ class InutilReleaseInfo {
       if (url.isNotEmpty) return url;
     }
     return apkDownloadUrl.trim();
+  }
+
+  /// Elige el primer APK publicado compatible con la lista ordenada de ABIs
+  /// soportadas por el dispositivo (`Build.SUPPORTED_ABIS`).
+  String apkUrlForSupportedAbis(List<String> abis) {
+    for (final abi in abis) {
+      final key = normalizeAbiKey(abi);
+      if (key.isEmpty) continue;
+      final url = androidDownloads[key]?.trim() ?? '';
+      if (url.isNotEmpty) return url;
+    }
+    return apkUrlForAbi('');
+  }
+
+  /// Hash SHA-256 esperado para el nombre de archivo de [url], o vacío si el
+  /// manifiesto no lo publicó.
+  String expectedSha256ForUrl(String url) {
+    if (checksums.isEmpty) return '';
+    final uri = Uri.tryParse(url.trim());
+    final fileName = uri != null && uri.pathSegments.isNotEmpty
+        ? uri.pathSegments.last
+        : p.basename(url.trim());
+    if (fileName.isEmpty) return '';
+    return (checksums[fileName] ?? '').trim();
   }
 
   /// Tamaño anunciado del paquete que se descargaría para [abi], o `0`.
@@ -797,12 +823,22 @@ class InutilUpdateService {
     }
   }
 
-  /// Descarga el paquete de actualización (`.apk` o `.tar.gz`) a `Directory.systemTemp`
-  /// reportando progreso en tiempo real y abre el instalador o carpeta al concluir.
+  final OtaDownloadManager _otaDownloadManager = OtaDownloadManager();
+
+  /// Descarga el paquete de actualización y abre el instalador correspondiente.
+  ///
+  /// En Android selecciona la ABI exacta del teléfono (`Build.SUPPORTED_ABIS`),
+  /// solicita el permiso «Instalar aplicaciones desconocidas», descarga con
+  /// reanudación + verificación ZIP/SHA-256 en caché interna y lanza el
+  /// instalador nativo vía `FileProvider` (`content://`).
   Future<String> downloadUpdate(
     InutilReleaseInfo release, {
     required void Function(int received, int total) onProgress,
   }) async {
+    if (Platform.isAndroid) {
+      return _downloadAndInstallAndroid(release, onProgress: onProgress);
+    }
+
     final url = release.platformDownloadUrl;
     if (url.isEmpty) {
       throw const FormatException(
@@ -859,6 +895,13 @@ class InutilUpdateService {
           await sink.flush();
           await sink.close();
         }
+        if (totalBytes > 0 && receivedBytes != totalBytes) {
+          await file.delete().catchError((_) => file);
+          throw HttpException(
+            'La descarga se interrumpió ($receivedBytes / $totalBytes bytes).',
+            uri: uri,
+          );
+        }
 
         usedUri = uri;
         break;
@@ -879,6 +922,78 @@ class InutilUpdateService {
 
     await _openDownloadedArtifact(file, fallbackUrl: usedUri);
     return file.path;
+  }
+
+  Future<String> _downloadAndInstallAndroid(
+    InutilReleaseInfo release, {
+    required void Function(int received, int total) onProgress,
+  }) async {
+    final allowed = await AndroidPackageInstaller.canRequestPackageInstalls();
+    if (!allowed) {
+      await AndroidPackageInstaller.openInstallUnknownAppsSettings();
+      throw const OtaDownloadException(
+        'Activa "Instalar aplicaciones desconocidas" para Inutix Music y vuelve a pulsar Actualizar.',
+      );
+    }
+
+    final abis = await AndroidPackageInstaller.supportedAbis();
+    final url = release.apkUrlForSupportedAbis(abis);
+    if (url.isEmpty) {
+      throw const OtaDownloadException(
+        'No hay un paquete APK configurado para la arquitectura de este dispositivo.',
+      );
+    }
+
+    final sanitizedVersion = release.latestVersion.replaceAll(
+      RegExp(r'[^A-Za-z0-9._-]'),
+      '_',
+    );
+    final abiTag = abis.isNotEmpty
+        ? InutilReleaseInfo.normalizeAbiKey(abis.first)
+        : 'apk';
+    final fileName = 'inutil_music_v${sanitizedVersion}_$abiTag.apk';
+    final expectedSha256 = release.expectedSha256ForUrl(url);
+
+    String localPath;
+    try {
+      localPath = await _otaDownloadManager.download(
+        url: url,
+        fileName: fileName,
+        expectedSha256: expectedSha256,
+        onProgress: (p) => onProgress(p.receivedBytes, p.totalBytes),
+      );
+    } on OtaDownloadException {
+      final fallbackUrl = otaFallbackUrlFor(url);
+      if (fallbackUrl.isEmpty || fallbackUrl == url) rethrow;
+      debugPrint(
+        'InutilUpdateService: descarga directa falló; reintentando vía Edge OTA: $fallbackUrl',
+      );
+      localPath = await _otaDownloadManager.download(
+        url: fallbackUrl,
+        fileName: fileName,
+        expectedSha256: expectedSha256,
+        onProgress: (p) => onProgress(p.receivedBytes, p.totalBytes),
+      );
+    }
+
+    final verification = await AndroidPackageInstaller.verifyPackage(localPath);
+    if (verification != null && verification['valid'] == false) {
+      final msg = verification['errorMessage'] as String? ??
+          'El paquete descargado no es compatible con este dispositivo.';
+      await _otaDownloadManager.clearDownloads();
+      throw OtaDownloadException(msg);
+    }
+
+    final installError = await AndroidPackageInstaller.installPackage(
+      localPath,
+    );
+    if (installError != null) {
+      // Si el instalador nativo rechazó el paquete (ej. corrupto), limpiar caché
+      // para que el siguiente reintento descargue desde cero.
+      await _otaDownloadManager.clearDownloads();
+      throw OtaDownloadException(installError);
+    }
+    return localPath;
   }
 
   Future<void> _openDownloadedArtifact(
@@ -1194,12 +1309,13 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
         await Future<void>.delayed(const Duration(milliseconds: 1500));
         exit(0);
       }
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
         _downloading = false;
-        _error =
-            'No se pudo descargar la actualización en este momento. Verifica tu conexión e inténtalo de nuevo.';
+        _error = error is OtaDownloadException
+            ? error.message
+            : 'No se pudo descargar la actualización en este momento. Verifica tu conexión e inténtalo de nuevo.';
       });
     }
   }
@@ -1361,11 +1477,25 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                             ),
                           )
                         else
-                          Text(
-                            'Ya cuentas con la versión más reciente de Inutix Music.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Ya cuentas con la versión más reciente de Inutix Music.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                ),
+                              ),
+                              if (Platform.isAndroid) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Puedes verificar si el paquete OTA publicado corresponde a la arquitectura y firma de tu dispositivo.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.onSurfaceVariant.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                         if (_downloading) ...[
                           const SizedBox(height: 16),
@@ -1441,6 +1571,14 @@ class _InutilUpdateDialogWidgetState extends State<InutilUpdateDialogContent> {
                   alignment: WrapAlignment.end,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
+                    if (!hasUpdate && Platform.isAndroid && release.platformDownloadUrl.isNotEmpty)
+                      OutlinedButton.icon(
+                        onPressed: _downloading ? null : _startDownload,
+                        icon: const Icon(Icons.verified_rounded, size: 18),
+                        label: Text(
+                          _downloading ? 'Verificando...' : 'Verificar paquete de este dispositivo',
+                        ),
+                      ),
                     if (canDismiss)
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),

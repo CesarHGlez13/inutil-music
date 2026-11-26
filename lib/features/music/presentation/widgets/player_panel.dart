@@ -55,6 +55,7 @@ import 'inutil_connect_sheet.dart';
 import 'inutil_sleep_timer_sheet.dart';
 import 'inutix_live_guide.dart';
 import 'listening_room_sheet.dart';
+import 'live_floating_reactions_overlay.dart';
 import 'lyrics_page_route.dart';
 import 'moment_share_sheet.dart';
 import 'now_playing_equalizer.dart';

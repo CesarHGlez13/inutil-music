@@ -18,7 +18,6 @@ class _FakePlayerService implements PlayerService {
   @override
   Stream<PlayerSnapshot> get snapshotStream => const Stream.empty();
 
-  @override
   Future<void> playFile(
     String filePath, {
     required String trackId,
@@ -44,7 +43,6 @@ class _FakePlayerService implements PlayerService {
     );
   }
 
-  @override
   Future<void> playUrl(
     String streamUrl, {
     required String trackId,
@@ -106,16 +104,13 @@ class _FakePlayerService implements PlayerService {
     _snapshot = _snapshot.copyWith(volume: volume);
   }
 
-  @override
   Future<void> setSpeed(double speed) async {}
 
-  @override
   Future<void> setCrossfade({
     required bool enabled,
     required Duration duration,
   }) async {}
 
-  @override
   Future<void> setSkipSilence(bool enabled) async {}
 
   @override

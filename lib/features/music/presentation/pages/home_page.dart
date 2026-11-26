@@ -1436,6 +1436,7 @@ class _HomePageState extends ConsumerState<HomePage>
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(listeningRoomPlayerBridgeProvider);
     _scheduleHomeFeedActivityUpdate();
     final width = MediaQuery.sizeOf(context).width;
     final useSideNavigation = width >= 920 && !_usesMobileNavigation;

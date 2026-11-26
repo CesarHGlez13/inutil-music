@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.34+4292 — 2026-11-26
+- **Autenticación con Google 100 % independiente:** el inicio de sesión y registro con Google ahora se procesa directamente a través de Google Identity y la infraestructura de Inutix sin intermediación de Firebase Auth.
+- **Verificación inteligente de arquitectura y compatibilidad OTA:** el motor de actualizaciones ahora analiza la arquitectura del dispositivo (`arm64-v8a`, `armeabi-v7a`, `x86_64`) y la firma de producción del paquete antes de abrir el instalador del sistema, evitando por completo el error «El paquete no es válido».
+- **Salas en vivo con reacciones animadas estilo TikTok LIVE:** superposición de reacciones flotantes físicas en tiempo real con efecto neón, botones con respuesta háptica y ecualizadores animados en salas de escucha.
+
 ## 2.5.33+4291 — 2026-11-25
 - **Panel de administración con datos reales:** la app ahora registra el uso del día (minutos reproducidos, reproducciones, aperturas, playlists y favoritos) y lo envía al cerrar la sesión, para que el panel de Inutix muestre estadísticas reales por cuenta. Tu forma de usar la app no cambia.
 - **Sin reintentos constantes ni consumo extra:** el resumen se manda una sola vez por día por el mismo canal seguro de tus datos; si estabas sin conexión, se guarda en el teléfono y se envía al regreso.

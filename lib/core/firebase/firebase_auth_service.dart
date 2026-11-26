@@ -613,12 +613,41 @@ class InutilAuthService extends ChangeNotifier {
     }
   }
 
-  /// Intercambio de refreshToken por un idToken nuevo (Secure Token Manager).
+  /// Intercambio de refreshToken por un idToken nuevo (Secure Token Manager o Inutix Relay).
   Future<bool> _ensureFreshIdToken() async {
     final user = _currentUser;
     if (user == null || user.refreshToken.isEmpty) return false;
     if (testSkipOnlineValidation) return _idTokenValid(user.idToken);
     if (_idTokenValid(user.idToken)) return true;
+
+    // Sesión nativa Inutix
+    if (user.refreshToken.startsWith('inutix_')) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('https://api.inutix.com/auth/refresh'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'refreshToken': user.refreshToken}),
+            )
+            .timeout(const Duration(seconds: 8));
+        if (response.statusCode == 200) {
+          final data = _tryDecode(response.body);
+          final idToken = data['idToken'] as String? ?? '';
+          if (idToken.isNotEmpty) {
+            _currentUser = user.copyWith(
+              idToken: idToken,
+              refreshToken: (data['refreshToken'] as String?) ?? user.refreshToken,
+            );
+            await _saveSession();
+            notifyListeners();
+            return true;
+          }
+        }
+      } catch (e) {
+        debugPrint('Fallo refrescando sesión Inutix: $e');
+      }
+    }
+
     try {
       final url = Uri.parse(
         '${FirebaseConfig.secureTokenUrl}?${FirebaseConfig.keyParam}',
@@ -653,6 +682,7 @@ class InutilAuthService extends ChangeNotifier {
   /// Decodifica el payload JWT y comprueba `exp` con margen de 60 s.
   static bool _idTokenValid(String idToken) {
     if (idToken.isEmpty) return false;
+    if (idToken.startsWith('inutix_')) return true;
     try {
       final parts = idToken.split('.');
       if (parts.length < 2) return false;
@@ -795,16 +825,42 @@ class InutilAuthService extends ChangeNotifier {
       );
     }
 
-    final postBody = (googleIdToken != null && googleIdToken.isNotEmpty)
-        ? 'id_token=$googleIdToken&providerId=google.com'
-        : 'access_token=$googleAccessToken&providerId=google.com';
+    Map<String, dynamic>? data;
+    // 1. Intento primario: autenticación directa contra Inutix Relay (100% independiente de Firebase Auth)
+    try {
+      final res = await http
+          .post(
+            Uri.parse('https://api.inutix.com/auth/google'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'idToken': googleIdToken,
+              'accessToken': googleAccessToken,
+            }),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+        if (decoded['ok'] == true && decoded['idToken'] != null) {
+          data = decoded;
+        }
+      }
+    } catch (e) {
+      debugPrint('Autenticación nativa Inutix falló ($e), usando respaldo Firebase');
+    }
 
-    final data = await _authPost('accounts:signInWithIdp', {
-      'postBody': postBody,
-      'requestUri': 'http://localhost',
-      'returnIdpCredential': true,
-      'returnSecureToken': true,
-    });
+    // 2. Respaldo secundario: intercambio contra Firebase Auth REST
+    if (data == null) {
+      final postBody = (googleIdToken != null && googleIdToken.isNotEmpty)
+          ? 'id_token=$googleIdToken&providerId=google.com'
+          : 'access_token=$googleAccessToken&providerId=google.com';
+
+      data = await _authPost('accounts:signInWithIdp', {
+        'postBody': postBody,
+        'requestUri': 'http://localhost',
+        'returnIdpCredential': true,
+        'returnSecureToken': true,
+      });
+    }
 
     final email = (data['email'] as String? ?? account.email)
         .trim()
@@ -816,7 +872,7 @@ class InutilAuthService extends ChangeNotifier {
               : email.split('@').first);
 
     final user = InutilUser(
-      uid: data['localId'] as String,
+      uid: (data['localId'] ?? data['uid']) as String,
       email: email,
       displayName: displayName,
       idToken: data['idToken'] as String? ?? '',

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +14,7 @@ import '../../../../services/player/player_service.dart';
 import '../../../../services/sharing/inutil_track_link.dart';
 import '../providers/listening_room_providers.dart';
 import '../providers/music_providers.dart';
+import 'live_floating_reactions_overlay.dart';
 import 'source_image.dart';
 
 /// Interactive modal for Listening Rooms (create, join by code/QR, share invite,
@@ -55,11 +57,21 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
   final _joinCodeController = TextEditingController();
   final _chatController = TextEditingController();
   final _queueSearchController = TextEditingController();
+  final _reactionsController = LiveFloatingReactionsController();
   bool _allowGuestQueue = true;
   bool _searchingQueue = false;
   List<ListeningRoomTrack> _searchResults = const <ListeningRoomTrack>[];
 
-  static const _quickEmojis = <String>['🔥', '❤️', '🎵', '😭', '👏', '🤯'];
+  static const _quickEmojis = <String>[
+    '🔥',
+    '❤️',
+    '🎵',
+    '👏',
+    '🤯',
+    '🚀',
+    '✨',
+    '😭',
+  ];
 
   @override
   void initState() {
@@ -590,237 +602,293 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
     final myUid = service.myUid ?? '';
     final burstReactions = service.recentBurstReactions;
 
-    return Column(
-      children: [
-        // Invite & quick actions bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
+    return LiveFloatingReactionsOverlay(
+      controller: _reactionsController,
+      bottomOffset: 70,
+      maxTravelHeight: 460,
+      autoListenRoom: true,
+      child: Column(
+        children: [
+          // Invite & quick actions bar
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1ED760).withValues(alpha: 0.16),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.circle,
+                        size: 8,
+                        color: Color(0xFF1ED760),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        room.code,
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.5,
+                          color: const Color(0xFF1ED760),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: spanish ? 'Copiar código' : 'Copy code',
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: room.code));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          spanish
+                              ? 'Código ${room.code} copiado'
+                              : 'Code ${room.code} copied',
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                ),
+                IconButton.filledTonal(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: spanish ? 'Compartir invitación' : 'Share invite',
+                  onPressed: () {
+                    SharePlus.instance.share(
+                      ShareParams(
+                        text: spanish
+                            ? 'Únete a mi sala «${room.name}» en Inutix Music 🎧\nCódigo: ${room.code}\n${room.shareUri}'
+                            : 'Join my Listening Room «${room.name}» on Inutix Music 🎧\nCode: ${room.code}\n${room.shareUri}',
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                ),
+                IconButton.filledTonal(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'QR',
+                  onPressed: () => _showQrDialog(room, spanish),
+                  icon: const Icon(Icons.qr_code_rounded, size: 18),
+                ),
+                const Spacer(),
+                TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: colors.error),
+                  onPressed: () async {
+                    await service.leaveRoom();
+                  },
+                  icon: const Icon(Icons.exit_to_app_rounded, size: 18),
+                  label: Text(
+                    service.isHost
+                        ? (spanish ? 'Cerrar' : 'End')
+                        : (spanish ? 'Salir' : 'Leave'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Hero card: Now Playing con Live DJ, Equalizer dinámico y glow
+          if (room.currentTrack != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
+              child: Container(
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1ED760).withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(999),
+                  gradient: LinearGradient(
+                    colors: [
+                      colors.surfaceContainerHigh,
+                      colors.surfaceContainerLow,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: const Color(0xFF1ED760).withValues(alpha: 0.35),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1ED760).withValues(alpha: 0.12),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: Color(0xFF1ED760),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      room.code,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.5,
-                        color: const Color(0xFF1ED760),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 50,
+                        height: 50,
+                        child: SourceImage(
+                          source: room.currentTrack!.thumbnailUrl,
+                          fit: BoxFit.cover,
+                          fallback: ColoredBox(
+                            color: colors.surfaceContainerHighest,
+                            child: const Icon(Icons.music_note_rounded),
+                          ),
+                        ),
                       ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF1ED760)
+                                      .withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'EN VIVO',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w900,
+                                    color: const Color(0xFF1ED760),
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'DJ: ${room.hostName}',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: colors.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            room.currentTrack!.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            room.currentTrack!.artist,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _LiveEqualizerBars(
+                      isPlaying: room.isPlaying,
+                      color: const Color(0xFF1ED760),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              IconButton.filledTonal(
-                visualDensity: VisualDensity.compact,
-                tooltip: spanish ? 'Copiar código' : 'Copy code',
-                onPressed: () {
-                  Clipboard.setData(ClipboardData(text: room.code));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        spanish
-                            ? 'Código ${room.code} copiado'
-                            : 'Code ${room.code} copied',
+            ),
+
+          // Members strip + live reaction bursts
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                for (final member in members)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Chip(
+                      visualDensity: VisualDensity.compact,
+                      avatar: Icon(
+                        member.isHost
+                            ? Icons.headphones_rounded
+                            : Icons.person_rounded,
+                        size: 14,
+                      ),
+                      label: Text(
+                        member.displayName,
+                        style: theme.textTheme.labelSmall,
                       ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.copy_rounded, size: 18),
-              ),
-              IconButton.filledTonal(
-                visualDensity: VisualDensity.compact,
-                tooltip: spanish ? 'Compartir invitación' : 'Share invite',
-                onPressed: () {
-                  SharePlus.instance.share(
-                    ShareParams(
-                      text: spanish
-                          ? 'Únete a mi sala «${room.name}» en Inutix Music 🎧\nCódigo: ${room.code}\n${room.shareUri}'
-                          : 'Join my Listening Room «${room.name}» on Inutix Music 🎧\nCode: ${room.code}\n${room.shareUri}',
+                  ),
+                for (final burst in burstReactions)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${burst.emoji} ${burst.senderName}',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  );
-                },
-                icon: const Icon(Icons.share_rounded, size: 18),
-              ),
-              IconButton.filledTonal(
-                visualDensity: VisualDensity.compact,
-                tooltip: 'QR',
-                onPressed: () => _showQrDialog(room, spanish),
-                icon: const Icon(Icons.qr_code_rounded, size: 18),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                style: TextButton.styleFrom(foregroundColor: colors.error),
-                onPressed: () async {
-                  await service.leaveRoom();
-                },
-                icon: const Icon(Icons.exit_to_app_rounded, size: 18),
-                label: Text(
-                  service.isHost
-                      ? (spanish ? 'Cerrar' : 'End')
-                      : (spanish ? 'Salir' : 'Leave'),
-                ),
-              ),
-            ],
+                  ),
+              ],
+            ),
           ),
-        ),
 
-        // Now playing + active members
-        if (room.currentTrack != null)
+          // Quick emoji reactions bar (TikTok / Stories style with physics bursts)
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: colors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 46,
-                      height: 46,
-                      child: SourceImage(
-                        source: room.currentTrack!.thumbnailUrl,
-                        fit: BoxFit.cover,
-                        fallback: ColoredBox(
-                          color: colors.surfaceContainerHighest,
-                          child: const Icon(Icons.music_note_rounded),
-                        ),
+                  for (final emoji in _quickEmojis)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _ReactionBurstButton(
+                        emoji: emoji,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          _reactionsController.spawnBurst(
+                            emoji,
+                            senderName: 'Tú',
+                            count: 6,
+                          );
+                          unawaited(service.sendReaction(emoji));
+                        },
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          room.currentTrack!.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        Text(
-                          '${room.currentTrack!.artist} · DJ: ${room.hostName}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    room.isPlaying
-                        ? Icons.graphic_eq_rounded
-                        : Icons.pause_circle_outline_rounded,
-                    color: room.isPlaying
-                        ? const Color(0xFF1ED760)
-                        : colors.onSurfaceVariant,
-                  ),
                 ],
               ),
             ),
           ),
-
-        // Members strip + live reaction bursts
-        SizedBox(
-          height: 36,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              for (final member in members)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Chip(
-                    visualDensity: VisualDensity.compact,
-                    avatar: Icon(
-                      member.isHost
-                          ? Icons.headphones_rounded
-                          : Icons.person_rounded,
-                      size: 14,
-                    ),
-                    label: Text(
-                      member.displayName,
-                      style: theme.textTheme.labelSmall,
-                    ),
-                  ),
-                ),
-              for (final burst in burstReactions)
-                Padding(
-                  padding: const EdgeInsets.only(right: 6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.primary.withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${burst.emoji} ${burst.senderName}',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-
-        // Quick emoji reactions bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              for (final emoji in _quickEmojis)
-                InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: () => unawaited(service.sendReaction(emoji)),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(emoji, style: const TextStyle(fontSize: 18)),
-                  ),
-                ),
-            ],
-          ),
-        ),
 
         TabBar(
           controller: _tabController,
@@ -979,26 +1047,41 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
                             itemBuilder: (context, index) {
                               final item = sortedQueue[index];
                               final voted = item.hasVoted(myUid);
+                              final isTop1 = index == 0;
                               return Container(
                                 decoration: BoxDecoration(
                                   color: colors.surfaceContainerLow,
                                   borderRadius: BorderRadius.circular(14),
+                                  border: isTop1
+                                      ? Border.all(
+                                          color: const Color(0xFFFFD700)
+                                              .withValues(alpha: 0.45),
+                                          width: 1.2,
+                                        )
+                                      : null,
                                 ),
                                 child: ListTile(
                                   dense: true,
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: SizedBox(
-                                      width: 42,
-                                      height: 42,
-                                      child: SourceImage(
-                                        source: item.track.thumbnailUrl,
-                                        fit: BoxFit.cover,
-                                        fallback: const Icon(
-                                          Icons.music_note_rounded,
+                                  leading: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _buildRankBadge(index + 1),
+                                      const SizedBox(width: 8),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: SizedBox(
+                                          width: 42,
+                                          height: 42,
+                                          child: SourceImage(
+                                            source: item.track.thumbnailUrl,
+                                            fit: BoxFit.cover,
+                                            fallback: const Icon(
+                                              Icons.music_note_rounded,
+                                            ),
+                                          ),
                                         ),
                                       ),
-                                    ),
+                                    ],
                                   ),
                                   title: Text(
                                     item.track.title,
@@ -1054,6 +1137,7 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
                             itemBuilder: (context, index) {
                               final msg = room.messages[index];
                               final mine = msg.senderUid == myUid;
+                              final isDj = msg.senderUid == room.hostUid;
                               return Align(
                                 alignment: mine
                                     ? Alignment.centerRight
@@ -1069,20 +1153,44 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
                                         ? colors.primary.withValues(alpha: 0.18)
                                         : colors.surfaceContainerLow,
                                     borderRadius: BorderRadius.circular(14),
+                                    border: isDj
+                                        ? Border.all(
+                                            color: const Color(0xFFFFD700)
+                                                .withValues(alpha: 0.35),
+                                            width: 1,
+                                          )
+                                        : null,
                                   ),
                                   child: Column(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        msg.senderName,
-                                        style: theme.textTheme.labelSmall
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w800,
-                                              color: mine
-                                                  ? colors.primary
-                                                  : colors.onSurfaceVariant,
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          if (isDj) ...[
+                                            const Text(
+                                              '👑 DJ ',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w900,
+                                                color: Color(0xFFFFD700),
+                                              ),
                                             ),
+                                          ],
+                                          Text(
+                                            msg.senderName,
+                                            style: theme.textTheme.labelSmall
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                  color: mine
+                                                      ? colors.primary
+                                                      : (isDj
+                                                          ? const Color(0xFFFFD700)
+                                                          : colors.onSurfaceVariant),
+                                                ),
+                                          ),
+                                        ],
                                       ),
                                       const SizedBox(height: 2),
                                       Text(msg.text),
@@ -1138,6 +1246,213 @@ class _ListeningRoomSheetState extends ConsumerState<ListeningRoomSheet>
           ),
         ),
       ],
+    ),
+    );
+  }
+}
+
+Widget _buildRankBadge(int rank) {
+  final Color bg;
+  final Color fg;
+  final String label;
+  if (rank == 1) {
+    bg = const Color(0xFFFFD700).withValues(alpha: 0.22);
+    fg = const Color(0xFFFFD700);
+    label = '👑 #1';
+  } else if (rank == 2) {
+    bg = const Color(0xFFC0C0C0).withValues(alpha: 0.20);
+    fg = const Color(0xFFE0E0E0);
+    label = '#2';
+  } else if (rank == 3) {
+    bg = const Color(0xFFCD7F32).withValues(alpha: 0.20);
+    fg = const Color(0xFFE29B58);
+    label = '#3';
+  } else {
+    bg = Colors.white.withValues(alpha: 0.06);
+    fg = Colors.white70;
+    label = '#$rank';
+  }
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(6),
+      border: Border.all(color: fg.withValues(alpha: 0.35), width: 1),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        fontSize: 10,
+        fontWeight: FontWeight.w900,
+        color: fg,
+        letterSpacing: 0.5,
+      ),
+    ),
+  );
+}
+
+class _LiveEqualizerBars extends StatefulWidget {
+  const _LiveEqualizerBars({
+    this.isPlaying = true,
+    this.color = const Color(0xFF1ED760),
+  });
+
+  final bool isPlaying;
+  final Color color;
+
+  @override
+  State<_LiveEqualizerBars> createState() => _LiveEqualizerBarsState();
+}
+
+class _LiveEqualizerBarsState extends State<_LiveEqualizerBars>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    );
+    if (widget.isPlaying) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _LiveEqualizerBars oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!widget.isPlaying && _controller.isAnimating) {
+      _controller.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = _controller.value * 2 * math.pi;
+        final h1 = widget.isPlaying ? (0.35 + 0.65 * math.sin(t).abs()) : 0.25;
+        final h2 = widget.isPlaying ? (0.25 + 0.75 * math.sin(t + 1.2).abs()) : 0.25;
+        final h3 = widget.isPlaying ? (0.40 + 0.60 * math.sin(t + 2.4).abs()) : 0.25;
+        final h4 = widget.isPlaying ? (0.30 + 0.70 * math.sin(t + 3.6).abs()) : 0.25;
+
+        return SizedBox(
+          width: 24,
+          height: 20,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildBar(h1),
+              _buildBar(h2),
+              _buildBar(h3),
+              _buildBar(h4),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBar(double heightFraction) {
+    return Container(
+      width: 3.5,
+      height: 20 * heightFraction.clamp(0.2, 1.0),
+      decoration: BoxDecoration(
+        color: widget.color,
+        borderRadius: BorderRadius.circular(2),
+        boxShadow: widget.isPlaying
+            ? [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: 0.5),
+                  blurRadius: 4,
+                  spreadRadius: 0.5,
+                ),
+              ]
+            : null,
+      ),
+    );
+  }
+}
+
+class _ReactionBurstButton extends StatefulWidget {
+  const _ReactionBurstButton({
+    required this.emoji,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final VoidCallback onTap;
+
+  @override
+  State<_ReactionBurstButton> createState() => _ReactionBurstButtonState();
+}
+
+class _ReactionBurstButtonState extends State<_ReactionBurstButton> {
+  double _scale = 1.0;
+
+  void _onTapDown(TapDownDetails _) {
+    setState(() => _scale = 0.82);
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    setState(() => _scale = 1.15);
+    widget.onTap();
+    Future.delayed(const Duration(milliseconds: 140), () {
+      if (mounted) setState(() => _scale = 1.0);
+    });
+  }
+
+  void _onTapCancel() {
+    setState(() => _scale = 1.0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedScale(
+        scale: _scale,
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutBack,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.25),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Text(
+            widget.emoji,
+            style: const TextStyle(fontSize: 20),
+          ),
+        ),
+      ),
     );
   }
 }

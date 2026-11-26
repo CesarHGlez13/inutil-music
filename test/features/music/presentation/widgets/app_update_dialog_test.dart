@@ -30,7 +30,7 @@ void main() {
 
     expect(find.text('Nueva versión disponible'), findsOneWidget);
     expect(
-      find.text('Inútil Music 1.3.0 está disponible. Versión actual: 1.2.9.'),
+      find.text('Inutix Music 1.3.0 está disponible. Versión actual: 1.2.9.'),
       findsOneWidget,
     );
     expect(find.text('Novedades 1.3.0'), findsOneWidget);

@@ -76,7 +76,7 @@ void main() {
             reason: 'No se pudo crear el fixture APK: ${zip.stderr}',
           );
         } else {
-          entry.value.writeAsBytesSync(utf8.encode('payload-${entry.key}'));
+          entry.value.writeAsBytesSync(utf8.encode('payload-${entry.key} InutilMusic/$version'));
         }
         expectedChecksums[entry.key] = sha256
             .convert(entry.value.readAsBytesSync())

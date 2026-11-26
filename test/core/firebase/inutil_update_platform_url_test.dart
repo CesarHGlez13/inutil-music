@@ -173,6 +173,41 @@ void main() {
       expect(roundTrip.checksums, fullRelease.checksums);
     });
 
+    test('apkUrlForSupportedAbis elige la ABI exacta (Motorola 32-bit vs 64-bit) y expectedSha256ForUrl', () {
+      final releaseWithUniversal = InutilReleaseInfo(
+        currentVersion: '2.5.32',
+        latestVersion: '2.5.33',
+        releaseNotes: const ['Compatibilidad Android.'],
+        apkDownloadUrl: 'https://example.test/app-release.apk',
+        publishedAt: DateTime.utc(2026, 11, 25),
+        androidDownloads: const {
+          'arm64_v8a': 'https://example.test/app-arm64-v8a-release.apk',
+          'armeabi_v7a': 'https://example.test/app-armeabi-v7a-release.apk',
+          'universal': 'https://example.test/app-release.apk',
+        },
+        checksums: const {
+          'app-armeabi-v7a-release.apk': 'deadbeef1234',
+          'app-arm64-v8a-release.apk': 'cafebabe5678',
+        },
+      );
+      expect(
+        releaseWithUniversal.apkUrlForSupportedAbis(const ['armeabi-v7a', 'armeabi']),
+        'https://example.test/app-armeabi-v7a-release.apk',
+      );
+      expect(
+        releaseWithUniversal.apkUrlForSupportedAbis(const ['arm64-v8a']),
+        'https://example.test/app-arm64-v8a-release.apk',
+      );
+      expect(
+        releaseWithUniversal.apkUrlForSupportedAbis(const ['x86']),
+        'https://example.test/app-release.apk',
+      );
+      expect(
+        releaseWithUniversal.expectedSha256ForUrl('https://example.test/app-armeabi-v7a-release.apk'),
+        'deadbeef1234',
+      );
+    });
+
     test('extensionForDownloadUrl deduce la extensión real del instalador', () {
       expect(
         InutilReleaseInfo.extensionForDownloadUrl(

@@ -101,13 +101,13 @@ APK_DIR="${INUTIL_APK_DIR:-$PROY/build/app/outputs/flutter-apk}"
 DIST_DIR="${INUTIL_DIST_DIR:-$PROY/dist}"
 
 # --- validación de firmas e integridad de binarios APK -----------------------
-for apk in "$APK_DIR"/app-*-release.apk; do
+for apk in "$APK_DIR"/app-*-release.apk "$APK_DIR"/app-release.apk; do
   [ -f "$apk" ] || continue
   APK_NAME="$(basename "$apk")"
   
-  # 1. Comprobar firma
+  # 1. Comprobar firma (producción + esquemas v1/v2/v3 para Android 7-16)
   if which apksigner >/dev/null 2>&1; then
-    CERTS="$(apksigner verify --print-certs "$apk" 2>&1 || true)"
+    CERTS="$(apksigner verify -v --print-certs "$apk" 2>&1 || true)"
     if echo "$CERTS" | grep -qi "Android Debug"; then
       echo "ERROR CRÍTICO: $APK_NAME está firmado con la clave de depuración (Android Debug)!" >&2
       echo "Android rechazará la actualización con INSTALL_FAILED_UPDATE_INCOMPATIBLE." >&2
@@ -116,6 +116,9 @@ for apk in "$APK_DIR"/app-*-release.apk; do
     fi
     if ! echo "$CERTS" | grep -q "CN=InutilMusic"; then
       echo "ADVERTENCIA: $APK_NAME no contiene el certificado CN=InutilMusic." >&2
+    fi
+    if ! echo "$CERTS" | grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" || ! echo "$CERTS" | grep -q "Verified using v3 scheme (APK Signature Scheme v3): true"; then
+      echo "ADVERTENCIA: $APK_NAME no incluye firma v2+v3 completa; algunos equipos Android 7-16 podrían mostrar 'Error al analizar el paquete'." >&2
     fi
   fi
 
@@ -139,6 +142,9 @@ add_artifact() { # clave ruta abi
   ABI_OF_KEY["$1"]="${3:-}"
 }
 add_artifact universal      "$APK_DIR/app-universal-release.apk"               "universal"
+if [ -z "${FILES[universal]:-}" ]; then
+  add_artifact universal    "$APK_DIR/app-release.apk"                         "universal"
+fi
 add_artifact arm64_v8a      "$APK_DIR/app-arm64-v8a-release.apk"               "arm64_v8a"
 add_artifact armeabi_v7a    "$APK_DIR/app-armeabi-v7a-release.apk"             "armeabi_v7a"
 add_artifact x86_64         "$APK_DIR/app-x86_64-release.apk"                  "x86_64"
@@ -173,6 +179,9 @@ verify_linux_artifact() { # clave ruta
     *.rpm)     out="$(rpm2cpio "$f" 2>/dev/null | cpio -i --to-stdout '*libapp.so' 2>/dev/null | strings | grep -c "InutilMusic/$VERSION" || true)" ;;
     *) return 0 ;;
   esac
+  if [ "${out:-0}" -eq 0 ]; then
+    out="$(strings "$f" 2>/dev/null | grep -c "InutilMusic/$VERSION" || true)"
+  fi
   if [ "${out:-0}" -eq 0 ]; then
     echo "ERROR CRITICO: $(basename "$f") (artefacto '$key') no contiene la cadena" >&2
     echo "'InutilMusic/$VERSION' en su libapp.so compilado." >&2

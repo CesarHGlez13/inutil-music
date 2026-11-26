@@ -46,7 +46,10 @@ android {
     defaultConfig {
         applicationId = "com.inutilmusic.app"
         minSdk = 24
-        targetSdk = flutter.targetSdkVersion
+        // Fijado en API 35 (Android 15 estable): compileSdk 36 sirve para compilar
+        // dependencias recientes, pero targetSdk 36 (Android 16) provoca rechazos
+        // de análisis en instaladores OEM de Android 11-15.
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         testInstrumentationRunner = "com.inutilmusic.app.WidgetLayoutInstrumentation"
@@ -64,6 +67,11 @@ android {
                 storePassword = releaseStorePassword
                 keyAlias = releaseKeyAlias
                 keyPassword = releaseKeyPassword
+                // Firmar con v1 + v2 + v3 simultáneamente para máxima compatibilidad
+                // con Android 7-16 y gestores/instaladores OEM (Motorola, Xiaomi, Samsung, etc.).
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }

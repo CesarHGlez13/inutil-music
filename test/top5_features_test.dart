@@ -438,8 +438,10 @@ void main() {
       final popped = await host.popNextQueuedTrack();
       expect(popped?.track.trackId, 't2');
 
-      // Host closes room -> guest sees room closed on next poll
+      // Host closes room -> guest sees room closed after consecutive missing polls
       await host.leaveRoom();
+      await guest.pollNow();
+      await guest.pollNow();
       await guest.pollNow();
       expect(guest.isInRoom, isFalse);
     });

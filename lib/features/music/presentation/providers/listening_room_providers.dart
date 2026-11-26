@@ -68,6 +68,7 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
 
   String? lastGuestTrackId;
   DateTime? lastGuestAttemptAt;
+  DateTime? lastGuestSeekAt;
   bool guestSyncBusy = false;
 
   Future<void> maybeAutoAdvanceCollaborativeQueue(
@@ -130,10 +131,10 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
     final playStateChanged = isPlaying != lastPublishedPlaying;
     final manualSeek =
         !trackChanged &&
-        (posMs - lastPublishedPosMs).abs() > 3500 &&
-        now.difference(lastPublishAt) >= const Duration(seconds: 1);
+        (posMs - lastPublishedPosMs).abs() > 2000 &&
+        now.difference(lastPublishAt) >= const Duration(milliseconds: 800);
     final heartbeatDue =
-        isPlaying && now.difference(lastPublishAt) >= const Duration(seconds: 5);
+        isPlaying && now.difference(lastPublishAt) >= const Duration(seconds: 4);
 
     if (!trackChanged && !playStateChanged && !manualSeek && !heartbeatDue) {
       return;
@@ -190,7 +191,7 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
           lastGuestTrackId != remoteCanonicalId) {
         final now = DateTime.now();
         if (lastGuestAttemptAt != null &&
-            now.difference(lastGuestAttemptAt!) < const Duration(seconds: 3)) {
+            now.difference(lastGuestAttemptAt!) < const Duration(seconds: 2)) {
           return;
         }
         lastGuestAttemptAt = now;
@@ -202,11 +203,10 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
         final postLoadTargetMs = latestRoom.estimatedPositionMsAt(
           DateTime.now(),
         );
-        if (postLoadTargetMs > 1500) {
-          await playerCtrl.seek(Duration(milliseconds: postLoadTargetMs));
-        }
         if (!latestRoom.isPlaying) {
           await playerCtrl.pause();
+        } else if (postLoadTargetMs > 2500) {
+          await playerCtrl.seek(Duration(milliseconds: postLoadTargetMs));
         }
         return;
       }
@@ -224,10 +224,16 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
         }
         final targetPosMs = room.estimatedPositionMsAt(DateTime.now());
         final localPosMs = localSnap.position.inMilliseconds;
-        if (ListeningRoomState.shouldResyncPosition(
-          localMs: localPosMs,
-          targetMs: targetPosMs,
-        )) {
+        final now = DateTime.now();
+        final canSeek = lastGuestSeekAt == null ||
+            now.difference(lastGuestSeekAt!) >= const Duration(seconds: 4);
+        if (canSeek &&
+            ListeningRoomState.shouldResyncPosition(
+              localMs: localPosMs,
+              targetMs: targetPosMs,
+              thresholdMs: 3500,
+            )) {
+          lastGuestSeekAt = now;
           await playerCtrl.seek(Duration(milliseconds: targetPosMs));
         }
       }
@@ -250,6 +256,7 @@ final listeningRoomPlayerBridgeProvider = Provider<void>((ref) {
       lastAutoAdvancedTrackId = null;
       lastGuestTrackId = null;
       lastGuestAttemptAt = null;
+      lastGuestSeekAt = null;
     }
   }
 

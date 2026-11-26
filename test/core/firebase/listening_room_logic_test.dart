@@ -248,5 +248,46 @@ void main() {
       sync.setListeningRoomGuestMode(false);
       expect(sync.isListeningRoomGuestMode, isFalse);
     });
+
+    test('tolerancia a jitter de reloj: reloj invitado atrasado no declara host inactivo ni genera posición negativa', () {
+      final hostNow = DateTime.utc(2026, 11, 26, 12, 0, 10);
+      // Reloj del invitado está 5 segundos atrasado con respecto al host
+      final guestBehindNow = DateTime.utc(2026, 11, 26, 12, 0, 5);
+
+      final state = ListeningRoomState(
+        code: 'JITTER',
+        name: 'Sala Jitter',
+        hostUid: 'host_uid',
+        hostName: 'Cesar',
+        currentTrack: const ListeningRoomTrack(
+          trackId: 'track_1',
+          title: 'Canción',
+          artist: 'Artista',
+          durationMs: 180000,
+        ),
+        positionMs: 15000,
+        isPlaying: true,
+        playbackUpdatedAtMs: hostNow.millisecondsSinceEpoch,
+        createdAtMs: hostNow.millisecondsSinceEpoch,
+        members: [
+          ListeningRoomMember(
+            uid: 'host_uid',
+            displayName: 'Cesar',
+            lastSeenMs: hostNow.millisecondsSinceEpoch,
+            isHost: true,
+          ),
+        ],
+      );
+
+      // El host NO debe ser declarado inactivo aunque el reloj del invitado esté atrasado
+      expect(state.isHostStaleAt(guestBehindNow), isFalse);
+
+      // La posición estimada no debe decrecer por debajo de positionMs ni ser negativa
+      expect(state.estimatedPositionMsAt(guestBehindNow), 15000);
+
+      // Cuando avanza en el futuro del host, debe sumar el delta correctamente
+      final futureGuest = hostNow.add(const Duration(seconds: 10));
+      expect(state.estimatedPositionMsAt(futureGuest), 25000);
+    });
   });
 }

@@ -34,6 +34,28 @@ class AndroidPackageInstaller {
     }
   }
 
+  /// Lista ordenada de ABIs soportadas por el dispositivo (`Build.SUPPORTED_ABIS`).
+  /// Garantiza elegir siempre una ABI compatible (por ejemplo `armeabi-v7a` en
+  /// teléfonos Motorola 32-bit o `arm64-v8a` en equipos 64-bit-only).
+  static Future<List<String>> supportedAbis() async {
+    if (!isSupported) return const <String>[];
+    try {
+      final raw = await channel.invokeMethod<List<Object?>>('supportedAbis');
+      if (raw != null && raw.isNotEmpty) {
+        return raw
+            .map((item) => (item?.toString() ?? '').trim())
+            .where((item) => item.isNotEmpty)
+            .toList(growable: false);
+      }
+    } on PlatformException {
+      // Cae a primaryAbi().
+    } on MissingPluginException {
+      // Cae a primaryAbi().
+    }
+    final primary = await primaryAbi();
+    return primary.isEmpty ? const <String>[] : <String>[primary];
+  }
+
   /// `true` cuando Android ya permite instalar apps de orígenes desconocidos.
   /// Antes de API 26 siempre devuelve `true`.
   static Future<bool> canRequestPackageInstalls() async {
@@ -62,6 +84,24 @@ class AndroidPackageInstaller {
       return false;
     } on MissingPluginException {
       return false;
+    }
+  }
+
+  /// Verifica exhaustivamente la compatibilidad del APK descargado contra este
+  /// dispositivo (compatibilidad de arquitectura ABI, coincidencia de firma y
+  /// relación de versiones) antes de pasarlo al instalador de Android.
+  static Future<Map<String, dynamic>?> verifyPackage(String apkPath) async {
+    if (!isSupported) return null;
+    try {
+      final res = await channel.invokeMapMethod<String, dynamic>(
+        'verifyPackage',
+        <String, Object?>{'path': apkPath},
+      );
+      return res;
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
     }
   }
 

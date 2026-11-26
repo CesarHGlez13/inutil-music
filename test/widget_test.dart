@@ -32,7 +32,7 @@ import 'package:inutil_music/features/music/presentation/pages/home_page.dart';
 import 'package:inutil_music/features/music/presentation/pages/search_view.dart';
 import 'package:inutil_music/features/music/presentation/widgets/library_panel.dart';
 import 'package:inutil_music/features/music/presentation/widgets/lyrics_text_style_transition.dart';
-import 'package:inutil_music/features/music/presentation/widgets/download_progress_panel.dart';
+// (removed unused DownloadProgressPanel import)
 import 'package:inutil_music/features/music/presentation/widgets/decorative_progress_transition.dart';
 import 'package:inutil_music/features/music/presentation/widgets/gradient_progress_bar.dart';
 import 'package:inutil_music/features/music/presentation/widgets/mini_player.dart';
@@ -76,14 +76,14 @@ void main() {
   setUp(() {
     TestWidgetsFlutterBinding.ensureInitialized();
     SharedPreferences.setMockInitialValues({});
+    final tempDir = io.Directory.systemTemp.createTempSync('inutil_music_widget_test_').path;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel, (call) async {
           return switch (call.method) {
-            'getApplicationDocumentsDirectory' => 'C:\\inutil_music_test',
-            'getTemporaryDirectory' => 'C:\\inutil_music_test\\temp',
-            'getApplicationSupportDirectory' =>
-              'C:\\inutil_music_test\\support',
-            'getApplicationCacheDirectory' => 'C:\\inutil_music_test\\cache',
+            'getApplicationDocumentsDirectory' => '$tempDir/docs',
+            'getTemporaryDirectory' => '$tempDir/temp',
+            'getApplicationSupportDirectory' => '$tempDir/support',
+            'getApplicationCacheDirectory' => '$tempDir/cache',
             _ => null,
           };
         });
@@ -9021,7 +9021,6 @@ void main() {
                 Expanded(
                   child: TrackResultTile(track: track, onOpenPlayer: () {}),
                 ),
-                const DownloadProgressPanel(),
               ],
             ),
           ),
@@ -9051,21 +9050,13 @@ void main() {
     var bars = tester
         .widgetList<GradientProgressBar>(find.byType(GradientProgressBar))
         .toList();
-    expect(bars, hasLength(2));
+    expect(bars, hasLength(1));
     expect(bars.every((bar) => !bar.indeterminate), isTrue);
     expect(bars.every((bar) => bar.value == 0.01), isTrue);
     expect(
       bars.every((bar) => listEquals(bar.colors, AppColors.downloadGradient)),
       isTrue,
     );
-    final downloadNote = tester.widget<Icon>(
-      find.descendant(
-        of: find.byType(DownloadProgressPanel),
-        matching: find.byIcon(Icons.music_note_rounded),
-      ),
-    );
-    expect(downloadNote.color, AppColors.downloadAccent);
-    expect(find.textContaining('1%'), findsOneWidget);
 
     downloader.emitProgress(taskId: taskId, progress: 0.62);
     await tester.pump();

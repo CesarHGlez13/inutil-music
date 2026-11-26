@@ -330,7 +330,9 @@ class ListeningRoomState {
       }
     }
     if (latestHostSignalMs <= 0) return false;
-    return (nowMs - latestHostSignalMs) > staleHostTtlMs;
+    final delta = nowMs - latestHostSignalMs;
+    if (delta < 0) return false;
+    return delta > staleHostTtlMs;
   }
 
   /// Drift-compensated target playback position for guests.
@@ -339,7 +341,8 @@ class ListeningRoomState {
       return positionMs.clamp(0, 1 << 30);
     }
     final elapsed = now.millisecondsSinceEpoch - playbackUpdatedAtMs;
-    final raw = elapsed > 0 ? positionMs + elapsed : positionMs;
+    final validElapsed = elapsed > 0 ? elapsed : 0;
+    final raw = positionMs + validElapsed;
     final durationMs = currentTrack?.durationMs ?? 0;
     if (durationMs > 0 && raw > durationMs) return durationMs;
     return raw.clamp(0, 1 << 30);
@@ -423,7 +426,7 @@ class ListeningRoomService extends ChangeNotifier {
        _clock = clock ?? DateTime.now;
 
   static const _alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  static const Duration _pollInterval = Duration(milliseconds: 2500);
+  static const Duration _pollInterval = Duration(milliseconds: 2000);
   static const int _maxReactions = 20;
   static const int _maxMessages = 40;
   static const int _maxMissingPollsBeforeClose = 3;

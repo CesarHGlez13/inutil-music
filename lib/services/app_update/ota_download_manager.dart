@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
@@ -116,24 +117,66 @@ class OtaDownloadManager {
 
   /// Carpeta privada de la app donde viven los paquetes.
   ///
-  /// En Android resuelve a
-  /// `/storage/emulated/0/Android/data/<id>/files/updates`, que está listada en
-  /// `provider_paths.xml` y por eso puede entregarse al instalador como
-  /// `content://`. En escritorio se usa el directorio de soporte de la app.
+  /// En Android prioriza `getTemporaryDirectory()/updates` (`cacheDir/updates`,
+  /// almacenamiento interno listado en `provider_paths.xml` como `cache-path`),
+  /// evitando bloqueos de FUSE/Scoped Storage en `Android/data` en Android 11-15.
   Future<Directory> updatesDirectory() async {
     Directory? base;
     try {
       if (Platform.isAndroid) {
-        base = await getExternalStorageDirectory();
+        base = await getTemporaryDirectory();
       } else if (Platform.isLinux || Platform.isMacOS || Platform.isWindows) {
         base = await getApplicationSupportDirectory();
       }
     } catch (_) {
       base = null;
     }
+    if (base == null && Platform.isAndroid) {
+      try {
+        base = await getExternalStorageDirectory();
+      } catch (_) {
+        base = null;
+      }
+    }
     base ??= await getApplicationDocumentsDirectory();
     final directory = Directory(p.join(base.path, updatesDirectoryName));
     return directory.create(recursive: true);
+  }
+
+  /// Verifica que un archivo `.apk` tenga firma ZIP (`PK\x03\x04`) y, si se
+  /// publicó `expectedSha256`, que el hash coincida exactamente.
+  Future<String?> _validateDownloadedFile(
+    File file, {
+    required String fileName,
+    String expectedSha256 = '',
+  }) async {
+    if (!await file.exists()) return 'El archivo descargado no existe.';
+    final size = await file.length();
+    if (size < 4) return 'El archivo descargado está vacío o truncado.';
+    if (fileName.toLowerCase().endsWith('.apk')) {
+      RandomAccessFile? raf;
+      try {
+        raf = await file.open();
+        final header = await raf.read(4);
+        if (header.length < 4 ||
+            header[0] != 0x50 ||
+            header[1] != 0x4B ||
+            header[2] != 0x03 ||
+            header[3] != 0x04) {
+          return 'El archivo descargado no es un paquete APK válido (posible bloqueo de red o portal cautivo).';
+        }
+      } finally {
+        await raf?.close();
+      }
+    }
+    final cleanSha = expectedSha256.trim().toLowerCase();
+    if (cleanSha.isNotEmpty) {
+      final digest = await sha256.bind(file.openRead()).first;
+      if (digest.toString().toLowerCase() != cleanSha) {
+        return 'La verificación de integridad (SHA-256) falló; el paquete se descargó corrupto.';
+      }
+    }
+    return null;
   }
 
   /// Cancela la descarga en curso. El `.part` se conserva para reanudar.
@@ -146,21 +189,29 @@ class OtaDownloadManager {
     }
   }
 
-  /// Devuelve la ruta final del paquete si ya estaba descargado por completo.
+  /// Devuelve la ruta final del paquete si ya estaba descargado e íntegro.
   Future<String?> existingDownload({
     required String url,
     required String fileName,
+    String expectedSha256 = '',
   }) async {
     try {
       final directory = await updatesDirectory();
       final finalFile = File(p.join(directory.path, fileName));
+      final doneMetaPath = p.join(directory.path, '$fileName.done.meta');
       if (!await finalFile.exists()) return null;
-      final meta = await _readMeta('$fileName.part');
-      // Un paquete completo sólo es reaprovechable si pertenece al mismo URL;
-      // así un archivo reutilizado no instala una versión anterior.
+      final meta = await _readMeta(doneMetaPath);
+      // Un paquete completo sólo es reaprovechable si pertenece al mismo URL
+      // y pasa la validación ZIP + SHA-256; si está dañado se descarta.
       if (meta != null && meta['url'] == url && meta['complete'] == true) {
-        final size = await finalFile.length();
-        if (size > 0) return finalFile.path;
+        final problem = await _validateDownloadedFile(
+          finalFile,
+          fileName: fileName,
+          expectedSha256: expectedSha256,
+        );
+        if (problem == null) return finalFile.path;
+        await _deleteQuietly(finalFile);
+        await _deleteQuietly(File(doneMetaPath));
       }
     } catch (_) {}
     return null;
@@ -173,6 +224,7 @@ class OtaDownloadManager {
     required String url,
     required String fileName,
     required void Function(OtaDownloadProgress progress) onProgress,
+    String expectedSha256 = '',
   }) async {
     _cancelled = false;
     final uri = Uri.tryParse(url);
@@ -181,18 +233,24 @@ class OtaDownloadManager {
     }
     final directory = await updatesDirectory();
     final finalPath = p.join(directory.path, fileName);
-    final partName = '$fileName.part';
-    final partFile = File(p.join(directory.path, partName));
+    final partPath = p.join(directory.path, '$fileName.part');
+    final metaPath = p.join(directory.path, '$fileName.part.meta');
+    final doneMetaPath = p.join(directory.path, '$fileName.done.meta');
+    final partFile = File(partPath);
 
-    final previous = await existingDownload(url: url, fileName: fileName);
+    final previous = await existingDownload(
+      url: url,
+      fileName: fileName,
+      expectedSha256: expectedSha256,
+    );
     if (previous != null) return previous;
 
     var startOffset = 0;
     if (await partFile.exists()) {
-      final meta = await _readMeta(partName);
+      final meta = await _readMeta(metaPath);
       if (meta == null || meta['url'] != url) {
         await _deleteQuietly(partFile);
-        await _deleteQuietly(File(_metaPath(partName)));
+        await _deleteQuietly(File(metaPath));
       } else {
         startOffset = await partFile.length();
       }
@@ -228,7 +286,7 @@ class OtaDownloadManager {
       // El `.part` quedó obsoleto (el APK cambió de tamaño). Se descarta y la
       // próxima comprobación descarga el paquete completo.
       await _deleteQuietly(partFile);
-      await _deleteQuietly(File(_metaPath(partName)));
+      await _deleteQuietly(File(metaPath));
       await response.drain<void>();
       throw const OtaDownloadException(
         'La descarga anterior quedó obsoleta. Vuelve a intentarlo.',
@@ -255,6 +313,14 @@ class OtaDownloadManager {
     final totalBytes = remaining < 0
         ? -1
         : (partialAccepted ? startOffset + remaining : remaining);
+
+    await _writeMeta(metaPath, <String, Object?>{
+      'url': url,
+      'etag': response.headers.value(HttpHeaders.etagHeader),
+      'lastModified': response.headers.value(HttpHeaders.lastModifiedHeader),
+      'totalBytes': totalBytes,
+      'complete': false,
+    });
 
     final sink = partFile.openWrite(
       mode: partialAccepted ? FileMode.append : FileMode.write,
@@ -338,21 +404,31 @@ class OtaDownloadManager {
               'Vuelve a intentarlo y continuará donde se quedó.',
             );
           }
-          await _writeMeta(partName, <String, Object?>{
-            'url': url,
-            'etag': response.headers.value(HttpHeaders.etagHeader),
-            'lastModified': response.headers.value(
-              HttpHeaders.lastModifiedHeader,
-            ),
-            'totalBytes': totalBytes,
-            'complete': true,
-          });
+          final validationProblem = await _validateDownloadedFile(
+            partFile,
+            fileName: fileName,
+            expectedSha256: expectedSha256,
+          );
+          if (validationProblem != null) {
+            await _deleteQuietly(partFile);
+            await _deleteQuietly(File(metaPath));
+            throw OtaDownloadException(validationProblem);
+          }
           final target = File(finalPath);
           if (await target.exists()) {
             await target.delete();
           }
           await partFile.rename(finalPath);
-          await _deleteQuietly(File(_metaPath(partName)));
+          await _writeMeta(doneMetaPath, <String, Object?>{
+            'url': url,
+            'etag': response.headers.value(HttpHeaders.etagHeader),
+            'lastModified': response.headers.value(
+              HttpHeaders.lastModifiedHeader,
+            ),
+            'totalBytes': written,
+            'complete': true,
+          });
+          await _deleteQuietly(File(metaPath));
           if (!completer.isCompleted) {
             completer.complete(finalPath);
           }
@@ -406,11 +482,9 @@ class OtaDownloadManager {
     } catch (_) {}
   }
 
-  String _metaPath(String partName) => '$partName.meta';
-
-  Future<Map<String, Object?>?> _readMeta(String partName) async {
+  Future<Map<String, Object?>?> _readMeta(String metaFilePath) async {
     try {
-      final file = File(_metaPath(partName));
+      final file = File(metaFilePath);
       if (!await file.exists()) return null;
       final decoded = jsonDecode(await file.readAsString());
       if (decoded is Map) {
@@ -422,9 +496,12 @@ class OtaDownloadManager {
     return null;
   }
 
-  Future<void> _writeMeta(String partName, Map<String, Object?> meta) async {
+  Future<void> _writeMeta(
+    String metaFilePath,
+    Map<String, Object?> meta,
+  ) async {
     try {
-      final file = File(_metaPath(partName));
+      final file = File(metaFilePath);
       await file.parent.create(recursive: true);
       await file.writeAsString(jsonEncode(meta), flush: true);
     } catch (_) {}

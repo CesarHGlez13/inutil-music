@@ -3,7 +3,7 @@
 > **App Oficial:** **Inutix Music** (ecosistema **inutix.com** junto con **Inutix TV** / **Familia Inutix**)
 > **Package ID Android:** `com.inutilmusic.app` *(namespace interno; NO cambiar para no romper OTAs)*
 > **Repo:** `/home/cesar/Escritorio/alo/inutil_music` → `CesarHGlez13/inutil-music` (rama `master`)
-> **Versión base actual:** `2.5.33+4291`
+> **Versión base actual:** `2.5.34+4292`
 
 ---
 

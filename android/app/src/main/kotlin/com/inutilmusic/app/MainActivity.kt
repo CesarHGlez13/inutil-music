@@ -2,7 +2,9 @@ package com.inutilmusic.app
 
 import android.Manifest
 import android.app.Activity
+import android.content.ClipData
 import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -21,10 +23,12 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import java.security.MessageDigest
 import java.util.ArrayDeque
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicLong
+import java.util.zip.ZipFile
 import kotlin.concurrent.thread
 
 class MainActivity : AudioServiceActivity() {
@@ -179,10 +183,24 @@ class MainActivity : AudioServiceActivity() {
         ).setMethodCallHandler { call, result ->
             when (call.method) {
                 "primaryAbi" -> result.success(primaryInstallAbi())
+                "supportedAbis" -> result.success(Build.SUPPORTED_ABIS.toList())
                 "canRequestPackageInstalls" ->
                     result.success(canRequestPackageInstalls())
                 "openInstallUnknownAppsSettings" ->
                     openInstallUnknownAppsSettings(result)
+                "verifyPackage" -> {
+                    val path = call.argument<String>("path")
+                    if (path.isNullOrEmpty()) {
+                        result.error("invalid_path", "Falta la ruta del APK.", null)
+                        return@setMethodCallHandler
+                    }
+                    val file = File(path)
+                    if (!file.exists()) {
+                        result.error("missing_file", "El archivo no existe.", null)
+                        return@setMethodCallHandler
+                    }
+                    result.success(verifyPackageDetails(file))
+                }
                 "installPackage" -> installDownloadedPackage(call, result)
                 else -> result.notImplemented()
             }
@@ -351,18 +369,212 @@ class MainActivity : AudioServiceActivity() {
         }
     }
 
+    private fun getCertificateDigests(signatures: Array<android.content.pm.Signature>?): List<String> {
+        if (signatures == null || signatures.isEmpty()) return emptyList()
+        val md = MessageDigest.getInstance("SHA-256")
+        return signatures.map { sig ->
+            md.reset()
+            val digest = md.digest(sig.toByteArray())
+            digest.joinToString("") { "%02x".format(it) }
+        }
+    }
+
+    private fun getInstalledSignatures(): List<String> {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val pi = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                val signingInfo = pi.signingInfo
+                if (signingInfo != null) {
+                    val sigs = if (signingInfo.hasMultipleSigners()) {
+                        signingInfo.apkContentsSigners
+                    } else {
+                        signingInfo.signingCertificateHistory
+                    }
+                    getCertificateDigests(sigs)
+                } else emptyList()
+            } else {
+                @Suppress("DEPRECATION")
+                val pi = packageManager.getPackageInfo(packageName, PackageManager.GET_SIGNATURES)
+                getCertificateDigests(pi.signatures)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error reading installed app signatures", e)
+            emptyList()
+        }
+    }
+
+    private fun getApkSignatures(file: File): List<String> {
+        return try {
+            val pi = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageArchiveInfo(
+                    file.absolutePath,
+                    PackageManager.GET_SIGNING_CERTIFICATES,
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageArchiveInfo(file.absolutePath, PackageManager.GET_SIGNATURES)
+            }
+            if (pi == null) return emptyList()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val signingInfo = pi.signingInfo
+                if (signingInfo != null) {
+                    val sigs = if (signingInfo.hasMultipleSigners()) {
+                        signingInfo.apkContentsSigners
+                    } else {
+                        signingInfo.signingCertificateHistory
+                    }
+                    getCertificateDigests(sigs)
+                } else {
+                    @Suppress("DEPRECATION")
+                    getCertificateDigests(pi.signatures)
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                getCertificateDigests(pi.signatures)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error reading APK signatures", e)
+            emptyList()
+        }
+    }
+
+    private fun getApkSupportedAbis(file: File): Set<String> {
+        val abis = mutableSetOf<String>()
+        try {
+            ZipFile(file).use { zip ->
+                val entries = zip.entries()
+                while (entries.hasMoreElements()) {
+                    val entry = entries.nextElement()
+                    val name = entry.name
+                    if (name.startsWith("lib/") && name.endsWith(".so")) {
+                        val parts = name.split("/")
+                        if (parts.size >= 2 && parts[1].isNotEmpty()) {
+                            abis.add(parts[1])
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error reading APK zip entries for ABIs", e)
+        }
+        return abis
+    }
+
+    private fun verifyPackageDetails(file: File): Map<String, Any?> {
+        val archiveInfo: PackageInfo? = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                packageManager.getPackageArchiveInfo(
+                    file.absolutePath,
+                    PackageManager.PackageInfoFlags.of(0),
+                )
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageArchiveInfo(file.absolutePath, 0)
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Error pre-validating APK archive", error)
+            null
+        }
+
+        if (archiveInfo == null) {
+            return mapOf(
+                "valid" to false,
+                "errorCode" to "corrupt_apk",
+                "errorMessage" to "El paquete descargado está dañado o incompleto. Pulsa Actualizar de nuevo para descargarlo limpio.",
+            )
+        }
+
+        if (archiveInfo.packageName != packageName) {
+            return mapOf(
+                "valid" to false,
+                "errorCode" to "wrong_package",
+                "errorMessage" to "El paquete descargado no corresponde a esta aplicación (${archiveInfo.packageName}).",
+            )
+        }
+
+        val apkAbis = getApkSupportedAbis(file)
+        val deviceAbis = Build.SUPPORTED_ABIS.toList()
+        val isAbiCompatible = apkAbis.isEmpty() || apkAbis.any { it in deviceAbis }
+
+        if (!isAbiCompatible) {
+            return mapOf(
+                "valid" to false,
+                "errorCode" to "incompatible_abi",
+                "errorMessage" to "El paquete está compilado para (${apkAbis.joinToString()}) y no es compatible con este dispositivo (${deviceAbis.joinToString()}).",
+                "apkAbis" to apkAbis.toList(),
+                "deviceAbis" to deviceAbis,
+            )
+        }
+
+        val installedSignatures = getInstalledSignatures()
+        val apkSignatures = getApkSignatures(file)
+        val signaturesMatch = installedSignatures.isEmpty() || apkSignatures.isEmpty() ||
+            installedSignatures.any { it in apkSignatures }
+
+        if (!signaturesMatch) {
+            return mapOf(
+                "valid" to false,
+                "errorCode" to "signature_mismatch",
+                "errorMessage" to "La firma del paquete no coincide con la versión instalada en este dispositivo. Esto causaría error de instalación incompatible.",
+                "installedSignatures" to installedSignatures,
+                "apkSignatures" to apkSignatures,
+            )
+        }
+
+        val installedVersionCode = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageManager.getPackageInfo(packageName, 0).longVersionCode
+            } else {
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(packageName, 0).versionCode.toLong()
+            }
+        } catch (_: Exception) {
+            -1L
+        }
+
+        val apkVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            archiveInfo.longVersionCode
+        } else {
+            @Suppress("DEPRECATION")
+            archiveInfo.versionCode.toLong()
+        }
+
+        val isDowngrade = installedVersionCode > 0L && apkVersionCode < installedVersionCode
+        val isSameVersion = installedVersionCode > 0L && apkVersionCode == installedVersionCode
+        val isUpgrade = installedVersionCode > 0L && apkVersionCode > installedVersionCode
+
+        if (isDowngrade) {
+            return mapOf(
+                "valid" to false,
+                "errorCode" to "downgrade_rejected",
+                "errorMessage" to "No se puede degradar la versión: el paquete (code $apkVersionCode) es inferior a la versión instalada ($installedVersionCode).",
+                "apkVersionCode" to apkVersionCode,
+                "installedVersionCode" to installedVersionCode,
+            )
+        }
+
+        return mapOf(
+            "valid" to true,
+            "packageName" to archiveInfo.packageName,
+            "versionName" to (archiveInfo.versionName ?: ""),
+            "versionCode" to apkVersionCode,
+            "installedVersionCode" to installedVersionCode,
+            "isSameVersion" to isSameVersion,
+            "isUpgrade" to isUpgrade,
+            "isDowngrade" to isDowngrade,
+            "apkAbis" to apkAbis.toList(),
+            "deviceAbis" to deviceAbis,
+            "isAbiCompatible" to true,
+            "signaturesMatch" to true,
+        )
+    }
+
     /**
      * Abre el instalador de paquetes con el APK que el OTA descargó dentro de
      * `getExternalStorageDirectory()/updates`.
      *
-     * El archivo se expone con `FileProvider` como `content://` porque desde
-     * Android 7 (API 24, el `minSdk` de esta app) una URI `file://` que sale de
-     * la aplicación lanza `FileUriExposedException`. El permiso de lectura se
-     * otorga sólo a la actividad del instalador
-     * (`FLAG_GRANT_READ_URI_PERMISSION`) y se revoca al cerrarla, así que no
-     * queda ningún acceso persistente ni notificación de ningún tipo. La app
-     * permanece viva: el audio gestionado por `audio_service` sigue sonando
-     * mientras el usuario acepta el instalador.
+     * Valida de antemano ABI, firmas y versión para impedir el fallo de Android
+     * "El paquete no es válido" antes de delegar la instalación al sistema.
      */
     private fun installDownloadedPackage(
         call: MethodCall,
@@ -382,19 +594,32 @@ class MainActivity : AudioServiceActivity() {
             )
             return
         }
+
+        val verification = verifyPackageDetails(file)
+        val isValid = verification["valid"] as? Boolean ?: false
+        if (!isValid) {
+            val code = verification["errorCode"] as? String ?: "invalid_package"
+            val msg = verification["errorMessage"] as? String ?: "El paquete no es válido para este dispositivo."
+            runCatching { file.delete() }
+            result.error(code, msg, verification)
+            return
+        }
+
         val apkUri = try {
             FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
         } catch (error: IllegalArgumentException) {
             result.error(
                 "unshared_path",
-                "El paquete descargado está fuera de las carpetas compartidas " +
-                    "con el instalador.",
+                "El paquete descargado está fuera de las carpetas compartidas con el instalador.",
                 null,
             )
             return
         }
         val intent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(apkUri, "application/vnd.android.package-archive")
+            .apply {
+                clipData = ClipData.newRawUri("", apkUri)
+            }
             .addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,

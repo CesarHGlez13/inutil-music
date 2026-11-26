@@ -165,9 +165,14 @@ class FirebaseConfig {
   /// (S7 Edge / standby Xiaomi), que soporta nativamente `listening_rooms/*`,
   /// `tv_pairing/*` y `music_pairing/*` con 0 cuota en Firestore.
   static bool get isAuthoritativeInutixRelay {
+    if (useEmulator) return false;
+    if (relayUsable) return true;
     final h = cloudRelayHost.trim().toLowerCase();
-    return !useEmulator &&
-        (h == 'api.inutix.com' || h == 's7.inutix.com' || h.endsWith('.inutix.com'));
+    return h == 'api.inutix.com' ||
+        h == 's7.inutix.com' ||
+        h.endsWith('.inutix.com') ||
+        dataTier == RelayTier.lanRelay ||
+        dataTier == RelayTier.cloudRelay;
   }
 
   /// La capa cloud no necesita sonda de TCP: vive en internet y el propio

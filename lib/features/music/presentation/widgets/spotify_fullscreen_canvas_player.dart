@@ -1827,10 +1827,14 @@ class _PlayerLiveOverlaysBarState
         ? roomService.recentBurstReactions.last
         : null;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (activeRoom != null)
+    return LiveFloatingReactionsOverlay(
+      autoListenRoom: true,
+      bottomOffset: 50,
+      maxTravelHeight: 340,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (activeRoom != null)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: InkWell(
@@ -1961,6 +1965,7 @@ class _PlayerLiveOverlaysBarState
             ),
           ),
       ],
+    ),
     );
   }
 }

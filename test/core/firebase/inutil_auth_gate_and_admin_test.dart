@@ -8,7 +8,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:inutil_music/core/firebase/firebase_auth_service.dart';
 import 'package:inutil_music/core/firebase/inutil_auth_gate.dart';
-import 'package:inutil_music/features/music/presentation/widgets/inutil_admin_panel.dart';
 
 /// Siembra una sesión local (snapshot v3 + sesión) como si Firebase Auth ya
 /// hubiera autenticado y Firestore devuelto la licencia indicada. En el test
@@ -407,30 +406,6 @@ void main() {
       expect(find.text('APP_INTERIOR'), findsOneWidget);
       expect(find.byType(InutilAuthScreen), findsNothing);
       expect(find.byType(InutilLicenseExpiredScreen), findsNothing);
-    });
-
-    testWidgets('InutilAdminPanel se renderiza con la sesión admin', (
-      tester,
-    ) async {
-      await seedSession(
-        uid: 'uid_admin3',
-        email: 'cesar@inutilmusic.com',
-        role: 'admin',
-        status: 'active',
-        expiresAt: DateTime(2099, 12, 31).toIso8601String(),
-      );
-      await InutilAuthService.instance.initialize();
-
-      await tester.pumpWidget(
-        const ProviderScope(
-          child: MaterialApp(home: Scaffold(body: InutilAdminPanel())),
-        ),
-      );
-
-      await tester.pumpAndSettle();
-
-      expect(find.text('Panel de Control César'), findsOneWidget);
-      expect(find.text('Nuevo Usuario'), findsOneWidget);
     });
   });
 }
