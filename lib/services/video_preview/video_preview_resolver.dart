@@ -160,13 +160,22 @@ class VideoPreviewResolver {
           try {
             var targetVideoId = videoId?.trim();
             final searchCatalog = catalog;
-            if ((targetVideoId == null || targetVideoId.isEmpty) && searchCatalog != null) {
+            if (searchCatalog != null) {
               final searchResults = await searchCatalog.searchVideos(
-                '$cleanArtist $cleanTitle official video',
-                limit: 3,
+                '$cleanTitle $cleanArtist video oficial',
+                limit: 5,
               );
               if (searchResults.isNotEmpty) {
-                targetVideoId = searchResults.first.videoId;
+                final artistLower = cleanArtist.toLowerCase();
+                final matching = searchResults.firstWhere(
+                  (r) => r.artists.any(
+                    (a) =>
+                        a.toLowerCase().contains(artistLower) ||
+                        artistLower.contains(a.toLowerCase()),
+                  ),
+                  orElse: () => searchResults.first,
+                );
+                targetVideoId = matching.videoId;
               }
             }
             if (targetVideoId != null && targetVideoId.isNotEmpty) {

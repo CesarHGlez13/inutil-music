@@ -206,6 +206,17 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            AUDIO_RECORDER_CHANNEL,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startListening" -> startVoiceRecognition(result)
+                "stopListeningAndGetQuery" -> stopVoiceRecognition(result)
+                else -> result.notImplemented()
+            }
+        }
+
         appActivationChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             APP_ACTIVATION_CHANNEL,
@@ -322,6 +333,8 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
+        speechRecognizer?.destroy()
+        speechRecognizer = null
         audioOutputPlugin?.dispose()
         localAudioQualityPlugin?.dispose()
         externalAudioExecutor.shutdownNow()
@@ -1146,6 +1159,78 @@ class MainActivity : AudioServiceActivity() {
         )
     }
 
+    private var speechRecognizer: android.speech.SpeechRecognizer? = null
+    private var lastRecognizedSpeech: String? = null
+    private var voiceRecognitionInFlight = false
+
+    private fun startVoiceRecognition(result: MethodChannel.Result) {
+        mainHandler.post {
+            try {
+                if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 4015)
+                }
+                lastRecognizedSpeech = null
+                speechRecognizer?.destroy()
+                if (!android.speech.SpeechRecognizer.isRecognitionAvailable(this)) {
+                    result.success(false)
+                    return@post
+                }
+                speechRecognizer = android.speech.SpeechRecognizer.createSpeechRecognizer(this)
+                val intent = Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(
+                        android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                        android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+                    )
+                    putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+                    putExtra(android.speech.RecognizerIntent.EXTRA_MAX_RESULTS, 5)
+                }
+                speechRecognizer?.setRecognitionListener(object : android.speech.RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {}
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {}
+                    override fun onError(error: Int) {
+                        Log.d("VoiceSearch", "Speech error code: $error")
+                    }
+                    override fun onResults(results: Bundle?) {
+                        val matches = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)
+                        if (!matches.isNullOrEmpty()) {
+                            lastRecognizedSpeech = matches[0]
+                        }
+                    }
+                    override fun onPartialResults(partialResults: Bundle?) {
+                        val matches = partialResults?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)
+                        if (!matches.isNullOrEmpty()) {
+                            lastRecognizedSpeech = matches[0]
+                        }
+                    }
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+                speechRecognizer?.startListening(intent)
+                voiceRecognitionInFlight = true
+                result.success(true)
+            } catch (e: Throwable) {
+                Log.e("VoiceSearch", "Could not start speech recognition", e)
+                result.success(false)
+            }
+        }
+    }
+
+    private fun stopVoiceRecognition(result: MethodChannel.Result) {
+        mainHandler.post {
+            try {
+                if (voiceRecognitionInFlight) {
+                    speechRecognizer?.stopListening()
+                    voiceRecognitionInFlight = false
+                }
+                result.success(lastRecognizedSpeech ?: "")
+            } catch (e: Throwable) {
+                result.success("")
+            }
+        }
+    }
+
     private fun MethodCall.requiredString(name: String): String {
         return argument<String>(name)
             ?: throw IllegalArgumentException("Falta el argumento $name")
@@ -1164,6 +1249,7 @@ class MainActivity : AudioServiceActivity() {
         private const val APP_ACTIVATION_CHANNEL = "inutil_music/app_activation"
         private const val APP_UPDATE_CHANNEL = "inutil_music/app_update"
         private const val LOCAL_AUDIO_CHANNEL = "inutil_music/local_audio"
+        private const val AUDIO_RECORDER_CHANNEL = "inutil_music/audio_recorder"
         private const val AUDIO_SERVICE_NOTIFICATION_CLICK_ACTION =
             "com.ryanheise.audioservice.NOTIFICATION_CLICK"
         private const val APP_ACTIVATION_HOME = "home"

@@ -4,13 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../services/video_preview/video_preview_resolver.dart';
 import '../../../../services/youtube_music/innertube_search_service.dart';
+import '../../../../services/youtube_music/playback/innertube_playback_service.dart';
 import 'music_providers.dart';
 
 final videoPreviewResolverProvider = Provider<VideoPreviewResolver>(
   (ref) {
     final search = ref.watch(youtubeMusicSearchProvider);
+    final videoPlayback = InnerTubePlaybackService(
+      audioFormatPredicate: (format) => !format.isAudioOnly,
+    );
+    ref.onDispose(videoPlayback.dispose);
     return VideoPreviewResolver(
-      innerTubePlayback: ref.watch(innerTubePlaybackServiceProvider),
+      innerTubePlayback: videoPlayback,
       catalog: search is InnerTubeSearchService ? search : null,
     );
   },

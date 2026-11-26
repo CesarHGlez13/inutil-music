@@ -2,6 +2,37 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'double_tap_seek_ripple.dart';
 
+/// InheritedWidget que expone el desplazamiento del gesto horizontal
+/// para que el Canvas y la portada se muevan interactivamente mientras los
+/// controles de reproducción permanecen fijos como en Spotify.
+class PlayerGestureScope extends InheritedWidget {
+  const PlayerGestureScope({
+    required this.horizontalOffset,
+    required this.dragFraction,
+    required super.child,
+    super.key,
+  });
+
+  final double horizontalOffset;
+  final double dragFraction;
+
+  static PlayerGestureScope? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<PlayerGestureScope>();
+
+  static PlayerGestureScope of(BuildContext context) =>
+      maybeOf(context) ??
+      const PlayerGestureScope(
+        horizontalOffset: 0.0,
+        dragFraction: 1.0,
+        child: SizedBox.shrink(),
+      );
+
+  @override
+  bool updateShouldNotify(PlayerGestureScope oldWidget) =>
+      horizontalOffset != oldWidget.horizontalOffset ||
+      dragFraction != oldWidget.dragFraction;
+}
+
 /// Envoltorio interactivo para el reproductor de pantalla completa.
 ///
 /// Soporta:
@@ -238,12 +269,10 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Transform.translate(
-            offset: Offset(_horizontalDragOffset, 0),
-            child: Opacity(
-              opacity: dragFraction,
-              child: widget.child,
-            ),
+          PlayerGestureScope(
+            horizontalOffset: _horizontalDragOffset,
+            dragFraction: dragFraction,
+            child: widget.child,
           ),
           if (_activeRippleForward != null && _accumulatedSeconds > 0)
             Positioned.fill(

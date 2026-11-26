@@ -51,6 +51,9 @@ class _HumSearchSheetState extends ConsumerState<HumSearchSheet>
   bool _isSearching = false;
   String? _errorMessage;
   List<TrackInfo> _results = [];
+  Timer? _listeningWindowTimer;
+  Timer? _countdownTimer;
+  int _secondsLeft = 12;
 
   @override
   void initState() {
@@ -70,6 +73,9 @@ class _HumSearchSheetState extends ConsumerState<HumSearchSheet>
   }
 
   void _startListeningCycle() {
+    _listeningWindowTimer?.cancel();
+    _countdownTimer?.cancel();
+    _secondsLeft = 12;
     _ampSub?.cancel();
     _ampSub = _service.amplitudeStream.listen((amp) {
       if (mounted) {
@@ -77,10 +83,31 @@ class _HumSearchSheetState extends ConsumerState<HumSearchSheet>
       }
     });
     _service.startListening();
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_secondsLeft > 1) {
+        setState(() => _secondsLeft--);
+      } else {
+        timer.cancel();
+      }
+    });
+
+    // Ventana automática de 12 segundos para terminar de escuchar e identificar
+    _listeningWindowTimer = Timer(const Duration(seconds: 12), () {
+      if (mounted && _isListening) {
+        _finishListening();
+      }
+    });
   }
 
   Future<void> _finishListening() async {
     if (!_isListening) return;
+    _listeningWindowTimer?.cancel();
+    _countdownTimer?.cancel();
     setState(() {
       _isListening = false;
       _isSearching = true;
@@ -109,6 +136,8 @@ class _HumSearchSheetState extends ConsumerState<HumSearchSheet>
 
   @override
   void dispose() {
+    _listeningWindowTimer?.cancel();
+    _countdownTimer?.cancel();
     _ampSub?.cancel();
     _waveController.dispose();
     super.dispose();
@@ -177,16 +206,16 @@ class _HumSearchSheetState extends ConsumerState<HumSearchSheet>
 
             Text(
               _isListening
-                  ? 'Escuchando tu voz o melodía...'
+                  ? 'Escuchando tu voz o melodía ($_secondsLeft s)...'
                   : _isSearching
-                      ? 'Analizando patrón melódico...'
+                      ? 'Identificando canción...'
                       : _results.isNotEmpty
                           ? 'Coincidencias encontradas'
                           : 'Listo para escuchar',
               style: TextStyle(
                 color: cyanNeon.withValues(alpha: 0.85),
                 fontSize: 13,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
             const SizedBox(height: 24),

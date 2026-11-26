@@ -75,11 +75,20 @@ Widget _buildLyricsTransition(
   Animation<double> secondaryAnimation,
   Widget child,
 ) {
-  return PlaybackPageTransition(
-    animation: animation,
-    fadeKey: const ValueKey('lyrics-route-fade-transition'),
-    slideKey: const ValueKey('lyrics-route-slide-transition'),
-    repaintBoundaryKey: const ValueKey('lyrics-route-repaint-boundary'),
-    child: child,
+  final slideAnimation = CurvedAnimation(
+    parent: animation,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
+  return SlideTransition(
+    key: const ValueKey('lyrics-route-slide-transition'),
+    position: Tween<Offset>(
+      begin: const Offset(0.0, 1.0),
+      end: Offset.zero,
+    ).animate(slideAnimation),
+    child: RepaintBoundary(
+      key: const ValueKey('lyrics-route-repaint-boundary'),
+      child: child,
+    ),
   );
 }

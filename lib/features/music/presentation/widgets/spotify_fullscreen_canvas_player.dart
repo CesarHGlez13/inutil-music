@@ -102,109 +102,128 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.35), rawAccent)
         : rawAccent;
     final motionAllowed = !disableAnimations && animatedArtworkEnabled;
+    final gestureScope = PlayerGestureScope.maybeOf(context);
+    final canvasOffset = gestureScope?.horizontalOffset ?? 0.0;
+    final canvasDragFraction = gestureScope?.dragFraction ?? 1.0;
 
     return Stack(
       key: const ValueKey('spotify-fullscreen-canvas-player'),
       fit: StackFit.expand,
       children: [
-        // 1. Generative Mesh Canvas en GPU con gradientes líquidos y partículas
-        // neón reactivas que aseguran 100% de cobertura visual sin depender
-        // de scrapers externos caídos ni consumir datos móviles.
+        // 1 & 2. Background Canvas & Video Stack.
+        // Se traslada interactivamente con el arrastre horizontal del gesto,
+        // mientras los controles de reproducción permanecen fijos como en Spotify.
         Positioned.fill(
-          child: GenerativeMeshCanvas(
-            primaryColor: artworkAccentColor ?? effectiveAccent,
-            secondaryColor: effectiveAccent,
-            isPlaying: isPlaying,
-          ),
-        ),
-
-        // 1b. Crisp animated full-bleed artwork Canvas layer (solo como placeholder
-        // temporal mientras carga el video; si no hay video, GenerativeMeshCanvas
-        // permanece 100% visible sin ser tapado por un zoom estático opaco).
-        Positioned.fill(
-          child: AnimatedSwitcher(
-              duration: backdropFadeDuration,
-              reverseDuration: backdropFadeDuration,
-              switchInCurve: Curves.easeInOutCubic,
-              switchOutCurve: Curves.easeInOutCubic,
-              layoutBuilder: (currentChild, previousChildren) => Stack(
+          child: Transform.translate(
+            offset: Offset(canvasOffset, 0),
+            child: Opacity(
+              opacity: canvasDragFraction,
+              child: Stack(
                 fit: StackFit.expand,
-                children: [...previousChildren, ?currentChild],
-              ),
-              child: activeCanvasUrl != null && artworkSource?.trim().isNotEmpty == true
-                  ? RepaintBoundary(
-                      key: ValueKey(
-                        'canvas-backdrop-${artworkSource ?? visualIdentity}',
+                children: [
+                  // 1. Generative Mesh Canvas en GPU con gradientes líquidos y partículas
+                  // neón reactivas que aseguran 100% de cobertura visual sin depender
+                  // de scrapers externos caídos ni consumir datos móviles.
+                  Positioned.fill(
+                    child: GenerativeMeshCanvas(
+                      primaryColor: artworkAccentColor ?? effectiveAccent,
+                      secondaryColor: effectiveAccent,
+                      isPlaying: isPlaying,
+                    ),
+                  ),
+
+                  // 1b. Crisp animated full-bleed artwork Canvas layer (solo como placeholder
+                  // temporal mientras carga el video; si no hay video, GenerativeMeshCanvas
+                  // permanece 100% visible sin ser tapado por un zoom estático opaco).
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: backdropFadeDuration,
+                      reverseDuration: backdropFadeDuration,
+                      switchInCurve: Curves.easeInOutCubic,
+                      switchOutCurve: Curves.easeInOutCubic,
+                      layoutBuilder: (currentChild, previousChildren) => Stack(
+                        fit: StackFit.expand,
+                        children: [...previousChildren, ?currentChild],
                       ),
-                      child: AnimatedArtworkMotion(
-                        enabled: motionAllowed,
-                        isPlaying: isPlaying,
-                        identity: visualIdentity,
-                        borderRadius: BorderRadius.zero,
-                        depthEnabled: false,
-                        motionScale: 1.0,
-                        zoomDuration: AnimatedArtworkMotion.defaultZoomDuration,
-                        panDuration: AnimatedArtworkMotion.defaultPanDuration,
-                        child: SourceImage(
-                          source: artworkSource,
-                          fallbackSource: artworkFallbackSource,
-                          fit: BoxFit.cover,
-                          fallback: const SizedBox.shrink(),
+                      child: activeCanvasUrl != null && artworkSource?.trim().isNotEmpty == true
+                          ? RepaintBoundary(
+                              key: ValueKey(
+                                'canvas-backdrop-${artworkSource ?? visualIdentity}',
+                              ),
+                              child: AnimatedArtworkMotion(
+                                enabled: motionAllowed,
+                                isPlaying: isPlaying,
+                                identity: visualIdentity,
+                                borderRadius: BorderRadius.zero,
+                                depthEnabled: false,
+                                motionScale: 1.0,
+                                zoomDuration: AnimatedArtworkMotion.defaultZoomDuration,
+                                panDuration: AnimatedArtworkMotion.defaultPanDuration,
+                                child: SourceImage(
+                                  source: artworkSource,
+                                  fallbackSource: artworkFallbackSource,
+                                  fit: BoxFit.cover,
+                                  fallback: const SizedBox.shrink(),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.expand(
+                              key: ValueKey('canvas-backdrop-empty'),
+                            ),
+                    ),
+                  ),
+
+                  // 1b. Dynamic breathing ambient glow when displaying the expanded cover
+                  // without a video Canvas; fades out cleanly once a real Canvas video
+                  // takes over.
+                  if (activeCanvasUrl == null && artworkSource?.trim().isNotEmpty == true)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: _CanvasArtworkAmbientAura(
+                          accentColor: artworkAccentColor ?? effectiveAccent,
+                          enabled: motionAllowed,
+                          isPlaying: isPlaying,
                         ),
                       ),
-                    )
-                  : const SizedBox.expand(
-                      key: ValueKey('canvas-backdrop-empty'),
                     ),
-            ),
-          ),
 
-        // 1b. Dynamic breathing ambient glow when displaying the expanded cover
-        // without a video Canvas; fades out cleanly once a real Canvas video
-        // takes over.
-        if (activeCanvasUrl == null && artworkSource?.trim().isNotEmpty == true)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: _CanvasArtworkAmbientAura(
-                accentColor: artworkAccentColor ?? effectiveAccent,
-                enabled: motionAllowed,
-                isPlaying: isPlaying,
-              ),
-            ),
-          ),
-
-        // 2. Full-bleed edge-to-edge looping muted video Canvas that fades in
-        // smoothly over the animated cover once frame 1 is decoded.
-        Positioned.fill(
-          key: const ValueKey('player-canvas-viewport'),
-          child: IgnorePointer(
-            child: AnimatedSwitcher(
-              duration: disableAnimations
-                  ? Duration.zero
-                  : const Duration(milliseconds: 650),
-              reverseDuration: disableAnimations
-                  ? Duration.zero
-                  : const Duration(milliseconds: 500),
-              switchInCurve: Curves.easeInOutCubic,
-              switchOutCurve: Curves.easeInOutCubic,
-              layoutBuilder: (currentChild, previousChildren) => Stack(
-                fit: StackFit.expand,
-                children: [...previousChildren, ?currentChild],
-              ),
-              child: activeCanvasUrl != null
-                  ? SpotifyCanvasVideo(
-                      key: const ValueKey('fullscreen-canvas-video'),
-                      url: activeCanvasUrl,
-                      isPlaying: isPlaying,
-                      identity: visualIdentity,
-                      startOffset: videoStartOffset,
-                      durationHint: videoDurationHint,
-                      revealDuration: videoRevealDuration,
-                      revealCurve: Curves.easeInOutCubic,
-                    )
-                  : const SizedBox.expand(
-                      key: ValueKey('fullscreen-canvas-pending'),
+                  // 2. Full-bleed edge-to-edge looping muted video Canvas that fades in
+                  // smoothly over the animated cover once frame 1 is decoded.
+                  Positioned.fill(
+                    key: const ValueKey('player-canvas-viewport'),
+                    child: IgnorePointer(
+                      child: AnimatedSwitcher(
+                        duration: disableAnimations
+                            ? Duration.zero
+                            : const Duration(milliseconds: 650),
+                        reverseDuration: disableAnimations
+                            ? Duration.zero
+                            : const Duration(milliseconds: 500),
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        layoutBuilder: (currentChild, previousChildren) => Stack(
+                          fit: StackFit.expand,
+                          children: [...previousChildren, ?currentChild],
+                        ),
+                        child: activeCanvasUrl != null
+                            ? SpotifyCanvasVideo(
+                                key: const ValueKey('fullscreen-canvas-video'),
+                                url: activeCanvasUrl,
+                                isPlaying: isPlaying,
+                                identity: visualIdentity,
+                                startOffset: videoStartOffset,
+                                durationHint: videoDurationHint,
+                                revealDuration: videoRevealDuration,
+                                revealCurve: Curves.easeInOutCubic,
+                              )
+                            : const SizedBox.expand(
+                                key: ValueKey('fullscreen-canvas-pending'),
+                              ),
+                      ),
                     ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -336,39 +355,45 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         duration: const Duration(milliseconds: 300),
                         child: activeCanvasUrl == null &&
                                 artworkSource?.trim().isNotEmpty == true
-                            ? Padding(
-                                key: ValueKey('desktop-canvas-center-art-${artworkSource ?? visualIdentity}'),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
-                                child: Container(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 240.0,
-                                    maxHeight: 240.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
-                                        blurRadius: 36,
-                                        spreadRadius: 2,
-                                        offset: const Offset(0, 12),
+                            ? Transform.translate(
+                                offset: Offset(canvasOffset, 0),
+                                child: Opacity(
+                                  opacity: canvasDragFraction,
+                                  child: Padding(
+                                    key: ValueKey('desktop-canvas-center-art-${artworkSource ?? visualIdentity}'),
+                                    padding: const EdgeInsets.symmetric(vertical: 12),
+                                    child: Container(
+                                      constraints: const BoxConstraints(
+                                        maxWidth: 240.0,
+                                        maxHeight: 240.0,
                                       ),
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.60),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(24),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
+                                            blurRadius: 36,
+                                            spreadRadius: 2,
+                                            offset: const Offset(0, 12),
+                                          ),
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.60),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 8),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: AspectRatio(
-                                      aspectRatio: 1.0,
-                                      child: SourceImage(
-                                        source: artworkSource,
-                                        fallbackSource: artworkFallbackSource,
-                                        fit: BoxFit.cover,
-                                        fallback: const SizedBox.shrink(),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(24),
+                                        child: AspectRatio(
+                                          aspectRatio: 1.0,
+                                          child: SourceImage(
+                                            source: artworkSource,
+                                            fallbackSource: artworkFallbackSource,
+                                            fit: BoxFit.cover,
+                                            fallback: const SizedBox.shrink(),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -890,39 +915,45 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         duration: const Duration(milliseconds: 300),
                         child: activeCanvasUrl == null &&
                                 artworkSource?.trim().isNotEmpty == true
-                            ? Padding(
-                                key: ValueKey('canvas-center-art-${artworkSource ?? visualIdentity}'),
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                                child: Container(
-                                  constraints: BoxConstraints(
-                                    maxWidth: math.min(constraints.maxWidth * 0.72, 300.0),
-                                    maxHeight: math.min(constraints.maxWidth * 0.72, 300.0),
-                                  ),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(24),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
-                                        blurRadius: 36,
-                                        spreadRadius: 2,
-                                        offset: const Offset(0, 12),
+                            ? Transform.translate(
+                                offset: Offset(canvasOffset, 0),
+                                child: Opacity(
+                                  opacity: canvasDragFraction,
+                                  child: Padding(
+                                    key: ValueKey('canvas-center-art-${artworkSource ?? visualIdentity}'),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                    child: Container(
+                                      constraints: BoxConstraints(
+                                        maxWidth: math.min(constraints.maxWidth * 0.72, 300.0),
+                                        maxHeight: math.min(constraints.maxWidth * 0.72, 300.0),
                                       ),
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.60),
-                                        blurRadius: 20,
-                                        offset: const Offset(0, 8),
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(24),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
+                                            blurRadius: 36,
+                                            spreadRadius: 2,
+                                            offset: const Offset(0, 12),
+                                          ),
+                                          BoxShadow(
+                                            color: Colors.black.withValues(alpha: 0.60),
+                                            blurRadius: 20,
+                                            offset: const Offset(0, 8),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: AspectRatio(
-                                      aspectRatio: 1.0,
-                                      child: SourceImage(
-                                        source: artworkSource,
-                                        fallbackSource: artworkFallbackSource,
-                                        fit: BoxFit.cover,
-                                        fallback: const SizedBox.shrink(),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(24),
+                                        child: AspectRatio(
+                                          aspectRatio: 1.0,
+                                          child: SourceImage(
+                                            source: artworkSource,
+                                            fallbackSource: artworkFallbackSource,
+                                            fit: BoxFit.cover,
+                                            fallback: const SizedBox.shrink(),
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),

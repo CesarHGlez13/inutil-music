@@ -551,6 +551,16 @@ class MiniPlayer extends ConsumerWidget {
                 ),
               if (backgroundMode == MiniPlayerBackgroundMode.transparent)
                 const Positioned.fill(child: _MiniGlassBackground()),
+              if (hasTrack)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: _MiniEqualizerBackground(
+                      isPlaying: isPlaying,
+                      accentColor: AppColors.downloadAccentFor(context),
+                      isDark: isDark,
+                    ),
+                  ),
+                ),
               if (!capsule && !backgroundMode.isLiquidGlass)
                 Positioned(
                   top: 0,
@@ -1356,6 +1366,138 @@ IconData _miniVolumeIcon(double volume) {
     return Icons.volume_down_rounded;
   }
   return Icons.volume_up_rounded;
+}
+
+class _MiniEqualizerBackground extends StatefulWidget {
+  const _MiniEqualizerBackground({
+    required this.isPlaying,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  final bool isPlaying;
+  final Color accentColor;
+  final bool isDark;
+
+  @override
+  State<_MiniEqualizerBackground> createState() =>
+      _MiniEqualizerBackgroundState();
+}
+
+class _MiniEqualizerBackgroundState extends State<_MiniEqualizerBackground>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    if (widget.isPlaying) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _MiniEqualizerBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPlaying != oldWidget.isPlaying) {
+      if (widget.isPlaying) {
+        if (!_controller.isAnimating) _controller.repeat();
+      } else {
+        _controller.stop();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) => CustomPaint(
+        painter: _MiniEqualizerPainter(
+          progress: _controller.value,
+          isPlaying: widget.isPlaying,
+          accentColor: widget.accentColor,
+          isDark: widget.isDark,
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniEqualizerPainter extends CustomPainter {
+  _MiniEqualizerPainter({
+    required this.progress,
+    required this.isPlaying,
+    required this.accentColor,
+    required this.isDark,
+  });
+
+  final double progress;
+  final bool isPlaying;
+  final Color accentColor;
+  final bool isDark;
+
+  static const int _barCount = 28;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+
+    const barWidth = 3.2;
+    final totalSpacing = size.width - (_barCount * barWidth);
+    final gap = totalSpacing / (_barCount + 1);
+    final baseAlpha = isDark ? 0.24 : 0.18;
+    final t = progress * 2 * math.pi;
+
+    for (var i = 0; i < _barCount; i++) {
+      final x = gap + i * (barWidth + gap);
+      var normalizedHeight = 0.08;
+
+      if (isPlaying) {
+        final wave1 = math.sin(t * 3.2 + i * 0.45).abs();
+        final wave2 = math.cos(t * 1.8 - i * 0.32).abs();
+        final wave3 = math.sin(t * 5.1 + i * 0.8).abs();
+        final envelope = 0.5 + 0.5 * math.sin((i / _barCount) * math.pi);
+        normalizedHeight = (0.10 + (0.50 * wave1 + 0.35 * wave2 + 0.15 * wave3) * envelope)
+            .clamp(0.08, 0.85);
+      }
+
+      final barHeight = size.height * normalizedHeight;
+      final y = size.height - barHeight - 4;
+
+      final rect = Rect.fromLTWH(x, y, barWidth, barHeight);
+      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+
+      final paint = Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            accentColor.withValues(alpha: baseAlpha * (0.8 + 0.4 * normalizedHeight)),
+            accentColor.withValues(alpha: baseAlpha * 0.25),
+          ],
+        ).createShader(rect);
+
+      canvas.drawRRect(rrect, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MiniEqualizerPainter oldDelegate) =>
+      progress != oldDelegate.progress ||
+      isPlaying != oldDelegate.isPlaying ||
+      accentColor != oldDelegate.accentColor ||
+      isDark != oldDelegate.isDark;
 }
 
 class _MiniBlurBackground extends StatelessWidget {

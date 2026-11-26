@@ -15,6 +15,7 @@
          que lo instale; sin este permiso el instalador se niega en silencio. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Cámara solo para escanear el QR de inicio de sesión en la PC. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />

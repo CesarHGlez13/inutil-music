@@ -28,7 +28,7 @@ void main() {
       expect(prevCalled, isFalse);
     });
 
-    testWidgets('Horizontal drag moves child with translation', (tester) async {
+    testWidgets('Horizontal drag updates PlayerGestureScope with translation', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -50,14 +50,15 @@ void main() {
       await gesture.moveBy(const Offset(-60, 0));
       await tester.pump();
 
-      final transformFinder = find.descendant(
+      final scopeFinder = find.descendant(
         of: find.byType(PlayerGesturesWrapper),
-        matching: find.byType(Transform),
+        matching: find.byType(PlayerGestureScope),
       );
-      expect(transformFinder, findsWidgets);
+      expect(scopeFinder, findsOneWidget);
 
-      final transform = tester.widget<Transform>(transformFinder.first);
-      expect(transform.transform.getTranslation().x, lessThan(0));
+      final scope = tester.widget<PlayerGestureScope>(scopeFinder);
+      expect(scope.horizontalOffset, lessThan(0));
+      expect(scope.dragFraction, lessThan(1.0));
 
       await gesture.up();
       await tester.pumpAndSettle();

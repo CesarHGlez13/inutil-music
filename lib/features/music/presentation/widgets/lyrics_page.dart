@@ -1982,12 +1982,36 @@ class _LyricsHeader extends ConsumerWidget {
     );
     final isPlaying = playback.status == PlayerStatus.playing;
 
-    return Column(
-      key: const ValueKey('lyrics-header'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 12, 6),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! > 180) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      onVerticalDragUpdate: (details) {
+        if (details.primaryDelta != null && details.primaryDelta! > 14) {
+          Navigator.of(context).maybePop();
+        }
+      },
+      child: Column(
+        key: const ValueKey('lyrics-header'),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle pill para deslizar hacia abajo y compactar (estilo Spotify)
+          Center(
+            child: Container(
+              width: 38,
+              height: 4.5,
+              margin: const EdgeInsets.only(top: 6, bottom: 4),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.35),
+                borderRadius: BorderRadius.circular(2.5),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 4, 12, 6),
           child: Row(
             children: [
               if (!mobileLayout) ...[
@@ -2072,8 +2096,9 @@ class _LyricsHeader extends ConsumerWidget {
         ),
         const _LyricsHeaderProgress(),
       ],
-    );
-  }
+    ),
+  );
+}
 }
 
 class _LyricsHeaderArtwork extends StatelessWidget {
