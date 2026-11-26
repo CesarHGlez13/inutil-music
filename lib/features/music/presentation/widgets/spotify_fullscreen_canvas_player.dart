@@ -107,16 +107,20 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
       key: const ValueKey('spotify-fullscreen-canvas-player'),
       fit: StackFit.expand,
       children: [
-        // 1. Crisp animated full-bleed artwork Canvas layer (always present
-        // underneath the video so the player NEVER drops to a blurry grey blob
-        // while a video loads, when paused before frame 1, or on tracks with no
-        // Canvas/video match). When no exact video Canvas exists, elevate the
-        // Ken Burns motion and overlay a soft color-matched ambient aura so the
-        // expanded cover itself feels alive and 100% faithful to the song.
+        // 1. Generative Mesh Canvas en GPU con gradientes líquidos y partículas
+        // neón reactivas que aseguran 100% de cobertura visual sin depender
+        // de scrapers externos caídos ni consumir datos móviles.
         Positioned.fill(
-          child: ColoredBox(
-            color: const Color(0xFF0A0C10),
-            child: AnimatedSwitcher(
+          child: GenerativeMeshCanvas(
+            primaryColor: artworkAccentColor ?? effectiveAccent,
+            secondaryColor: effectiveAccent,
+            isPlaying: isPlaying,
+          ),
+        ),
+
+        // 1b. Crisp animated full-bleed artwork Canvas layer
+        Positioned.fill(
+          child: AnimatedSwitcher(
               duration: backdropFadeDuration,
               reverseDuration: backdropFadeDuration,
               switchInCurve: Curves.easeInOutCubic,
@@ -147,7 +151,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                           source: artworkSource,
                           fallbackSource: artworkFallbackSource,
                           fit: BoxFit.cover,
-                          fallback: const ColoredBox(color: Color(0xFF0A0C10)),
+                          fallback: const SizedBox.shrink(),
                         ),
                       ),
                     )
@@ -156,7 +160,6 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     ),
             ),
           ),
-        ),
 
         // 1b. Dynamic breathing ambient glow when displaying the expanded cover
         // without a video Canvas; fades out cleanly once a real Canvas video

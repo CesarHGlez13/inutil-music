@@ -51,6 +51,7 @@ import 'audio_routing_menus.dart';
 import 'classic_vinyl_deck.dart';
 import 'echo_memory_sheet.dart';
 import 'favorite_star_badge.dart';
+import 'generative_mesh_canvas.dart';
 import 'inutil_connect_sheet.dart';
 import 'inutil_sleep_timer_sheet.dart';
 import 'inutix_live_guide.dart';
