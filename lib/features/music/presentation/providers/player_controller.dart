@@ -154,6 +154,8 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
   Future<void> _skipSilenceConfigurationTail = Future<void>.value();
   final _CrossfadePreparationCoordinator _crossfadePreparation =
       _CrossfadePreparationCoordinator();
+  final PlaybackPreloadCoordinator _playbackPreloader =
+      PlaybackPreloadCoordinator();
   Future<void>? _nextNavigationInFlight;
   DateTime? _nextNavigationStartedAt;
   static const _nextNavigationMaxWait = Duration(milliseconds: 900);
@@ -4867,6 +4869,27 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
     _preparedRemoteAudioSources.removeWhere(
       (entryId, _) => !retainedEntryIds.contains(entryId),
     );
+    final upcomingTrack = plan.upcoming.isNotEmpty ? plan.upcoming.first.track : null;
+    if (upcomingTrack != null) {
+      unawaited(
+        _playbackPreloader.schedulePreload(
+          nextTrack: upcomingTrack,
+          resolveStreamUrl: (t) async {
+            final resolved = await _resolveTrackWithPreResolvedHighQuality(
+              t,
+              resolveYoutube: () => _resolveRemoteTrack(
+                t,
+                shouldContinue: () =>
+                    _isRemotePrefetchCurrent(requestId, plan.currentQueueEntryId),
+              ),
+              shouldContinue: () =>
+                  _isRemotePrefetchCurrent(requestId, plan.currentQueueEntryId),
+            );
+            return resolved.playable.streamUrl;
+          },
+        ),
+      );
+    }
     await _remotePrefetch.prepare(
       plan: plan,
       cacheEnabled: cache.isEnabled,
@@ -4935,6 +4958,7 @@ class PlayerController extends AsyncNotifier<PlayerSnapshot> {
 
   void _invalidateCrossfadePreparations() {
     _crossfadePreparation.invalidate();
+    _playbackPreloader.cancel();
   }
 
   Future<void> _scheduleCrossfadePreparation(CrossfadePlaybackSource? source) {
