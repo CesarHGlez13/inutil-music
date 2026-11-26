@@ -18,6 +18,7 @@ import '../providers/music_providers.dart';
 import '../providers/track_selection_controller.dart';
 import '../providers/player/related_radio_queue_extender.dart';
 import '../widgets/search_input.dart';
+import '../widgets/hum_search_sheet.dart';
 import '../widgets/scrolled_under_tab_frame.dart';
 import '../widgets/now_playing_equalizer.dart';
 import '../widgets/source_image.dart';
@@ -186,6 +187,34 @@ class _SearchViewState extends ConsumerState<SearchView> {
         setState(() => _focusInputAfterClear = false);
       }
     });
+  }
+
+  Future<void> _playTrack(TrackInfo track) {
+    final player = ref.read(playerControllerProvider.notifier);
+    final service = ref.read(youtubeMusicSearchProvider);
+    final link = const InutilTrackLinkCodec().tryFromTrack(track);
+    if (service is! YouTubeMusicRelated || link == null) {
+      return player.playRemote(track, queue: [track]);
+    }
+    final selected = RecommendationPlaybackItem(track: track);
+    return player.playRecommendation(
+      selected,
+      queue: [selected],
+      queueSourceId: 'search-radio:${link.videoId}',
+      queueExtender: buildRelatedRadioQueueExtender(
+        related: service as YouTubeMusicRelated,
+        seedVideoId: link.videoId,
+        initialQueue: [selected],
+      ),
+    );
+  }
+
+  Future<void> _handleHumSearch() async {
+    final track = await showHumSearchSheet(context);
+    if (track != null && mounted) {
+      await _playTrack(track);
+      widget.onOpenPlayer();
+    }
   }
 
   void _selectBrowseCategory(SearchBrowseCategory category) {
@@ -371,6 +400,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
                 onKeyEvent: _handleSuggestionKeyEvent,
                 onSubmitted: _submitSearch,
                 onCleared: _clearSearch,
+                onHumSearch: _handleHumSearch,
               ),
       ),
       scrollKey: const ValueKey('search-results-scroll'),
@@ -405,6 +435,7 @@ class _SearchViewState extends ConsumerState<SearchView> {
                       onKeyEvent: _handleSuggestionKeyEvent,
                       onSubmitted: _submitSearch,
                       onCleared: _clearSearch,
+                      onHumSearch: _handleHumSearch,
                     ),
                   ),
                 if (searchState.hasQuery &&

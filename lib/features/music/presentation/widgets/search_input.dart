@@ -12,6 +12,8 @@ class SearchInput extends StatefulWidget {
     this.onFocusChanged,
     this.onKeyEvent,
     this.onCleared,
+    this.onHumSearch,
+    this.humSearchTooltip,
     this.initialText = '',
     this.compact = false,
     this.requestFocusOnClear = true,
@@ -27,6 +29,8 @@ class SearchInput extends StatefulWidget {
   final void Function(bool hasFocus, String text)? onFocusChanged;
   final KeyEventResult Function(FocusNode node, KeyEvent event)? onKeyEvent;
   final VoidCallback? onCleared;
+  final VoidCallback? onHumSearch;
+  final String? humSearchTooltip;
   final String initialText;
   final bool compact;
   final bool requestFocusOnClear;
@@ -136,6 +140,13 @@ class _SearchInputState extends State<SearchInput> {
             suffixIcon: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (widget.onHumSearch != null)
+                  IconButton(
+                    key: const ValueKey('search-hum-button'),
+                    tooltip: widget.humSearchTooltip ?? 'Di, canta o tararea',
+                    icon: const Icon(Icons.graphic_eq_rounded, color: Color(0xFF00E5FF)),
+                    onPressed: widget.onHumSearch,
+                  ),
                 if (hasText)
                   IconButton(
                     key: const ValueKey('search-clear-button'),
