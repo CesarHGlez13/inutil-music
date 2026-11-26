@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import '../visual_track_identity.dart';
+import '../youtube_music/innertube_search_service.dart';
+import '../youtube_music/playback/innertube_playback_service.dart';
 
 typedef VideoPreviewJsonFetcher =
     Future<Map<String, dynamic>?> Function(Uri uri);
@@ -56,6 +58,8 @@ class VideoPreviewResolver {
   VideoPreviewResolver({
     VideoPreviewJsonFetcher? fetchJson,
     DateTime Function()? clock,
+    this.innerTubePlayback,
+    this.catalog,
   }) : _fetchJson = fetchJson ?? _requestJson,
        _clock = clock ?? DateTime.now;
 
@@ -65,6 +69,8 @@ class VideoPreviewResolver {
 
   final VideoPreviewJsonFetcher _fetchJson;
   final DateTime Function() _clock;
+  final InnerTubePlaybackService? innerTubePlayback;
+  final InnerTubeSearchService? catalog;
   final Map<String, _CachedResult<VideoPreviewClip?>> _trackCache = {};
   final Map<String, _CachedResult<List<VideoPreviewClip>>> _clipsCache = {};
   final Map<String, Future<VideoPreviewClip?>> _trackInFlight = {};
@@ -72,13 +78,13 @@ class VideoPreviewResolver {
 
   /// Resolves the official music-video preview clip for a single song.
   ///
-  /// Matches exact track title and artist first. When a track does not have
-  /// its own individual music video on iTunes (e.g. album cuts), falls back
-  /// to an official video clip by the same artist (sameVisualArtist) as an
-  /// artist visual canvas, but NEVER displays an unrelated artist.
+  /// Matches exact track title and artist first via iTunes. If no clip is found
+  /// and the track has an associated YouTube video (or YouTube search is available),
+  /// resolves the progressive MP4 format from InnerTube as a full video loop Canvas.
   Future<VideoPreviewClip?> resolveForTrack({
     required String title,
     required String artist,
+    String? videoId,
   }) {
     final cleanTitle = cleanVisualTrackTitle(title);
     final cleanArtist = primaryVisualArtist(artist);
@@ -143,6 +149,43 @@ class VideoPreviewResolver {
           final artistClips = await resolveClipsForArtist(artistName: artist);
           if (artistClips.isNotEmpty) {
             resolved = artistClips.first;
+          }
+        }
+
+        // Official YouTube Video Canvas loop fallback:
+        // When iTunes has no clip, resolve the progressive MP4 format
+        // via InnerTubePlaybackService so video Canvas is available for YouTube songs.
+        final playback = innerTubePlayback;
+        if (resolved == null && playback != null) {
+          try {
+            var targetVideoId = videoId?.trim();
+            final searchCatalog = catalog;
+            if ((targetVideoId == null || targetVideoId.isEmpty) && searchCatalog != null) {
+              final searchResults = await searchCatalog.searchVideos(
+                '$cleanArtist $cleanTitle official video',
+                limit: 3,
+              );
+              if (searchResults.isNotEmpty) {
+                targetVideoId = searchResults.first.videoId;
+              }
+            }
+            if (targetVideoId != null && targetVideoId.isNotEmpty) {
+              final ytResult = await playback.resolve(
+                targetVideoId,
+                requireAudioOnly: false,
+              );
+              if (!ytResult.format.isAudioOnly) {
+                resolved = VideoPreviewClip(
+                  videoUrl: ytResult.uri,
+                  title: title,
+                  artist: artist,
+                  duration: ytResult.format.approxDuration,
+                  tags: const ['#youtube', '#video canvas'],
+                );
+              }
+            }
+          } catch (_) {
+            // Safe fallback to GenerativeMeshCanvas
           }
         }
       } catch (_) {

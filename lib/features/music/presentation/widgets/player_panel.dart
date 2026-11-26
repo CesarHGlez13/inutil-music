@@ -518,6 +518,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
             trackVideoPreviewProvider((
               title: snapshot.title ?? '',
               artist: snapshot.artist ?? '',
+              videoId: snapshot.trackId,
             )),
           )
         : null;
@@ -6392,6 +6393,7 @@ Future<void> _openShareMomentFromPlayer({
                 trackVideoPreviewProvider((
                   title: snapshot.title ?? '',
                   artist: snapshot.artist ?? '',
+                  videoId: snapshot.trackId,
                 )),
               )
               .value

@@ -84,6 +84,7 @@ class DesktopNowPlayingRail extends ConsumerWidget {
                 trackVideoPreviewProvider((
                   title: snapshot.title ?? '',
                   artist: snapshot.artist ?? '',
+                  videoId: snapshot.trackId,
                 )),
               )
               .value

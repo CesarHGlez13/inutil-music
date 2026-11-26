@@ -28,6 +28,41 @@ void main() {
       expect(prevCalled, isFalse);
     });
 
+    testWidgets('Horizontal drag moves child with translation', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: PlayerGesturesWrapper(
+              child: const SizedBox(
+                key: ValueKey('test-child'),
+                width: 400,
+                height: 800,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final gesture = await tester.startGesture(const Offset(200, 400));
+      // First move beyond slop
+      await gesture.moveBy(const Offset(-25, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(-60, 0));
+      await tester.pump();
+
+      final transformFinder = find.descendant(
+        of: find.byType(PlayerGesturesWrapper),
+        matching: find.byType(Transform),
+      );
+      expect(transformFinder, findsWidgets);
+
+      final transform = tester.widget<Transform>(transformFinder.first);
+      expect(transform.transform.getTranslation().x, lessThan(0));
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+    });
+
     testWidgets('Swipe right calls onPreviousTrack', (tester) async {
       var nextCalled = false;
       var prevCalled = false;

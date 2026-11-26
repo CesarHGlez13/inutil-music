@@ -814,6 +814,7 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
                 trackVideoPreviewProvider((
                   title: snapshot.title ?? '',
                   artist: snapshot.artist ?? '',
+                  videoId: snapshot.trackId,
                 )),
               )
               .value
@@ -4253,6 +4254,7 @@ class _LyricsCanvasBackground extends ConsumerWidget {
                 trackVideoPreviewProvider((
                   title: snapshot.title ?? '',
                   artist: snapshot.artist ?? '',
+                  videoId: snapshot.trackId,
                 )),
               )
               .value

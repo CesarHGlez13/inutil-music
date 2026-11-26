@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:inutil_music/services/video_preview/video_preview_resolver.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_client_profile.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_playback_service.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_models.dart';
+import 'package:inutil_music/services/youtube_music/playback/innertube_stream_validator.dart';
 
 void main() {
   group('VideoPreviewResolver', () {
@@ -285,5 +289,72 @@ void main() {
         expect(resolved, isNull);
       },
     );
+
+    test(
+      'resolveForTrack falls back to YouTube progressive video format when iTunes has no clip',
+      () async {
+        final fakePlayback = _FakePlaybackService(
+          resolvedAudio: InnerTubeResolvedAudio(
+            videoId: 'yt123',
+            uri: Uri.parse('https://googlevideo.com/videoplayback?id=yt123'),
+            headers: const {},
+            profile: InnerTubeClientRegistry.androidSdkless,
+            format: InnerTubeAudioFormat(
+              source: InnerTubeFormatSource.formats,
+              itag: 18,
+              uri: Uri.parse('https://googlevideo.com/videoplayback?id=yt123'),
+              mimeType: 'video/mp4',
+              container: 'mp4',
+              codecs: const ['avc1.42001E', 'mp4a.40.2'],
+              bitrate: 500000,
+            ),
+            expiresAt: DateTime.now().add(const Duration(hours: 4)),
+            resolutionElapsed: const Duration(milliseconds: 100),
+            probe: const InnerTubeStreamProbe(
+              statusCode: 206,
+              elapsed: Duration(milliseconds: 30),
+              probedOffset: 0,
+              receivedBytes: 32768,
+              contentLength: 2000000,
+            ),
+          ),
+        );
+
+        final resolver = VideoPreviewResolver(
+          fetchJson: (_) async => {'results': []},
+          innerTubePlayback: fakePlayback,
+        );
+
+        final resolved = await resolver.resolveForTrack(
+          title: 'Song Without Itunes Clip',
+          artist: 'Some Artist',
+          videoId: 'yt123',
+        );
+
+        expect(resolved, isNotNull);
+        expect(
+          resolved!.videoUrl.toString(),
+          'https://googlevideo.com/videoplayback?id=yt123',
+        );
+        expect(resolved.tags, contains('#video canvas'));
+      },
+    );
   });
+}
+
+class _FakePlaybackService extends Fake implements InnerTubePlaybackService {
+  _FakePlaybackService({required this.resolvedAudio});
+
+  final InnerTubeResolvedAudio resolvedAudio;
+
+  @override
+  Future<InnerTubeResolvedAudio> resolve(
+    String videoReference, {
+    bool skipPrimary = false,
+    bool requireAudioOnly = false,
+    Set<String> excludedProfileKeys = const <String>{},
+    InnerTubeContinuation? shouldContinue,
+  }) async {
+    return resolvedAudio;
+  }
 }

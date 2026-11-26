@@ -118,7 +118,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
           ),
         ),
 
-        // 1b. Crisp animated full-bleed artwork Canvas layer
+        // 1b. Crisp animated full-bleed artwork Canvas layer (solo como placeholder
+        // temporal mientras carga el video; si no hay video, GenerativeMeshCanvas
+        // permanece 100% visible sin ser tapado por un zoom estático opaco).
         Positioned.fill(
           child: AnimatedSwitcher(
               duration: backdropFadeDuration,
@@ -129,7 +131,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                 fit: StackFit.expand,
                 children: [...previousChildren, ?currentChild],
               ),
-              child: artworkSource?.trim().isNotEmpty == true
+              child: activeCanvasUrl != null && artworkSource?.trim().isNotEmpty == true
                   ? RepaintBoundary(
                       key: ValueKey(
                         'canvas-backdrop-${artworkSource ?? visualIdentity}',
@@ -140,13 +142,9 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                         identity: visualIdentity,
                         borderRadius: BorderRadius.zero,
                         depthEnabled: false,
-                        motionScale: activeCanvasUrl == null ? 1.85 : 1.0,
-                        zoomDuration: activeCanvasUrl == null
-                            ? const Duration(seconds: 18)
-                            : AnimatedArtworkMotion.defaultZoomDuration,
-                        panDuration: activeCanvasUrl == null
-                            ? const Duration(seconds: 22)
-                            : AnimatedArtworkMotion.defaultPanDuration,
+                        motionScale: 1.0,
+                        zoomDuration: AnimatedArtworkMotion.defaultZoomDuration,
+                        panDuration: AnimatedArtworkMotion.defaultPanDuration,
                         child: SourceImage(
                           source: artworkSource,
                           fallbackSource: artworkFallbackSource,
@@ -332,7 +330,54 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   ),
 
                   // Open center window with live synced lyrics over Canvas video
-                  const Spacer(),
+                  Expanded(
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: activeCanvasUrl == null &&
+                                artworkSource?.trim().isNotEmpty == true
+                            ? Padding(
+                                key: ValueKey('desktop-canvas-center-art-${artworkSource ?? visualIdentity}'),
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Container(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 240.0,
+                                    maxHeight: 240.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
+                                        blurRadius: 36,
+                                        spreadRadius: 2,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.60),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: AspectRatio(
+                                      aspectRatio: 1.0,
+                                      child: SourceImage(
+                                        source: artworkSource,
+                                        fallbackSource: artworkFallbackSource,
+                                        fit: BoxFit.cover,
+                                        fallback: const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 48),
@@ -837,8 +882,56 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                     accentColor: effectiveAccent,
                   ),
 
-                  // Open center window so the full-bleed artist video shines.
-                  const Spacer(),
+                  // Open center window: if activeCanvasUrl == null, show beautiful centered album art
+                  // over the GenerativeMeshCanvas; if activeCanvasUrl != null, keep open for full-bleed video.
+                  Expanded(
+                    child: Center(
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: activeCanvasUrl == null &&
+                                artworkSource?.trim().isNotEmpty == true
+                            ? Padding(
+                                key: ValueKey('canvas-center-art-${artworkSource ?? visualIdentity}'),
+                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                child: Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth: math.min(constraints.maxWidth * 0.72, 300.0),
+                                    maxHeight: math.min(constraints.maxWidth * 0.72, 300.0),
+                                  ),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(24),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
+                                        blurRadius: 36,
+                                        spreadRadius: 2,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.60),
+                                        blurRadius: 20,
+                                        offset: const Offset(0, 8),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: AspectRatio(
+                                      aspectRatio: 1.0,
+                                      child: SourceImage(
+                                        source: artworkSource,
+                                        fallbackSource: artworkFallbackSource,
+                                        fit: BoxFit.cover,
+                                        fallback: const SizedBox.shrink(),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
 
                   // Live floating synced lyric line right over the video.
                   _CanvasFloatingLyricLine(onTap: onOpenLyrics),

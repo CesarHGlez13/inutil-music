@@ -33,8 +33,13 @@ class PlayerGesturesWrapper extends StatefulWidget {
   State<PlayerGesturesWrapper> createState() => _PlayerGesturesWrapperState();
 }
 
-class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
+class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
+    with SingleTickerProviderStateMixin {
   Offset _dragTotalDelta = Offset.zero;
+  double _horizontalDragOffset = 0.0;
+  bool _isHorizontalDrag = false;
+  late final AnimationController _slideController;
+  Animation<double>? _slideAnimation;
 
   // Seguimiento de doble toque acumulativo
   DateTime? _lastTapTime;
@@ -48,7 +53,24 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
   static const Duration _doubleTapMaxInterval = Duration(milliseconds: 400);
 
   @override
+  void initState() {
+    super.initState();
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    _slideController.addListener(() {
+      if (_slideAnimation != null) {
+        setState(() {
+          _horizontalDragOffset = _slideAnimation!.value;
+        });
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _slideController.dispose();
     _seekResetTimer?.cancel();
     super.dispose();
   }
@@ -96,13 +118,30 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
   }
 
   void _handlePanStart(DragStartDetails details) {
+    _slideController.stop();
     _dragTotalDelta = Offset.zero;
+    _horizontalDragOffset = 0.0;
+    _isHorizontalDrag = false;
     _lastTapTime = null;
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
     if (!widget.enabled) return;
     _dragTotalDelta += details.delta;
+
+    final dx = _dragTotalDelta.dx;
+    final dy = _dragTotalDelta.dy;
+
+    // Detectar si el gesto horizontal domina
+    if (!_isHorizontalDrag && dx.abs() > 10 && dx.abs() > dy.abs() * 1.1) {
+      _isHorizontalDrag = true;
+    }
+
+    if (_isHorizontalDrag) {
+      setState(() {
+        _horizontalDragOffset = dx;
+      });
+    }
   }
 
   void _handlePanEnd(DragEndDetails details) {
@@ -112,14 +151,29 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
     final dy = _dragTotalDelta.dy;
     final vx = details.velocity.pixelsPerSecond.dx;
     final vy = details.velocity.pixelsPerSecond.dy;
+    final screenWidth = MediaQuery.maybeSizeOf(context)?.width ?? 400.0;
 
-    // Comprobar dirección dominante para evitar disparos en gestos diagonales
-    if (dx.abs() > dy.abs() * 1.2) {
+    if (_isHorizontalDrag || dx.abs() > dy.abs() * 1.2) {
       // Horizontal
       if (dx < -_horizontalThreshold || vx < -300) {
-        widget.onNextTrack?.call();
+        // Deslizar hacia la izquierda -> Siguiente pista
+        _animateTrackTransition(
+          from: _horizontalDragOffset,
+          exitTo: -screenWidth,
+          entryFrom: screenWidth,
+          onMidpoint: widget.onNextTrack,
+        );
       } else if (dx > _horizontalThreshold || vx > 300) {
-        widget.onPreviousTrack?.call();
+        // Deslizar hacia la derecha -> Pista anterior
+        _animateTrackTransition(
+          from: _horizontalDragOffset,
+          exitTo: screenWidth,
+          entryFrom: -screenWidth,
+          onMidpoint: widget.onPreviousTrack,
+        );
+      } else {
+        // Cancelado: volver al centro con resorte suave
+        _animateSpringBack();
       }
     } else if (dy.abs() > dx.abs() * 1.2) {
       // Vertical
@@ -128,13 +182,53 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
       } else if (dy < -_verticalThreshold || vy < -300) {
         widget.onOpenLyrics?.call();
       }
+      _animateSpringBack();
+    } else {
+      _animateSpringBack();
     }
 
     _dragTotalDelta = Offset.zero;
+    _isHorizontalDrag = false;
+  }
+
+  void _animateTrackTransition({
+    required double from,
+    required double exitTo,
+    required double entryFrom,
+    required VoidCallback? onMidpoint,
+  }) {
+    // Fase 1: salida rápida de la pista actual
+    _slideAnimation = Tween<double>(begin: from, end: exitTo).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeInQuad),
+    );
+    _slideController.duration = const Duration(milliseconds: 110);
+    _slideController.forward(from: 0.0).then((_) {
+      if (!mounted) return;
+      onMidpoint?.call();
+
+      // Fase 2: entrada fluida de la nueva pista desde el lado opuesto
+      _slideAnimation = Tween<double>(begin: entryFrom, end: 0.0).animate(
+        CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+      );
+      _slideController.duration = const Duration(milliseconds: 220);
+      _slideController.forward(from: 0.0);
+    });
+  }
+
+  void _animateSpringBack() {
+    if (_horizontalDragOffset == 0.0) return;
+    _slideAnimation = Tween<double>(begin: _horizontalDragOffset, end: 0.0).animate(
+      CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+    );
+    _slideController.duration = const Duration(milliseconds: 180);
+    _slideController.forward(from: 0.0);
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.maybeSizeOf(context)?.width ?? 400.0;
+    final dragFraction = (1.0 - (_horizontalDragOffset.abs() / (screenWidth * 1.4))).clamp(0.45, 1.0);
+
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapDown: _handleTapDown,
@@ -144,7 +238,13 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper> {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          widget.child,
+          Transform.translate(
+            offset: Offset(_horizontalDragOffset, 0),
+            child: Opacity(
+              opacity: dragFraction,
+              child: widget.child,
+            ),
+          ),
           if (_activeRippleForward != null && _accumulatedSeconds > 0)
             Positioned.fill(
               child: IgnorePointer(
