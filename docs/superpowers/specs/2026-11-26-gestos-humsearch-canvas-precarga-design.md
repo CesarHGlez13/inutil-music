@@ -24,10 +24,12 @@ Este diseño unifica las 4 soluciones bajo la identidad visual oscura y neón de
 * **Gestos táctiles completos:**
   * Swipe horizontal sobre la carátula/lienzo para pista siguiente (izquierda) o anterior (derecha) con inercia física y carrusel continuo.
   * Swipe vertical hacia abajo para minimizar suavemente al mini-reproductor.
+  * Swipe vertical hacia arriba sobre la carátula o área de reproducción para abrir inmediatamente la letra sincronizada en tiempo real (`onOpenLyrics`).
   * Doble toque lateral tipo YouTube (derecha: +10 s; izquierda: -10 s) con retroalimentación háptica y ondas neón.
   * Deslizamiento vertical en bordes para volumen (derecho) y atenuador de pantalla (izquierdo).
-* **Búsqueda por tarareo (*Hum to Search*) integrada y gratuita:**
+* **Búsqueda por tarareo/canto/voz integrada y gratuita:**
   * Botón en barra de búsqueda que despliega modal con espectrograma de ondas neón vivas (`#00E5FF` y `#7C4DFF` sobre fondo `#0A0B10`).
+  * Indicador de acción claro para el usuario: **«Di, canta o tararea un fragmento de la canción»**.
   * Grabación y resolución melódica en 5 a 8 segundos vía InnerTube Sound Search.
   * Resultados en tarjetas de canción con reproducción inmediata a un toque.
 * **Canvas Cinemático 100 % autónomo (Eliminación de `spotycovs.lol`):**

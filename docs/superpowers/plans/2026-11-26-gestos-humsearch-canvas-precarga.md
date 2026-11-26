@@ -89,8 +89,8 @@ git commit -m "feat(search): búsqueda acústica con InnerTube ('Di, canta o tar
 - Test: `test/features/music/presentation/widgets/player_gestures_wrapper_test.dart`
 
 **Interfaces:**
-- Consumes: `ref.read(playerProvider).next()`, `ref.read(playerProvider).previous()`, `ref.read(playerProvider).seekTo()`.
-- Exposes: `PlayerGesturesWrapper` widget envolvente con soporte para swipe horizontal (con umbral de inercia), swipe vertical para minimizar, doble tap para salto acumulativo ±10s y deslizadores laterales de volumen/brillo.
+- Consumes: `ref.read(playerProvider).next()`, `ref.read(playerProvider).previous()`, `ref.read(playerProvider).seekTo()`, `onOpenLyrics()`.
+- Exposes: `PlayerGesturesWrapper` widget envolvente con soporte para swipe horizontal (con umbral de inercia), swipe vertical hacia abajo para minimizar, swipe vertical hacia arriba para abrir la letra en vivo, doble tap para salto acumulativo ±10s y deslizadores laterales de volumen/brillo.
 
 - [ ] **Step 1: Escribir pruebas unitarias para `PlayerGesturesWrapper` y `DoubleTapSeekRipple`**
 
@@ -98,9 +98,10 @@ Crear `test/features/music/presentation/widgets/player_gestures_wrapper_test.dar
 1. Swipe a la izquierda dispara callback `onNext`.
 2. Swipe a la derecha dispara callback `onPrevious`.
 3. Swipe hacia abajo con desplazamiento > 120 px dispara `onMinimize`.
-4. Doble tap en borde derecho dispara `onSeekForward(10)`.
-5. Doble tap en borde izquierdo dispara `onSeekBackward(10)`.
-6. Toques continuos rápidos acumulan los segundos (+10s, +20s, +30s).
+4. Swipe hacia arriba con desplazamiento > 100 px dispara `onOpenLyrics`.
+5. Doble tap en borde derecho dispara `onSeekForward(10)`.
+6. Doble tap en borde izquierdo dispara `onSeekBackward(10)`.
+7. Toques continuos rápidos acumulan los segundos (+10s, +20s, +30s).
 
 - [ ] **Step 2: Ejecutar prueba y verificar que falle (Red)**
 
