@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.5.35+4293 — 2026-11-26
+- **Actualización obligatoria y estabilidad de sesión:** resolución automática de endpoints Inutix y carga inmediata de perfil para eliminar el bloqueo de cuenta pendiente y garantizar la conectividad continua.
+- **Optimización de infraestructura y consumo en la nube:** mitigación de operaciones en segundo plano y reducción drástica de consultas redundantes en la red de borde Cloudflare.
+- **Verificación inteligente de arquitectura y compatibilidad OTA:** el motor de actualizaciones analiza la arquitectura del dispositivo y la firma del paquete antes de abrir el instalador del sistema, evitando por completo el error «El paquete no es válido».
+
 ## 2.5.34+4292 — 2026-11-26
 - **Autenticación con Google 100 % independiente:** el inicio de sesión y registro con Google ahora se procesa directamente a través de Google Identity y la infraestructura de Inutix sin intermediación de Firebase Auth.
 - **Verificación inteligente de arquitectura y compatibilidad OTA:** el motor de actualizaciones ahora analiza la arquitectura del dispositivo (`arm64-v8a`, `armeabi-v7a`, `x86_64`) y la firma de producción del paquete antes de abrir el instalador del sistema, evitando por completo el error «El paquete no es válido».
