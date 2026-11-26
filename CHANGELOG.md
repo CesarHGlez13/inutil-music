@@ -1,10 +1,10 @@
 # Changelog
 
 ## 2.5.36+4294 — 2026-11-26
-- **Búsqueda acústica por voz, canto o tarareo:** nuevo botón de reconocimiento acústico con ondas neón reactivas en tiempo real («Di, canta o tararea un fragmento de la canción») 100 % gratuito e integrado.
-- **Gestos táctiles completos en reproductor:** deslizamiento horizontal para cambiar de pista, deslizamiento vertical hacia arriba para mostrar la letra sincronizada, deslizamiento vertical hacia abajo para minimizar y doble tap lateral con salto acumulativo ±10s.
-- **Canvas Generativo Líquido en GPU:** motor autónomo de gradientes orgánicos acelerado por hardware con partículas estelares sutiles y soporte de video loops oficiales de YouTube, sustituyendo definitivamente servicios externos no oficiales.
-- **Precarga instantánea de audio y Canvas:** resolución en segundo plano y pre-buffer de la siguiente pista en cola para reproducción con 0 ms de latencia.
+- Busca canciones tarareando, cantando o diciendo un fragmento.
+- Nuevos gestos en el reproductor: desliza para cambiar de canción o ver la letra, y toca dos veces para adelantar o retroceder.
+- Fondos animados Canvas: visuales en movimiento para acompañar tus canciones.
+- Música al instante: cambio de pista más rápido y sin esperas.
 
 ## 2.5.35+4293 — 2026-11-26
 - **Actualización obligatoria y estabilidad de sesión:** resolución automática de endpoints Inutix y carga inmediata de perfil para eliminar el bloqueo de cuenta pendiente y garantizar la conectividad continua.
