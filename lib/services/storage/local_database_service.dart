@@ -1115,6 +1115,92 @@ class LocalDatabaseService {
     });
   }
 
+  /// Returns all cached recommendation feeds for user cloud backup.
+  Future<List<Map<String, dynamic>>> getAllRecommendationFeeds() async {
+    final db = await database;
+    final rows = await db.query('recommendation_feed_cache');
+    return rows.map((r) => Map<String, dynamic>.from(r)).toList();
+  }
+
+  /// Restores cached recommendation feeds from cloud backup.
+  Future<void> restoreRecommendationFeeds(
+    List<Map<String, dynamic>> feeds,
+  ) async {
+    if (feeds.isEmpty) return;
+    final db = await database;
+    await db.transaction((transaction) async {
+      for (final feed in feeds) {
+        final feedKey = feed['feed_key']?.toString();
+        final payloadJson = feed['payload_json']?.toString();
+        final generatedAt = feed['generated_at']?.toString();
+        final expiresAt = feed['expires_at']?.toString();
+        if (feedKey != null &&
+            payloadJson != null &&
+            generatedAt != null &&
+            expiresAt != null) {
+          await transaction.insert(
+            'recommendation_feed_cache',
+            <String, Object?>{
+              'feed_key': feedKey,
+              'payload_json': payloadJson,
+              'generated_at': generatedAt,
+              'expires_at': expiresAt,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      }
+    });
+  }
+
+  /// Restores playback events into the database in a batch transaction.
+  Future<int> restorePlaybackEvents(List<PlaybackEvent> events) async {
+    if (events.isEmpty) return 0;
+    final db = await database;
+    var restored = 0;
+    await db.transaction((transaction) async {
+      for (final event in events) {
+        final sessionId = event.sessionId.trim();
+        final trackId = event.trackId.trim();
+        final title = event.title.trim();
+        if (sessionId.isEmpty || trackId.isEmpty || title.isEmpty) continue;
+        final trackKey = event.trackKey.trim().isEmpty ? trackId : event.trackKey.trim();
+        final artistsJson = jsonEncode(event.artists);
+        final browseJson = jsonEncode(event.artistBrowseIds);
+
+        await transaction.insert(
+          'playback_events',
+          <String, Object?>{
+            'session_id': sessionId,
+            'track_key': event.videoId ?? trackKey,
+            'track_id': trackId,
+            'video_id': event.videoId,
+            'title': title,
+            'artists_json': artistsJson,
+            'artist_browse_ids_json': browseJson,
+            'album': event.album,
+            'thumbnail_url': event.thumbnailUrl,
+            'duration_ms': event.durationMs,
+            'source': event.source.name,
+            'started_at': event.startedAt.toIso8601String(),
+            'played_at': event.playedAt.toIso8601String(),
+            'listened_ms': event.listenedMs,
+            'completed': event.completed ? 1 : 0,
+            'is_favorite': event.isFavorite == true
+                ? 1
+                : (event.isFavorite == false ? 0 : null),
+            'is_liked': event.isLiked == true
+                ? 1
+                : (event.isLiked == false ? 0 : null),
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        restored++;
+      }
+    });
+    return restored;
+  }
+
   /// Clears personalization data without touching downloads or playlists.
   Future<void> clearRecommendationHistory() async {
     // Advance before the first await so every in-flight network refresh sees

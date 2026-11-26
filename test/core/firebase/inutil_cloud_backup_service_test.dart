@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inutil_music/core/firebase/inutil_cloud_backup_service.dart';
 import 'package:inutil_music/features/music/domain/entities/catalog_track.dart';
 import 'package:inutil_music/features/music/domain/entities/playlist_entry.dart';
+import 'package:inutil_music/services/recommendations/recommendation_storage_models.dart';
 import 'package:inutil_music/services/storage/local_database_service.dart';
 import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -194,6 +195,116 @@ void main() {
           .map((e) => (e as Map)['name'])
           .toSet();
       expect(remoteNames, {'Mias', 'Nueva'});
+    },
+  );
+
+  test(
+    'restores recent playback events, recommendation feeds, and settings after full reinstall',
+    () async {
+      final sandbox = await Directory.systemTemp.createTemp('inutil-cloud-3-');
+      final dbA = _TestDatabase(p.join(sandbox.path, 'a.db'));
+      final dbB = _TestDatabase(p.join(sandbox.path, 'b.db'));
+      addTearDown(() async {
+        await dbA.close();
+        await dbB.close();
+        await sandbox.delete(recursive: true);
+      });
+
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'user_custom_setting': 'dark_mode_custom',
+        'equalizer_preset': 'rock_heavy',
+      });
+
+      final cloud = <String, Map<String, dynamic>>{};
+      var uid = 'user-3';
+      final backupA = _buildService(
+        db: dbA,
+        cloudDocs: cloud,
+        uidProvider: () => uid,
+      );
+
+      final now = DateTime.utc(2026, 11, 26, 12, 0);
+
+      // Guardar evento reciente
+      await dbA.recordPlaybackEvent(
+        PlaybackEvent(
+          sessionId: 'session-rec-1',
+          trackId: 'track-rec-1',
+          videoId: 'yt-rec-1',
+          title: 'Recent Hit Song',
+          artists: const ['Popular Artist'],
+          source: PlaybackEventSource.streaming,
+          startedAt: now.subtract(const Duration(minutes: 5)),
+          playedAt: now,
+          listenedMs: 180000,
+          completed: true,
+          isFavorite: true,
+        ),
+      );
+
+      // Guardar feed de recomendaciones
+      await dbA.saveRecommendationFeed(
+        RecommendationFeedCache(
+          feedKey: 'personalized_v1',
+          payload: const {'mix_title': 'Tu Mix Diario', 'tracks': ['yt-rec-1']},
+          generatedAt: now,
+          expiresAt: now.add(const Duration(hours: 12)),
+        ),
+      );
+
+      // Simular documento de sesión ("dónde se quedó") en la nube
+      cloud['users/user-3/data/backup_playback_state'] = {
+        'session': {
+          'activeDeviceId': 'device-old',
+          'activeDeviceName': 'Device Old',
+          'activeDevicePlatform': 'android',
+          'trackId': 'track-last-played',
+          'title': 'Last Played Song',
+          'artist': 'Saved Artist',
+          'positionMs': 54000,
+          'durationMs': 210000,
+          'isPlaying': false,
+          'queue': [],
+          'queueIndex': 0,
+        },
+        'updatedAt': now.toIso8601String(),
+      };
+
+      await backupA.pushNow();
+
+      // Verificar que se crearon los documentos en la nube
+      expect(cloud.containsKey('users/user-3/data/backup_playback_events'), isTrue);
+      expect(cloud.containsKey('users/user-3/data/backup_recommendations'), isTrue);
+
+      // Simular dispositivo B tras reinstalación
+      SharedPreferences.setMockInitialValues(<String, Object>{});
+      final backupB = _buildService(
+        db: dbB,
+        cloudDocs: cloud,
+        uidProvider: () => uid,
+      );
+
+      await backupB.pullAndRestoreIfEmpty();
+      expect(backupB.lastRestoreHadChanges, isTrue);
+
+      // Verificar recientes restaurados en dbB
+      final restoredEvents = await dbB.getPlaybackEventsForTimeMachine();
+      expect(restoredEvents.length, 1);
+      expect(restoredEvents.first.title, 'Recent Hit Song');
+      expect(restoredEvents.first.isFavorite, isTrue);
+
+      // Verificar feed de recomendaciones restaurado en dbB
+      final restoredFeeds = await dbB.getAllRecommendationFeeds();
+      expect(restoredFeeds.length, 1);
+      expect(restoredFeeds.first['feed_key'], 'personalized_v1');
+
+      // Verificar ajustes restaurados en SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('user_custom_setting'), 'dark_mode_custom');
+      expect(prefs.getString('equalizer_preset'), 'rock_heavy');
+
+      // Verificar que el estado de reproducción ("dónde se quedó") fue restaurado
+      expect(prefs.getString('inutil_music_last_playback_session'), contains('Last Played Song'));
     },
   );
 }

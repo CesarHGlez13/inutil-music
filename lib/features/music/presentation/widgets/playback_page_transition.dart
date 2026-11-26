@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 
-const playbackPageTransitionDuration = Duration(milliseconds: 420);
-const playbackPageReverseTransitionDuration = Duration(milliseconds: 360);
-const playbackPageTransitionBeginOffset = Offset(0, 0.035);
+const playbackPageTransitionDuration = Duration(milliseconds: 400);
+const playbackPageReverseTransitionDuration = Duration(milliseconds: 340);
+const playbackPageTransitionBeginOffset = Offset(0, 1.0);
 
 /// The shared page motion used when moving into a playback-focused surface.
 ///
-/// Lyrics and the full player intentionally use this same composition so
-/// their fade, vertical travel, curves, and raster boundary cannot drift.
+/// Expands from the mini player position (bottom) to full screen edge-to-edge
+/// with morphing corner radius and subtle scale for an ultra-professional,
+/// fluid transition like Spotify / Apple Music.
 class PlaybackPageTransition extends StatelessWidget {
   const PlaybackPageTransition({
     required this.animation,
@@ -26,20 +27,54 @@ class PlaybackPageTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final motion = animation.drive(CurveTween(curve: Curves.easeInOutCubic));
-    final opacity = animation.drive(CurveTween(curve: Curves.easeInOut));
+    final curvedAnimation = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
 
-    return FadeTransition(
-      key: fadeKey,
-      opacity: opacity,
-      child: SlideTransition(
-        key: slideKey,
-        position: Tween<Offset>(
-          begin: playbackPageTransitionBeginOffset,
-          end: Offset.zero,
-        ).animate(motion),
-        child: RepaintBoundary(key: repaintBoundaryKey, child: child),
-      ),
+    final slide = Tween<Offset>(
+      begin: playbackPageTransitionBeginOffset,
+      end: Offset.zero,
+    ).animate(curvedAnimation);
+
+    final scale = Tween<double>(
+      begin: 0.93,
+      end: 1.0,
+    ).animate(curvedAnimation);
+
+    final radius = Tween<double>(
+      begin: 32.0,
+      end: 0.0,
+    ).animate(curvedAnimation);
+
+    final opacity = CurvedAnimation(
+      parent: animation,
+      curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.55, 1.0, curve: Curves.easeIn),
+    );
+
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, staticChild) {
+        return SlideTransition(
+          key: slideKey,
+          position: slide,
+          child: Transform.scale(
+            scale: scale.value,
+            alignment: Alignment.bottomCenter,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(radius.value),
+              child: FadeTransition(
+                key: fadeKey,
+                opacity: opacity,
+                child: staticChild,
+              ),
+            ),
+          ),
+        );
+      },
+      child: RepaintBoundary(key: repaintBoundaryKey, child: child),
     );
   }
 }

@@ -85,9 +85,6 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     final videoRevealDuration = disableAnimations
         ? Duration.zero
         : const Duration(milliseconds: 950);
-    final miniArtFadeDuration = disableAnimations
-        ? Duration.zero
-        : const Duration(milliseconds: 500);
     final activeCanvasUrl = canvasUrl;
     final artworkAccentColor = artworkSource?.trim().isNotEmpty == true
         ? ref.watch(artworkProgressColorProvider(artworkSource)).value
@@ -968,47 +965,10 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   _CanvasFloatingLyricLine(onTap: onOpenLyrics),
                   const SizedBox(height: 18),
 
-                  // Track row: mini cover + bold title/artist + circular +/check.
+                  // Track row: bold title/artist + circular +/check (clean Spotify Canvas layout).
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: SizedBox.square(
-                          dimension: 48,
-                          child: AnimatedSwitcher(
-                            duration: miniArtFadeDuration,
-                            switchInCurve: Curves.easeInOutCubic,
-                            switchOutCurve: Curves.easeInOutCubic,
-                            layoutBuilder: (currentChild, previousChildren) =>
-                                Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    ...previousChildren,
-                                    ?currentChild,
-                                  ],
-                                ),
-                            child: KeyedSubtree(
-                              key: ValueKey(
-                                'canvas-mini-art-${artworkSource ?? visualIdentity}',
-                              ),
-                              child: ProportionalArtwork(
-                                source: artworkSource,
-                                fallbackSource: artworkFallbackSource,
-                                cacheWidth: 160,
-                                fallback: const ColoredBox(
-                                  color: Color(0xFF1F2430),
-                                  child: Icon(
-                                    Icons.music_note_rounded,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
                       Expanded(
                         child: TrackChangeTransition(
                           switcherKey: const ValueKey(

@@ -512,6 +512,18 @@ class InutilPlaybackSyncService extends ChangeNotifier {
     now: DateTime.now(),
   );
 
+  /// Sesión de reproducción registrada localmente en este dispositivo.
+  PlaybackSyncSession? get localSession => _currentLocalSession;
+
+  /// Restaura la sesión guardada desde el respaldo en la nube del usuario
+  /// (donde se quedó: canción, posición en ms y cola activa).
+  void restoreSessionFromBackup(PlaybackSyncSession session) {
+    if (_currentLocalSession != null && _currentLocalSession!.isPlaying) return;
+    _currentLocalSession = session;
+    _currentRemoteSession = session;
+    notifyListeners();
+  }
+
   LanDevicePeer? get autoPairedPeer {
     final paired = _autoPairedPeer;
     if (paired == null) return null;

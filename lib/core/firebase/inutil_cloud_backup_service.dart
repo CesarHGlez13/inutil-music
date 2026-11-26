@@ -10,9 +10,11 @@ import '../../features/music/domain/entities/local_track.dart';
 import '../../features/music/domain/entities/playlist.dart';
 import '../../features/music/domain/entities/playlist_entry.dart';
 import '../../services/memories/echo_memory.dart';
+import '../../services/recommendations/recommendation_storage_models.dart';
 import '../../services/storage/local_database_service.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
+import 'firebase_playback_sync_service.dart';
 import 'daily_usage_report_service.dart';
 import 'inutil_wrapped_service.dart';
 
@@ -276,6 +278,47 @@ class InutilCloudBackupService {
         });
       }
 
+      // Respaldo de estado de reproducción actual / último ("dónde se quedó")
+      final activeSession = InutilPlaybackSyncService.instance.remoteSession ??
+          InutilPlaybackSyncService.instance.localSession;
+      if (activeSession != null && activeSession.trackId.isNotEmpty) {
+        final sessionMap = activeSession.toCloudJson();
+        meta['lastPlaybackState'] = sessionMap;
+        await _setDocument('users/$uid/data/backup_playback_state', {
+          'session': sessionMap,
+          'updatedAt': DateTime.now().toIso8601String(),
+        });
+      }
+
+      // Respaldo de canciones recientes (eventos de reproducción)
+      try {
+        final recentEvents =
+            await _db.getPlaybackEventsForTimeMachine(limit: 200);
+        if (recentEvents.isNotEmpty) {
+          await _setDocument('users/$uid/data/backup_playback_events', {
+            'events': recentEvents
+                .map(_playbackEventToMap)
+                .toList(growable: false),
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        debugPrint('Cloud backup: no se pudieron respaldar recientes: $e');
+      }
+
+      // Respaldo de feeds de recomendaciones personalizadas
+      try {
+        final feeds = await _db.getAllRecommendationFeeds();
+        if (feeds.isNotEmpty) {
+          await _setDocument('users/$uid/data/backup_recommendations', {
+            'feeds': feeds,
+            'updatedAt': DateTime.now().toIso8601String(),
+          });
+        }
+      } catch (e) {
+        debugPrint('Cloud backup: no se pudieron respaldar recomendaciones: $e');
+      }
+
       await _syncWrappedToCloud();
 
       // Reporte diario de telemetría al relay, en el momento de cierre que ya
@@ -456,7 +499,6 @@ class InutilCloudBackupService {
         if (settings is Map) {
           settings.cast<String, dynamic>().forEach((key, value) {
             if (_volatilePrefKeys.contains(key)) return;
-            if (prefs.containsKey(key)) return;
             if (value is String) {
               prefs.setString(key, value);
             } else if (value is bool) {
@@ -470,6 +512,23 @@ class InutilCloudBackupService {
               prefs.setStringList(key, strings);
             }
           });
+        }
+
+        final rawSession = meta['lastPlaybackState'];
+        if (rawSession is Map) {
+          try {
+            final session = PlaybackSyncSession.fromJson(
+              rawSession.cast<String, dynamic>(),
+            );
+            if (session.trackId.isNotEmpty) {
+              InutilPlaybackSyncService.instance.restoreSessionFromBackup(session);
+              await prefs.setString(
+                'inutil_music_last_playback_session',
+                jsonEncode(rawSession),
+              );
+              _lastRestoreHadChanges = true;
+            }
+          } catch (_) {}
         }
       }
 
@@ -589,12 +648,82 @@ class InutilCloudBackupService {
         debugPrint('No se pudieron restaurar Echo Memories: $e');
       }
 
+      // Restaurar estado de reproducción ("dónde se quedó") si existe documento separado
+      try {
+        final playbackDoc =
+            await _getDocument('users/$uid/data/backup_playback_state');
+        final rawSession = playbackDoc?['session'];
+        if (rawSession is Map) {
+          final session = PlaybackSyncSession.fromJson(
+            rawSession.cast<String, dynamic>(),
+          );
+          if (session.trackId.isNotEmpty) {
+            InutilPlaybackSyncService.instance.restoreSessionFromBackup(session);
+            await prefs.setString(
+              'inutil_music_last_playback_session',
+              jsonEncode(rawSession),
+            );
+            _lastRestoreHadChanges = true;
+          }
+        }
+      } catch (e) {
+        debugPrint('Cloud backup: no se pudo restaurar estado de reproducción: $e');
+      }
+
+      // Restaurar canciones recientes (historial de reproducción)
+      var restoredRecentEvents = 0;
+      try {
+        final eventsDoc =
+            await _getDocument('users/$uid/data/backup_playback_events');
+        final rawEvents = eventsDoc?['events'];
+        if (rawEvents is List) {
+          final events = <PlaybackEvent>[];
+          for (final raw in rawEvents) {
+            if (raw is Map) {
+              final ev = _playbackEventFromMap(raw.cast<String, dynamic>());
+              if (ev != null) events.add(ev);
+            }
+          }
+          if (events.isNotEmpty) {
+            restoredRecentEvents = await _db.restorePlaybackEvents(events);
+          }
+        }
+      } catch (e) {
+        debugPrint(
+          'Cloud backup: no se pudieron restaurar eventos de reproducción: $e',
+        );
+      }
+
+      // Restaurar feeds de recomendaciones personalizadas
+      var restoredFeeds = 0;
+      try {
+        final recsDoc =
+            await _getDocument('users/$uid/data/backup_recommendations');
+        final rawFeeds = recsDoc?['feeds'];
+        if (rawFeeds is List) {
+          final feeds = rawFeeds
+              .whereType<Map>()
+              .map((f) => f.cast<String, dynamic>())
+              .toList();
+          if (feeds.isNotEmpty) {
+            await _db.restoreRecommendationFeeds(feeds);
+            restoredFeeds = feeds.length;
+          }
+        }
+      } catch (e) {
+        debugPrint(
+          'Cloud backup: no se pudieron restaurar recomendaciones: $e',
+        );
+      }
+
       _initialPullCompleted = true;
       _lastRestoreHadChanges =
           restoredPlaylists > 0 ||
           restoredTracks > 0 ||
           restoredEntries > 0 ||
-          restoredMemories > 0;
+          restoredMemories > 0 ||
+          restoredRecentEvents > 0 ||
+          restoredFeeds > 0;
       _lastError = '';
       if (!_lastRestoreHadChanges && meta == null) {
         return 'Aún no hay respaldo en la nube para esta cuenta.';
@@ -608,6 +737,72 @@ class InutilCloudBackupService {
     } finally {
       _pulling = false;
     }
+  }
+
+  Map<String, dynamic> _playbackEventToMap(PlaybackEvent e) => {
+        'sessionId': e.sessionId,
+        'trackKey': e.trackKey,
+        'trackId': e.trackId,
+        'videoId': e.videoId,
+        'title': e.title,
+        'artists': e.artists,
+        'artistBrowseIds': e.artistBrowseIds,
+        'album': e.album,
+        'thumbnailUrl': e.thumbnailUrl,
+        'durationMs': e.durationMs,
+        'source': e.source.name,
+        'startedAt': e.startedAt.toIso8601String(),
+        'playedAt': e.playedAt.toIso8601String(),
+        'listenedMs': e.listenedMs,
+        'completed': e.completed ? 1 : 0,
+        'isFavorite': e.isFavorite == true
+            ? 1
+            : (e.isFavorite == false ? 0 : null),
+        'isLiked': e.isLiked == true ? 1 : (e.isLiked == false ? 0 : null),
+      };
+
+  PlaybackEvent? _playbackEventFromMap(Map<String, dynamic> map) {
+    final sessionId = map['sessionId']?.toString() ?? '';
+    final trackId = map['trackId']?.toString() ?? '';
+    final title = map['title']?.toString() ?? '';
+    if (sessionId.isEmpty || trackId.isEmpty || title.isEmpty) return null;
+    final sourceName = map['source']?.toString() ?? 'unknown';
+    final source = PlaybackEventSource.values.firstWhere(
+      (s) => s.name == sourceName,
+      orElse: () => PlaybackEventSource.unknown,
+    );
+    return PlaybackEvent(
+      sessionId: sessionId,
+      trackId: trackId,
+      videoId: map['videoId']?.toString(),
+      title: title,
+      artists: (map['artists'] as List?)
+              ?.map((e) => e.toString())
+              .toList(growable: false) ??
+          const <String>[],
+      artistBrowseIds: (map['artistBrowseIds'] as List?)
+              ?.map((e) => e?.toString())
+              .toList(growable: false) ??
+          const <String?>[],
+      album: map['album']?.toString(),
+      thumbnailUrl: map['thumbnailUrl']?.toString(),
+      durationMs: (map['durationMs'] as num?)?.toInt(),
+      source: source,
+      startedAt: DateTime.tryParse(map['startedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      playedAt: DateTime.tryParse(map['playedAt']?.toString() ?? '') ??
+          DateTime.now(),
+      listenedMs: (map['listenedMs'] as num?)?.toInt() ?? 0,
+      completed: map['completed'] == 1 || map['completed'] == true,
+      isFavorite: map['isFavorite'] == 1 || map['isFavorite'] == true
+          ? true
+          : (map['isFavorite'] == 0 || map['isFavorite'] == false
+              ? false
+              : null),
+      isLiked: map['isLiked'] == 1 || map['isLiked'] == true
+          ? true
+          : (map['isLiked'] == 0 || map['isLiked'] == false ? false : null),
+    );
   }
 
   Playlist? _playlistFromMap(Map<String, dynamic> map) {
