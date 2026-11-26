@@ -5,8 +5,9 @@ part of 'player_panel.dart';
 /// top bar, floating live synced lyric line, mini cover + title + circular
 /// favorite button, crisp white timeline, large white circular play/pause
 /// button, device/share/queue bar, and a bottom "Muestra de la letra" card.
-class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
+class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
   const _SpotifyFullscreenCanvasPlayer({
+    super.key,
     required this.snapshot,
     required this.artworkSource,
     required this.artworkFallbackSource,
@@ -55,7 +56,79 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
   final AppStrings strings;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SpotifyFullscreenCanvasPlayer> createState() =>
+      _SpotifyFullscreenCanvasPlayerState();
+}
+
+class _SpotifyFullscreenCanvasPlayerState
+    extends ConsumerState<_SpotifyFullscreenCanvasPlayer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _lyricsController;
+  bool _canvasVideoReady = false;
+  double _lastInteractiveFraction = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _lyricsController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 320),
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _SpotifyFullscreenCanvasPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.visualIdentity != widget.visualIdentity ||
+        oldWidget.canvasUrl != widget.canvasUrl) {
+      _canvasVideoReady = false;
+      _lastInteractiveFraction = 0.0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _lyricsController.dispose();
+    super.dispose();
+  }
+
+  void openLyricsDrawer({double? from}) {
+    final start = from ?? _lastInteractiveFraction;
+    if (start > _lyricsController.value) {
+      _lyricsController.value = start;
+    }
+    _lyricsController.animateTo(1.0, curve: Curves.easeOutCubic);
+  }
+
+  void closeLyricsDrawer() {
+    _lyricsController.animateTo(0.0, curve: Curves.easeOutCubic);
+  }
+
+  PlayerSnapshot get snapshot => widget.snapshot;
+  String? get artworkSource => widget.artworkSource;
+  String? get artworkFallbackSource => widget.artworkFallbackSource;
+  String get visualIdentity => widget.visualIdentity;
+  bool get trackTransitionsEnabled => widget.trackTransitionsEnabled;
+  bool get animatedArtworkEnabled => widget.animatedArtworkEnabled;
+  Uri? get canvasUrl => widget.canvasUrl;
+  Duration get videoStartOffset => widget.videoStartOffset;
+  Duration get videoDurationHint => widget.videoDurationHint;
+  bool get hasTrack => widget.hasTrack;
+  bool get isFavorite => widget.isFavorite;
+  String? get savedTrackId => widget.savedTrackId;
+  bool get hasError => widget.hasError;
+  String? get errorText => widget.errorText;
+  bool get queueVisible => widget.queueVisible;
+  VoidCallback get onToggleQueue => widget.onToggleQueue;
+  VoidCallback? get onCollapse => widget.onCollapse;
+  VoidCallback get onOpenLyrics => widget.onOpenLyrics;
+  VoidCallback? get onOpenSearch => widget.onOpenSearch;
+  VoidCallback? get onOpenArtist => widget.onOpenArtist;
+  VoidCallback? get onOpenAlbum => widget.onOpenAlbum;
+  AppStrings get strings => widget.strings;
+
+  @override
+  Widget build(BuildContext context) {
     final topInset = _playerTopSafeInset(context);
     final bottomInset = math.max(
       MediaQuery.viewPaddingOf(context).bottom,
@@ -102,11 +175,33 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
     final gestureScope = PlayerGestureScope.maybeOf(context);
     final canvasOffset = gestureScope?.horizontalOffset ?? 0.0;
     final canvasDragFraction = gestureScope?.dragFraction ?? 1.0;
+    final verticalOffset = gestureScope?.verticalOffset ?? 0.0;
 
-    return Stack(
-      key: const ValueKey('spotify-fullscreen-canvas-player'),
-      fit: StackFit.expand,
-      children: [
+    final interactiveFraction = verticalOffset < 0
+        ? (-verticalOffset / 320.0).clamp(0.0, 1.0)
+        : 0.0;
+    if (interactiveFraction > 0) {
+      _lastInteractiveFraction = interactiveFraction;
+    }
+    final effectiveLyricsProgress = math.max(
+      _lyricsController.value,
+      interactiveFraction,
+    );
+
+    return PopScope(
+      canPop: effectiveLyricsProgress <= 0.05,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          closeLyricsDrawer();
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _lyricsController,
+        builder: (context, _) {
+          return Stack(
+            key: const ValueKey('spotify-fullscreen-canvas-player'),
+            fit: StackFit.expand,
+            children: [
         // 1 & 2. Background Canvas & Video Stack.
         // Se traslada interactivamente con el arrastre horizontal del gesto,
         // mientras los controles de reproducción permanecen fijos como en Spotify.
@@ -173,7 +268,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   // 1b. Dynamic breathing ambient glow when displaying the expanded cover
                   // without a video Canvas; fades out cleanly once a real Canvas video
                   // takes over.
-                  if (activeCanvasUrl == null && artworkSource?.trim().isNotEmpty == true)
+                  if ((activeCanvasUrl == null || !_canvasVideoReady) && artworkSource?.trim().isNotEmpty == true)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: _CanvasArtworkAmbientAura(
@@ -212,6 +307,11 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                 durationHint: videoDurationHint,
                                 revealDuration: videoRevealDuration,
                                 revealCurve: Curves.easeInOutCubic,
+                                onReadyChanged: (ready) {
+                                  if (mounted && _canvasVideoReady != ready) {
+                                    setState(() => _canvasVideoReady = ready);
+                                  }
+                                },
                               )
                             : const SizedBox.expand(
                                 key: ValueKey('fullscreen-canvas-pending'),
@@ -349,8 +449,28 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   Expanded(
                     child: Center(
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: activeCanvasUrl == null &&
+                        duration: const Duration(milliseconds: 750),
+                        reverseDuration: const Duration(milliseconds: 700),
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeInOutCubic,
+                            ),
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.94, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOutCubic,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: (activeCanvasUrl == null || !_canvasVideoReady) &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
                                 offset: Offset(canvasOffset, 0),
@@ -361,11 +481,11 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     child: Container(
                                       constraints: const BoxConstraints(
-                                        maxWidth: 240.0,
-                                        maxHeight: 240.0,
+                                        maxWidth: 340.0,
+                                        maxHeight: 340.0,
                                       ),
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(24),
+                                        borderRadius: BorderRadius.circular(16),
                                         boxShadow: [
                                           BoxShadow(
                                             color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
@@ -381,7 +501,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                         ],
                                       ),
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(24),
+                                        borderRadius: BorderRadius.circular(16),
                                         child: AspectRatio(
                                           aspectRatio: 1.0,
                                           child: SourceImage(
@@ -449,31 +569,11 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                               ),
                               child: Row(
                                 children: [
-                                  // Left section: 60px artwork + metadata + favorite button
+                                  // Left section: metadata + favorite button
                                   Expanded(
                                     flex: 3,
                                     child: Row(
                                       children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: SizedBox.square(
-                                            dimension: 60,
-                                            child: ProportionalArtwork(
-                                              source: artworkSource,
-                                              fallbackSource:
-                                                  artworkFallbackSource,
-                                              cacheWidth: 180,
-                                              fallback: const ColoredBox(
-                                                color: Color(0xFF1F2430),
-                                                child: Icon(
-                                                  Icons.music_note_rounded,
-                                                  color: Colors.white70,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
                                             mainAxisSize: MainAxisSize.min,
@@ -909,8 +1009,28 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   Expanded(
                     child: Center(
                       child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: activeCanvasUrl == null &&
+                        duration: const Duration(milliseconds: 750),
+                        reverseDuration: const Duration(milliseconds: 700),
+                        switchInCurve: Curves.easeInOutCubic,
+                        switchOutCurve: Curves.easeInOutCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeInOutCubic,
+                            ),
+                            child: ScaleTransition(
+                              scale: Tween<double>(begin: 0.94, end: 1.0).animate(
+                                CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeOutCubic,
+                                ),
+                              ),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: (activeCanvasUrl == null || !_canvasVideoReady) &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
                                 offset: Offset(canvasOffset, 0),
@@ -918,14 +1038,14 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                   opacity: canvasDragFraction,
                                   child: Padding(
                                     key: ValueKey('canvas-center-art-${artworkSource ?? visualIdentity}'),
-                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                                     child: Container(
                                       constraints: BoxConstraints(
-                                        maxWidth: math.min(constraints.maxWidth * 0.72, 300.0),
-                                        maxHeight: math.min(constraints.maxWidth * 0.72, 300.0),
+                                        maxWidth: math.min(constraints.maxWidth * 0.88, 380.0),
+                                        maxHeight: math.min(constraints.maxWidth * 0.88, 380.0),
                                       ),
                                       decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(24),
+                                        borderRadius: BorderRadius.circular(14),
                                         boxShadow: [
                                           BoxShadow(
                                             color: (artworkAccentColor ?? effectiveAccent).withValues(alpha: 0.38),
@@ -941,7 +1061,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                                         ],
                                       ),
                                       child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(24),
+                                        borderRadius: BorderRadius.circular(14),
                                         child: AspectRatio(
                                           aspectRatio: 1.0,
                                           child: SourceImage(
@@ -962,7 +1082,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                   ),
 
                   // Live floating synced lyric line right over the video.
-                  _CanvasFloatingLyricLine(onTap: onOpenLyrics),
+                  _CanvasFloatingLyricLine(onTap: openLyricsDrawer),
                   const SizedBox(height: 18),
 
                   // Track row: bold title/artist + circular +/check (clean Spotify Canvas layout).
@@ -1274,14 +1394,29 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
 
                   const SizedBox(height: 8),
 
-                  // Bottom "Muestra de la letra" peek card (Spotify style).
-                  Material(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
-                      key: const ValueKey('spotify-canvas-lyrics-card'),
+                  // Bottom "Muestra de la letra" peek card with interactive vertical drag.
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: openLyricsDrawer,
+                    onVerticalDragUpdate: (details) {
+                      final delta = details.primaryDelta ?? 0;
+                      if (delta != 0) {
+                        _lyricsController.value =
+                            (_lyricsController.value - (delta / (constraints.maxHeight * 0.65)))
+                                .clamp(0.0, 1.0);
+                      }
+                    },
+                    onVerticalDragEnd: (details) {
+                      final vy = details.velocity.pixelsPerSecond.dy;
+                      if (vy < -250 || _lyricsController.value > 0.25) {
+                        openLyricsDrawer();
+                      } else {
+                        closeLyricsDrawer();
+                      }
+                    },
+                    child: Material(
+                      color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
-                      onTap: onOpenLyrics,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 16,
@@ -1318,19 +1453,122 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerWidget {
                 ],
               ),
             );
-            if (!isWideCanvas) return foreground;
-            return Align(
-              alignment: Alignment.center,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: foreground,
-              ),
+
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                if (!isWideCanvas)
+                  foreground
+                else
+                  Align(
+                    alignment: Alignment.center,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: foreground,
+                    ),
+                  ),
+
+                // Interactive drag-to-reveal lyrics drawer sheet
+                if (effectiveLyricsProgress > 0.001)
+                  Positioned.fill(
+                    child: RepaintBoundary(
+                      child: Transform.translate(
+                        offset: Offset(
+                          0,
+                          (1.0 - Curves.easeOutCubic.transform(effectiveLyricsProgress)) *
+                              constraints.maxHeight,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.vertical(
+                            top: Radius.circular(
+                              lerpDouble(24.0, 0.0, effectiveLyricsProgress)!,
+                            ),
+                          ),
+                          child: Material(
+                            color: const Color(0xFF070B0E),
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: NotificationListener<ScrollNotification>(
+                                    onNotification: (notification) {
+                                      if (notification.metrics.pixels <= 0) {
+                                        if (notification is ScrollUpdateNotification) {
+                                          final delta = notification.scrollDelta ?? 0;
+                                          if (delta < 0) {
+                                            _lyricsController.value =
+                                                (_lyricsController.value - (-delta / constraints.maxHeight))
+                                                    .clamp(0.0, 1.0);
+                                          }
+                                        } else if (notification is ScrollEndNotification) {
+                                          if (_lyricsController.value < 0.80) {
+                                            closeLyricsDrawer();
+                                          } else {
+                                            openLyricsDrawer();
+                                          }
+                                        }
+                                      }
+                                      return false;
+                                    },
+                                    child: const LyricsPage(),
+                                  ),
+                                ),
+                                // Top drag handle to drag back down interactively
+                                Positioned(
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  height: topInset + 68,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onVerticalDragUpdate: (details) {
+                                      final delta = details.primaryDelta ?? 0;
+                                      if (delta > 0) {
+                                        _lyricsController.value =
+                                            (_lyricsController.value - (delta / constraints.maxHeight))
+                                                .clamp(0.0, 1.0);
+                                      }
+                                    },
+                                    onVerticalDragEnd: (details) {
+                                      final vy = details.velocity.pixelsPerSecond.dy;
+                                      if (vy > 250 || _lyricsController.value < 0.70) {
+                                        closeLyricsDrawer();
+                                      } else {
+                                        openLyricsDrawer();
+                                      }
+                                    },
+                                    child: Container(
+                                      color: Colors.transparent,
+                                      padding: EdgeInsets.only(top: topInset + 6),
+                                      child: Center(
+                                        child: Container(
+                                          width: 44,
+                                          height: 5,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.45),
+                                            borderRadius: BorderRadius.circular(2.5),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
       ],
     );
-  }
+  },
+),
+);
+}
 }
 
 /// Resolves the active synced lyric line for [position] using binary search

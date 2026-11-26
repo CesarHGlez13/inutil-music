@@ -21,6 +21,7 @@ import '../../../../core/widgets/liquid_glass_surface.dart';
 import '../../../../services/downloader/audio_stream_resolver.dart';
 import '../../../../services/player/player_service.dart';
 import '../providers/music_providers.dart';
+import '../providers/artwork_progress_color_provider.dart';
 import '../providers/playback_artwork_provider.dart';
 import '../providers/playback_visual_cache_provider.dart';
 import 'favorite_star_badge.dart';
@@ -157,12 +158,16 @@ class MiniPlayer extends ConsumerWidget {
     final artwork = ref.watch(playbackArtworkProvider);
     final artworkSource = artwork.source;
     final artworkFallbackSource = artwork.fallback;
+    final artworkAccentColor = artworkSource?.trim().isNotEmpty == true
+        ? ref.watch(artworkProgressColorProvider(artworkSource)).value
+        : null;
     final isFavorite = ref.watch(
       favoriteTrackIdsProvider.select(
         (ids) => ids.contains(presentation.trackId),
       ),
     );
     final theme = Theme.of(context);
+    final effectiveAccent = artworkAccentColor ?? theme.colorScheme.primary;
     final compactMobile = AppPlatform.isMobileTargetPlatform(theme.platform);
     final usesDesktopLayout = AppPlatform.isDesktop && !compactMobile;
     final windowsLayout =
@@ -556,7 +561,7 @@ class MiniPlayer extends ConsumerWidget {
                   child: IgnorePointer(
                     child: _MiniEqualizerBackground(
                       isPlaying: isPlaying,
-                      accentColor: AppColors.downloadAccentFor(context),
+                      accentColor: effectiveAccent,
                       isDark: isDark,
                     ),
                   ),
@@ -1447,44 +1452,60 @@ class _MiniEqualizerPainter extends CustomPainter {
   final Color accentColor;
   final bool isDark;
 
-  static const int _barCount = 28;
+  static const int _barCount = 38;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
 
-    const barWidth = 3.2;
+    const barWidth = 3.6;
     final totalSpacing = size.width - (_barCount * barWidth);
-    final gap = totalSpacing / (_barCount + 1);
-    final baseAlpha = isDark ? 0.24 : 0.18;
+    final gap = (totalSpacing / (_barCount + 1)).clamp(2.0, 16.0);
     final t = progress * 2 * math.pi;
+
+    // Ambient bottom glow across the mini player width
+    final glowPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [
+          accentColor.withValues(alpha: isPlaying ? (isDark ? 0.22 : 0.16) : 0.08),
+          accentColor.withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromLTWH(0, size.height * 0.3, size.width, size.height * 0.7));
+    canvas.drawRect(Rect.fromLTWH(0, size.height * 0.3, size.width, size.height * 0.7), glowPaint);
 
     for (var i = 0; i < _barCount; i++) {
       final x = gap + i * (barWidth + gap);
       var normalizedHeight = 0.08;
 
       if (isPlaying) {
-        final wave1 = math.sin(t * 3.2 + i * 0.45).abs();
-        final wave2 = math.cos(t * 1.8 - i * 0.32).abs();
-        final wave3 = math.sin(t * 5.1 + i * 0.8).abs();
-        final envelope = 0.5 + 0.5 * math.sin((i / _barCount) * math.pi);
-        normalizedHeight = (0.10 + (0.50 * wave1 + 0.35 * wave2 + 0.15 * wave3) * envelope)
-            .clamp(0.08, 0.85);
+        final wave1 = math.sin(t * 3.8 + i * 0.38).abs();
+        final wave2 = math.cos(t * 2.1 - i * 0.26).abs();
+        final wave3 = math.sin(t * 5.6 + i * 0.65).abs();
+        final envelope = 0.45 + 0.55 * math.sin((i / _barCount) * math.pi);
+        normalizedHeight = (0.12 + (0.52 * wave1 + 0.33 * wave2 + 0.15 * wave3) * envelope)
+            .clamp(0.08, 0.92);
+      } else {
+        normalizedHeight = (0.06 + 0.03 * math.sin(t * 0.5 + i * 0.25)).clamp(0.04, 0.10);
       }
 
       final barHeight = size.height * normalizedHeight;
-      final y = size.height - barHeight - 4;
+      final y = size.height - barHeight - 3;
 
       final rect = Rect.fromLTWH(x, y, barWidth, barHeight);
-      final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(2));
+      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(barWidth / 2));
+
+      final topAlpha = (isDark ? 0.75 : 0.65) * (0.6 + 0.4 * normalizedHeight);
+      final bottomAlpha = isDark ? 0.28 : 0.20;
 
       final paint = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            accentColor.withValues(alpha: baseAlpha * (0.8 + 0.4 * normalizedHeight)),
-            accentColor.withValues(alpha: baseAlpha * 0.25),
+            accentColor.withValues(alpha: topAlpha),
+            accentColor.withValues(alpha: bottomAlpha),
           ],
         ).createShader(rect);
 

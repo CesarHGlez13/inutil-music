@@ -69,6 +69,7 @@ class SpotifyCanvasVideo extends StatefulWidget {
     this.coverPath,
     this.revealDuration = const Duration(milliseconds: 250),
     this.revealCurve = Curves.easeInOutCubic,
+    this.onReadyChanged,
     super.key,
   });
 
@@ -81,6 +82,7 @@ class SpotifyCanvasVideo extends StatefulWidget {
   final String? coverPath;
   final Duration revealDuration;
   final Curve revealCurve;
+  final ValueChanged<bool>? onReadyChanged;
 
   @override
   State<SpotifyCanvasVideo> createState() => _SpotifyCanvasVideoState();
@@ -106,6 +108,17 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   Timer? _loopFrameFadeTimer;
   Timer? _loopFrameReleaseTimer;
   bool _ready = false;
+
+  void _setReady(bool ready) {
+    if (_ready == ready) return;
+    if (mounted) {
+      setState(() => _ready = ready);
+    } else {
+      _ready = ready;
+    }
+    widget.onReadyChanged?.call(ready);
+  }
+
   bool _active = true;
   bool _tickerEnabled = true;
   int _generation = 0;
@@ -198,7 +211,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     _controller = null;
     _canvasController = null;
     _linuxCanvasController = null;
-    _ready = false;
+    _setReady(false);
     _clearLoopFrame();
     _effectiveStartOffset = Duration.zero;
     _loopRestartToken++;
@@ -323,7 +336,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
         _controller = null;
-        if (mounted) setState(() => _ready = false);
+        if (mounted) _setReady(false);
       }
       if (controller != null) unawaited(controller.dispose());
     }
@@ -350,8 +363,8 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           track: widget.identity ?? widget.url.toString(),
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
+        _setReady(true);
         setState(() {
-          _ready = true;
           _insetFitResolved = true;
         });
         _synchronizePlayback();
@@ -364,13 +377,13 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         if (!mounted || generation != _generation) return;
         final failed = _canvasController;
         _canvasController = null;
-        setState(() => _ready = false);
+        _setReady(false);
         if (failed != null) unawaited(failed.dispose());
       };
     } catch (_) {
       if (generation == _generation) {
         _canvasController = null;
-        if (mounted) setState(() => _ready = false);
+        if (mounted) _setReady(false);
       }
       if (canvas != null) unawaited(canvas.dispose());
     }
@@ -397,8 +410,8 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           track: widget.identity ?? widget.url.toString(),
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
+        _setReady(true);
         setState(() {
-          _ready = true;
           _insetFitResolved = true;
         });
         _synchronizePlayback();
@@ -411,13 +424,13 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         if (!mounted || generation != _generation) return;
         final failed = _linuxCanvasController;
         _linuxCanvasController = null;
-        setState(() => _ready = false);
+        _setReady(false);
         if (failed != null) unawaited(failed.dispose());
       };
     } catch (_) {
       if (generation == _generation) {
         _linuxCanvasController = null;
-        if (mounted) setState(() => _ready = false);
+        if (mounted) _setReady(false);
       }
       if (linuxCanvas != null) unawaited(linuxCanvas.dispose());
     }
@@ -428,7 +441,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     if (!mounted || controller == null) return;
     if (controller.value.hasError) {
       _controller = null;
-      setState(() => _ready = false);
+      _setReady(false);
       unawaited(controller.dispose());
       return;
     }
@@ -442,8 +455,8 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           if (_ready && _loopFrame != null) {
             _loopFrameFadeTimer?.cancel();
             _loopFrameReleaseTimer?.cancel();
+            _setReady(false);
             setState(() {
-              _ready = false;
               _loopFrameFadingOut = false;
             });
           }
@@ -496,7 +509,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           track: widget.identity ?? widget.url.toString(),
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
-        setState(() => _ready = true);
+        _setReady(true);
         _queueInsetFitAnalysis();
         _scheduleLoopFrameRelease();
         _synchronizePlayback();
@@ -556,11 +569,11 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         _loopFrameFadeTimer?.cancel();
         _loopFrameReleaseTimer?.cancel();
         final previousFrame = _loopFrame;
+        _setReady(false);
         setState(() {
           _loopFrame = heldFrame;
           _loopFrameFadingOut = false;
           _loopFrameCaptureUnavailable = false;
-          _ready = false;
         });
         if (previousFrame != null) _disposeAfterFrame(previousFrame);
         logVisualLoad(

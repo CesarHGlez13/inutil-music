@@ -3121,19 +3121,6 @@ class _AppearanceSettings extends StatelessWidget {
             title: strings.player,
             children: [
               _SettingsEntryCard(
-                key: const ValueKey('player-style-selector'),
-                icon: switch (playerStyle) {
-                  PlayerStyle.inutilMusic => Icons.graphic_eq_rounded,
-                  PlayerStyle.appleMusic => Icons.music_note_rounded,
-                  PlayerStyle.classicVinyl => Icons.album_rounded,
-                  PlayerStyle.spotifyMusic => Icons.play_circle_rounded,
-                },
-                title: strings.playerStyle,
-                subtitle: strings.playerStyleLabel(playerStyle),
-                onTap: onOpenPlayerStyles,
-              ),
-              const SizedBox(height: appCardGap),
-              _SettingsEntryCard(
                 key: const ValueKey('player-visual-backdrop-selector'),
                 icon: switch (visualBackdropMode) {
                   PlayerVisualBackdropMode.staticCover =>

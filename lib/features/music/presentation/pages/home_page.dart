@@ -1940,13 +1940,8 @@ class _HomePageState extends ConsumerState<HomePage>
                                 visible: miniPlayerVisible,
                                 suspended: _keyboardVisible,
                                 duration: chromeVisibilityDuration,
-                                hiddenTranslation:
-                                    miniPlayerAppearance
-                                        .backgroundMode
-                                        .isLiquidGlass
-                                    ? const Offset(0, 1)
-                                    : const Offset(0, 0.36),
-                                hiddenScale: 0.94,
+                                hiddenTranslation: const Offset(0, 0.04),
+                                hiddenScale: 0.96,
                                 preserveBackdropMaterial: miniPlayerAppearance
                                     .backgroundMode
                                     .isLiquidGlass,

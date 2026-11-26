@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-const playbackPageTransitionDuration = Duration(milliseconds: 400);
-const playbackPageReverseTransitionDuration = Duration(milliseconds: 340);
-const playbackPageTransitionBeginOffset = Offset(0, 1.0);
+const playbackPageTransitionDuration = Duration(milliseconds: 380);
+const playbackPageReverseTransitionDuration = Duration(milliseconds: 320);
+const playbackPageTransitionBeginOffset = Offset(0, 0.55);
 
 /// The shared page motion used when moving into a playback-focused surface.
 ///
@@ -39,19 +39,19 @@ class PlaybackPageTransition extends StatelessWidget {
     ).animate(curvedAnimation);
 
     final scale = Tween<double>(
-      begin: 0.93,
+      begin: 0.88,
       end: 1.0,
     ).animate(curvedAnimation);
 
     final radius = Tween<double>(
-      begin: 32.0,
+      begin: 28.0,
       end: 0.0,
     ).animate(curvedAnimation);
 
     final opacity = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.55, 1.0, curve: Curves.easeIn),
+      curve: const Interval(0.0, 0.28, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.0, 0.28, curve: Curves.easeIn),
     );
 
     return AnimatedBuilder(
@@ -62,7 +62,7 @@ class PlaybackPageTransition extends StatelessWidget {
           position: slide,
           child: Transform.scale(
             scale: scale.value,
-            alignment: Alignment.bottomCenter,
+            alignment: const Alignment(0.0, 0.82),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius.value),
               child: FadeTransition(

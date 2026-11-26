@@ -8,12 +8,14 @@ import 'double_tap_seek_ripple.dart';
 class PlayerGestureScope extends InheritedWidget {
   const PlayerGestureScope({
     required this.horizontalOffset,
+    this.verticalOffset = 0.0,
     required this.dragFraction,
     required super.child,
     super.key,
   });
 
   final double horizontalOffset;
+  final double verticalOffset;
   final double dragFraction;
 
   static PlayerGestureScope? maybeOf(BuildContext context) =>
@@ -23,6 +25,7 @@ class PlayerGestureScope extends InheritedWidget {
       maybeOf(context) ??
       const PlayerGestureScope(
         horizontalOffset: 0.0,
+        verticalOffset: 0.0,
         dragFraction: 1.0,
         child: SizedBox.shrink(),
       );
@@ -30,6 +33,7 @@ class PlayerGestureScope extends InheritedWidget {
   @override
   bool updateShouldNotify(PlayerGestureScope oldWidget) =>
       horizontalOffset != oldWidget.horizontalOffset ||
+      verticalOffset != oldWidget.verticalOffset ||
       dragFraction != oldWidget.dragFraction;
 }
 
@@ -68,7 +72,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     with SingleTickerProviderStateMixin {
   Offset _dragTotalDelta = Offset.zero;
   double _horizontalDragOffset = 0.0;
+  double _verticalDragOffset = 0.0;
   bool _isHorizontalDrag = false;
+  bool _isVerticalDrag = false;
   late final AnimationController _slideController;
   Animation<double>? _slideAnimation;
 
@@ -152,7 +158,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     _slideController.stop();
     _dragTotalDelta = Offset.zero;
     _horizontalDragOffset = 0.0;
+    _verticalDragOffset = 0.0;
     _isHorizontalDrag = false;
+    _isVerticalDrag = false;
     _lastTapTime = null;
   }
 
@@ -163,14 +171,22 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     final dx = _dragTotalDelta.dx;
     final dy = _dragTotalDelta.dy;
 
-    // Detectar si el gesto horizontal domina
-    if (!_isHorizontalDrag && dx.abs() > 10 && dx.abs() > dy.abs() * 1.1) {
-      _isHorizontalDrag = true;
+    // Detectar si el gesto horizontal o vertical domina
+    if (!_isHorizontalDrag && !_isVerticalDrag) {
+      if (dx.abs() > 8 && dx.abs() > dy.abs() * 1.1) {
+        _isHorizontalDrag = true;
+      } else if (dy.abs() > 8 && dy.abs() > dx.abs() * 1.1) {
+        _isVerticalDrag = true;
+      }
     }
 
     if (_isHorizontalDrag) {
       setState(() {
         _horizontalDragOffset = dx;
+      });
+    } else if (_isVerticalDrag) {
+      setState(() {
+        _verticalDragOffset = dy;
       });
     }
   }
@@ -206,7 +222,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
         // Cancelado: volver al centro con resorte suave
         _animateSpringBack();
       }
-    } else if (dy.abs() > dx.abs() * 1.2) {
+    } else if (_isVerticalDrag || dy.abs() > dx.abs() * 1.2) {
       // Vertical
       if (dy > _verticalThreshold || vy > 300) {
         widget.onMinimize?.call();
@@ -220,6 +236,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
 
     _dragTotalDelta = Offset.zero;
     _isHorizontalDrag = false;
+    _isVerticalDrag = false;
   }
 
   void _animateTrackTransition({
@@ -247,6 +264,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
   }
 
   void _animateSpringBack() {
+    setState(() {
+      _verticalDragOffset = 0.0;
+    });
     if (_horizontalDragOffset == 0.0) return;
     _slideAnimation = Tween<double>(begin: _horizontalDragOffset, end: 0.0).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
@@ -271,6 +291,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
         children: [
           PlayerGestureScope(
             horizontalOffset: _horizontalDragOffset,
+            verticalOffset: _verticalDragOffset,
             dragFraction: dragFraction,
             child: widget.child,
           ),
