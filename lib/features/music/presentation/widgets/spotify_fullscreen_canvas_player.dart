@@ -321,13 +321,11 @@ class _SpotifyFullscreenCanvasPlayerState
                   Positioned.fill(
                     child: _CanvasTrackCrossfade(
                       identity: (activeCanvasUrl != null || isResolvingCanvas) &&
-                              !_canvasVideoReady &&
                               artworkSource?.trim().isNotEmpty == true
                           ? 'canvas-fullbleed-${artworkSource ?? visualIdentity}'
                           : 'canvas-fullbleed-empty',
                       duration: backdropFadeDuration,
                       child: (activeCanvasUrl != null || isResolvingCanvas) &&
-                              !_canvasVideoReady &&
                               artworkSource?.trim().isNotEmpty == true
                           ? RepaintBoundary(
                               child: AnimatedArtworkMotion(
@@ -391,7 +389,7 @@ class _SpotifyFullscreenCanvasPlayerState
                             ? SpotifyCanvasVideo(
                                 key: const ValueKey('fullscreen-canvas-video'),
                                 url: activeCanvasUrl,
-                                isPlaying: isPlaying && !widget.transitioning,
+                                isPlaying: isPlaying,
                                 identity: visualIdentity,
                                 startOffset: videoStartOffset,
                                 durationHint: videoDurationHint,

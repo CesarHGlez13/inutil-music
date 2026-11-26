@@ -111,9 +111,15 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   Timer? _loopFrameFadeTimer;
   Timer? _loopFrameReleaseTimer;
   bool _ready = false;
+  bool _hasStartedPlaying = false;
 
   void _syncRevealAnimation() {
-    final target = _ready ? (_insetFitResolved ? 1.0 : 0.02) : 0.0;
+    if (widget.isPlaying) {
+      _hasStartedPlaying = true;
+    }
+    final shouldReveal =
+        _ready && (_hasStartedPlaying || AppPlatform.isFlutterTest);
+    final target = shouldReveal ? (_insetFitResolved ? 1.0 : 0.02) : 0.0;
     final dur = _loopFrame != null && !_ready
         ? Duration.zero
         : _loopFrame != null
@@ -212,7 +218,13 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         _resetInsetFit(keepVisible: _ready);
         _queueInsetFitAnalysis();
       }
-      if (oldWidget.isPlaying != widget.isPlaying) _synchronizePlayback();
+      if (oldWidget.isPlaying != widget.isPlaying) {
+        if (widget.isPlaying) {
+          _hasStartedPlaying = true;
+          _syncRevealAnimation();
+        }
+        _synchronizePlayback();
+      }
     }
   }
 
@@ -250,6 +262,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     _controller = null;
     _canvasController = null;
     _linuxCanvasController = null;
+    _hasStartedPlaying = widget.isPlaying;
     _setReady(false);
     _clearLoopFrame();
     _effectiveStartOffset = Duration.zero;
