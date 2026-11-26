@@ -2023,7 +2023,7 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 }
 
-class _ShellVisibilityTransition extends StatelessWidget {
+class _ShellVisibilityTransition extends StatefulWidget {
   const _ShellVisibilityTransition({
     required this.visible,
     required this.duration,
@@ -2058,36 +2058,83 @@ class _ShellVisibilityTransition extends StatelessWidget {
   final double clipTopOutset;
 
   @override
+  State<_ShellVisibilityTransition> createState() =>
+      _ShellVisibilityTransitionState();
+}
+
+class _ShellVisibilityTransitionState extends State<_ShellVisibilityTransition>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      value: widget.visible ? 1.0 : 0.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _ShellVisibilityTransition oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.duration != oldWidget.duration) {
+      _controller.duration = widget.duration;
+    }
+    if (widget.visible != oldWidget.visible) {
+      if (widget.duration == Duration.zero) {
+        _controller.value = widget.visible ? 1.0 : 0.0;
+      } else {
+        _controller.animateTo(
+          widget.visible ? 1.0 : 0.0,
+          duration: widget.duration,
+          curve: widget.visible ? Curves.easeOutCubic : Curves.easeInCubic,
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return _KeyboardChromeTransition(
-      hidden: suspended,
-      disableAnimations: duration == Duration.zero,
+      hidden: widget.suspended,
+      disableAnimations: widget.duration == Duration.zero,
       child: ExcludeFocus(
-        excluding: !visible || suspended,
+        excluding: !widget.visible || widget.suspended,
         child: IgnorePointer(
-          ignoring: !visible || suspended,
+          ignoring: !widget.visible || widget.suspended,
           child: ExcludeSemantics(
-            excluding: !visible || suspended,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: visible ? 1 : 0),
-              duration: duration,
-              curve: visible ? Curves.easeOutCubic : Curves.easeInCubic,
-              builder: (context, value, child) {
-                final scale = lerpDouble(hiddenScale, 1, value)!;
+            excluding: !widget.visible || widget.suspended,
+            child: AnimatedBuilder(
+              animation: _controller,
+              child: widget.child,
+              builder: (context, child) {
+                final value = _controller.value;
+                final scale = lerpDouble(widget.hiddenScale, 1, value)!;
                 final movingChild = FractionalTranslation(
-                  key: translationKey,
+                  key: widget.translationKey,
                   translation: Offset.lerp(
-                    hiddenTranslation,
+                    widget.hiddenTranslation,
                     Offset.zero,
                     value,
                   )!,
                   child: Transform.scale(
-                    key: scaleKey,
+                    key: widget.scaleKey,
                     scaleX: scale,
                     // A live backdrop must keep its physical height. Scaling it
                     // vertically stretches the captured pixels and flattens the
                     // rim while the sheet is moving.
-                    scaleY: preserveBackdropMaterial ? 1 : scale,
+                    scaleY: widget.preserveBackdropMaterial ? 1 : scale,
                     alignment: Alignment.bottomCenter,
                     // Keep every visible exit frame (and the live material)
                     // unchanged. Once the sheet has completely left its clip,
@@ -2095,32 +2142,36 @@ class _ShellVisibilityTransition extends StatelessWidget {
                     // frames behind the full player. This does not mute any
                     // browsing text that is visible underneath Liquid Glass.
                     child: TickerMode(
-                      enabled: visible || value > 0,
+                      enabled: widget.visible || value > 0,
                       child: child!,
                     ),
                   ),
                 );
-                final isCompletelyHidden = !visible && value <= 0.001;
+                final isCompletelyHidden = !widget.visible && value <= 0.001;
                 return Offstage(
                   offstage: isCompletelyHidden,
                   child: ClipRect(
-                    key: clipKey,
+                    key: widget.clipKey,
                     clipper:
-                        fixedHorizontalClipWidth == null && clipTopOutset == 0
+                        widget.fixedHorizontalClipWidth == null &&
+                            widget.clipTopOutset == 0
                         ? null
                         : _ShellBoundsClipper(
-                            fixedHorizontalClipWidth,
-                            topOutset: clipTopOutset,
+                            widget.fixedHorizontalClipWidth,
+                            topOutset: widget.clipTopOutset,
                           ),
                     // Keep Liquid Glass out of an Opacity save layer: fading the
                     // complete BackdropFilter also fades its sampled background and
                     // makes the material look like a flat overlay. Its full-height
                     // translation exits through this clip instead. Other surface
                     // modes retain their established fade.
-                    child: preserveBackdropMaterial
-                        ? KeyedSubtree(key: opacityKey, child: movingChild)
+                    child: widget.preserveBackdropMaterial
+                        ? KeyedSubtree(
+                            key: widget.opacityKey,
+                            child: movingChild,
+                          )
                         : Opacity(
-                            key: opacityKey,
+                            key: widget.opacityKey,
                             opacity:
                                 1 -
                                 math.pow(1 - value.clamp(0.0, 1.0), 3).toDouble(),
@@ -2129,7 +2180,6 @@ class _ShellVisibilityTransition extends StatelessWidget {
                   ),
                 );
               },
-              child: child,
             ),
           ),
         ),

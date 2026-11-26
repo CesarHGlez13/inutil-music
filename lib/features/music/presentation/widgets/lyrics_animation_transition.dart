@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../providers/lyrics_animation_style.dart';
 
 // Keep lyric changes long enough to read as one continuous movement, while
@@ -7,18 +8,28 @@ import '../providers/lyrics_animation_style.dart';
 const _kLyricsSmoothDuration = Duration(milliseconds: 580);
 const _kLyricsSlideDuration = Duration(milliseconds: 550);
 const _kLyricsHighlightDuration = Duration(milliseconds: 570);
+const _kLyricsKaraokeDuration = Duration(milliseconds: 540);
+const _kLyricsCinematicDuration = Duration(milliseconds: 620);
 const _kLyricsExitDuration = Duration(milliseconds: 460);
 
-const _kLyricsSmoothInactiveScale = 0.98;
-const _kLyricsSmoothInactiveOpacity = 0.62;
+const _kLyricsSmoothInactiveScale = 0.965;
+const _kLyricsSmoothInactiveOpacity = 0.58;
 
 const _kLyricsSlideOffsetPx = 34.0;
-const _kLyricsSlideInactiveOpacity = 0.70;
+const _kLyricsSlideInactiveOpacity = 0.65;
 
-const _kLyricsHighlightActiveBackgroundAlpha = 0.10;
-const _kLyricsHighlightActiveShadowAlpha = 0.16;
+const _kLyricsHighlightActiveBackgroundAlpha = 0.12;
+const _kLyricsHighlightActiveShadowAlpha = 0.22;
 const _kLyricsHighlightActiveScale = 1.01;
 const _kLyricsHighlightInactiveScale = 0.98;
+
+const _kLyricsKaraokeActiveScale = 1.035;
+const _kLyricsKaraokeInactiveScale = 0.945;
+const _kLyricsKaraokeInactiveOpacity = 0.50;
+
+const _kLyricsCinematicActiveScale = 1.04;
+const _kLyricsCinematicInactiveScale = 0.935;
+const _kLyricsCinematicInactiveOpacity = 0.42;
 
 class LyricsAnimationTransition extends StatefulWidget {
   const LyricsAnimationTransition({
@@ -45,8 +56,13 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
     with TickerProviderStateMixin {
   late final AnimationController _controller;
   late final AnimationController _slideController;
+  late final AnimationController _shimmerController;
   late Animation<double> _animation;
   bool _disableAnimations = false;
+
+  AnimationBehavior get _behavior => AppPlatform.isFlutterTest
+      ? AnimationBehavior.normal
+      : AnimationBehavior.preserve;
 
   @override
   void initState() {
@@ -55,22 +71,46 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
       vsync: this,
       duration: _durationFor(widget.style),
       reverseDuration: _kLyricsExitDuration,
+      animationBehavior: _behavior,
     );
     _slideController = AnimationController(
       vsync: this,
       duration: _kLyricsSlideDuration,
       value: 1,
+      animationBehavior: _behavior,
+    );
+    _shimmerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+      animationBehavior: _behavior,
     );
     _animation = _buildTween(widget.style);
     if (widget.active) {
       _controller.value = 1;
+      _syncShimmer();
+    }
+  }
+
+  void _syncShimmer() {
+    final shouldShimmer =
+        !_disableAnimations &&
+        widget.active &&
+        widget.style == LyricsAnimationStyle.karaoke;
+    if (shouldShimmer) {
+      if (!_shimmerController.isAnimating) {
+        _shimmerController.repeat();
+      }
+    } else if (_shimmerController.isAnimating) {
+      _shimmerController.stop();
+      _shimmerController.value = 0;
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final disableAnimations =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     if (_disableAnimations == disableAnimations) {
       return;
     }
@@ -79,6 +119,7 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
     _slideController.stop();
     _controller.value = widget.active ? 1 : 0;
     _slideController.value = 1;
+    _syncShimmer();
   }
 
   @override
@@ -96,6 +137,7 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
       _slideController.stop();
       _controller.value = widget.active ? 1 : 0;
       _slideController.value = 1;
+      _syncShimmer();
       return;
     }
     if (widget.active != oldWidget.active || styleChanged) {
@@ -132,12 +174,14 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
         ..stop()
         ..value = 1;
     }
+    _syncShimmer();
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _slideController.dispose();
+    _shimmerController.dispose();
     super.dispose();
   }
 
@@ -146,6 +190,8 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
       LyricsAnimationStyle.smooth => _kLyricsSmoothDuration,
       LyricsAnimationStyle.slide => _kLyricsSlideDuration,
       LyricsAnimationStyle.highlight => _kLyricsHighlightDuration,
+      LyricsAnimationStyle.karaoke => _kLyricsKaraokeDuration,
+      LyricsAnimationStyle.cinematic => _kLyricsCinematicDuration,
     };
   }
 
@@ -153,8 +199,8 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
     return CurvedAnimation(
       parent: _controller,
       curve: switch (style) {
-        // Avoid the overshoot from easeOutBack: it made the highlight land
-        // with a small visual bump when two short lines changed quickly.
+        LyricsAnimationStyle.karaoke => const Cubic(0.22, 1.0, 0.32, 1.0),
+        LyricsAnimationStyle.cinematic => Curves.easeOutQuart,
         _ => Curves.easeOutCubic,
       },
       reverseCurve: Curves.easeInOutCubic,
@@ -163,22 +209,29 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context)) {
       return widget.child;
     }
     final alignment = widget.alignment;
     final accent = widget.accent;
     return AnimatedBuilder(
-      animation: Listenable.merge([_animation, _slideController]),
+      animation: Listenable.merge([
+        _animation,
+        _slideController,
+        _shimmerController,
+      ]),
       builder: (context, child) {
         final value = _animation.value;
         return switch (widget.style) {
           LyricsAnimationStyle.smooth => Opacity(
             opacity: lerpDouble(_kLyricsSmoothInactiveOpacity, 1, value),
-            child: Transform.scale(
-              scale: lerpDouble(_kLyricsSmoothInactiveScale, 1, value),
-              alignment: alignment,
-              child: child,
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(4.0, 0.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(_kLyricsSmoothInactiveScale, 1.015, value),
+                alignment: alignment,
+                child: child,
+              ),
             ),
           ),
           LyricsAnimationStyle.slide => Opacity(
@@ -204,7 +257,7 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
                         color: accent.withValues(
                           alpha: _kLyricsHighlightActiveShadowAlpha * value,
                         ),
-                        blurRadius: 18 * value,
+                        blurRadius: 20 * value,
                         spreadRadius: value,
                       ),
                     ],
@@ -217,6 +270,78 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
               ),
               alignment: alignment,
               child: child,
+            ),
+          ),
+          LyricsAnimationStyle.karaoke => Opacity(
+            opacity: lerpDouble(_kLyricsKaraokeInactiveOpacity, 1.0, value),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(8.0, -2.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(
+                  _kLyricsKaraokeInactiveScale,
+                  _kLyricsKaraokeActiveScale,
+                  value,
+                ),
+                alignment: alignment,
+                child: value > 0.35
+                    ? ShaderMask(
+                        blendMode: BlendMode.srcATop,
+                        shaderCallback: (bounds) {
+                          final sweep = (_shimmerController.value * 2.4) - 0.7;
+                          return LinearGradient(
+                            begin: Alignment(sweep - 0.5, -0.2),
+                            end: Alignment(sweep + 0.5, 0.2),
+                            colors: [
+                              Colors.transparent,
+                              Color.alphaBlend(
+                                Colors.white.withValues(alpha: 0.55),
+                                accent,
+                              ).withValues(alpha: 0.42 * value),
+                              Colors.transparent,
+                            ],
+                          ).createShader(bounds);
+                        },
+                        child: child,
+                      )
+                    : child,
+              ),
+            ),
+          ),
+          LyricsAnimationStyle.cinematic => Opacity(
+            opacity: lerpDouble(_kLyricsCinematicInactiveOpacity, 1.0, value),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(6.0, -3.0, value)),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: value > 0.15
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.14 * value),
+                          width: 0.8,
+                        )
+                      : null,
+                  gradient: value > 0.1
+                      ? LinearGradient(
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                          colors: [
+                            accent.withValues(alpha: 0.16 * value),
+                            Colors.white.withValues(alpha: 0.05 * value),
+                            Colors.transparent,
+                          ],
+                        )
+                      : null,
+                ),
+                child: Transform.scale(
+                  scale: lerpDouble(
+                    _kLyricsCinematicInactiveScale,
+                    _kLyricsCinematicActiveScale,
+                    value,
+                  ),
+                  alignment: alignment,
+                  child: child,
+                ),
+              ),
             ),
           ),
         };
@@ -246,15 +371,13 @@ class LyricsAnimationPreviewTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context)) {
       return child;
     }
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
       duration: _kDurationForPreview(style),
-      curve: switch (style) {
-        _ => Curves.easeOutCubic,
-      },
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
         return switch (style) {
           LyricsAnimationStyle.smooth => Opacity(
@@ -302,6 +425,36 @@ class LyricsAnimationPreviewTransition extends StatelessWidget {
               child: child,
             ),
           ),
+          LyricsAnimationStyle.karaoke => Opacity(
+            opacity: lerpDouble(_kLyricsKaraokeInactiveOpacity, 1, value),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(8.0, -2.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(
+                  _kLyricsKaraokeInactiveScale,
+                  _kLyricsKaraokeActiveScale,
+                  value,
+                ),
+                alignment: alignment,
+                child: child,
+              ),
+            ),
+          ),
+          LyricsAnimationStyle.cinematic => Opacity(
+            opacity: lerpDouble(_kLyricsCinematicInactiveOpacity, 1, value),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(6.0, -3.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(
+                  _kLyricsCinematicInactiveScale,
+                  _kLyricsCinematicActiveScale,
+                  value,
+                ),
+                alignment: alignment,
+                child: child,
+              ),
+            ),
+          ),
         };
       },
       child: child,
@@ -313,6 +466,8 @@ class LyricsAnimationPreviewTransition extends StatelessWidget {
       LyricsAnimationStyle.smooth => _kLyricsSmoothDuration,
       LyricsAnimationStyle.slide => _kLyricsSlideDuration,
       LyricsAnimationStyle.highlight => _kLyricsHighlightDuration,
+      LyricsAnimationStyle.karaoke => _kLyricsKaraokeDuration,
+      LyricsAnimationStyle.cinematic => _kLyricsCinematicDuration,
     };
   }
 }

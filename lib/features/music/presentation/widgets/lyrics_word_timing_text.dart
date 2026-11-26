@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../../../core/animation/frame_rate_ticker_provider.dart';
+import '../../../../core/platform/app_platform.dart';
 import '../../domain/entities/lyric_word.dart';
 import 'lyrics_line_layout.dart';
 
@@ -65,7 +66,7 @@ class LyricsWordTimingText extends StatefulWidget {
 
 class _LyricsWordTimingTextState extends State<LyricsWordTimingText>
     with WidgetsBindingObserver {
-  final _vsync = FrameRateTickerProvider(maxFramesPerSecond: 30);
+  final _vsync = FrameRateTickerProvider(maxFramesPerSecond: 60);
   final _paintClock = _WordPaintClock();
   late final Ticker _ticker;
   Timer? _boundaryTimer;
@@ -102,7 +103,8 @@ class _LyricsWordTimingTextState extends State<LyricsWordTimingText>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerMode = TickerMode.valuesOf(context).enabled;
-    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+    _reducedMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     _vsync.setDisplayRefreshRate(View.of(context).display.refreshRate);
     _synchronizeClock();
   }

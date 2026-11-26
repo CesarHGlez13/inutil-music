@@ -148,6 +148,7 @@ class SettingsState {
     this.lyricsTextAlignment = LyricsTextAlignment.normal,
     this.enabledLyricsProviders = defaultLyricsProviders,
     this.lyricsAnimationStyle = LyricsAnimationStyle.smooth,
+    this.lyricsBackdropOpacity = 0.78,
     this.lyricsRomanizationEnabled = false,
     this.lyricsTranslationEnabled = false,
     this.lyricsRomanizationLanguages = defaultLyricsRomanizationLanguages,
@@ -189,6 +190,7 @@ class SettingsState {
   final LyricsTextAlignment lyricsTextAlignment;
   final Set<LyricsProvider> enabledLyricsProviders;
   final LyricsAnimationStyle lyricsAnimationStyle;
+  final double lyricsBackdropOpacity;
   final bool lyricsRomanizationEnabled;
   final bool lyricsTranslationEnabled;
   final Set<LyricsRomanizationLanguage> lyricsRomanizationLanguages;
@@ -235,6 +237,7 @@ class SettingsState {
     LyricsTextAlignment? lyricsTextAlignment,
     Set<LyricsProvider>? enabledLyricsProviders,
     LyricsAnimationStyle? lyricsAnimationStyle,
+    double? lyricsBackdropOpacity,
     bool? lyricsRomanizationEnabled,
     bool? lyricsTranslationEnabled,
     Set<LyricsRomanizationLanguage>? lyricsRomanizationLanguages,
@@ -282,6 +285,8 @@ class SettingsState {
       enabledLyricsProviders:
           enabledLyricsProviders ?? this.enabledLyricsProviders,
       lyricsAnimationStyle: lyricsAnimationStyle ?? this.lyricsAnimationStyle,
+      lyricsBackdropOpacity:
+          lyricsBackdropOpacity ?? this.lyricsBackdropOpacity,
       lyricsRomanizationEnabled:
           lyricsRomanizationEnabled ?? this.lyricsRomanizationEnabled,
       lyricsTranslationEnabled:
@@ -340,6 +345,7 @@ class SettingsController extends AsyncNotifier<SettingsState> {
   static const _lyricsTextAlignmentKey = 'settings.lyricsAlignment';
   static const _enabledLyricsProvidersKey = 'settings.enabledLyricsProviders';
   static const _lyricsAnimationStyleKey = 'settings.lyricsAnimation';
+  static const _lyricsBackdropOpacityKey = 'settings.lyricsBackdropOpacity';
   static const _lyricsRomanizationEnabledKey =
       'settings.lyricsRomanizationEnabled';
   static const _lyricsTranslationEnabledKey =
@@ -486,6 +492,8 @@ class SettingsController extends AsyncNotifier<SettingsState> {
         lyricsAnimationStyle.code,
       );
     }
+    final lyricsBackdropOpacity =
+        (prefs.getDouble(_lyricsBackdropOpacityKey) ?? 0.78).clamp(0.15, 0.95);
     final lyricsTranslationEnabled =
         prefs.getBool(_lyricsTranslationEnabledKey) ?? false;
     final lyricsRomanizationEnabled =
@@ -691,6 +699,7 @@ class SettingsController extends AsyncNotifier<SettingsState> {
       lyricsTextAlignment: lyricsTextAlignment,
       enabledLyricsProviders: enabledLyricsProviders,
       lyricsAnimationStyle: lyricsAnimationStyle,
+      lyricsBackdropOpacity: lyricsBackdropOpacity,
       lyricsRomanizationEnabled: lyricsRomanizationEnabled,
       lyricsTranslationEnabled: lyricsTranslationEnabled,
       lyricsRomanizationLanguages: lyricsRomanizationLanguages,
@@ -1301,6 +1310,17 @@ class SettingsController extends AsyncNotifier<SettingsState> {
     });
     _lyricsAnimationStyleWriteTail = write.catchError((_) {});
     await write;
+  }
+
+  Future<void> setLyricsBackdropOpacity(double opacity) async {
+    final clamped = opacity.clamp(0.15, 0.95).toDouble();
+    final current = state.asData?.value ?? await future;
+    if ((current.lyricsBackdropOpacity - clamped).abs() < 0.005) {
+      return;
+    }
+    state = AsyncData(current.copyWith(lyricsBackdropOpacity: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_lyricsBackdropOpacityKey, clamped);
   }
 
   Future<void> setLyricsRomanizationEnabled(bool enabled) async {

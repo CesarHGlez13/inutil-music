@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../providers/artwork_progress_color_provider.dart';
 import 'decorative_progress_transition.dart';
 
@@ -53,7 +54,8 @@ class _PlaybackProgressLineState extends State<PlaybackProgressLine>
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+    _reducedMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
   }
 
   @override

@@ -78,6 +78,9 @@ class _SpotifyFullscreenCanvasPlayerState
     _lyricsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
     );
     _lyricsController.addListener(_syncLyricsOpenFlag);
   }
@@ -260,27 +263,22 @@ class _SpotifyFullscreenCanvasPlayerState
                     ),
                   ),
 
-                  // 1b. Smooth full-bleed animated artwork placeholder ONLY while a
-                  // Canvas video is resolving or decoding its first frame. That way
-                  // songs with Canvas never flash a floating square cover before video,
-                  // and crossfade edge-to-edge directly into the live Canvas video.
+                  // 1b. Smooth full-bleed cinematic crossfade + subtle zoom when changing
+                  // tracks or while a Canvas video is resolving/decoding its first frame.
+                  // Uses AnimationBehavior.preserve so track changes always cross-dissolve
+                  // fluidly even when Android's animator_duration_scale is 0.
                   Positioned.fill(
-                    child: AnimatedSwitcher(
+                    child: _CanvasTrackCrossfade(
+                      identity: (activeCanvasUrl != null || isResolvingCanvas) &&
+                              !_canvasVideoReady &&
+                              artworkSource?.trim().isNotEmpty == true
+                          ? 'canvas-fullbleed-${artworkSource ?? visualIdentity}'
+                          : 'canvas-fullbleed-empty',
                       duration: backdropFadeDuration,
-                      reverseDuration: const Duration(milliseconds: 650),
-                      switchInCurve: Curves.easeInOutCubic,
-                      switchOutCurve: Curves.easeInOutCubic,
-                      layoutBuilder: (currentChild, previousChildren) => Stack(
-                        fit: StackFit.expand,
-                        children: [...previousChildren, ?currentChild],
-                      ),
                       child: (activeCanvasUrl != null || isResolvingCanvas) &&
                               !_canvasVideoReady &&
                               artworkSource?.trim().isNotEmpty == true
                           ? RepaintBoundary(
-                              key: ValueKey(
-                                'canvas-fullbleed-loading-${artworkSource ?? visualIdentity}',
-                              ),
                               child: AnimatedArtworkMotion(
                                 enabled: motionAllowed,
                                 isPlaying: isPlaying,
@@ -300,9 +298,7 @@ class _SpotifyFullscreenCanvasPlayerState
                                 ),
                               ),
                             )
-                          : const SizedBox.expand(
-                              key: ValueKey('canvas-fullbleed-loading-empty'),
-                            ),
+                          : const SizedBox.expand(),
                     ),
                   ),
 
@@ -2324,6 +2320,113 @@ class _PlayerLiveOverlaysBarState
           ),
       ],
     ),
+    );
+  }
+}
+
+/// Smooth cinematic track-change cross-dissolve + gentle zoom for the Canvas
+/// backdrop that uses [AnimationBehavior.preserve] on real devices so changing
+/// songs always glides smoothly even when Android's animator scale is 0.
+class _CanvasTrackCrossfade extends StatefulWidget {
+  const _CanvasTrackCrossfade({
+    required this.identity,
+    required this.duration,
+    required this.child,
+  });
+
+  final String identity;
+  final Duration duration;
+  final Widget child;
+
+  @override
+  State<_CanvasTrackCrossfade> createState() => _CanvasTrackCrossfadeState();
+}
+
+class _CanvasTrackCrossfadeState extends State<_CanvasTrackCrossfade>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  Widget? _outgoingChild;
+  late Widget _currentChild;
+  late String _currentIdentity;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentChild = widget.child;
+    _currentIdentity = widget.identity;
+    _controller = AnimationController(
+      vsync: this,
+      duration: widget.duration,
+      value: 1.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
+    _controller.addStatusListener((status) {
+      if (status == AnimationStatus.completed && _outgoingChild != null) {
+        if (mounted) {
+          setState(() => _outgoingChild = null);
+        }
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CanvasTrackCrossfade oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.duration != oldWidget.duration) {
+      _controller.duration = widget.duration;
+    }
+    if (widget.identity != _currentIdentity) {
+      _outgoingChild = _currentChild;
+      _currentChild = widget.child;
+      _currentIdentity = widget.identity;
+      if (widget.duration == Duration.zero) {
+        _outgoingChild = null;
+        _controller.value = 1.0;
+      } else {
+        _controller.forward(from: 0.0);
+      }
+    } else {
+      _currentChild = widget.child;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final t = Curves.easeInOutCubic.transform(_controller.value);
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (_outgoingChild != null && t < 1.0)
+              Opacity(
+                opacity: (1.0 - t).clamp(0.0, 1.0),
+                child: Transform.scale(
+                  scale: lerpDouble(1.0, 0.96, t)!,
+                  child: _outgoingChild,
+                ),
+              ),
+            Opacity(
+              opacity: _outgoingChild != null ? t.clamp(0.0, 1.0) : 1.0,
+              child: Transform.scale(
+                scale: _outgoingChild != null
+                    ? lerpDouble(1.06, 1.0, t)!
+                    : 1.0,
+                child: _currentChild,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

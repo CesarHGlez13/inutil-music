@@ -2,6 +2,8 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/platform/app_platform.dart';
+
 const playbackPageTransitionDuration = Duration(milliseconds: 460);
 const playbackPageReverseTransitionDuration = Duration(milliseconds: 400);
 const playbackPageTransitionBeginOffset = Offset(0, 0.12);
@@ -91,26 +93,37 @@ class PlaybackPageTransition extends StatelessWidget {
           return innerContent;
         }
 
-        return CustomPaint(
-          foregroundPainter: t > 0.005
-              ? _CapsuleMorphBorderPainter(
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (t > 0.005)
+              IgnorePointer(
+                child: ColoredBox(
+                  color: Colors.black.withValues(alpha: (t * 0.45).clamp(0.0, 0.45)),
+                ),
+              ),
+            CustomPaint(
+              foregroundPainter: t > 0.005
+                  ? _CapsuleMorphBorderPainter(
+                      progress: t,
+                      originHeight: morphOriginHeight,
+                      originBottomOffset: morphOriginBottomOffset,
+                      originHorizontalInset: morphOriginHorizontalInset,
+                      originBorderRadius: morphOriginBorderRadius,
+                    )
+                  : null,
+              child: ClipPath(
+                clipper: _CapsuleMorphClipper(
                   progress: t,
                   originHeight: morphOriginHeight,
                   originBottomOffset: morphOriginBottomOffset,
                   originHorizontalInset: morphOriginHorizontalInset,
                   originBorderRadius: morphOriginBorderRadius,
-                )
-              : null,
-          child: ClipPath(
-            clipper: _CapsuleMorphClipper(
-              progress: t,
-              originHeight: morphOriginHeight,
-              originBottomOffset: morphOriginBottomOffset,
-              originHorizontalInset: morphOriginHorizontalInset,
-              originBorderRadius: morphOriginBorderRadius,
+                ),
+                child: innerContent,
+              ),
             ),
-            child: innerContent,
-          ),
+          ],
         );
       },
     );
@@ -275,6 +288,9 @@ class _PlaybackPageVisibilityTransitionState
       duration: widget.duration,
       reverseDuration: widget.reverseDuration,
       value: startsVisible ? 1 : 0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
     );
     if (widget.visible && !startsVisible) {
       _show();

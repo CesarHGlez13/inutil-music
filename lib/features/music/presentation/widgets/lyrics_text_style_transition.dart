@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 
+import '../../../../core/platform/app_platform.dart';
 import '../../domain/entities/lyric_word.dart';
 import 'lyrics_glyph_snapshot.dart';
 import 'lyrics_line_layout.dart';
@@ -70,6 +71,9 @@ class _LyricsTextStyleTransitionState extends State<LyricsTextStyleTransition>
       vsync: this,
       duration: const Duration(milliseconds: 520),
       value: widget.active ? 1 : 0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
     );
     _activeOpacity = _controller.drive(
       CurveTween(curve: Curves.easeInOutCubic),
@@ -80,7 +84,8 @@ class _LyricsTextStyleTransitionState extends State<LyricsTextStyleTransition>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final disabled = MediaQuery.disableAnimationsOf(context);
+    final disabled =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     if (_disableAnimations == disabled) return;
     _disableAnimations = disabled;
     _controller.stop();

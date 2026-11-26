@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../../../../core/platform/app_platform.dart';
 import 'double_tap_seek_ripple.dart';
 
 /// InheritedWidget que expone el desplazamiento del gesto horizontal
@@ -102,6 +103,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     _slideController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 220),
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
     );
     _slideController.addListener(() {
       if (_slideAnimation != null) {

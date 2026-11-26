@@ -254,7 +254,8 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
     final mobileLayout = _usesMobileLyricsLayout(context);
     final size = MediaQuery.sizeOf(context);
     final landscapeTarget = mobileLayout && size.width > size.height;
-    final reducedMotion = MediaQuery.disableAnimationsOf(context);
+    final reducedMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     final previousTarget = _mobileLandscapeTarget;
     final reducedMotionChanged =
         _mobileLayoutReducedMotion != null &&
@@ -436,6 +437,8 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
       mobileLayout: mobileLayout,
     );
 
+    final backdropOpacity =
+        (settings?.lyricsBackdropOpacity ?? 0.78).clamp(0.15, 0.95).toDouble();
     final headerWidget = _LyricsHeader(
       lookup: lookup,
       onClose: widget.onRequestClose,
@@ -453,19 +456,25 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
             const Positioned.fill(
               child: IgnorePointer(child: _LyricsCanvasBackground()),
             ),
-          const DecoratedBox(
-            decoration: BoxDecoration(color: Color(0x6E000000)),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: backdropOpacity),
+            ),
           ),
         ] else
-          const DecoratedBox(
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Color(0xE0090D12),
-                  Color(0xD4070A0E),
-                  Color(0xEC05070A),
+                  const Color(0xFF090D12).withValues(
+                    alpha: (backdropOpacity + 0.06).clamp(0.15, 0.96),
+                  ),
+                  const Color(0xFF070A0E).withValues(alpha: backdropOpacity),
+                  const Color(0xFF05070A).withValues(
+                    alpha: (backdropOpacity + 0.10).clamp(0.20, 0.98),
+                  ),
                 ],
               ),
             ),
@@ -2734,7 +2743,7 @@ class _SyncedLyricsTimelineState extends ConsumerState<_SyncedLyricsTimeline>
       if (distance < 0.5) {
         return;
       }
-      if (MediaQuery.disableAnimationsOf(context)) {
+      if (AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context)) {
         _scrollController.jumpTo(target);
         return;
       }
@@ -3132,7 +3141,8 @@ class _InstrumentalLyricsTile extends ConsumerWidget {
     final progress = enabled
         ? (elapsedMilliseconds / totalMilliseconds).clamp(0.0, 1.0).toDouble()
         : 0.0;
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final reduceMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     final artworkColor = TickerMode.valuesOf(context).enabled
         ? ref.watch(playbackArtworkColorProvider)
         : null;
@@ -3406,6 +3416,77 @@ class _LyricsSettingsMenu extends ConsumerWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 16),
+            const Divider(),
+            Row(
+              children: [
+                Icon(Icons.opacity_rounded, size: 18, color: foreground),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    strings.lyricsBackdropOpacity,
+                    style: TextStyle(
+                      color: foreground,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                Text(
+                  '${((settings?.lyricsBackdropOpacity ?? 0.78) * 100).round()}%',
+                  style: TextStyle(
+                    color: foreground.withValues(alpha: 0.78),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              strings.lyricsBackdropOpacityHint,
+              style: TextStyle(
+                color: foreground.withValues(alpha: .7),
+                fontSize: 12.5,
+              ),
+            ),
+            Slider(
+              key: const ValueKey('lyrics-menu-backdrop-opacity-slider'),
+              value: (settings?.lyricsBackdropOpacity ?? 0.78).clamp(0.15, 0.95),
+              min: 0.15,
+              max: 0.95,
+              divisions: 16,
+              onChanged: settings == null
+                  ? null
+                  : (value) => unawaited(
+                      settingsController.setLyricsBackdropOpacity(value),
+                    ),
+            ),
+            const SizedBox(height: 8),
+            const Divider(),
+            Text(
+              strings.lyricsAnimation,
+              style: TextStyle(color: foreground, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              key: const ValueKey('lyrics-menu-animation-options'),
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final style in LyricsAnimationStyle.values)
+                  ChoiceChip(
+                    selected:
+                        (settings?.lyricsAnimationStyle ??
+                            LyricsAnimationStyle.smooth) ==
+                        style,
+                    label: Text(strings.lyricsAnimationLabel(style)),
+                    onSelected: settings == null
+                        ? null
+                        : (_) => unawaited(
+                            settingsController.setLyricsAnimationStyle(style),
+                          ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 16),
             const Divider(),
             Text(
@@ -4347,7 +4428,8 @@ class _LyricsCanvasBackground extends ConsumerWidget {
             : null) ??
         effectiveVideoUrl;
 
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final disableAnimations =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
 
     if (playableUri != null) {
       return SpotifyCanvasVideo(

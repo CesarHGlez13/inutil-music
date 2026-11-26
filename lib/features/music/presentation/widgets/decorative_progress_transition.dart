@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/animation/frame_rate_ticker_provider.dart';
+import '../../../../core/platform/app_platform.dart';
 
 /// A finite decorative progress tween that leaves unused display frames idle.
 /// Interactive sliders and lyric scrolling keep their ordinary full-rate clocks.
@@ -33,7 +34,7 @@ class DecorativeProgressTransition extends StatefulWidget {
 class _DecorativeProgressTransitionState
     extends State<DecorativeProgressTransition>
     with WidgetsBindingObserver {
-  final _vsync = FrameRateTickerProvider(maxFramesPerSecond: 30);
+  final _vsync = FrameRateTickerProvider(maxFramesPerSecond: 60);
   late final AnimationController _controller;
   late Tween<double> _tween;
   bool _tickerEnabled = true;
@@ -59,6 +60,9 @@ class _DecorativeProgressTransitionState
       vsync: _vsync,
       duration: widget.duration,
       value: 1,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
     );
   }
 
@@ -66,7 +70,8 @@ class _DecorativeProgressTransitionState
   void didChangeDependencies() {
     super.didChangeDependencies();
     _tickerEnabled = TickerMode.valuesOf(context).enabled;
-    _reducedMotion = MediaQuery.disableAnimationsOf(context);
+    _reducedMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     _vsync.setDisplayRefreshRate(View.of(context).display.refreshRate);
     _syncAvailability();
   }

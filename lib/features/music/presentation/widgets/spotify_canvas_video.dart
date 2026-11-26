@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/platform/app_platform.dart';
 import 'package:flutter/rendering.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
@@ -89,7 +91,7 @@ class SpotifyCanvasVideo extends StatefulWidget {
 }
 
 class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const _introFastForwardSpeed = 8.0;
   static const _loopFrameCrossfadeDuration = Duration(milliseconds: 400);
   static const _loopFrameHoldBeforeFade = Duration(milliseconds: 100);
@@ -98,6 +100,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   static const _insetProbeMaxSide = 192.0;
   static final LinkedHashMap<String, double> _insetZoomCache = LinkedHashMap();
 
+  late final AnimationController _revealController;
   VideoPlayerController? _controller;
   InutilCanvasController? _canvasController;
   InutilLinuxCanvasController? _linuxCanvasController;
@@ -109,10 +112,31 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   Timer? _loopFrameReleaseTimer;
   bool _ready = false;
 
+  void _syncRevealAnimation() {
+    final target = _ready ? (_insetFitResolved ? 1.0 : 0.02) : 0.0;
+    final dur = _loopFrame != null && !_ready
+        ? Duration.zero
+        : _loopFrame != null
+        ? _loopFrameCrossfadeDuration
+        : widget.revealDuration;
+    if (dur == Duration.zero || target == 0.0) {
+      _revealController.value = target;
+    } else {
+      _revealController.animateTo(
+        target,
+        duration: dur,
+        curve: _loopFrame != null
+            ? Curves.easeInOutCubic
+            : widget.revealCurve,
+      );
+    }
+  }
+
   void _setReady(bool ready) {
     if (_ready == ready) return;
     if (mounted) {
       setState(() => _ready = ready);
+      _syncRevealAnimation();
     } else {
       _ready = ready;
     }
@@ -138,6 +162,14 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
   @override
   void initState() {
     super.initState();
+    _revealController = AnimationController(
+      vsync: this,
+      duration: widget.revealDuration,
+      value: 0.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
     WidgetsBinding.instance.addObserver(this);
     _active =
         WidgetsBinding.instance.lifecycleState == null ||
@@ -370,10 +402,8 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           track: widget.identity ?? widget.url.toString(),
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
+        _insetFitResolved = true;
         _setReady(true);
-        setState(() {
-          _insetFitResolved = true;
-        });
         _synchronizePlayback();
       };
       canvas.onSizeChanged = () {
@@ -420,10 +450,8 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
           track: widget.identity ?? widget.url.toString(),
           elapsedMs: _startupTimer.elapsedMilliseconds,
         );
+        _insetFitResolved = true;
         _setReady(true);
-        setState(() {
-          _insetFitResolved = true;
-        });
         _synchronizePlayback();
       };
       linuxCanvas.onSizeChanged = () {
@@ -955,6 +983,7 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     _loopFrameReleaseTimer?.cancel();
     _loopFrame?.dispose();
     _loopFrame = null;
+    _revealController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     final canvas = _canvasController;
     _canvasController = null;
@@ -984,20 +1013,21 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
     final frames = Stack(
       fit: StackFit.expand,
       children: [
-        AnimatedOpacity(
-          duration: _loopFrame != null && !_ready
-              ? Duration.zero
-              : _loopFrame != null
-              ? _loopFrameCrossfadeDuration
-              : widget.revealDuration,
-          curve: _loopFrame != null
-              ? Curves.easeInOutCubic
-              : widget.revealCurve,
-          // Paint at a barely visible opacity while comparing the first
-          // frame, then reveal the already fitted video over the still cover.
-          opacity: _ready && size.width > 0 && size.height > 0
-              ? (_insetFitResolved ? 1 : 0.02)
-              : 0,
+        AnimatedBuilder(
+          animation: _revealController,
+          builder: (context, child) {
+            final v = _revealController.value;
+            final visibleOpacity = (size.width > 0 && size.height > 0)
+                ? v
+                : 0.0;
+            final bloomScale = _loopFrame == null
+                ? (1.045 - (0.045 * Curves.easeOutCubic.transform(v)))
+                : 1.0;
+            return Opacity(
+              opacity: visibleOpacity,
+              child: Transform.scale(scale: bloomScale, child: child),
+            );
+          },
           child: !hasSurface || size.isEmpty
               ? const SizedBox.shrink()
               : RepaintBoundary(

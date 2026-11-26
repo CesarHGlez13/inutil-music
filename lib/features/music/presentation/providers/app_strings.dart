@@ -628,10 +628,20 @@ class AppStrings {
       choose('Y el ritmo vuelve a empezar', 'And the rhythm starts again');
   String get replayAnimation =>
       choose('Reproducir animación', 'Play animation');
+  String get lyricsAnimationKaraoke => choose('Ola luminosa', 'Luminous wave');
+  String get lyricsAnimationCinematic => choose('Cinemático', 'Cinematic');
+  String get lyricsBackdropOpacity =>
+      choose('Opacidad del fondo', 'Backdrop opacity');
+  String get lyricsBackdropOpacityHint => choose(
+    'Ajusta qué tanto se ve el Canvas de video detrás de la letra',
+    'Adjust how visible the video Canvas is behind the lyrics',
+  );
   String lyricsAnimationLabel(LyricsAnimationStyle style) => switch (style) {
     LyricsAnimationStyle.smooth => lyricsAnimationSmooth,
     LyricsAnimationStyle.slide => lyricsAnimationSlide,
     LyricsAnimationStyle.highlight => lyricsAnimationHighlight,
+    LyricsAnimationStyle.karaoke => lyricsAnimationKaraoke,
+    LyricsAnimationStyle.cinematic => lyricsAnimationCinematic,
   };
   String get retry => choose('Reintentar', 'Retry');
   String get lyricsSource =>
