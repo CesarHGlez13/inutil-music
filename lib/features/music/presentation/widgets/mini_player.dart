@@ -238,6 +238,8 @@ class MiniPlayer extends ConsumerWidget {
             size: artworkSize,
             isFavorite: isFavorite,
             circular: capsule,
+            isPlaying: isPlaying,
+            accentColor: effectiveAccent,
           ),
           SizedBox(
             width: compactMobile
@@ -340,16 +342,70 @@ class MiniPlayer extends ConsumerWidget {
         iconSize: playIconSize,
         padding: EdgeInsets.zero,
         constraints: BoxConstraints.tight(Size.square(playControlSize)),
-        icon: Transform.translate(
-          offset: windowsLayout && !isPlaying
-              ? const Offset(1, 0)
-              : Offset.zero,
-          child: Icon(
-            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-          ),
-        ),
-        onPressed: () =>
-            ref.read(playerControllerProvider.notifier).togglePlayPause(),
+        icon: compactMobile
+            ? Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: isPlaying
+                        ? [
+                            Color.alphaBlend(
+                              effectiveAccent.withValues(alpha: 0.42),
+                              Colors.white.withValues(alpha: 0.22),
+                            ),
+                            effectiveAccent.withValues(alpha: 0.24),
+                          ]
+                        : [
+                            Colors.white.withValues(alpha: isDark ? 0.18 : 0.72),
+                            Colors.white.withValues(alpha: isDark ? 0.08 : 0.48),
+                          ],
+                  ),
+                  border: Border.all(
+                    color: isPlaying
+                        ? Color.alphaBlend(
+                            Colors.white.withValues(alpha: 0.45),
+                            effectiveAccent,
+                          ).withValues(alpha: 0.58)
+                        : Colors.white.withValues(alpha: isDark ? 0.20 : 0.35),
+                    width: 1.0,
+                  ),
+                  boxShadow: isPlaying
+                      ? [
+                          BoxShadow(
+                            color: effectiveAccent.withValues(alpha: 0.36),
+                            blurRadius: 12,
+                            spreadRadius: 0.5,
+                          ),
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Transform.translate(
+                  offset: !isPlaying ? const Offset(1.0, 0) : Offset.zero,
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    size: isPlaying ? 24 : 26,
+                  ),
+                ),
+              )
+            : Transform.translate(
+                offset: windowsLayout && !isPlaying
+                    ? const Offset(1, 0)
+                    : Offset.zero,
+                child: Icon(
+                  isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                ),
+              ),
+        onPressed: () {
+          if (compactMobile && !AppPlatform.isFlutterTest) {
+            HapticFeedback.lightImpact();
+          }
+          ref.read(playerControllerProvider.notifier).togglePlayPause();
+        },
       ),
     );
     final previousControl = _MiniTransportButton(
@@ -450,11 +506,22 @@ class MiniPlayer extends ConsumerWidget {
                   : [
                       BoxShadow(
                         color: Colors.black.withValues(
-                          alpha: isDark ? 0.18 : 0.08,
+                          alpha: isDark ? 0.34 : 0.10,
                         ),
-                        blurRadius: compactMobile ? 6 : 8,
-                        offset: Offset(0, compactMobile ? 1 : 2),
+                        blurRadius: compactMobile ? 14 : 10,
+                        offset: Offset(0, compactMobile ? 4 : 2),
                       ),
+                      if (hasTrack)
+                        BoxShadow(
+                          color: effectiveAccent.withValues(
+                            alpha: isPlaying
+                                ? (isDark ? 0.24 : 0.14)
+                                : (isDark ? 0.10 : 0.06),
+                          ),
+                          blurRadius: compactMobile ? 18 : 12,
+                          spreadRadius: isPlaying ? 0.5 : 0,
+                          offset: const Offset(0, 2),
+                        ),
                     ],
             )
           : BoxDecoration(
@@ -466,9 +533,10 @@ class MiniPlayer extends ConsumerWidget {
           ? BoxDecoration(
               borderRadius: BorderRadius.circular(capsuleRadius),
               border: Border.all(
-                color: AppColors.downloadAccentFor(
-                  context,
-                ).withValues(alpha: isDark ? 0.22 : 0.18),
+                color: Color.alphaBlend(
+                  Colors.white.withValues(alpha: isDark ? 0.24 : 0.45),
+                  effectiveAccent,
+                ).withValues(alpha: isDark ? 0.36 : 0.26),
                 width: 0.5,
                 strokeAlign: BorderSide.strokeAlignInside,
               ),
@@ -525,19 +593,43 @@ class MiniPlayer extends ConsumerWidget {
                     key: const ValueKey('mini-player-background-overlay'),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                         colors: hasTrack
                             ? isDark
-                                  ? const [
-                                      Color(0xDA0A100C),
-                                      Color(0x99112816),
-                                      Color(0xE407100A),
+                                  ? [
+                                      Color.lerp(
+                                        const Color(0xFF0A0D12),
+                                        effectiveAccent,
+                                        0.16,
+                                      )!.withValues(alpha: 0.84),
+                                      Color.lerp(
+                                        const Color(0xFF0F131A),
+                                        effectiveAccent,
+                                        0.26,
+                                      )!.withValues(alpha: 0.68),
+                                      Color.lerp(
+                                        const Color(0xFF07090D),
+                                        effectiveAccent,
+                                        0.14,
+                                      )!.withValues(alpha: 0.88),
                                     ]
-                                  : const [
-                                      Color(0xEAF5F8F6),
-                                      Color(0xDDEAF3ED),
-                                      Color(0xEEF5F8F6),
+                                  : [
+                                      Color.lerp(
+                                        const Color(0xFFF6F8FA),
+                                        effectiveAccent,
+                                        0.08,
+                                      )!.withValues(alpha: 0.90),
+                                      Color.lerp(
+                                        const Color(0xFFEDF3F6),
+                                        effectiveAccent,
+                                        0.14,
+                                      )!.withValues(alpha: 0.84),
+                                      Color.lerp(
+                                        const Color(0xFFF5F7F9),
+                                        effectiveAccent,
+                                        0.08,
+                                      )!.withValues(alpha: 0.92),
                                     ]
                             : isDark
                             ? const [
@@ -563,6 +655,45 @@ class MiniPlayer extends ConsumerWidget {
                       isPlaying: isPlaying,
                       accentColor: effectiveAccent,
                       isDark: isDark,
+                    ),
+                  ),
+                ),
+              if (capsule && !backgroundMode.isLiquidGlass)
+                Positioned(
+                  top: 0.5,
+                  left: 22,
+                  right: 22,
+                  height: 1.2,
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: isDark ? 0.28 : 0.65),
+                            effectiveAccent.withValues(
+                              alpha: isDark ? 0.42 : 0.28,
+                            ),
+                            Colors.white.withValues(alpha: isDark ? 0.28 : 0.65),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.24, 0.5, 0.76, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              if (capsule && compactMobile && hasTrack)
+                Positioned(
+                  left: 24,
+                  right: 24,
+                  bottom: 2,
+                  child: IgnorePointer(
+                    child: _MiniProgress(
+                      key: const ValueKey('mini-player-capsule-progress'),
+                      height: 2.2,
+                      rounded: true,
+                      accentColorOverride: effectiveAccent,
                     ),
                   ),
                 ),
@@ -597,7 +728,9 @@ class MiniPlayer extends ConsumerWidget {
                 ),
               _MiniPlayerSwipeRegion(
                 enabled: swipeEnabled,
-                animationsEnabled: !MediaQuery.disableAnimationsOf(context),
+                animationsEnabled:
+                    !(AppPlatform.isFlutterTest &&
+                        MediaQuery.disableAnimationsOf(context)),
                 nextSemanticsLabel: strings.next,
                 previousSemanticsLabel: strings.previous,
                 onNext: () => unawaited(
@@ -1390,15 +1523,27 @@ class _MiniEqualizerBackground extends StatefulWidget {
 }
 
 class _MiniEqualizerBackgroundState extends State<_MiniEqualizerBackground>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _controller;
+  late final AnimationController _energyController;
+
+  AnimationBehavior get _behavior => AppPlatform.isFlutterTest
+      ? AnimationBehavior.normal
+      : AnimationBehavior.preserve;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 2800),
+      animationBehavior: _behavior,
+    );
+    _energyController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+      value: widget.isPlaying ? 1.0 : 0.0,
+      animationBehavior: _behavior,
     );
     if (widget.isPlaying) {
       _controller.repeat();
@@ -1411,8 +1556,13 @@ class _MiniEqualizerBackgroundState extends State<_MiniEqualizerBackground>
     if (widget.isPlaying != oldWidget.isPlaying) {
       if (widget.isPlaying) {
         if (!_controller.isAnimating) _controller.repeat();
+        _energyController.forward();
       } else {
-        _controller.stop();
+        _energyController.reverse().whenComplete(() {
+          if (mounted && !widget.isPlaying) {
+            _controller.stop();
+          }
+        });
       }
     }
   }
@@ -1420,19 +1570,22 @@ class _MiniEqualizerBackgroundState extends State<_MiniEqualizerBackground>
   @override
   void dispose() {
     _controller.dispose();
+    _energyController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) => CustomPaint(
-        painter: _MiniEqualizerPainter(
-          progress: _controller.value,
-          isPlaying: widget.isPlaying,
-          accentColor: widget.accentColor,
-          isDark: widget.isDark,
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_controller, _energyController]),
+        builder: (context, _) => CustomPaint(
+          painter: _MiniEqualizerPainter(
+            progress: _controller.value,
+            energy: Curves.easeOutCubic.transform(_energyController.value),
+            accentColor: widget.accentColor,
+            isDark: widget.isDark,
+          ),
         ),
       ),
     );
@@ -1442,81 +1595,219 @@ class _MiniEqualizerBackgroundState extends State<_MiniEqualizerBackground>
 class _MiniEqualizerPainter extends CustomPainter {
   _MiniEqualizerPainter({
     required this.progress,
-    required this.isPlaying,
+    required this.energy,
     required this.accentColor,
     required this.isDark,
   });
 
   final double progress;
-  final bool isPlaying;
+  final double energy;
   final Color accentColor;
   final bool isDark;
 
-  static const int _barCount = 38;
+  static const int _barCount = 36;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0 || size.height <= 0) return;
 
-    const barWidth = 3.6;
-    final totalSpacing = size.width - (_barCount * barWidth);
-    final gap = (totalSpacing / (_barCount + 1)).clamp(2.0, 16.0);
     final t = progress * 2 * math.pi;
+    final hsl = HSLColor.fromColor(accentColor);
+    final secondaryAccent = hsl
+        .withHue((hsl.hue + 34.0) % 360.0)
+        .withLightness((hsl.lightness + 0.08).clamp(0.35, 0.78))
+        .toColor();
+    final highlightTip = Color.alphaBlend(
+      Colors.white.withValues(alpha: isDark ? 0.62 : 0.35),
+      accentColor,
+    );
 
-    // Ambient bottom glow across the mini player width
-    final glowPaint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
+    // 1. Drifting ambient aurora glow pools
+    final orb1X = size.width * (0.28 + 0.18 * math.sin(t));
+    final orb2X = size.width * (0.74 + 0.14 * math.cos(t * 0.85));
+    final orbRadius = size.width * 0.42;
+
+    final aurora1 = Paint()
+      ..shader = RadialGradient(
         colors: [
-          accentColor.withValues(alpha: isPlaying ? (isDark ? 0.22 : 0.16) : 0.08),
+          accentColor.withValues(
+            alpha: (isDark ? 0.24 : 0.16) * (0.35 + 0.65 * energy),
+          ),
           accentColor.withValues(alpha: 0.0),
         ],
-      ).createShader(Rect.fromLTWH(0, size.height * 0.3, size.width, size.height * 0.7));
-    canvas.drawRect(Rect.fromLTWH(0, size.height * 0.3, size.width, size.height * 0.7), glowPaint);
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(orb1X, size.height * 0.65),
+          radius: orbRadius,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, aurora1);
+
+    final aurora2 = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          secondaryAccent.withValues(
+            alpha: (isDark ? 0.18 : 0.12) * (0.25 + 0.75 * energy),
+          ),
+          secondaryAccent.withValues(alpha: 0.0),
+        ],
+      ).createShader(
+        Rect.fromCircle(
+          center: Offset(orb2X, size.height * 0.35),
+          radius: orbRadius * 0.85,
+        ),
+      );
+    canvas.drawRect(Offset.zero & size, aurora2);
+
+    // 2. Fluid dual-sine audio wave ribbons
+    final ribbonSteps = 28;
+    final backWavePath = Path()..moveTo(0, size.height);
+    final frontWavePath = Path()..moveTo(0, size.height);
+    final crestPath = Path();
+
+    for (var s = 0; s <= ribbonSteps; s++) {
+      final frac = s / ribbonSteps;
+      final x = frac * size.width;
+      final edgeFade = math.sin(frac * math.pi);
+      final backAmp =
+          (0.16 + 0.26 * energy) *
+          edgeFade *
+          (0.5 + 0.5 * math.sin(t * 2.0 + frac * math.pi * 3.2));
+      final frontAmp =
+          (0.12 + 0.22 * energy) *
+          edgeFade *
+          (0.5 + 0.5 * math.cos(t * 2.8 - frac * math.pi * 4.4));
+      final backY = size.height * (0.94 - backAmp);
+      final frontY = size.height * (0.96 - frontAmp);
+      backWavePath.lineTo(x, backY);
+      frontWavePath.lineTo(x, frontY);
+      if (s == 0) {
+        crestPath.moveTo(x, frontY);
+      } else {
+        crestPath.lineTo(x, frontY);
+      }
+    }
+    backWavePath
+      ..lineTo(size.width, size.height)
+      ..close();
+    frontWavePath
+      ..lineTo(size.width, size.height)
+      ..close();
+
+    canvas.drawPath(
+      backWavePath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            secondaryAccent.withValues(
+              alpha: (isDark ? 0.20 : 0.14) * (0.3 + 0.7 * energy),
+            ),
+            Colors.transparent,
+          ],
+        ).createShader(Offset.zero & size),
+    );
+    canvas.drawPath(
+      frontWavePath,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            accentColor.withValues(
+              alpha: (isDark ? 0.26 : 0.18) * (0.35 + 0.65 * energy),
+            ),
+            Colors.transparent,
+          ],
+        ).createShader(Offset.zero & size),
+    );
+    if (energy > 0.05) {
+      canvas.drawPath(
+        crestPath,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.1
+          ..shader = LinearGradient(
+            colors: [
+              Colors.transparent,
+              highlightTip.withValues(alpha: (isDark ? 0.36 : 0.26) * energy),
+              secondaryAccent.withValues(
+                alpha: (isDark ? 0.28 : 0.20) * energy,
+              ),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.3, 0.7, 1.0],
+          ).createShader(Offset.zero & size),
+      );
+    }
+
+    // 3. Crisp rhythmic equalizer spectrum bars + floating luminous peak dots
+    const barWidth = 3.2;
+    final horizontalInset = 18.0;
+    final usableWidth = math.max(1.0, size.width - horizontalInset * 2);
+    final totalSpacing = usableWidth - (_barCount * barWidth);
+    final gap = (totalSpacing / (_barCount - 1)).clamp(1.5, 16.0);
 
     for (var i = 0; i < _barCount; i++) {
-      final x = gap + i * (barWidth + gap);
-      var normalizedHeight = 0.08;
-
-      if (isPlaying) {
-        final wave1 = math.sin(t * 3.8 + i * 0.38).abs();
-        final wave2 = math.cos(t * 2.1 - i * 0.26).abs();
-        final wave3 = math.sin(t * 5.6 + i * 0.65).abs();
-        final envelope = 0.45 + 0.55 * math.sin((i / _barCount) * math.pi);
-        normalizedHeight = (0.12 + (0.52 * wave1 + 0.33 * wave2 + 0.15 * wave3) * envelope)
-            .clamp(0.08, 0.92);
-      } else {
-        normalizedHeight = (0.06 + 0.03 * math.sin(t * 0.5 + i * 0.25)).clamp(0.04, 0.10);
-      }
+      final frac = i / (_barCount - 1);
+      final x = horizontalInset + i * (barWidth + gap);
+      final wave1 = math.sin(t * 3.0 + i * 0.42).abs();
+      final wave2 = math.cos(t * 2.0 - i * 0.28).abs();
+      final wave3 = math.sin(t * 5.0 + i * 0.68).abs();
+      final envelope = 0.36 + 0.64 * math.sin(frac * math.pi);
+      final activeHeight =
+          (0.14 + (0.48 * wave1 + 0.32 * wave2 + 0.20 * wave3) * envelope)
+              .clamp(0.10, 0.84);
+      final restingHeight =
+          (0.06 + 0.04 * math.sin(frac * math.pi * 2.0 + 0.6)).clamp(0.04, 0.11);
+      final normalizedHeight = lerpDouble(restingHeight, activeHeight, energy)!;
 
       final barHeight = size.height * normalizedHeight;
-      final y = size.height - barHeight - 3;
+      final y = size.height - barHeight - 4.5;
 
       final rect = Rect.fromLTWH(x, y, barWidth, barHeight);
       final rrect = RRect.fromRectAndRadius(rect, Radius.circular(barWidth / 2));
 
-      final topAlpha = (isDark ? 0.75 : 0.65) * (0.6 + 0.4 * normalizedHeight);
-      final bottomAlpha = isDark ? 0.28 : 0.20;
+      final barColor = Color.lerp(accentColor, secondaryAccent, frac)!;
+      final topAlpha =
+          (isDark ? 0.62 : 0.50) * (0.45 + 0.55 * normalizedHeight);
+      final bottomAlpha = isDark ? 0.14 : 0.10;
 
       final paint = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            accentColor.withValues(alpha: topAlpha),
-            accentColor.withValues(alpha: bottomAlpha),
+            Color.alphaBlend(
+              Colors.white.withValues(alpha: isDark ? 0.32 : 0.18),
+              barColor,
+            ).withValues(alpha: topAlpha),
+            barColor.withValues(alpha: bottomAlpha),
           ],
         ).createShader(rect);
 
       canvas.drawRRect(rrect, paint);
+
+      // Luminous floating peak cap dot on energetic peaks
+      if (energy > 0.15 && normalizedHeight > 0.28) {
+        final peakY = (y - 3.2 - 2.2 * wave2).clamp(4.0, size.height - 6.0);
+        canvas.drawCircle(
+          Offset(x + barWidth / 2, peakY),
+          1.4,
+          Paint()
+            ..color = highlightTip.withValues(
+              alpha: (isDark ? 0.72 : 0.55) * energy * normalizedHeight,
+            ),
+        );
+      }
     }
   }
 
   @override
   bool shouldRepaint(covariant _MiniEqualizerPainter oldDelegate) =>
       progress != oldDelegate.progress ||
-      isPlaying != oldDelegate.isPlaying ||
+      energy != oldDelegate.energy ||
       accentColor != oldDelegate.accentColor ||
       isDark != oldDelegate.isDark;
 }
@@ -1625,6 +1916,7 @@ class _MiniProgress extends ConsumerStatefulWidget {
     this.height = 3,
     this.rounded = false,
     this.textColor,
+    this.accentColorOverride,
     super.key,
   });
 
@@ -1632,6 +1924,7 @@ class _MiniProgress extends ConsumerStatefulWidget {
   final double height;
   final bool rounded;
   final Color? textColor;
+  final Color? accentColorOverride;
 
   @override
   ConsumerState<_MiniProgress> createState() => _MiniProgressState();
@@ -1653,7 +1946,8 @@ class _MiniProgressState extends ConsumerState<_MiniProgress> {
     final timeline = TickerMode.valuesOf(context).enabled
         ? ref.watch(timelineProvider)
         : ref.read(timelineProvider);
-    final progressColor = AppColors.downloadAccentFor(context);
+    final progressColor =
+        widget.accentColorOverride ?? AppColors.downloadAccentFor(context);
     final strings = ref.watch(appStringsProvider);
     final duration = timeline.duration;
     final position = timeline.position;
@@ -1865,6 +2159,8 @@ class _MiniArtwork extends StatelessWidget {
     required this.size,
     required this.isFavorite,
     required this.circular,
+    this.isPlaying = false,
+    this.accentColor,
   });
 
   final String? url;
@@ -1872,10 +2168,13 @@ class _MiniArtwork extends StatelessWidget {
   final double size;
   final bool isFavorite;
   final bool circular;
+  final bool isPlaying;
+  final Color? accentColor;
 
   @override
   Widget build(BuildContext context) {
     final ringInset = circular ? 2.5 : 0.0;
+    final haloColor = accentColor ?? AppColors.downloadAccentFor(context);
 
     return SizedBox(
       key: const ValueKey('mini-player-artwork'),
@@ -1884,6 +2183,19 @@ class _MiniArtwork extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
+          if (circular && isPlaying)
+            DecoratedBox(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: haloColor.withValues(alpha: 0.42),
+                    blurRadius: 12,
+                    spreadRadius: 0.5,
+                  ),
+                ],
+              ),
+            ),
           if (circular)
             Padding(
               padding: EdgeInsets.all(ringInset),
@@ -1905,7 +2217,9 @@ class _MiniArtwork extends StatelessWidget {
               // Position ticks only rebuild and paint this small ring. The
               // artwork underneath keeps its image stream and raster layer.
               child: RepaintBoundary(
-                child: ExcludeSemantics(child: _MiniArtworkProgressRing()),
+                child: ExcludeSemantics(
+                  child: _MiniArtworkProgressRing(colorOverride: accentColor),
+                ),
               ),
             ),
           if (isFavorite)
@@ -1921,7 +2235,9 @@ class _MiniArtwork extends StatelessWidget {
 }
 
 class _MiniArtworkProgressRing extends ConsumerWidget {
-  const _MiniArtworkProgressRing();
+  const _MiniArtworkProgressRing({this.colorOverride});
+
+  final Color? colorOverride;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1949,10 +2265,10 @@ class _MiniArtworkProgressRing extends ConsumerWidget {
           value: animatedProgress,
           strokeWidth: 2,
           strokeCap: StrokeCap.round,
-          color: AppColors.downloadAccentFor(context),
+          color: colorOverride ?? AppColors.downloadAccentFor(context),
           backgroundColor: AppColors.menuInactiveSliderFor(
             context,
-          ).withValues(alpha: 0.55),
+          ).withValues(alpha: 0.45),
         ),
       ),
     );

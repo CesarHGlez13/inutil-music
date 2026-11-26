@@ -144,4 +144,39 @@ void main() {
     expect(tester.binding.hasScheduledFrame, isFalse);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('zoom style enlarges active line beyond inactive scale', (
+    tester,
+  ) async {
+    const transitionKey = ValueKey('zoom-transition');
+    Widget buildZoom({required bool active}) => MaterialApp(
+      home: LyricsAnimationTransition(
+        key: transitionKey,
+        style: LyricsAnimationStyle.zoom,
+        active: active,
+        accent: Colors.cyan,
+        child: const Text('Big active lyric'),
+      ),
+    );
+
+    double currentScale() {
+      final transforms = tester.widgetList<Transform>(
+        find.descendant(
+          of: find.byKey(transitionKey),
+          matching: find.byType(Transform),
+        ),
+      );
+      return transforms.last.transform.entry(0, 0);
+    }
+
+    await tester.pumpWidget(buildZoom(active: false));
+    final inactiveScale = currentScale();
+    expect(inactiveScale, closeTo(0.80, 0.01));
+
+    await tester.pumpWidget(buildZoom(active: true));
+    await tester.pumpAndSettle();
+    final activeScale = currentScale();
+    expect(activeScale, greaterThan(1.03));
+    expect(tester.takeException(), isNull);
+  });
 }

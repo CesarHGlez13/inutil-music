@@ -3696,6 +3696,7 @@ IconData _lyricsAnimationIcon(LyricsAnimationStyle style) => switch (style) {
   LyricsAnimationStyle.highlight => Icons.zoom_in_rounded,
   LyricsAnimationStyle.karaoke => Icons.waves_rounded,
   LyricsAnimationStyle.cinematic => Icons.movie_filter_rounded,
+  LyricsAnimationStyle.zoom => Icons.format_size_rounded,
 };
 
 class _LyricsAnimationPreview extends ConsumerStatefulWidget {

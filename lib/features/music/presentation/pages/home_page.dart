@@ -1015,6 +1015,12 @@ class _HomePageState extends ConsumerState<HomePage>
 
     final leavingPlayer = _isPlayerSelected && index != _playerIndex;
     final enteringPlayer = !_isPlayerSelected && index == _playerIndex;
+    if (!AppPlatform.isFlutterTest &&
+        _usesMobileNavigation &&
+        !enteringPlayer &&
+        !leavingPlayer) {
+      HapticFeedback.selectionClick();
+    }
     final revealsBottomNavigation =
         index != _playerIndex &&
         revealBottomNavigation &&
@@ -2518,6 +2524,11 @@ class _BottomNavigation extends StatelessWidget {
         ),
       );
     }
+    final selectedOrdinal = destinations.indexWhere(
+      (destination) => destination.index == selectedIndex,
+    );
+    final isDark = theme.brightness == Brightness.dark;
+    final navAccent = theme.colorScheme.primary;
     final content = SafeArea(
       top: false,
       bottom: false,
@@ -2528,7 +2539,86 @@ class _BottomNavigation extends StatelessWidget {
           constraints: BoxConstraints(
             minHeight: baseHeight(glassyCompact: glassyCompact),
           ),
-          child: navigationItems,
+          child: SizedBox(
+            height: baseHeight(glassyCompact: glassyCompact),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (selectedOrdinal >= 0 && destinations.isNotEmpty)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: _SlidingBottomNavIndicator(
+                        selectedOrdinal: selectedOrdinal,
+                        itemCount: destinations.length,
+                        accentColor: navAccent,
+                        isDark: isDark,
+                        disableAnimations:
+                            transitionDuration == Duration.zero,
+                      ),
+                    ),
+                  ),
+                navigationItems,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    final navGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: isDark
+          ? [
+              Color.lerp(
+                const Color(0xFF10131A),
+                navAccent,
+                0.14,
+              )!.withValues(alpha: transparent ? 0.62 : 0.88),
+              Color.lerp(
+                const Color(0xFF0A0C10),
+                navAccent,
+                0.08,
+              )!.withValues(alpha: transparent ? 0.80 : 0.96),
+              const Color(0xFF050608).withValues(
+                alpha: transparent ? 0.92 : 0.99,
+              ),
+            ]
+          : [
+              Color.lerp(
+                Colors.white,
+                navAccent,
+                0.07,
+              )!.withValues(alpha: transparent ? 0.68 : 0.90),
+              Color.lerp(
+                const Color(0xFFF6F7F9),
+                navAccent,
+                0.04,
+              )!.withValues(alpha: transparent ? 0.84 : 0.96),
+              const Color(0xFFF2F4F7).withValues(
+                alpha: transparent ? 0.94 : 0.99,
+              ),
+            ],
+      stops: const [0.0, 0.45, 1.0],
+    );
+    final topRimHairline = Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 1.0,
+      child: IgnorePointer(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.transparent,
+                navAccent.withValues(alpha: isDark ? 0.34 : 0.24),
+                Colors.white.withValues(alpha: isDark ? 0.28 : 0.72),
+                navAccent.withValues(alpha: isDark ? 0.34 : 0.24),
+                Colors.transparent,
+              ],
+              stops: const [0.0, 0.22, 0.5, 0.78, 1.0],
+            ),
+          ),
         ),
       ),
     );
@@ -2540,7 +2630,15 @@ class _BottomNavigation extends StatelessWidget {
             top: BorderSide(color: theme.colorScheme.outlineVariant),
           ),
         ),
-        child: content,
+        child: DecoratedBox(
+          decoration: BoxDecoration(gradient: navGradient),
+          child: Stack(
+            children: [
+              content,
+              topRimHairline,
+            ],
+          ),
+        ),
       );
     }
 
@@ -2558,17 +2656,200 @@ class _BottomNavigation extends StatelessWidget {
           top: BorderSide(color: theme.colorScheme.outlineVariant),
         ),
       ),
-      child: content,
+      child: DecoratedBox(
+        decoration: BoxDecoration(gradient: navGradient),
+        child: Stack(
+          children: [
+            content,
+            topRimHairline,
+          ],
+        ),
+      ),
     );
     return ClipRect(
       key: const ValueKey('bottom-navigation-glass'),
       child: BackdropFilter(
         filter: ImageFilter.blur(
-          sigmaX: transparent ? 14 : 16,
-          sigmaY: transparent ? 14 : 16,
+          sigmaX: transparent ? 16 : 20,
+          sigmaY: transparent ? 16 : 20,
         ),
         child: surface,
       ),
+    );
+  }
+}
+
+class _SlidingBottomNavIndicator extends StatefulWidget {
+  const _SlidingBottomNavIndicator({
+    required this.selectedOrdinal,
+    required this.itemCount,
+    required this.accentColor,
+    required this.isDark,
+    required this.disableAnimations,
+  });
+
+  final int selectedOrdinal;
+  final int itemCount;
+  final Color accentColor;
+  final bool isDark;
+  final bool disableAnimations;
+
+  @override
+  State<_SlidingBottomNavIndicator> createState() =>
+      _SlidingBottomNavIndicatorState();
+}
+
+class _SlidingBottomNavIndicatorState extends State<_SlidingBottomNavIndicator>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late double _fromOrdinal;
+  late double _toOrdinal;
+
+  @override
+  void initState() {
+    super.initState();
+    _fromOrdinal = widget.selectedOrdinal.toDouble();
+    _toOrdinal = widget.selectedOrdinal.toDouble();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: 1.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _SlidingBottomNavIndicator oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedOrdinal != widget.selectedOrdinal) {
+      final current = lerpDouble(
+        _fromOrdinal,
+        _toOrdinal,
+        Curves.easeOutCubic.transform(_controller.value),
+      )!;
+      _fromOrdinal = current;
+      _toOrdinal = widget.selectedOrdinal.toDouble();
+      if (widget.disableAnimations) {
+        _controller.value = 1.0;
+      } else {
+        _controller.forward(from: 0.0);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.itemCount <= 0) return const SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final slotWidth = constraints.maxWidth / widget.itemCount;
+        final pillWidth = math.max(44.0, slotWidth - 10.0);
+        return AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            final t = Curves.easeOutCubic.transform(_controller.value);
+            final ordinal = lerpDouble(_fromOrdinal, _toOrdinal, t)!;
+            final centerX = (ordinal + 0.5) * slotWidth;
+            final left = centerX - pillWidth / 2;
+            final highlightColor = Color.alphaBlend(
+              Colors.white.withValues(alpha: widget.isDark ? 0.35 : 0.25),
+              widget.accentColor,
+            );
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Subtle ambient glow pool tracking the active tab
+                Positioned(
+                  left: centerX - slotWidth * 0.75,
+                  top: -8,
+                  width: slotWidth * 1.5,
+                  height: constraints.maxHeight + 8,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(0, -0.35),
+                        radius: 0.9,
+                        colors: [
+                          widget.accentColor.withValues(
+                            alpha: widget.isDark ? 0.24 : 0.14,
+                          ),
+                          widget.accentColor.withValues(alpha: 0.0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Sliding translucent gradient pill behind active icon+label
+                Positioned(
+                  left: left,
+                  top: 6,
+                  bottom: 6,
+                  width: pillWidth,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          widget.accentColor.withValues(
+                            alpha: widget.isDark ? 0.22 : 0.15,
+                          ),
+                          widget.accentColor.withValues(
+                            alpha: widget.isDark ? 0.08 : 0.05,
+                          ),
+                        ],
+                      ),
+                      border: Border.all(
+                        color: highlightColor.withValues(
+                          alpha: widget.isDark ? 0.26 : 0.20,
+                        ),
+                        width: 0.75,
+                      ),
+                    ),
+                  ),
+                ),
+                // Crisp luminous top beacon aligned to the active slot
+                Positioned(
+                  left: centerX - 15,
+                  top: 0,
+                  width: 30,
+                  height: 2.4,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(99),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [
+                          widget.accentColor.withValues(alpha: 0.2),
+                          highlightColor,
+                          widget.accentColor.withValues(alpha: 0.2),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.accentColor.withValues(alpha: 0.65),
+                          blurRadius: 8,
+                          spreadRadius: 0.5,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -3045,7 +3326,7 @@ class _DetachedSearchButton extends StatelessWidget {
   }
 }
 
-class _BottomNavigationItem extends StatelessWidget {
+class _BottomNavigationItem extends StatefulWidget {
   const _BottomNavigationItem({
     required this.destinationIndex,
     required this.glyph,
@@ -3071,65 +3352,110 @@ class _BottomNavigationItem extends StatelessWidget {
   final bool iconOnly;
 
   @override
+  State<_BottomNavigationItem> createState() => _BottomNavigationItemState();
+}
+
+class _BottomNavigationItemState extends State<_BottomNavigationItem>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+      reverseDuration: const Duration(milliseconds: 200),
+      value: widget.selected ? 1.0 : 0.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _BottomNavigationItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selected != widget.selected) {
+      final disableAnimations =
+          AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
+      if (disableAnimations) {
+        _controller.value = widget.selected ? 1.0 : 0.0;
+      } else if (widget.selected) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final active = colors.primary;
     final inactive = colors.onSurfaceVariant.withValues(alpha: 0.72);
-    final duration = MediaQuery.disableAnimationsOf(context)
-        ? Duration.zero
-        : const Duration(milliseconds: 260);
-    final animatedSelection = TweenAnimationBuilder<double>(
-      key: ValueKey('bottom-navigation-selection-$destinationIndex'),
-      tween: Tween<double>(end: selected ? 1 : 0),
-      duration: duration,
-      curve: Curves.easeOutCubic,
-      builder: (context, value, _) {
+    final animatedSelection = AnimatedBuilder(
+      key: ValueKey('bottom-navigation-selection-${widget.destinationIndex}'),
+      animation: _controller,
+      builder: (context, _) {
+        final raw = _controller.value;
+        final value = Curves.easeOutCubic.transform(raw);
+        final pop = widget.selected
+            ? const Cubic(0.22, 1.24, 0.34, 1.0).transform(raw)
+            : value;
         final foreground = Color.lerp(inactive, active, value)!;
-        if (iconOnly) {
+        if (widget.iconOnly) {
           return Center(
             child: Transform.scale(
-              key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
-              scale: lerpDouble(1, 1.12, value)!,
+              key: ValueKey(
+                'bottom-navigation-icon-scale-${widget.destinationIndex}',
+              ),
+              scale: lerpDouble(1.0, 1.14, pop)!,
               child: InutilIcon(
-                glyph,
+                widget.glyph,
                 color: foreground,
                 size: 26,
-                filled: selected,
+                filled: widget.selected,
               ),
             ),
           );
         }
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: liquidGlass
-                ? Colors.transparent
-                : active.withValues(alpha: 0.08 * value),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Transform.scale(
-                key: ValueKey('bottom-navigation-icon-scale-$destinationIndex'),
-                scale: lerpDouble(1, 1.12, value)!,
-                child: InutilIcon(
-                  glyph,
-                  color: foreground,
-                  size: 25,
-                  filled: value > 0.5,
+              Transform.translate(
+                offset: Offset(0, lerpDouble(0.0, -2.0, pop)!),
+                child: Transform.scale(
+                  key: ValueKey(
+                    'bottom-navigation-icon-scale-${widget.destinationIndex}',
+                  ),
+                  scale: lerpDouble(1.0, 1.14, pop)!,
+                  child: InutilIcon(
+                    widget.glyph,
+                    color: foreground,
+                    size: 25,
+                    filled: value > 0.45,
+                  ),
                 ),
               ),
               const SizedBox(height: 3),
               Text(
-                label,
+                widget.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall!.copyWith(
                   color: foreground,
                   fontSize: 11.2,
-                  letterSpacing: 0.1,
+                  letterSpacing: lerpDouble(0.05, 0.18, value),
                   fontWeight: FontWeight.lerp(
                     FontWeight.w500,
                     FontWeight.w800,
@@ -3137,13 +3463,30 @@ class _BottomNavigationItem extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 2.5),
               Container(
-                width: lerpDouble(0, 16, value)!,
+                width: lerpDouble(0, 18, value)!,
                 height: 2.5,
                 decoration: BoxDecoration(
-                  color: active.withValues(alpha: value),
+                  gradient: LinearGradient(
+                    colors: [
+                      active.withValues(alpha: 0.45 * value),
+                      Color.alphaBlend(
+                        Colors.white.withValues(alpha: 0.35),
+                        active,
+                      ).withValues(alpha: value),
+                      active.withValues(alpha: 0.45 * value),
+                    ],
+                  ),
                   borderRadius: BorderRadius.circular(99),
+                  boxShadow: value > 0.2
+                      ? [
+                          BoxShadow(
+                            color: active.withValues(alpha: 0.45 * value),
+                            blurRadius: 6,
+                          ),
+                        ]
+                      : null,
                 ),
               ),
             ],
@@ -3151,16 +3494,18 @@ class _BottomNavigationItem extends StatelessWidget {
         );
       },
     );
-    final scaledSelection = liquidGlass
+    final scaledSelection = widget.liquidGlass
         ? MediaQuery.withClampedTextScaling(
             maxScaleFactor: 1.35,
             child: animatedSelection,
           )
         : animatedSelection;
-    final item = liquidGlass
+    final item = widget.liquidGlass
         ? LiquidGlassHoverTarget(
-            key: ValueKey('bottom-navigation-hover-glass-$destinationIndex'),
-            borderRadius: BorderRadius.circular(iconOnly ? 32 : 22),
+            key: ValueKey(
+              'bottom-navigation-hover-glass-${widget.destinationIndex}',
+            ),
+            borderRadius: BorderRadius.circular(widget.iconOnly ? 32 : 22),
             intensity: 0.72,
             // Bottom navigation is touch chrome on Android, including when it
             // is hosted by an emulator with a desktop mouse attached. Keeping
@@ -3171,42 +3516,51 @@ class _BottomNavigationItem extends StatelessWidget {
           )
         : scaledSelection;
     final control = InkWell(
-      key: ValueKey('bottom-navigation-item-$destinationIndex'),
-      onTap: onTap,
-      borderRadius: iconOnly ? null : BorderRadius.circular(appNavItemRadius),
-      customBorder: iconOnly ? const CircleBorder() : null,
-      splashFactory: liquidGlass ? NoSplash.splashFactory : null,
-      overlayColor: liquidGlass
+      key: ValueKey('bottom-navigation-item-${widget.destinationIndex}'),
+      onTap: widget.onTap,
+      borderRadius: widget.iconOnly
+          ? null
+          : BorderRadius.circular(appNavItemRadius),
+      customBorder: widget.iconOnly ? const CircleBorder() : null,
+      splashFactory: widget.liquidGlass ? NoSplash.splashFactory : null,
+      overlayColor: widget.liquidGlass
           ? WidgetStateProperty.resolveWith((states) {
               if (states.contains(WidgetState.focused)) {
                 return active.withValues(alpha: 0.12);
               }
               return Colors.transparent;
             })
-          : null,
+          : WidgetStateProperty.resolveWith((states) {
+              if (states.contains(WidgetState.pressed)) {
+                return active.withValues(alpha: 0.14);
+              }
+              return Colors.transparent;
+            }),
       child: item,
     );
-    if (!liquidGlass) {
+    if (!widget.liquidGlass) {
       return control;
     }
     final semantics = Semantics(
       key:
-          semanticsKey ??
-          ValueKey('bottom-navigation-primary-destination-$destinationIndex'),
-      label: label,
-      hint: semanticsHint,
+          widget.semanticsKey ??
+          ValueKey(
+            'bottom-navigation-primary-destination-${widget.destinationIndex}',
+          ),
+      label: widget.label,
+      hint: widget.semanticsHint,
       button: true,
-      selected: selected,
-      expanded: semanticsExpanded,
-      onTap: onTap,
+      selected: widget.selected,
+      expanded: widget.semanticsExpanded,
+      onTap: widget.onTap,
       excludeSemantics: true,
       child: control,
     );
-    if (!iconOnly) {
+    if (!widget.iconOnly) {
       return semantics;
     }
     return Tooltip(
-      message: label,
+      message: widget.label,
       excludeFromSemantics: true,
       child: semantics,
     );
@@ -3620,6 +3974,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
       widget.selectedIndex == widget.playerIndex;
   Timer? _playerTransitionMilestoneTimer;
   int? _playerTransitionOriginIndex;
+  int _tabTransitionDirection = 1;
 
   @override
   void initState() {
@@ -3643,6 +3998,12 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
   void didUpdateWidget(covariant _PersistentCurrentViews oldWidget) {
     super.didUpdateWidget(oldWidget);
     _visitedIndexes.add(widget.selectedIndex);
+    if (widget.selectedIndex != oldWidget.selectedIndex &&
+        widget.selectedIndex != widget.playerIndex &&
+        oldWidget.selectedIndex != widget.playerIndex) {
+      _tabTransitionDirection =
+          widget.selectedIndex > oldWidget.selectedIndex ? 1 : -1;
+    }
     if (widget.selectedIndex != oldWidget.selectedIndex &&
         (widget.selectedIndex == widget.playerIndex ||
             oldWidget.selectedIndex == widget.playerIndex)) {
@@ -3724,6 +4085,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             instantVisibilityChange: _switchBrowsingViewImmediately(
               widget.homeIndex,
             ),
+            transitionDirection: _tabTransitionDirection,
             bottomPadding: widget.viewportBottomPadding,
             child: _homeContent.resolve(
               (
@@ -3746,6 +4108,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             instantVisibilityChange: _switchBrowsingViewImmediately(
               widget.searchIndex,
             ),
+            transitionDirection: _tabTransitionDirection,
             bottomPadding: widget.viewportBottomPadding,
             child: _searchContent.resolve(
               (
@@ -3770,6 +4133,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             instantVisibilityChange: _switchBrowsingViewImmediately(
               widget.localIndex,
             ),
+            transitionDirection: _tabTransitionDirection,
             bottomPadding: widget.viewportBottomPadding,
             child: _localContent.resolve(
               (
@@ -3792,6 +4156,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             instantVisibilityChange: _switchBrowsingViewImmediately(
               widget.libraryIndex,
             ),
+            transitionDirection: _tabTransitionDirection,
             bottomPadding: widget.viewportBottomPadding,
             child: _libraryContent.resolve(
               (
@@ -3814,6 +4179,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             instantVisibilityChange: _switchBrowsingViewImmediately(
               widget.settingsIndex,
             ),
+            transitionDirection: _tabTransitionDirection,
             bottomPadding: widget.viewportBottomPadding,
             child: _settingsContent.resolve(
               (
@@ -3900,6 +4266,7 @@ class _PersistentViewSlot extends StatefulWidget {
     this.transitionStyle = _PersistentViewTransitionStyle.tab,
     this.transitionDuration,
     this.reverseTransitionDuration,
+    this.transitionDirection = 1,
     this.keepTickerEnabled = false,
     this.animateInitialEntry = true,
     this.keepVisible = false,
@@ -3918,6 +4285,7 @@ class _PersistentViewSlot extends StatefulWidget {
   final _PersistentViewTransitionStyle transitionStyle;
   final Duration? transitionDuration;
   final Duration? reverseTransitionDuration;
+  final int transitionDirection;
   final bool keepTickerEnabled;
   final bool animateInitialEntry;
   final bool keepVisible;
@@ -3932,12 +4300,29 @@ class _PersistentViewSlot extends StatefulWidget {
   State<_PersistentViewSlot> createState() => _PersistentViewSlotState();
 }
 
-class _PersistentViewSlotState extends State<_PersistentViewSlot> {
+class _PersistentViewSlotState extends State<_PersistentViewSlot>
+    with SingleTickerProviderStateMixin {
   bool _hasEntered = false;
+  late final AnimationController _tabController;
+  int _activeDirection = 1;
+
+  bool get _isPlayerStyle =>
+      widget.transitionStyle == _PersistentViewTransitionStyle.player;
 
   @override
   void initState() {
     super.initState();
+    _activeDirection = widget.transitionDirection;
+    _tabController = AnimationController(
+      vsync: this,
+      duration: widget.transitionDuration ?? const Duration(milliseconds: 280),
+      reverseDuration:
+          widget.reverseTransitionDuration ?? const Duration(milliseconds: 220),
+      value: widget.selected && !widget.animateInitialEntry ? 1.0 : 0.0,
+      animationBehavior: AppPlatform.isFlutterTest
+          ? AnimationBehavior.normal
+          : AnimationBehavior.preserve,
+    );
     if (widget.selected) {
       // A player restored as the initial destination has no preceding shell
       // state to transition from. Mount it fully visible on its first frame.
@@ -3954,7 +4339,10 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
   @override
   void didUpdateWidget(covariant _PersistentViewSlot oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final wasVisible = oldWidget.selected || oldWidget.keepVisible;
+    final nowVisible = widget.selected || widget.keepVisible;
     if (widget.selected && !oldWidget.selected) {
+      _activeDirection = widget.transitionDirection;
       if (widget.instantVisibilityChange) {
         _hasEntered = true;
       } else if (!_hasEntered) {
@@ -3963,6 +4351,42 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
         // its target immediately avoids adding a frame of input latency.
         _scheduleEntryAnimation();
       }
+    } else if (!widget.selected && oldWidget.selected) {
+      _activeDirection = widget.transitionDirection;
+    }
+
+    if (!_isPlayerStyle &&
+        (wasVisible != nowVisible ||
+            widget.instantVisibilityChange !=
+                oldWidget.instantVisibilityChange)) {
+      _syncTabAnimation(nowVisible);
+    }
+  }
+
+  void _syncTabAnimation(bool visible) {
+    if (_isPlayerStyle) return;
+    final disableAnimations =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
+    final enterDuration =
+        widget.transitionDuration ?? const Duration(milliseconds: 280);
+    final exitDuration =
+        widget.reverseTransitionDuration ?? const Duration(milliseconds: 220);
+    if (disableAnimations ||
+        widget.instantVisibilityChange ||
+        enterDuration == Duration.zero) {
+      _tabController.value = visible ? 1.0 : 0.0;
+    } else if (visible) {
+      _tabController.animateTo(
+        1.0,
+        duration: enterDuration,
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _tabController.animateTo(
+        0.0,
+        duration: exitDuration,
+        curve: Curves.easeInOutCubic,
+      );
     }
   }
 
@@ -3970,8 +4394,17 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         setState(() => _hasEntered = true);
+        if (!_isPlayerStyle && (widget.selected || widget.keepVisible)) {
+          _syncTabAnimation(true);
+        }
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -3983,14 +4416,17 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
         AppColors.surfaceBackgroundModeFor(context).isLiquidGlass;
     final duration = disableAnimations || widget.instantVisibilityChange
         ? Duration.zero
-        : widget.transitionDuration ?? const Duration(milliseconds: 320);
+        : widget.transitionDuration ?? const Duration(milliseconds: 280);
     final reverseDuration = disableAnimations || widget.instantVisibilityChange
         ? Duration.zero
-        : widget.reverseTransitionDuration ?? duration;
+        : widget.reverseTransitionDuration ??
+              const Duration(milliseconds: 220);
     final visible = widget.selected || widget.keepVisible;
     final entered = visible && (_hasEntered || disableAnimations);
-    final playerTransition =
-        widget.transitionStyle == _PersistentViewTransitionStyle.player;
+    if (!_isPlayerStyle && disableAnimations) {
+      _tabController.value = entered ? 1.0 : 0.0;
+    }
+    final playerTransition = _isPlayerStyle;
     final tickerContent = TickerMode(
       enabled: widget.selected || widget.keepTickerEnabled,
       // Browsing pages keep their original safe viewport throughout player
@@ -4022,25 +4458,31 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
             morphOriginBorderRadius: widget.morphOriginBorderRadius,
             child: tickerContent,
           )
-        : AnimatedOpacity(
-            opacity: entered ? 1 : 0,
-            duration: duration,
-            // A symmetric fade keeps the outgoing view visible while a newly
-            // visited, data-heavy tab completes its first frame. An ease-out
-            // here made both slots nearly transparent at once and produced a
-            // brief dark flash on slower Android devices.
-            curve: Curves.easeInOutCubic,
-            child: AnimatedSlide(
-              // Moving a backdrop by even a few pixels changes its intermediate
-              // texture bounds every frame. A pure fade keeps Android's glass
-              // captures reusable throughout the tab transition.
-              offset: entered || stableGlassTabGeometry
-                  ? Offset.zero
-                  : const Offset(0.018, 0),
-              duration: duration,
-              curve: Curves.easeOutCubic,
-              child: RepaintBoundary(child: tickerContent),
-            ),
+        : AnimatedBuilder(
+            animation: _tabController,
+            child: RepaintBoundary(child: tickerContent),
+            builder: (context, child) {
+              final value = _tabController.value;
+              final isHidden = !visible && value <= 0.001;
+              final slideFactor = stableGlassTabGeometry
+                  ? 0.0
+                  : (1.0 - value) *
+                        (widget.selected ? 0.032 : -0.022) *
+                        _activeDirection;
+              final scale = stableGlassTabGeometry
+                  ? 1.0
+                  : lerpDouble(widget.selected ? 0.986 : 0.992, 1.0, value)!;
+              return Offstage(
+                offstage: isHidden,
+                child: Opacity(
+                  opacity: value.clamp(0.0, 1.0),
+                  child: FractionalTranslation(
+                    translation: Offset(slideFactor, 0),
+                    child: Transform.scale(scale: scale, child: child),
+                  ),
+                ),
+              );
+            },
           );
 
     return Positioned.fill(

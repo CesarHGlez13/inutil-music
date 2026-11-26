@@ -3,7 +3,8 @@ enum LyricsAnimationStyle {
   slide,
   highlight,
   karaoke,
-  cinematic;
+  cinematic,
+  zoom;
 
   String get code => name;
 
@@ -13,6 +14,7 @@ enum LyricsAnimationStyle {
       'highlight' => LyricsAnimationStyle.highlight,
       'karaoke' => LyricsAnimationStyle.karaoke,
       'cinematic' => LyricsAnimationStyle.cinematic,
+      'zoom' => LyricsAnimationStyle.zoom,
       _ => LyricsAnimationStyle.smooth,
     };
   }

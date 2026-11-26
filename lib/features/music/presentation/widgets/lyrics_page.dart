@@ -2907,6 +2907,13 @@ class _SyncedLyricsTimelineState extends ConsumerState<_SyncedLyricsTimeline>
   Widget build(BuildContext context) {
     final strings = ref.watch(appStringsProvider);
     final typography = _lyricsTypographyFor(context);
+    final isZoomStyle = widget.animationStyle == LyricsAnimationStyle.zoom;
+    final effectiveActiveFontSize = isZoomStyle
+        ? typography.active + 7.0
+        : typography.active;
+    final effectiveInactiveFontSize = isZoomStyle
+        ? math.max(14.0, typography.inactive - 3.0)
+        : typography.inactive;
     final viewportHeight = MediaQuery.sizeOf(context).height;
     final verticalPadding = (viewportHeight * 0.27).clamp(96.0, 260.0);
     final horizontalPadding =
@@ -2931,8 +2938,8 @@ class _SyncedLyricsTimelineState extends ConsumerState<_SyncedLyricsTimeline>
         );
         final metricsChanged = _ensureLineMetrics(
           contentWidth: contentWidth,
-          activeFontSize: typography.active,
-          inactiveFontSize: typography.inactive,
+          activeFontSize: effectiveActiveFontSize,
+          inactiveFontSize: effectiveInactiveFontSize,
           inheritedStyle: defaultTextStyle.style,
           textHeightBehavior: textHeightBehavior,
           textWidthBasis: defaultTextStyle.textWidthBasis,
@@ -3051,8 +3058,8 @@ class _SyncedLyricsTimelineState extends ConsumerState<_SyncedLyricsTimeline>
                       selected: widget.selectedLines.contains(sourceIndex),
                       lyricsCentered: widget.lyricsCentered,
                       animationStyle: widget.animationStyle,
-                      activeFontSize: typography.active,
-                      inactiveFontSize: typography.inactive,
+                      activeFontSize: effectiveActiveFontSize,
+                      inactiveFontSize: effectiveInactiveFontSize,
                       onTap: widget.selectingLines
                           ? () => widget.onSelectLine(sourceIndex)
                           : () => _seekToTimestamp(line.timestamp),

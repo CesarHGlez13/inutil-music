@@ -10,6 +10,7 @@ const _kLyricsSlideDuration = Duration(milliseconds: 550);
 const _kLyricsHighlightDuration = Duration(milliseconds: 570);
 const _kLyricsKaraokeDuration = Duration(milliseconds: 540);
 const _kLyricsCinematicDuration = Duration(milliseconds: 620);
+const _kLyricsZoomDuration = Duration(milliseconds: 560);
 const _kLyricsExitDuration = Duration(milliseconds: 460);
 
 const _kLyricsSmoothInactiveScale = 0.965;
@@ -30,6 +31,10 @@ const _kLyricsKaraokeInactiveOpacity = 0.50;
 const _kLyricsCinematicActiveScale = 1.04;
 const _kLyricsCinematicInactiveScale = 0.935;
 const _kLyricsCinematicInactiveOpacity = 0.42;
+
+const _kLyricsZoomActiveScale = 1.045;
+const _kLyricsZoomInactiveScale = 0.80;
+const _kLyricsZoomInactiveOpacity = 0.34;
 
 class LyricsAnimationTransition extends StatefulWidget {
   const LyricsAnimationTransition({
@@ -192,6 +197,7 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
       LyricsAnimationStyle.highlight => _kLyricsHighlightDuration,
       LyricsAnimationStyle.karaoke => _kLyricsKaraokeDuration,
       LyricsAnimationStyle.cinematic => _kLyricsCinematicDuration,
+      LyricsAnimationStyle.zoom => _kLyricsZoomDuration,
     };
   }
 
@@ -201,6 +207,7 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
       curve: switch (style) {
         LyricsAnimationStyle.karaoke => const Cubic(0.22, 1.0, 0.32, 1.0),
         LyricsAnimationStyle.cinematic => Curves.easeOutQuart,
+        LyricsAnimationStyle.zoom => const Cubic(0.20, 1.12, 0.30, 1.0),
         _ => Curves.easeOutCubic,
       },
       reverseCurve: Curves.easeInOutCubic,
@@ -344,6 +351,25 @@ class _LyricsAnimationTransitionState extends State<LyricsAnimationTransition>
               ),
             ),
           ),
+          LyricsAnimationStyle.zoom => Opacity(
+            opacity: lerpDouble(
+              _kLyricsZoomInactiveOpacity,
+              1.0,
+              value.clamp(0.0, 1.0),
+            ),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(6.0, -3.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(
+                  _kLyricsZoomInactiveScale,
+                  _kLyricsZoomActiveScale,
+                  value,
+                ),
+                alignment: alignment,
+                child: child,
+              ),
+            ),
+          ),
         };
       },
       child: widget.child,
@@ -455,6 +481,21 @@ class LyricsAnimationPreviewTransition extends StatelessWidget {
               ),
             ),
           ),
+          LyricsAnimationStyle.zoom => Opacity(
+            opacity: lerpDouble(
+              _kLyricsZoomInactiveOpacity,
+              1,
+              value.clamp(0.0, 1.0),
+            ),
+            child: Transform.translate(
+              offset: Offset(0, lerpDouble(6.0, -3.0, value)),
+              child: Transform.scale(
+                scale: lerpDouble(0.76, 1.14, value),
+                alignment: alignment,
+                child: child,
+              ),
+            ),
+          ),
         };
       },
       child: child,
@@ -468,6 +509,7 @@ class LyricsAnimationPreviewTransition extends StatelessWidget {
       LyricsAnimationStyle.highlight => _kLyricsHighlightDuration,
       LyricsAnimationStyle.karaoke => _kLyricsKaraokeDuration,
       LyricsAnimationStyle.cinematic => _kLyricsCinematicDuration,
+      LyricsAnimationStyle.zoom => _kLyricsZoomDuration,
     };
   }
 }

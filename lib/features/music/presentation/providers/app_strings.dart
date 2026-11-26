@@ -630,6 +630,7 @@ class AppStrings {
       choose('Reproducir animación', 'Play animation');
   String get lyricsAnimationKaraoke => choose('Ola luminosa', 'Luminous wave');
   String get lyricsAnimationCinematic => choose('Cinemático', 'Cinematic');
+  String get lyricsAnimationZoom => choose('Aumento', 'Zoom');
   String get lyricsBackdropOpacity =>
       choose('Opacidad del fondo', 'Backdrop opacity');
   String get lyricsBackdropOpacityHint => choose(
@@ -642,6 +643,7 @@ class AppStrings {
     LyricsAnimationStyle.highlight => lyricsAnimationHighlight,
     LyricsAnimationStyle.karaoke => lyricsAnimationKaraoke,
     LyricsAnimationStyle.cinematic => lyricsAnimationCinematic,
+    LyricsAnimationStyle.zoom => lyricsAnimationZoom,
   };
   String get retry => choose('Reintentar', 'Retry');
   String get lyricsSource =>
