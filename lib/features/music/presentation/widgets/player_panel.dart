@@ -64,6 +64,7 @@ import 'playback_dark_theme.dart';
 import 'playback_gradient_background.dart';
 import 'playback_menu_bottom_sheet.dart';
 import 'player_dismiss_region.dart';
+import 'player_gestures_wrapper.dart';
 import 'playlist_picker_dialog.dart';
 import 'source_image.dart';
 import 'spotify_canvas_video.dart';
@@ -1549,20 +1550,35 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                           _hadTrack = nextHasTrack;
                         });
                       }
-                      return AnimatedSwitcher(
-                        key: const ValueKey('player-canvas-mode-switcher'),
-                        duration: modeSwitchInDuration,
-                        reverseDuration: modeSwitchOutDuration,
-                        switchInCurve: Curves.easeInOutCubic,
-                        switchOutCurve: Curves.easeInOutCubic,
-                        layoutBuilder: (currentChild, previousChildren) =>
-                            Stack(
-                              fit: StackFit.expand,
-                              children: [...previousChildren, ?currentChild],
-                            ),
-                        transitionBuilder: (child, animation) =>
-                            FadeTransition(opacity: animation, child: child),
-                        child: activePlayerLayout,
+                      return PlayerGesturesWrapper(
+                        onNextTrack: () => ref.read(playerControllerProvider.notifier).playNext(),
+                        onPreviousTrack: () => ref.read(playerControllerProvider.notifier).playPrevious(),
+                        onMinimize: widget.onCollapse,
+                        onOpenLyrics: _openLyrics,
+                        onSeekRelative: (delta) {
+                          final current = snapshot.position;
+                          final duration = snapshot.duration;
+                          final target = current + delta;
+                          final clamped = target < Duration.zero
+                              ? Duration.zero
+                              : (duration != null && target > duration ? duration : target);
+                          ref.read(playerControllerProvider.notifier).seek(clamped);
+                        },
+                        child: AnimatedSwitcher(
+                          key: const ValueKey('player-canvas-mode-switcher'),
+                          duration: modeSwitchInDuration,
+                          reverseDuration: modeSwitchOutDuration,
+                          switchInCurve: Curves.easeInOutCubic,
+                          switchOutCurve: Curves.easeInOutCubic,
+                          layoutBuilder: (currentChild, previousChildren) =>
+                              Stack(
+                                fit: StackFit.expand,
+                                children: [...previousChildren, ?currentChild],
+                              ),
+                          transitionBuilder: (child, animation) =>
+                              FadeTransition(opacity: animation, child: child),
+                          child: activePlayerLayout,
+                        ),
                       );
                     },
                   ),
