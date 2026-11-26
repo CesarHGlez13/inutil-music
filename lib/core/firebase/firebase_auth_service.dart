@@ -180,7 +180,9 @@ class InutilUser {
 ///   * La licencia (vigencia/estado/rol) vive en Firestore `users/{uid}` y la
 ///     controla el administrador. Sin documento vigente no se reproduce nada.
 class InutilAuthService extends ChangeNotifier {
-  InutilAuthService._();
+  InutilAuthService._() {
+    FirebaseConfig.activeSessionTokenProvider = () => _currentUser?.idToken ?? '';
+  }
   static final InutilAuthService instance = InutilAuthService._();
 
   static const _storageUserKey = 'inutil_music_auth_user_v3';
@@ -871,12 +873,33 @@ class InutilAuthService extends ChangeNotifier {
               ? account.displayName!
               : email.split('@').first);
 
+    final role = (data['role'] as String?) ??
+        (data['fields']?['role'] as String?) ??
+        (isBootstrapAdminEmail(email) ? 'admin' : 'user');
+    final status = (data['status'] as String?) ??
+        (data['fields']?['status'] as String?) ??
+        (isBootstrapAdminEmail(email) ? 'active' : 'pending');
+    final isActive = (data['isActive'] as bool?) ??
+        (data['fields']?['isActive'] as bool?) ??
+        true;
+    final expiresAtRaw = data['accountExpiresAt'] ??
+        data['fields']?['accountExpiresAt'];
+    final expiresAt = expiresAtRaw != null
+        ? (expiresAtRaw is DateTime
+            ? expiresAtRaw
+            : DateTime.tryParse(expiresAtRaw.toString()))
+        : (isBootstrapAdminEmail(email) ? DateTime(2099, 12, 31) : null);
+
     final user = InutilUser(
       uid: (data['localId'] ?? data['uid']) as String,
       email: email,
       displayName: displayName,
       idToken: data['idToken'] as String? ?? '',
       refreshToken: data['refreshToken'] as String? ?? '',
+      role: role,
+      status: status,
+      isActive: isActive,
+      accountExpiresAt: expiresAt,
       createdAt: DateTime.now(),
       lastLoginAt: DateTime.now(),
     );
@@ -1259,6 +1282,12 @@ class InutilAuthService extends ChangeNotifier {
   Future<Map<String, dynamic>?> _fetchVerifiedUserProfile(String uid) async {
     final remote = await InutilFirestoreService.instance.getUserProfile(uid);
     if (remote != null && remote.isNotEmpty) return remote;
+    final token = _currentUser?.idToken ?? '';
+    if (token.startsWith('inutix_')) {
+      // Las sesiones nativas de Inutix solo existen en el nodo Inutix (api.inutix.com / backup);
+      // Google Firestore las desconoce y respondería 401.
+      return remote;
+    }
     final usingRelay =
         FirebaseConfig.relayUsable ||
         FirebaseConfig.cloudRelayUsable ||

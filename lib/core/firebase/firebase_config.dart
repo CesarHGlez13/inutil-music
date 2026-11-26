@@ -161,11 +161,24 @@ class FirebaseConfig {
     _cloudRelayFailedAt = null;
   }
 
+  /// Proveedor desacoplado del token de sesión activo (evita acoplamiento circular).
+  static String Function()? activeSessionTokenProvider;
+
+  static bool get _hasInutixSession {
+    try {
+      final tok = activeSessionTokenProvider?.call() ?? '';
+      return tok.startsWith('inutix_');
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// `true` cuando el build apunta a nuestro servidor autoritativo `inutix.com`
   /// (S7 Edge / standby Xiaomi), que soporta nativamente `listening_rooms/*`,
   /// `tv_pairing/*` y `music_pairing/*` con 0 cuota en Firestore.
   static bool get isAuthoritativeInutixRelay {
     if (useEmulator) return false;
+    if (_hasInutixSession) return true;
     if (relayUsable) return true;
     final h = cloudRelayHost.trim().toLowerCase();
     return h == 'api.inutix.com' ||
@@ -177,13 +190,19 @@ class FirebaseConfig {
 
   /// La capa cloud no necesita sonda de TCP: vive en internet y el propio
   /// request fallido es la señal.
-  static bool get cloudRelayUsable =>
-      !useEmulator &&
-      cloudRelayHost.trim().isNotEmpty &&
-      _cloudRelayCurrentlyReachable;
+  static bool get cloudRelayUsable {
+    if (useEmulator) return false;
+    if (cloudRelayHost.trim().isNotEmpty) return _cloudRelayCurrentlyReachable;
+    if (_hasInutixSession) return _cloudRelayCurrentlyReachable;
+    return false;
+  }
 
-  static bool get backupRelayUsable =>
-      !useEmulator && backupRelayHost.trim().isNotEmpty;
+  static bool get backupRelayUsable {
+    if (useEmulator) return false;
+    if (backupRelayHost.trim().isNotEmpty) return true;
+    if (_hasInutixSession) return true;
+    return false;
+  }
 
   // ---------------------------------------------------------------------------
   // Fallback de alcance del relay (decidido por Cesar el 2026-11-20)
@@ -353,19 +372,27 @@ class FirebaseConfig {
   /// está yendo esta app ahora mismo" lee `dataTier`, no tiene que reimplementar
   /// el árbol.
   @visibleForTesting
-  static RelayTierInputs get relayTierInputs => RelayTierInputs(
-    lanHost: relayHost,
-    lanPort: relayPort,
-    emulator: useEmulator,
-    lanReachable: _relayReachable,
-    cloudHost: cloudRelayHost,
-    cloudScheme: cloudRelayScheme,
-    cloudPort: cloudRelayPort,
-    cloudReachable: _cloudRelayCurrentlyReachable,
-    backupHost: backupRelayHost,
-    backupScheme: backupRelayScheme,
-    backupPort: backupRelayPort,
-  );
+  static RelayTierInputs get relayTierInputs {
+    final effectiveCloudHost = cloudRelayHost.trim().isNotEmpty
+        ? cloudRelayHost
+        : (_hasInutixSession ? 'api.inutix.com' : '');
+    final effectiveBackupHost = backupRelayHost.trim().isNotEmpty
+        ? backupRelayHost
+        : (_hasInutixSession ? 'backup.inutix.com' : '');
+    return RelayTierInputs(
+      lanHost: relayHost,
+      lanPort: relayPort,
+      emulator: useEmulator,
+      lanReachable: _relayReachable,
+      cloudHost: effectiveCloudHost,
+      cloudScheme: cloudRelayScheme,
+      cloudPort: cloudRelayPort,
+      cloudReachable: _cloudRelayCurrentlyReachable,
+      backupHost: effectiveBackupHost,
+      backupScheme: backupRelayScheme,
+      backupPort: backupRelayPort,
+    );
+  }
 
   /// Tier de datos efectivo ahora mismo.
   static RelayTier get dataTier => RelayTierSelector.select(relayTierInputs);

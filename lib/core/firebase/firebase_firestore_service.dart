@@ -283,6 +283,10 @@ class InutilFirestoreService {
   /// relays/respaldo. Se usa como doble verificación antes de declarar que una
   /// cuenta ya no existe (404).
   Future<Map<String, dynamic>?> getDocumentDirect(String path) async {
+    final token = _idToken;
+    if (token != null && token.startsWith('inutix_')) {
+      return null;
+    }
     final url = Uri.parse('${FirebaseConfig.directFirestoreBaseUrl}/$path');
     final response = await http
         .get(url, headers: _headers())
