@@ -13,6 +13,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
     required this.artworkFallbackSource,
     required this.visualIdentity,
     required this.trackTransitionsEnabled,
+    this.transitioning = false,
     this.animatedArtworkEnabled = true,
     required this.canvasUrl,
     this.isResolvingCanvas = false,
@@ -38,6 +39,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
   final String? artworkFallbackSource;
   final String visualIdentity;
   final bool trackTransitionsEnabled;
+  final bool transitioning;
   final bool animatedArtworkEnabled;
   final Uri? canvasUrl;
   final bool isResolvingCanvas;
@@ -65,16 +67,31 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
 class _SpotifyFullscreenCanvasPlayerState
     extends ConsumerState<_SpotifyFullscreenCanvasPlayer>
     with SingleTickerProviderStateMixin {
+  static final Set<_SpotifyFullscreenCanvasPlayerState> _mountedInstances = {};
+
+  static bool closeActiveInlineLyricsDrawer() {
+    for (final instance in _mountedInstances.toList()) {
+      if (instance.mounted && instance.isLyricsOpen) {
+        instance.closeLyricsDrawer();
+        return true;
+      }
+    }
+    return false;
+  }
+
   late final AnimationController _lyricsController;
   bool _canvasVideoReady = false;
   bool _lyricsSheetOpenFlag = false;
   double _viewportHeight = 760.0;
+  LocalHistoryEntry? _lyricsHistoryEntry;
+  bool _ignoreLyricsHistoryRemoval = false;
 
   bool get isLyricsOpen => _lyricsController.value > 0.05;
 
   @override
   void initState() {
     super.initState();
+    _mountedInstances.add(this);
     _lyricsController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 320),
@@ -89,6 +106,44 @@ class _SpotifyFullscreenCanvasPlayerState
     final open = _lyricsController.value > 0.05;
     if (open != _lyricsSheetOpenFlag && mounted) {
       setState(() => _lyricsSheetOpenFlag = open);
+      if (open) {
+        _ensureLyricsHistoryEntry();
+      } else {
+        _removeLyricsHistoryEntry();
+      }
+    }
+  }
+
+  void _ensureLyricsHistoryEntry() {
+    if (_lyricsHistoryEntry != null || !mounted) return;
+    final route = ModalRoute.of(context);
+    if (route == null) return;
+    late final LocalHistoryEntry entry;
+    entry = LocalHistoryEntry(
+      impliesAppBarDismissal: false,
+      onRemove: () {
+        if (identical(_lyricsHistoryEntry, entry)) {
+          _lyricsHistoryEntry = null;
+        }
+        if (!mounted || _ignoreLyricsHistoryRemoval) return;
+        if (isLyricsOpen) {
+          closeLyricsDrawer();
+        }
+      },
+    );
+    _lyricsHistoryEntry = entry;
+    route.addLocalHistoryEntry(entry);
+  }
+
+  void _removeLyricsHistoryEntry() {
+    final entry = _lyricsHistoryEntry;
+    if (entry == null) return;
+    _lyricsHistoryEntry = null;
+    _ignoreLyricsHistoryRemoval = true;
+    try {
+      entry.remove();
+    } finally {
+      _ignoreLyricsHistoryRemoval = false;
     }
   }
 
@@ -112,6 +167,8 @@ class _SpotifyFullscreenCanvasPlayerState
 
   @override
   void dispose() {
+    _mountedInstances.remove(this);
+    _removeLyricsHistoryEntry();
     _lyricsController.removeListener(_syncLyricsOpenFlag);
     _lyricsController.dispose();
     super.dispose();
@@ -225,22 +282,16 @@ class _SpotifyFullscreenCanvasPlayerState
     final effectiveAccent = rawAccent.computeLuminance() < 0.24
         ? Color.alphaBlend(Colors.white.withValues(alpha: 0.35), rawAccent)
         : rawAccent;
-    final motionAllowed = !disableAnimations && animatedArtworkEnabled;
+    final motionAllowed =
+        !disableAnimations && animatedArtworkEnabled && !widget.transitioning;
     final gestureScope = PlayerGestureScope.maybeOf(context);
     final canvasOffset = gestureScope?.horizontalOffset ?? 0.0;
     final canvasDragFraction = gestureScope?.dragFraction ?? 1.0;
 
-    return PopScope(
-      canPop: !_lyricsSheetOpenFlag,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _lyricsSheetOpenFlag) {
-          closeLyricsDrawer();
-        }
-      },
-      child: Stack(
-        key: const ValueKey('spotify-fullscreen-canvas-player'),
-        fit: StackFit.expand,
-        children: [
+    return Stack(
+      key: const ValueKey('spotify-fullscreen-canvas-player'),
+      fit: StackFit.expand,
+      children: [
         // 1 & 2. Background Canvas & Video Stack.
         // Se traslada interactivamente con el arrastre horizontal del gesto,
         // mientras los controles de reproducción permanecen fijos como en Spotify.
@@ -259,7 +310,7 @@ class _SpotifyFullscreenCanvasPlayerState
                     child: GenerativeMeshCanvas(
                       primaryColor: artworkAccentColor ?? effectiveAccent,
                       secondaryColor: effectiveAccent,
-                      isPlaying: isPlaying,
+                      isPlaying: isPlaying && !widget.transitioning,
                     ),
                   ),
 
@@ -335,11 +386,12 @@ class _SpotifyFullscreenCanvasPlayerState
                           fit: StackFit.expand,
                           children: [...previousChildren, ?currentChild],
                         ),
-                        child: activeCanvasUrl != null
+                        child: activeCanvasUrl != null &&
+                                (!widget.transitioning || _canvasVideoReady)
                             ? SpotifyCanvasVideo(
                                 key: const ValueKey('fullscreen-canvas-video'),
                                 url: activeCanvasUrl,
-                                isPlaying: isPlaying,
+                                isPlaying: isPlaying && !widget.transitioning,
                                 identity: visualIdentity,
                                 startOffset: videoStartOffset,
                                 durationHint: videoDurationHint,
@@ -1495,38 +1547,6 @@ class _SpotifyFullscreenCanvasPlayerState
 
             _viewportHeight = constraints.maxHeight;
 
-            final embeddedLyrics = NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification.metrics.pixels <= 0) {
-                  if (notification is OverscrollNotification &&
-                      notification.overscroll < 0) {
-                    handleLyricsDragUpdate(-notification.overscroll);
-                  } else if (notification is ScrollUpdateNotification &&
-                      notification.dragDetails != null) {
-                    final delta = notification.scrollDelta ?? 0;
-                    if (delta < 0) {
-                      handleLyricsDragUpdate(-delta);
-                    }
-                  } else if (notification is ScrollEndNotification &&
-                      _lyricsController.value < 0.99 &&
-                      _lyricsController.value > 0.0) {
-                    handleLyricsDragEnd(0);
-                  }
-                }
-                return false;
-              },
-              child: LyricsPage(
-                embeddedInSheet: true,
-                onRequestClose: closeLyricsDrawer,
-                onHeaderVerticalDragUpdate: (details) {
-                  handleLyricsDragUpdate(details.primaryDelta ?? 0);
-                },
-                onHeaderVerticalDragEnd: (details) {
-                  handleLyricsDragEnd(details.velocity.pixelsPerSecond.dy);
-                },
-              ),
-            );
-
             final framedForeground = !isWideCanvas
                 ? foreground
                 : Align(
@@ -1561,11 +1581,11 @@ class _SpotifyFullscreenCanvasPlayerState
                 ),
 
                 // Interactive 1:1 GPU-accelerated drag-to-reveal lyrics sheet.
-                // Rebuilds ONLY this sheet layer on drag (zero player rebuilds).
+                // Mounts LyricsPage only while visible/dragging so opening and
+                // collapsing the player stays at locked 120fps.
                 AnimatedBuilder(
                   animation: _lyricsController,
-                  child: embeddedLyrics,
-                  builder: (context, lyricsChild) {
+                  builder: (context, _) {
                     final progress = _lyricsController.value;
                     if (progress <= 0.001) {
                       return const SizedBox.shrink();
@@ -1582,7 +1602,47 @@ class _SpotifyFullscreenCanvasPlayerState
                             ),
                             child: Material(
                               color: Colors.transparent,
-                              child: lyricsChild,
+                              child: NotificationListener<ScrollNotification>(
+                                onNotification: (notification) {
+                                  if (notification.metrics.pixels <= 0) {
+                                    if (notification
+                                            is OverscrollNotification &&
+                                        notification.overscroll < 0) {
+                                      handleLyricsDragUpdate(
+                                        -notification.overscroll,
+                                      );
+                                    } else if (notification
+                                            is ScrollUpdateNotification &&
+                                        notification.dragDetails != null) {
+                                      final delta =
+                                          notification.scrollDelta ?? 0;
+                                      if (delta < 0) {
+                                        handleLyricsDragUpdate(-delta);
+                                      }
+                                    } else if (notification
+                                            is ScrollEndNotification &&
+                                        _lyricsController.value < 0.99 &&
+                                        _lyricsController.value > 0.0) {
+                                      handleLyricsDragEnd(0);
+                                    }
+                                  }
+                                  return false;
+                                },
+                                child: LyricsPage(
+                                  embeddedInSheet: true,
+                                  onRequestClose: closeLyricsDrawer,
+                                  onHeaderVerticalDragUpdate: (details) {
+                                    handleLyricsDragUpdate(
+                                      details.primaryDelta ?? 0,
+                                    );
+                                  },
+                                  onHeaderVerticalDragEnd: (details) {
+                                    handleLyricsDragEnd(
+                                      details.velocity.pixelsPerSecond.dy,
+                                    );
+                                  },
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -1595,9 +1655,8 @@ class _SpotifyFullscreenCanvasPlayerState
           },
         ),
       ],
-    ),
-  );
-}
+    );
+  }
 }
 
 /// Resolves the active synced lyric line for [position] using binary search

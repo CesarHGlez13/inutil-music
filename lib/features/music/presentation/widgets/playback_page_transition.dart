@@ -1,19 +1,16 @@
-import 'dart:ui' show lerpDouble;
-
 import 'package:flutter/material.dart';
 
 import '../../../../core/platform/app_platform.dart';
 
-const playbackPageTransitionDuration = Duration(milliseconds: 460);
-const playbackPageReverseTransitionDuration = Duration(milliseconds: 400);
-const playbackPageTransitionBeginOffset = Offset(0, 0.12);
+const playbackPageTransitionDuration = Duration(milliseconds: 320);
+const playbackPageReverseTransitionDuration = Duration(milliseconds: 320);
+const playbackPageTransitionBeginOffset = Offset(0, 0.08);
 
 /// The shared page motion used when moving into a playback-focused surface.
 ///
-/// When [enableCapsuleMorph] is true (mobile), the full-screen player morphs
-/// directly out of the Mini Player capsule's exact bounding box and corner
-/// radius to full screen on open, and folds smoothly back down into the Mini
-/// Player capsule on collapse — without re-laying out the player subtree.
+/// Uses pure hardware-composited [SlideTransition] and [FadeTransition] layers
+/// around a single [RepaintBoundary] without per-frame [ClipPath] stencil passes
+/// so 1080p/1440p Canvas video and shaders composite at locked 120fps.
 class PlaybackPageTransition extends StatelessWidget {
   const PlaybackPageTransition({
     required this.animation,
@@ -42,197 +39,29 @@ class PlaybackPageTransition extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final morphCurve = CurvedAnimation(
+    final curved = CurvedAnimation(
       parent: animation,
-      curve: const Cubic(0.22, 0.80, 0.24, 1.0),
-      reverseCurve: const Cubic(0.36, 0.0, 0.16, 1.0),
+      curve: Curves.easeInOutCubic,
     );
 
     final slide = Tween<Offset>(
-      begin: enableCapsuleMorph
-          ? playbackPageTransitionBeginOffset
-          : const Offset(0, 0.08),
+      begin: playbackPageTransitionBeginOffset,
       end: Offset.zero,
-    ).animate(morphCurve);
+    ).animate(curved);
 
-    final opacity = CurvedAnimation(
-      parent: animation,
-      curve: const Interval(0.0, 0.18, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.0, 0.20, curve: Curves.easeIn),
-    );
-
-    final boundaryChild = RepaintBoundary(
-      key: repaintBoundaryKey,
-      child: child,
-    );
-
-    return AnimatedBuilder(
-      animation: animation,
-      child: boundaryChild,
-      builder: (context, staticChild) {
-        final t = morphCurve.value.clamp(0.0, 1.0);
-        final contentScale = enableCapsuleMorph
-            ? lerpDouble(0.92, 1.0, t)!
-            : lerpDouble(0.96, 1.0, t)!;
-
-        final innerContent = SlideTransition(
-          key: slideKey,
-          position: slide,
-          child: Transform.scale(
-            scale: contentScale,
-            alignment: const Alignment(0.0, 0.84),
-            child: FadeTransition(
-              key: fadeKey,
-              opacity: opacity,
-              child: staticChild,
-            ),
-          ),
-        );
-
-        if (!enableCapsuleMorph || t >= 0.999) {
-          return innerContent;
-        }
-
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (t > 0.005)
-              IgnorePointer(
-                child: ColoredBox(
-                  color: Colors.black.withValues(alpha: (t * 0.45).clamp(0.0, 0.45)),
-                ),
-              ),
-            CustomPaint(
-              foregroundPainter: t > 0.005
-                  ? _CapsuleMorphBorderPainter(
-                      progress: t,
-                      originHeight: morphOriginHeight,
-                      originBottomOffset: morphOriginBottomOffset,
-                      originHorizontalInset: morphOriginHorizontalInset,
-                      originBorderRadius: morphOriginBorderRadius,
-                    )
-                  : null,
-              child: ClipPath(
-                clipper: _CapsuleMorphClipper(
-                  progress: t,
-                  originHeight: morphOriginHeight,
-                  originBottomOffset: morphOriginBottomOffset,
-                  originHorizontalInset: morphOriginHorizontalInset,
-                  originBorderRadius: morphOriginBorderRadius,
-                ),
-                child: innerContent,
-              ),
-            ),
-          ],
-        );
-      },
+    return SlideTransition(
+      key: slideKey,
+      position: slide,
+      child: FadeTransition(
+        key: fadeKey,
+        opacity: curved,
+        child: RepaintBoundary(
+          key: repaintBoundaryKey,
+          child: child,
+        ),
+      ),
     );
   }
-}
-
-RRect _computeMorphRRect({
-  required Size size,
-  required double progress,
-  required double originHeight,
-  required double originBottomOffset,
-  required double originHorizontalInset,
-  required double originBorderRadius,
-}) {
-  final safeHeight = originHeight.clamp(48.0, size.height);
-  final safeInset = originHorizontalInset.clamp(0.0, size.width * 0.35);
-  final safeBottom = originBottomOffset.clamp(
-    0.0,
-    (size.height - safeHeight).clamp(0.0, size.height),
-  );
-  final originRect = Rect.fromLTWH(
-    safeInset,
-    (size.height - safeBottom - safeHeight).clamp(0.0, size.height),
-    (size.width - safeInset * 2).clamp(1.0, size.width),
-    safeHeight,
-  );
-  final fullRect = Offset.zero & size;
-  final currentRect = Rect.lerp(originRect, fullRect, progress) ?? fullRect;
-  final currentRadius = lerpDouble(originBorderRadius, 0.0, progress) ?? 0.0;
-  return RRect.fromRectAndRadius(currentRect, Radius.circular(currentRadius));
-}
-
-class _CapsuleMorphClipper extends CustomClipper<Path> {
-  const _CapsuleMorphClipper({
-    required this.progress,
-    required this.originHeight,
-    required this.originBottomOffset,
-    required this.originHorizontalInset,
-    required this.originBorderRadius,
-  });
-
-  final double progress;
-  final double originHeight;
-  final double originBottomOffset;
-  final double originHorizontalInset;
-  final double originBorderRadius;
-
-  @override
-  Path getClip(Size size) {
-    final rrect = _computeMorphRRect(
-      size: size,
-      progress: progress,
-      originHeight: originHeight,
-      originBottomOffset: originBottomOffset,
-      originHorizontalInset: originHorizontalInset,
-      originBorderRadius: originBorderRadius,
-    );
-    return Path()..addRRect(rrect);
-  }
-
-  @override
-  bool shouldReclip(covariant _CapsuleMorphClipper oldClipper) =>
-      progress != oldClipper.progress ||
-      originHeight != oldClipper.originHeight ||
-      originBottomOffset != oldClipper.originBottomOffset ||
-      originHorizontalInset != oldClipper.originHorizontalInset ||
-      originBorderRadius != oldClipper.originBorderRadius;
-}
-
-class _CapsuleMorphBorderPainter extends CustomPainter {
-  const _CapsuleMorphBorderPainter({
-    required this.progress,
-    required this.originHeight,
-    required this.originBottomOffset,
-    required this.originHorizontalInset,
-    required this.originBorderRadius,
-  });
-
-  final double progress;
-  final double originHeight;
-  final double originBottomOffset;
-  final double originHorizontalInset;
-  final double originBorderRadius;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rrect = _computeMorphRRect(
-      size: size,
-      progress: progress,
-      originHeight: originHeight,
-      originBottomOffset: originBottomOffset,
-      originHorizontalInset: originHorizontalInset,
-      originBorderRadius: originBorderRadius,
-    );
-    final rimAlpha = ((1.0 - progress) * 0.28).clamp(0.0, 0.28);
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0
-      ..color = Colors.white.withValues(alpha: rimAlpha);
-    canvas.drawRRect(rrect.deflate(0.5), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _CapsuleMorphBorderPainter oldDelegate) =>
-      progress != oldDelegate.progress ||
-      originHeight != oldDelegate.originHeight ||
-      originBottomOffset != oldDelegate.originBottomOffset ||
-      originHorizontalInset != oldDelegate.originHorizontalInset ||
-      originBorderRadius != oldDelegate.originBorderRadius;
 }
 
 /// Drives [PlaybackPageTransition] while keeping its child mounted between

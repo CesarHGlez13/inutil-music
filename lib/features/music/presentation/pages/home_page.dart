@@ -166,8 +166,8 @@ class _HomePageState extends ConsumerState<HomePage>
   bool _rootRouteVisible = true;
   static const _maxViewHistory = 2;
   static const _shellTransitionDuration = Duration(milliseconds: 320);
-  static const _playerTransitionDuration = Duration(milliseconds: 460);
-  static const _playerReverseTransitionDuration = Duration(milliseconds: 400);
+  static const _playerTransitionDuration = Duration(milliseconds: 320);
+  static const _playerReverseTransitionDuration = Duration(milliseconds: 320);
   static const _bottomNavigationHideTravel = 24.0;
   static const _bottomNavigationShowTravel = 12.0;
 
@@ -1182,9 +1182,14 @@ class _HomePageState extends ConsumerState<HomePage>
     }
     // The player can be opened directly by a media notification, without a
     // previous in-app tab. Keep Back inside the app in that case.
-    if (_selectedIndex == _playerIndex &&
-        _restorePreviousView(fallback: _homeIndex)) {
-      return;
+    if (_selectedIndex == _playerIndex) {
+      if (PlayerPanel.closeActiveInlineLyricsDrawer()) {
+        _schedulePlayerHistoryEntry();
+        return;
+      }
+      if (_restorePreviousView(fallback: _homeIndex)) {
+        return;
+      }
     }
     if (_restorePreviousView()) {
       return;
@@ -3888,6 +3893,7 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
                 active:
                     widget.selectedIndex == widget.playerIndex ||
                     widget.playerTransitionActive,
+                transitioning: widget.playerTransitionActive,
                 onOpenSearch: widget.onOpenSearch,
                 onCollapse: widget.onCollapsePlayer,
                 // Keep the dark artwork backdrop scoped to the player. The

@@ -262,6 +262,7 @@ Duration playerCanvasModeSwitchDuration({
 class PlayerPanel extends ConsumerStatefulWidget {
   const PlayerPanel({
     this.active = true,
+    this.transitioning = false,
     this.onOpenSearch,
     this.onCollapse,
     this.drawBackground = true,
@@ -274,8 +275,14 @@ class PlayerPanel extends ConsumerStatefulWidget {
     super.key,
   });
 
+  /// Closes the inline full-screen lyrics drawer if it is currently open and
+  /// returns `true`. Returns `false` when no inline lyrics drawer is open.
+  static bool closeActiveInlineLyricsDrawer() =>
+      _SpotifyFullscreenCanvasPlayerState.closeActiveInlineLyricsDrawer();
+
   final VoidCallback? onOpenSearch;
   final bool active;
+  final bool transitioning;
   final VoidCallback? onCollapse;
   final bool drawBackground;
   final bool trackTransitionsEnabled;
@@ -293,6 +300,15 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
   static const _mobileArtworkExtentCeiling = 400.0;
   final GlobalKey<_SpotifyFullscreenCanvasPlayerState> _lyricsPlayerKey =
       GlobalKey<_SpotifyFullscreenCanvasPlayerState>();
+
+  void _handleCollapseRequest() {
+    final canvasState = _lyricsPlayerKey.currentState;
+    if (canvasState != null && canvasState.isLyricsOpen) {
+      canvasState.closeLyricsDrawer();
+      return;
+    }
+    widget.onCollapse?.call();
+  }
 
   bool _showPlaybackQueue = false;
   bool _initialQueueVisibilitySet = false;
@@ -588,6 +604,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 visualIdentity: visualIdentity,
                                 trackTransitionsEnabled:
                                     widget.trackTransitionsEnabled,
+                                transitioning: widget.transitioning,
                                 animatedArtworkEnabled:
                                     widget.animatedArtworkEnabled,
                                 canvasUrl: canvasUrl,
@@ -601,7 +618,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 errorText: presentation.errorText,
                                 queueVisible: showSideQueue,
                                 onToggleQueue: toggleQueue,
-                                onCollapse: widget.onCollapse,
+                                onCollapse: _handleCollapseRequest,
                                 onOpenLyrics: () {
                                   if (_lyricsPlayerKey.currentState != null) {
                                     _lyricsPlayerKey.currentState!.openLyricsDrawer();
@@ -619,7 +636,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                       return PlayerGesturesWrapper(
                         onNextTrack: () => ref.read(playerControllerProvider.notifier).playNext(),
                         onPreviousTrack: () => ref.read(playerControllerProvider.notifier).playPrevious(),
-                        onMinimize: widget.onCollapse,
+                        onMinimize: _handleCollapseRequest,
                         onOpenLyrics: () {
                           if (_lyricsPlayerKey.currentState != null) {
                             _lyricsPlayerKey.currentState!.openLyricsDrawer();
@@ -706,7 +723,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
       useMiniArtworkPreview: visualActive,
       child: PlayerDismissRegion(
         active: widget.active,
-        onDismiss: widget.onCollapse,
+        onDismiss: _handleCollapseRequest,
         child: panel,
       ),
     );
