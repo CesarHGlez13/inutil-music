@@ -1,14 +1,17 @@
+import 'dart:ui' show lerpDouble;
+
 import 'package:flutter/material.dart';
 
-const playbackPageTransitionDuration = Duration(milliseconds: 380);
-const playbackPageReverseTransitionDuration = Duration(milliseconds: 320);
-const playbackPageTransitionBeginOffset = Offset(0, 0.55);
+const playbackPageTransitionDuration = Duration(milliseconds: 420);
+const playbackPageReverseTransitionDuration = Duration(milliseconds: 360);
+const playbackPageTransitionBeginOffset = Offset(0, 0.14);
 
 /// The shared page motion used when moving into a playback-focused surface.
 ///
-/// Expands from the mini player position (bottom) to full screen edge-to-edge
-/// with morphing corner radius and subtle scale for an ultra-professional,
-/// fluid transition like Spotify / Apple Music.
+/// When [enableCapsuleMorph] is true (mobile), the full-screen player morphs
+/// directly out of the Mini Player capsule's exact bounding box and corner
+/// radius to full screen on open, and folds smoothly back down into the Mini
+/// Player capsule on collapse — without re-laying out the player subtree.
 class PlaybackPageTransition extends StatelessWidget {
   const PlaybackPageTransition({
     required this.animation,
@@ -16,6 +19,11 @@ class PlaybackPageTransition extends StatelessWidget {
     this.fadeKey,
     this.slideKey,
     this.repaintBoundaryKey,
+    this.enableCapsuleMorph = false,
+    this.morphOriginHeight = 72.0,
+    this.morphOriginBottomOffset = 82.0,
+    this.morphOriginHorizontalInset = 8.0,
+    this.morphOriginBorderRadius = 32.0,
     super.key,
   });
 
@@ -24,59 +32,194 @@ class PlaybackPageTransition extends StatelessWidget {
   final Key? fadeKey;
   final Key? slideKey;
   final Key? repaintBoundaryKey;
+  final bool enableCapsuleMorph;
+  final double morphOriginHeight;
+  final double morphOriginBottomOffset;
+  final double morphOriginHorizontalInset;
+  final double morphOriginBorderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final curvedAnimation = CurvedAnimation(
+    final morphCurve = CurvedAnimation(
       parent: animation,
-      curve: Curves.easeOutCubic,
-      reverseCurve: Curves.easeInCubic,
+      curve: const Cubic(0.18, 0.92, 0.22, 1.0),
+      reverseCurve: const Cubic(0.28, 0.0, 0.20, 1.0),
     );
 
     final slide = Tween<Offset>(
-      begin: playbackPageTransitionBeginOffset,
+      begin: enableCapsuleMorph
+          ? playbackPageTransitionBeginOffset
+          : const Offset(0, 0.08),
       end: Offset.zero,
-    ).animate(curvedAnimation);
-
-    final scale = Tween<double>(
-      begin: 0.88,
-      end: 1.0,
-    ).animate(curvedAnimation);
-
-    final radius = Tween<double>(
-      begin: 28.0,
-      end: 0.0,
-    ).animate(curvedAnimation);
+    ).animate(morphCurve);
 
     final opacity = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.0, 0.28, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.0, 0.28, curve: Curves.easeIn),
+      curve: const Interval(0.0, 0.34, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.06, 0.48, curve: Curves.easeIn),
+    );
+
+    final boundaryChild = RepaintBoundary(
+      key: repaintBoundaryKey,
+      child: child,
     );
 
     return AnimatedBuilder(
       animation: animation,
+      child: boundaryChild,
       builder: (context, staticChild) {
-        return SlideTransition(
+        final t = morphCurve.value.clamp(0.0, 1.0);
+        final contentScale = enableCapsuleMorph
+            ? lerpDouble(0.92, 1.0, t)!
+            : lerpDouble(0.96, 1.0, t)!;
+
+        final innerContent = SlideTransition(
           key: slideKey,
           position: slide,
           child: Transform.scale(
-            scale: scale.value,
-            alignment: const Alignment(0.0, 0.82),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(radius.value),
-              child: FadeTransition(
-                key: fadeKey,
-                opacity: opacity,
-                child: staticChild,
-              ),
+            scale: contentScale,
+            alignment: const Alignment(0.0, 0.84),
+            child: FadeTransition(
+              key: fadeKey,
+              opacity: opacity,
+              child: staticChild,
             ),
           ),
         );
+
+        if (!enableCapsuleMorph || t >= 0.999) {
+          return innerContent;
+        }
+
+        return CustomPaint(
+          foregroundPainter: t > 0.005
+              ? _CapsuleMorphBorderPainter(
+                  progress: t,
+                  originHeight: morphOriginHeight,
+                  originBottomOffset: morphOriginBottomOffset,
+                  originHorizontalInset: morphOriginHorizontalInset,
+                  originBorderRadius: morphOriginBorderRadius,
+                )
+              : null,
+          child: ClipPath(
+            clipper: _CapsuleMorphClipper(
+              progress: t,
+              originHeight: morphOriginHeight,
+              originBottomOffset: morphOriginBottomOffset,
+              originHorizontalInset: morphOriginHorizontalInset,
+              originBorderRadius: morphOriginBorderRadius,
+            ),
+            child: innerContent,
+          ),
+        );
       },
-      child: RepaintBoundary(key: repaintBoundaryKey, child: child),
     );
   }
+}
+
+RRect _computeMorphRRect({
+  required Size size,
+  required double progress,
+  required double originHeight,
+  required double originBottomOffset,
+  required double originHorizontalInset,
+  required double originBorderRadius,
+}) {
+  final safeHeight = originHeight.clamp(48.0, size.height);
+  final safeInset = originHorizontalInset.clamp(0.0, size.width * 0.35);
+  final safeBottom = originBottomOffset.clamp(
+    0.0,
+    (size.height - safeHeight).clamp(0.0, size.height),
+  );
+  final originRect = Rect.fromLTWH(
+    safeInset,
+    (size.height - safeBottom - safeHeight).clamp(0.0, size.height),
+    (size.width - safeInset * 2).clamp(1.0, size.width),
+    safeHeight,
+  );
+  final fullRect = Offset.zero & size;
+  final currentRect = Rect.lerp(originRect, fullRect, progress) ?? fullRect;
+  final currentRadius = lerpDouble(originBorderRadius, 0.0, progress) ?? 0.0;
+  return RRect.fromRectAndRadius(currentRect, Radius.circular(currentRadius));
+}
+
+class _CapsuleMorphClipper extends CustomClipper<Path> {
+  const _CapsuleMorphClipper({
+    required this.progress,
+    required this.originHeight,
+    required this.originBottomOffset,
+    required this.originHorizontalInset,
+    required this.originBorderRadius,
+  });
+
+  final double progress;
+  final double originHeight;
+  final double originBottomOffset;
+  final double originHorizontalInset;
+  final double originBorderRadius;
+
+  @override
+  Path getClip(Size size) {
+    final rrect = _computeMorphRRect(
+      size: size,
+      progress: progress,
+      originHeight: originHeight,
+      originBottomOffset: originBottomOffset,
+      originHorizontalInset: originHorizontalInset,
+      originBorderRadius: originBorderRadius,
+    );
+    return Path()..addRRect(rrect);
+  }
+
+  @override
+  bool shouldReclip(covariant _CapsuleMorphClipper oldClipper) =>
+      progress != oldClipper.progress ||
+      originHeight != oldClipper.originHeight ||
+      originBottomOffset != oldClipper.originBottomOffset ||
+      originHorizontalInset != oldClipper.originHorizontalInset ||
+      originBorderRadius != oldClipper.originBorderRadius;
+}
+
+class _CapsuleMorphBorderPainter extends CustomPainter {
+  const _CapsuleMorphBorderPainter({
+    required this.progress,
+    required this.originHeight,
+    required this.originBottomOffset,
+    required this.originHorizontalInset,
+    required this.originBorderRadius,
+  });
+
+  final double progress;
+  final double originHeight;
+  final double originBottomOffset;
+  final double originHorizontalInset;
+  final double originBorderRadius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rrect = _computeMorphRRect(
+      size: size,
+      progress: progress,
+      originHeight: originHeight,
+      originBottomOffset: originBottomOffset,
+      originHorizontalInset: originHorizontalInset,
+      originBorderRadius: originBorderRadius,
+    );
+    final rimAlpha = ((1.0 - progress) * 0.28).clamp(0.0, 0.28);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..color = Colors.white.withValues(alpha: rimAlpha);
+    canvas.drawRRect(rrect.deflate(0.5), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _CapsuleMorphBorderPainter oldDelegate) =>
+      progress != oldDelegate.progress ||
+      originHeight != oldDelegate.originHeight ||
+      originBottomOffset != oldDelegate.originBottomOffset ||
+      originHorizontalInset != oldDelegate.originHorizontalInset ||
+      originBorderRadius != oldDelegate.originBorderRadius;
 }
 
 /// Drives [PlaybackPageTransition] while keeping its child mounted between
@@ -91,6 +234,11 @@ class PlaybackPageVisibilityTransition extends StatefulWidget {
     this.fadeKey,
     this.slideKey,
     this.repaintBoundaryKey,
+    this.enableCapsuleMorph = false,
+    this.morphOriginHeight = 72.0,
+    this.morphOriginBottomOffset = 82.0,
+    this.morphOriginHorizontalInset = 8.0,
+    this.morphOriginBorderRadius = 32.0,
     super.key,
   });
 
@@ -102,6 +250,11 @@ class PlaybackPageVisibilityTransition extends StatefulWidget {
   final Key? fadeKey;
   final Key? slideKey;
   final Key? repaintBoundaryKey;
+  final bool enableCapsuleMorph;
+  final double morphOriginHeight;
+  final double morphOriginBottomOffset;
+  final double morphOriginHorizontalInset;
+  final double morphOriginBorderRadius;
 
   @override
   State<PlaybackPageVisibilityTransition> createState() =>
@@ -171,6 +324,11 @@ class _PlaybackPageVisibilityTransitionState
       fadeKey: widget.fadeKey,
       slideKey: widget.slideKey,
       repaintBoundaryKey: widget.repaintBoundaryKey,
+      enableCapsuleMorph: widget.enableCapsuleMorph,
+      morphOriginHeight: widget.morphOriginHeight,
+      morphOriginBottomOffset: widget.morphOriginBottomOffset,
+      morphOriginHorizontalInset: widget.morphOriginHorizontalInset,
+      morphOriginBorderRadius: widget.morphOriginBorderRadius,
       child: widget.child,
     );
   }

@@ -622,6 +622,14 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                             _openLyrics();
                           }
                         },
+                        onLyricsDragUpdate: (deltaDy) {
+                          _lyricsPlayerKey.currentState?.handleLyricsDragUpdate(deltaDy);
+                        },
+                        onLyricsDragEnd: (velocityDy) {
+                          _lyricsPlayerKey.currentState?.handleLyricsDragEnd(velocityDy);
+                        },
+                        isLyricsOpen: () =>
+                            _lyricsPlayerKey.currentState?.isLyricsOpen ?? false,
                         onSeekRelative: (delta) {
                           final current = snapshot.position;
                           final duration = snapshot.duration;

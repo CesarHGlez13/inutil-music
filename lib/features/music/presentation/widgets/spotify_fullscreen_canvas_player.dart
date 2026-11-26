@@ -65,7 +65,10 @@ class _SpotifyFullscreenCanvasPlayerState
     with SingleTickerProviderStateMixin {
   late final AnimationController _lyricsController;
   bool _canvasVideoReady = false;
-  double _lastInteractiveFraction = 0.0;
+  bool _lyricsSheetOpenFlag = false;
+  double _viewportHeight = 760.0;
+
+  bool get isLyricsOpen => _lyricsController.value > 0.05;
 
   @override
   void initState() {
@@ -74,34 +77,78 @@ class _SpotifyFullscreenCanvasPlayerState
       vsync: this,
       duration: const Duration(milliseconds: 320),
     );
+    _lyricsController.addListener(_syncLyricsOpenFlag);
+  }
+
+  void _syncLyricsOpenFlag() {
+    final open = _lyricsController.value > 0.05;
+    if (open != _lyricsSheetOpenFlag && mounted) {
+      setState(() => _lyricsSheetOpenFlag = open);
+    }
   }
 
   @override
   void didUpdateWidget(covariant _SpotifyFullscreenCanvasPlayer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.visualIdentity != widget.visualIdentity ||
-        oldWidget.canvasUrl != widget.canvasUrl) {
+    final isCacheUpgrade =
+        oldWidget.visualIdentity == widget.visualIdentity &&
+        oldWidget.canvasUrl != null &&
+        widget.canvasUrl != null &&
+        oldWidget.canvasUrl!.scheme.startsWith('http') &&
+        widget.canvasUrl!.scheme == 'file';
+    if (widget.canvasUrl == null) {
       _canvasVideoReady = false;
-      _lastInteractiveFraction = 0.0;
+    } else if (!isCacheUpgrade &&
+        (oldWidget.visualIdentity != widget.visualIdentity ||
+            oldWidget.canvasUrl != widget.canvasUrl)) {
+      _canvasVideoReady = false;
     }
   }
 
   @override
   void dispose() {
+    _lyricsController.removeListener(_syncLyricsOpenFlag);
     _lyricsController.dispose();
     super.dispose();
   }
 
-  void openLyricsDrawer({double? from}) {
-    final start = from ?? _lastInteractiveFraction;
-    if (start > _lyricsController.value) {
-      _lyricsController.value = start;
+  void handleLyricsDragUpdate(double deltaDy) {
+    if (deltaDy == 0) return;
+    final height = _viewportHeight > 120.0 ? _viewportHeight : 760.0;
+    _lyricsController.value =
+        (_lyricsController.value - (deltaDy / height)).clamp(0.0, 1.0);
+  }
+
+  void handleLyricsDragEnd(double velocityDy) {
+    if (velocityDy < -280) {
+      openLyricsDrawer();
+    } else if (velocityDy > 280) {
+      closeLyricsDrawer();
+    } else if (_lyricsController.value > 0.28) {
+      openLyricsDrawer();
+    } else {
+      closeLyricsDrawer();
     }
-    _lyricsController.animateTo(1.0, curve: Curves.easeOutCubic);
+  }
+
+  void openLyricsDrawer() {
+    final remaining = (1.0 - _lyricsController.value).clamp(0.0, 1.0);
+    final ms = (180 + remaining * 160).round();
+    _lyricsController.animateTo(
+      1.0,
+      duration: Duration(milliseconds: ms),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void closeLyricsDrawer() {
-    _lyricsController.animateTo(0.0, curve: Curves.easeOutCubic);
+    final remaining = _lyricsController.value.clamp(0.0, 1.0);
+    final ms = (160 + remaining * 150).round();
+    _lyricsController.animateTo(
+      0.0,
+      duration: Duration(milliseconds: ms),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   PlayerSnapshot get snapshot => widget.snapshot;
@@ -175,33 +222,18 @@ class _SpotifyFullscreenCanvasPlayerState
     final gestureScope = PlayerGestureScope.maybeOf(context);
     final canvasOffset = gestureScope?.horizontalOffset ?? 0.0;
     final canvasDragFraction = gestureScope?.dragFraction ?? 1.0;
-    final verticalOffset = gestureScope?.verticalOffset ?? 0.0;
-
-    final interactiveFraction = verticalOffset < 0
-        ? (-verticalOffset / 320.0).clamp(0.0, 1.0)
-        : 0.0;
-    if (interactiveFraction > 0) {
-      _lastInteractiveFraction = interactiveFraction;
-    }
-    final effectiveLyricsProgress = math.max(
-      _lyricsController.value,
-      interactiveFraction,
-    );
 
     return PopScope(
-      canPop: effectiveLyricsProgress <= 0.05,
+      canPop: !_lyricsSheetOpenFlag,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
+        if (!didPop && _lyricsSheetOpenFlag) {
           closeLyricsDrawer();
         }
       },
-      child: AnimatedBuilder(
-        animation: _lyricsController,
-        builder: (context, _) {
-          return Stack(
-            key: const ValueKey('spotify-fullscreen-canvas-player'),
-            fit: StackFit.expand,
-            children: [
+      child: Stack(
+        key: const ValueKey('spotify-fullscreen-canvas-player'),
+        fit: StackFit.expand,
+        children: [
         // 1 & 2. Background Canvas & Video Stack.
         // Se traslada interactivamente con el arrastre horizontal del gesto,
         // mientras los controles de reproducción permanecen fijos como en Spotify.
@@ -224,50 +256,8 @@ class _SpotifyFullscreenCanvasPlayerState
                     ),
                   ),
 
-                  // 1b. Crisp animated full-bleed artwork Canvas layer (solo como placeholder
-                  // temporal mientras carga el video; si no hay video, GenerativeMeshCanvas
-                  // permanece 100% visible sin ser tapado por un zoom estático opaco).
-                  Positioned.fill(
-                    child: AnimatedSwitcher(
-                      duration: backdropFadeDuration,
-                      reverseDuration: backdropFadeDuration,
-                      switchInCurve: Curves.easeInOutCubic,
-                      switchOutCurve: Curves.easeInOutCubic,
-                      layoutBuilder: (currentChild, previousChildren) => Stack(
-                        fit: StackFit.expand,
-                        children: [...previousChildren, ?currentChild],
-                      ),
-                      child: activeCanvasUrl != null && artworkSource?.trim().isNotEmpty == true
-                          ? RepaintBoundary(
-                              key: ValueKey(
-                                'canvas-backdrop-${artworkSource ?? visualIdentity}',
-                              ),
-                              child: AnimatedArtworkMotion(
-                                enabled: motionAllowed,
-                                isPlaying: isPlaying,
-                                identity: visualIdentity,
-                                borderRadius: BorderRadius.zero,
-                                depthEnabled: false,
-                                motionScale: 1.0,
-                                zoomDuration: AnimatedArtworkMotion.defaultZoomDuration,
-                                panDuration: AnimatedArtworkMotion.defaultPanDuration,
-                                child: SourceImage(
-                                  source: artworkSource,
-                                  fallbackSource: artworkFallbackSource,
-                                  fit: BoxFit.cover,
-                                  fallback: const SizedBox.shrink(),
-                                ),
-                              ),
-                            )
-                          : const SizedBox.expand(
-                              key: ValueKey('canvas-backdrop-empty'),
-                            ),
-                    ),
-                  ),
-
                   // 1b. Dynamic breathing ambient glow when displaying the expanded cover
-                  // without a video Canvas; fades out cleanly once a real Canvas video
-                  // takes over.
+                  // without a ready video Canvas; fades out cleanly once frame 1 is decoded.
                   if ((activeCanvasUrl == null || !_canvasVideoReady) && artworkSource?.trim().isNotEmpty == true)
                     Positioned.fill(
                       child: IgnorePointer(
@@ -473,11 +463,13 @@ class _SpotifyFullscreenCanvasPlayerState
                         child: (activeCanvasUrl == null || !_canvasVideoReady) &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
+                                key: ValueKey(
+                                  'desktop-canvas-center-art-${artworkSource ?? visualIdentity}',
+                                ),
                                 offset: Offset(canvasOffset, 0),
                                 child: Opacity(
                                   opacity: canvasDragFraction,
                                   child: Padding(
-                                    key: ValueKey('desktop-canvas-center-art-${artworkSource ?? visualIdentity}'),
                                     padding: const EdgeInsets.symmetric(vertical: 12),
                                     child: Container(
                                       constraints: const BoxConstraints(
@@ -516,7 +508,9 @@ class _SpotifyFullscreenCanvasPlayerState
                                   ),
                                 ),
                               )
-                            : const SizedBox.shrink(),
+                            : const SizedBox.shrink(
+                                key: ValueKey('canvas-center-art-hidden'),
+                              ),
                       ),
                     ),
                   ),
@@ -1033,11 +1027,13 @@ class _SpotifyFullscreenCanvasPlayerState
                         child: (activeCanvasUrl == null || !_canvasVideoReady) &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
+                                key: ValueKey(
+                                  'canvas-center-art-${artworkSource ?? visualIdentity}',
+                                ),
                                 offset: Offset(canvasOffset, 0),
                                 child: Opacity(
                                   opacity: canvasDragFraction,
                                   child: Padding(
-                                    key: ValueKey('canvas-center-art-${artworkSource ?? visualIdentity}'),
                                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                                     child: Container(
                                       constraints: BoxConstraints(
@@ -1076,7 +1072,9 @@ class _SpotifyFullscreenCanvasPlayerState
                                   ),
                                 ),
                               )
-                            : const SizedBox.shrink(),
+                            : const SizedBox.shrink(
+                                key: ValueKey('canvas-center-art-hidden'),
+                              ),
                       ),
                     ),
                   ),
@@ -1399,21 +1397,12 @@ class _SpotifyFullscreenCanvasPlayerState
                     behavior: HitTestBehavior.opaque,
                     onTap: openLyricsDrawer,
                     onVerticalDragUpdate: (details) {
-                      final delta = details.primaryDelta ?? 0;
-                      if (delta != 0) {
-                        _lyricsController.value =
-                            (_lyricsController.value - (delta / (constraints.maxHeight * 0.65)))
-                                .clamp(0.0, 1.0);
-                      }
+                      handleLyricsDragUpdate(details.primaryDelta ?? 0);
                     },
                     onVerticalDragEnd: (details) {
-                      final vy = details.velocity.pixelsPerSecond.dy;
-                      if (vy < -250 || _lyricsController.value > 0.25) {
-                        openLyricsDrawer();
-                      } else {
-                        closeLyricsDrawer();
-                      }
+                      handleLyricsDragEnd(details.velocity.pixelsPerSecond.dy);
                     },
+                    onVerticalDragCancel: () => handleLyricsDragEnd(0),
                     child: Material(
                       color: Colors.white.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(16),
@@ -1454,120 +1443,110 @@ class _SpotifyFullscreenCanvasPlayerState
               ),
             );
 
-            return Stack(
-              fit: StackFit.expand,
-              children: [
-                if (!isWideCanvas)
-                  foreground
-                else
-                  Align(
+            _viewportHeight = constraints.maxHeight;
+
+            final embeddedLyrics = NotificationListener<ScrollNotification>(
+              onNotification: (notification) {
+                if (notification.metrics.pixels <= 0) {
+                  if (notification is OverscrollNotification &&
+                      notification.overscroll < 0) {
+                    handleLyricsDragUpdate(-notification.overscroll);
+                  } else if (notification is ScrollUpdateNotification &&
+                      notification.dragDetails != null) {
+                    final delta = notification.scrollDelta ?? 0;
+                    if (delta < 0) {
+                      handleLyricsDragUpdate(-delta);
+                    }
+                  } else if (notification is ScrollEndNotification &&
+                      _lyricsController.value < 0.99 &&
+                      _lyricsController.value > 0.0) {
+                    handleLyricsDragEnd(0);
+                  }
+                }
+                return false;
+              },
+              child: LyricsPage(
+                embeddedInSheet: true,
+                onRequestClose: closeLyricsDrawer,
+                onHeaderVerticalDragUpdate: (details) {
+                  handleLyricsDragUpdate(details.primaryDelta ?? 0);
+                },
+                onHeaderVerticalDragEnd: (details) {
+                  handleLyricsDragEnd(details.velocity.pixelsPerSecond.dy);
+                },
+              ),
+            );
+
+            final framedForeground = !isWideCanvas
+                ? foreground
+                : Align(
                     alignment: Alignment.center,
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 560),
                       child: foreground,
                     ),
-                  ),
+                  );
 
-                // Interactive drag-to-reveal lyrics drawer sheet
-                if (effectiveLyricsProgress > 0.001)
-                  Positioned.fill(
-                    child: RepaintBoundary(
-                      child: Transform.translate(
-                        offset: Offset(
-                          0,
-                          (1.0 - Curves.easeOutCubic.transform(effectiveLyricsProgress)) *
-                              constraints.maxHeight,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(
-                              lerpDouble(24.0, 0.0, effectiveLyricsProgress)!,
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimatedBuilder(
+                  animation: _lyricsController,
+                  child: framedForeground,
+                  builder: (context, child) {
+                    final progress = _lyricsController.value;
+                    if (progress <= 0.001) {
+                      return child!;
+                    }
+                    final controlsOpacity =
+                        (1.0 - progress * 1.65).clamp(0.0, 1.0);
+                    return IgnorePointer(
+                      ignoring: progress > 0.05,
+                      child: Opacity(
+                        opacity: controlsOpacity,
+                        child: child,
+                      ),
+                    );
+                  },
+                ),
+
+                // Interactive 1:1 GPU-accelerated drag-to-reveal lyrics sheet.
+                // Rebuilds ONLY this sheet layer on drag (zero player rebuilds).
+                AnimatedBuilder(
+                  animation: _lyricsController,
+                  child: embeddedLyrics,
+                  builder: (context, lyricsChild) {
+                    final progress = _lyricsController.value;
+                    if (progress <= 0.001) {
+                      return const SizedBox.shrink();
+                    }
+                    final translateY = (1.0 - progress) * constraints.maxHeight;
+                    final topRadius = lerpDouble(26.0, 0.0, progress)!;
+                    return Positioned.fill(
+                      child: RepaintBoundary(
+                        child: Transform.translate(
+                          offset: Offset(0, translateY),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.vertical(
+                              top: Radius.circular(topRadius),
                             ),
-                          ),
-                          child: Material(
-                            color: const Color(0xFF070B0E),
-                            child: Stack(
-                              children: [
-                                Positioned.fill(
-                                  child: NotificationListener<ScrollNotification>(
-                                    onNotification: (notification) {
-                                      if (notification.metrics.pixels <= 0) {
-                                        if (notification is ScrollUpdateNotification) {
-                                          final delta = notification.scrollDelta ?? 0;
-                                          if (delta < 0) {
-                                            _lyricsController.value =
-                                                (_lyricsController.value - (-delta / constraints.maxHeight))
-                                                    .clamp(0.0, 1.0);
-                                          }
-                                        } else if (notification is ScrollEndNotification) {
-                                          if (_lyricsController.value < 0.80) {
-                                            closeLyricsDrawer();
-                                          } else {
-                                            openLyricsDrawer();
-                                          }
-                                        }
-                                      }
-                                      return false;
-                                    },
-                                    child: const LyricsPage(),
-                                  ),
-                                ),
-                                // Top drag handle to drag back down interactively
-                                Positioned(
-                                  top: 0,
-                                  left: 0,
-                                  right: 0,
-                                  height: topInset + 68,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onVerticalDragUpdate: (details) {
-                                      final delta = details.primaryDelta ?? 0;
-                                      if (delta > 0) {
-                                        _lyricsController.value =
-                                            (_lyricsController.value - (delta / constraints.maxHeight))
-                                                .clamp(0.0, 1.0);
-                                      }
-                                    },
-                                    onVerticalDragEnd: (details) {
-                                      final vy = details.velocity.pixelsPerSecond.dy;
-                                      if (vy > 250 || _lyricsController.value < 0.70) {
-                                        closeLyricsDrawer();
-                                      } else {
-                                        openLyricsDrawer();
-                                      }
-                                    },
-                                    child: Container(
-                                      color: Colors.transparent,
-                                      padding: EdgeInsets.only(top: topInset + 6),
-                                      child: Center(
-                                        child: Container(
-                                          width: 44,
-                                          height: 5,
-                                          decoration: BoxDecoration(
-                                            color: Colors.white.withValues(alpha: 0.45),
-                                            borderRadius: BorderRadius.circular(2.5),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            child: Material(
+                              color: Colors.transparent,
+                              child: lyricsChild,
                             ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
+                    );
+                  },
+                ),
               ],
             );
           },
         ),
       ],
-    );
-  },
-),
-);
+    ),
+  );
 }
 }
 

@@ -132,6 +132,10 @@ class LyricsPage extends ConsumerStatefulWidget {
     super.key,
     this.presentationChrome = const LyricsPresentationChrome(),
     this.monotonicClock,
+    this.embeddedInSheet = false,
+    this.onRequestClose,
+    this.onHeaderVerticalDragUpdate,
+    this.onHeaderVerticalDragEnd,
   });
 
   @visibleForTesting
@@ -141,6 +145,14 @@ class LyricsPage extends ConsumerStatefulWidget {
   /// sleeps. Production uses a private [Stopwatch] owned by the timeline.
   @visibleForTesting
   final Duration Function()? monotonicClock;
+
+  /// When embedded inside the full-screen player's interactive lyrics drawer,
+  /// omit duplicate video/gradient backgrounds and forward header drag/close
+  /// actions directly to the parent drawer controller for locked 120fps motion.
+  final bool embeddedInSheet;
+  final VoidCallback? onRequestClose;
+  final GestureDragUpdateCallback? onHeaderVerticalDragUpdate;
+  final GestureDragEndCallback? onHeaderVerticalDragEnd;
 
   @override
   ConsumerState<LyricsPage> createState() => _LyricsPageState();
@@ -424,6 +436,145 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
       mobileLayout: mobileLayout,
     );
 
+    final headerWidget = _LyricsHeader(
+      lookup: lookup,
+      onClose: widget.onRequestClose,
+      onHeaderVerticalDragUpdate: widget.onHeaderVerticalDragUpdate,
+      onHeaderVerticalDragEnd: widget.onHeaderVerticalDragEnd,
+    );
+
+    final bodyStack = Stack(
+      fit: StackFit.expand,
+      children: [
+        if (!widget.embeddedInSheet) ...[
+          const PlayerPlaybackGradientBackground(),
+          if (!AppPlatform.isFlutterTest &&
+              AppPlatform.supportsRemoteArtworkVideo)
+            const Positioned.fill(
+              child: IgnorePointer(child: _LyricsCanvasBackground()),
+            ),
+          const DecoratedBox(
+            decoration: BoxDecoration(color: Color(0x6E000000)),
+          ),
+        ] else
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Color(0xE0090D12),
+                  Color(0xD4070A0E),
+                  Color(0xEC05070A),
+                ],
+              ),
+            ),
+          ),
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: systemBottomInset + bottomChromeHeight,
+            ),
+            child: mobileLayout
+                ? _LyricsMobileOrientationLayout(
+                    landscape: landscape,
+                    animation: _mobileSideLayoutAnimation,
+                    companionWidth: animatedMobileCompanionWidth,
+                    companionSlotWidth: animatedMobileCompanionSlotWidth,
+                    header: headerWidget,
+                    companion: const _LyricsPlaybackCompanion(
+                      mobileLayout: true,
+                    ),
+                    content: lyricsContentLayer,
+                  )
+                : Column(
+                    children: [
+                      if (!showSideCompanion) headerWidget,
+                      Expanded(
+                        child: FractionallySizedBox(
+                          key: const ValueKey('lyrics-side-layout-frame'),
+                          widthFactor: sideLayoutWidthFactor,
+                          alignment: Alignment.center,
+                          child: Row(
+                            children: [
+                              if (showSideCompanion)
+                                SizedBox(
+                                  key: const ValueKey(
+                                    'lyrics-companion-width',
+                                  ),
+                                  width: companionWidth,
+                                  child: const _LyricsPlaybackCompanion(
+                                    mobileLayout: false,
+                                  ),
+                                ),
+                              if (showSideCompanion)
+                                SizedBox(
+                                  key: const ValueKey(
+                                    'lyrics-desktop-companion-gap',
+                                  ),
+                                  width: sideCompanionGap,
+                                ),
+                              Expanded(
+                                key: const ValueKey(
+                                  'lyrics-content-region',
+                                ),
+                                child: lyricsContentLayer,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+        if (!mobileLayout)
+          Positioned(
+            top: math.max(viewPadding.top, mediaPadding.top) + 12,
+            right: systemRightInset + 12,
+            // Anchor the desktop controls to the viewport, not the centered,
+            // width-limited lyrics panel (including on ultrawide displays).
+            child: _buildLyricsToolbar(mobileLayout: false),
+          ),
+        if (!mobileLayout && showBottomMiniPlayer && !widget.embeddedInSheet)
+          Positioned(
+            left: systemLeftInset,
+            right: systemRightInset,
+            bottom: systemBottomInset,
+            child: SizedBox(
+              key: const ValueKey('lyrics-player-dock'),
+              height: bottomChromeHeight,
+              child: MiniPlayer(
+                mode: miniPlayerMode,
+                backgroundMode: miniPlayerBackgroundMode,
+                onOpenPlayer: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ),
+        if (_selectingLines)
+          Positioned(
+            left: systemLeftInset + 12,
+            right: systemRightInset + 12,
+            bottom: systemBottomInset + bottomChromeHeight + 12,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: _buildLineSelectionBar(strings),
+              ),
+            ),
+          ),
+      ],
+    );
+
+    if (widget.embeddedInSheet) {
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: bodyStack,
+      );
+    }
+
     return PopScope(
       canPop: !_selectingLines,
       onPopInvokedWithResult: (didPop, result) {
@@ -431,115 +582,7 @@ class _LyricsPageState extends ConsumerState<LyricsPage>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF030504),
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            const PlayerPlaybackGradientBackground(),
-            if (!AppPlatform.isFlutterTest &&
-                AppPlatform.supportsRemoteArtworkVideo)
-              const Positioned.fill(
-                child: IgnorePointer(child: _LyricsCanvasBackground()),
-              ),
-            const DecoratedBox(
-              decoration: BoxDecoration(color: Color(0x6E000000)),
-            ),
-            SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  bottom: systemBottomInset + bottomChromeHeight,
-                ),
-                child: mobileLayout
-                    ? _LyricsMobileOrientationLayout(
-                        landscape: landscape,
-                        animation: _mobileSideLayoutAnimation,
-                        companionWidth: animatedMobileCompanionWidth,
-                        companionSlotWidth: animatedMobileCompanionSlotWidth,
-                        header: _LyricsHeader(lookup: lookup),
-                        companion: const _LyricsPlaybackCompanion(
-                          mobileLayout: true,
-                        ),
-                        content: lyricsContentLayer,
-                      )
-                    : Column(
-                        children: [
-                          if (!showSideCompanion) _LyricsHeader(lookup: lookup),
-                          Expanded(
-                            child: FractionallySizedBox(
-                              key: const ValueKey('lyrics-side-layout-frame'),
-                              widthFactor: sideLayoutWidthFactor,
-                              alignment: Alignment.center,
-                              child: Row(
-                                children: [
-                                  if (showSideCompanion)
-                                    SizedBox(
-                                      key: const ValueKey(
-                                        'lyrics-companion-width',
-                                      ),
-                                      width: companionWidth,
-                                      child: const _LyricsPlaybackCompanion(
-                                        mobileLayout: false,
-                                      ),
-                                    ),
-                                  if (showSideCompanion)
-                                    SizedBox(
-                                      key: const ValueKey(
-                                        'lyrics-desktop-companion-gap',
-                                      ),
-                                      width: sideCompanionGap,
-                                    ),
-                                  Expanded(
-                                    key: const ValueKey(
-                                      'lyrics-content-region',
-                                    ),
-                                    child: lyricsContentLayer,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            if (!mobileLayout)
-              Positioned(
-                top: math.max(viewPadding.top, mediaPadding.top) + 12,
-                right: systemRightInset + 12,
-                // Anchor the desktop controls to the viewport, not the centered,
-                // width-limited lyrics panel (including on ultrawide displays).
-                child: _buildLyricsToolbar(mobileLayout: false),
-              ),
-            if (!mobileLayout && showBottomMiniPlayer)
-              Positioned(
-                left: systemLeftInset,
-                right: systemRightInset,
-                bottom: systemBottomInset,
-                child: SizedBox(
-                  key: const ValueKey('lyrics-player-dock'),
-                  height: bottomChromeHeight,
-                  child: MiniPlayer(
-                    mode: miniPlayerMode,
-                    backgroundMode: miniPlayerBackgroundMode,
-                    onOpenPlayer: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ),
-            if (_selectingLines)
-              Positioned(
-                left: systemLeftInset + 12,
-                right: systemRightInset + 12,
-                bottom: systemBottomInset + bottomChromeHeight + 12,
-                child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 600),
-                    child: _buildLineSelectionBar(strings),
-                  ),
-                ),
-              ),
-          ],
-        ),
+        body: bodyStack,
       ),
     );
   }
@@ -1958,9 +2001,17 @@ class _LyricsCompanionTimeline extends ConsumerWidget {
 }
 
 class _LyricsHeader extends ConsumerWidget {
-  const _LyricsHeader({required this.lookup});
+  const _LyricsHeader({
+    required this.lookup,
+    this.onClose,
+    this.onHeaderVerticalDragUpdate,
+    this.onHeaderVerticalDragEnd,
+  });
 
   final LyricsLookup? lookup;
+  final VoidCallback? onClose;
+  final GestureDragUpdateCallback? onHeaderVerticalDragUpdate;
+  final GestureDragEndCallback? onHeaderVerticalDragEnd;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1981,19 +2032,23 @@ class _LyricsHeader extends ConsumerWidget {
       }),
     );
     final isPlaying = playback.status == PlayerStatus.playing;
+    final closeAction = onClose ?? () => Navigator.of(context).maybePop();
 
     return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onVerticalDragEnd: (details) {
-        if (details.primaryVelocity != null && details.primaryVelocity! > 180) {
-          Navigator.of(context).maybePop();
-        }
-      },
-      onVerticalDragUpdate: (details) {
-        if (details.primaryDelta != null && details.primaryDelta! > 14) {
-          Navigator.of(context).maybePop();
-        }
-      },
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragUpdate: onHeaderVerticalDragUpdate ??
+          (details) {
+            if (details.primaryDelta != null && details.primaryDelta! > 14) {
+              closeAction();
+            }
+          },
+      onVerticalDragEnd: onHeaderVerticalDragEnd ??
+          (details) {
+            if (details.primaryVelocity != null &&
+                details.primaryVelocity! > 180) {
+              closeAction();
+            }
+          },
       child: Column(
         key: const ValueKey('lyrics-header'),
         mainAxisSize: MainAxisSize.min,
@@ -2001,11 +2056,11 @@ class _LyricsHeader extends ConsumerWidget {
           // Handle pill para deslizar hacia abajo y compactar (estilo Spotify)
           Center(
             child: Container(
-              width: 38,
+              width: 42,
               height: 4.5,
-              margin: const EdgeInsets.only(top: 6, bottom: 4),
+              margin: const EdgeInsets.only(top: 8, bottom: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.35),
+                color: Colors.white.withValues(alpha: 0.42),
                 borderRadius: BorderRadius.circular(2.5),
               ),
             ),
@@ -2020,14 +2075,14 @@ class _LyricsHeader extends ConsumerWidget {
                   tooltip: strings.back,
                   icon: const Icon(Icons.arrow_back_rounded),
                   color: AppColors.downloadAccentFor(context),
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: closeAction,
                 ),
                 const SizedBox(width: 4),
               ],
               if (mobileLayout) ...[
                 _LyricsHeaderArtwork(
                   source: playback.thumbnailUrl,
-                  onTap: () => Navigator.of(context).maybePop(),
+                  onTap: closeAction,
                   semanticsLabel: currentLookup == null
                       ? strings.choose('Portada de la canción', 'Track artwork')
                       : strings.choose(

@@ -166,8 +166,8 @@ class _HomePageState extends ConsumerState<HomePage>
   bool _rootRouteVisible = true;
   static const _maxViewHistory = 2;
   static const _shellTransitionDuration = Duration(milliseconds: 320);
-  static const _playerTransitionDuration = Duration(milliseconds: 320);
-  static const _playerReverseTransitionDuration = Duration(milliseconds: 320);
+  static const _playerTransitionDuration = Duration(milliseconds: 420);
+  static const _playerReverseTransitionDuration = Duration(milliseconds: 360);
   static const _bottomNavigationHideTravel = 24.0;
   static const _bottomNavigationShowTravel = 12.0;
 
@@ -1778,6 +1778,25 @@ class _HomePageState extends ConsumerState<HomePage>
                                               playerReverseTransitionDuration,
                                           playerTransitionActive:
                                               _playerTransitionActive,
+                                          enablePlayerCapsuleMorph:
+                                              !useSideNavigation,
+                                          miniPlayerMorphHeight:
+                                              miniPlayerHeight,
+                                          miniPlayerMorphBottomOffset:
+                                              (bottomNavigationHeight -
+                                                      miniPlayerNavigationOffset)
+                                                  .clamp(0.0, double.infinity),
+                                          miniPlayerMorphHorizontalInset:
+                                              collapsedMiniPlayerHorizontalInset +
+                                              (miniPlayerMode ==
+                                                      MiniPlayerMode.capsule
+                                                  ? 8.0
+                                                  : 0.0),
+                                          miniPlayerMorphBorderRadius:
+                                              miniPlayerMode ==
+                                                  MiniPlayerMode.capsule
+                                              ? 32.0
+                                              : 18.0,
                                           libraryNavigationController:
                                               _libraryNavigationController,
                                           localMusicNavigationController:
@@ -1940,8 +1959,8 @@ class _HomePageState extends ConsumerState<HomePage>
                                 visible: miniPlayerVisible,
                                 suspended: _keyboardVisible,
                                 duration: chromeVisibilityDuration,
-                                hiddenTranslation: const Offset(0, 0.04),
-                                hiddenScale: 0.96,
+                                hiddenTranslation: const Offset(0, 1),
+                                hiddenScale: 0.94,
                                 preserveBackdropMaterial: miniPlayerAppearance
                                     .backgroundMode
                                     .isLiquidGlass,
@@ -3451,6 +3470,11 @@ class _PersistentCurrentViews extends StatefulWidget {
     required this.playerTransitionDuration,
     required this.playerReverseTransitionDuration,
     required this.playerTransitionActive,
+    required this.enablePlayerCapsuleMorph,
+    required this.miniPlayerMorphHeight,
+    required this.miniPlayerMorphBottomOffset,
+    required this.miniPlayerMorphHorizontalInset,
+    required this.miniPlayerMorphBorderRadius,
     required this.libraryNavigationController,
     required this.localMusicNavigationController,
     required this.settingsNavigationController,
@@ -3477,6 +3501,11 @@ class _PersistentCurrentViews extends StatefulWidget {
   final Duration playerTransitionDuration;
   final Duration playerReverseTransitionDuration;
   final bool playerTransitionActive;
+  final bool enablePlayerCapsuleMorph;
+  final double miniPlayerMorphHeight;
+  final double miniPlayerMorphBottomOffset;
+  final double miniPlayerMorphHorizontalInset;
+  final double miniPlayerMorphBorderRadius;
   final LibraryNavigationController libraryNavigationController;
   final LocalMusicNavigationController localMusicNavigationController;
   final SettingsNavigationController settingsNavigationController;
@@ -3506,6 +3535,7 @@ class _PersistentCurrentViews extends StatefulWidget {
     playerTransitionDuration,
     playerReverseTransitionDuration,
     playerTransitionActive,
+    enablePlayerCapsuleMorph,
     libraryNavigationController,
     localMusicNavigationController,
     settingsNavigationController,
@@ -3758,6 +3788,11 @@ class _PersistentCurrentViewsState extends State<_PersistentCurrentViews> {
             reverseTransitionDuration: widget.playerReverseTransitionDuration,
             keepTickerEnabled: widget.playerTransitionActive,
             animateInitialEntry: !_playerWasInitialDestination,
+            enableCapsuleMorph: widget.enablePlayerCapsuleMorph,
+            morphOriginHeight: widget.miniPlayerMorphHeight,
+            morphOriginBottomOffset: widget.miniPlayerMorphBottomOffset,
+            morphOriginHorizontalInset: widget.miniPlayerMorphHorizontalInset,
+            morphOriginBorderRadius: widget.miniPlayerMorphBorderRadius,
             child: _MobilePlaybackSystemBars(
               playerVisible: true,
               regionKey: const ValueKey('player-status-bar-style'),
@@ -3816,6 +3851,11 @@ class _PersistentViewSlot extends StatefulWidget {
     this.animateInitialEntry = true,
     this.keepVisible = false,
     this.instantVisibilityChange = false,
+    this.enableCapsuleMorph = false,
+    this.morphOriginHeight = 72.0,
+    this.morphOriginBottomOffset = 82.0,
+    this.morphOriginHorizontalInset = 8.0,
+    this.morphOriginBorderRadius = 32.0,
     super.key,
   });
 
@@ -3829,6 +3869,11 @@ class _PersistentViewSlot extends StatefulWidget {
   final bool animateInitialEntry;
   final bool keepVisible;
   final bool instantVisibilityChange;
+  final bool enableCapsuleMorph;
+  final double morphOriginHeight;
+  final double morphOriginBottomOffset;
+  final double morphOriginHorizontalInset;
+  final double morphOriginBorderRadius;
 
   @override
   State<_PersistentViewSlot> createState() => _PersistentViewSlotState();
@@ -3916,6 +3961,11 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
             animateInitialEntry: widget.animateInitialEntry,
             slideKey: const ValueKey('player-view-slide-transition'),
             repaintBoundaryKey: const ValueKey('player-view-repaint-boundary'),
+            enableCapsuleMorph: widget.enableCapsuleMorph,
+            morphOriginHeight: widget.morphOriginHeight,
+            morphOriginBottomOffset: widget.morphOriginBottomOffset,
+            morphOriginHorizontalInset: widget.morphOriginHorizontalInset,
+            morphOriginBorderRadius: widget.morphOriginBorderRadius,
             child: tickerContent,
           )
         : AnimatedOpacity(

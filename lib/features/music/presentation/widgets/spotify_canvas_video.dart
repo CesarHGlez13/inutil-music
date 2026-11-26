@@ -168,6 +168,13 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
             oldWidget.startOffset != widget.startOffset)) {
       unawaited(_open());
     } else {
+      if (upgradedSameTrackToCache && _ready) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _ready) {
+            widget.onReadyChanged?.call(true);
+          }
+        });
+      }
       if (oldWidget.coverPath != widget.coverPath ||
           oldWidget.autoFitInsetArtwork != widget.autoFitInsetArtwork) {
         _resetInsetFit(keepVisible: _ready);
@@ -380,6 +387,9 @@ class _SpotifyCanvasVideoState extends State<SpotifyCanvasVideo>
         _setReady(false);
         if (failed != null) unawaited(failed.dispose());
       };
+      if (canvas.isReady) {
+        canvas.onReady?.call();
+      }
     } catch (_) {
       if (generation == _generation) {
         _canvasController = null;

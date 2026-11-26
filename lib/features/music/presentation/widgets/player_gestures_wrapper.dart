@@ -52,6 +52,9 @@ class PlayerGesturesWrapper extends StatefulWidget {
     this.onPreviousTrack,
     this.onMinimize,
     this.onOpenLyrics,
+    this.onLyricsDragUpdate,
+    this.onLyricsDragEnd,
+    this.isLyricsOpen,
     this.onSeekRelative,
     this.enabled = true,
   });
@@ -61,6 +64,9 @@ class PlayerGesturesWrapper extends StatefulWidget {
   final VoidCallback? onPreviousTrack;
   final VoidCallback? onMinimize;
   final VoidCallback? onOpenLyrics;
+  final ValueChanged<double>? onLyricsDragUpdate;
+  final ValueChanged<double>? onLyricsDragEnd;
+  final bool Function()? isLyricsOpen;
   final ValueChanged<Duration>? onSeekRelative;
   final bool enabled;
 
@@ -75,6 +81,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
   double _verticalDragOffset = 0.0;
   bool _isHorizontalDrag = false;
   bool _isVerticalDrag = false;
+  bool _draggingLyricsSheet = false;
   late final AnimationController _slideController;
   Animation<double>? _slideAnimation;
 
@@ -113,7 +120,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
   }
 
   void _handleTapDown(TapDownDetails details) {
-    if (!widget.enabled) return;
+    if (!widget.enabled || (widget.isLyricsOpen?.call() ?? false)) return;
 
     final now = DateTime.now();
     final localPos = details.localPosition;
@@ -161,11 +168,12 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     _verticalDragOffset = 0.0;
     _isHorizontalDrag = false;
     _isVerticalDrag = false;
+    _draggingLyricsSheet = false;
     _lastTapTime = null;
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
-    if (!widget.enabled) return;
+    if (!widget.enabled || (widget.isLyricsOpen?.call() ?? false)) return;
     _dragTotalDelta += details.delta;
 
     final dx = _dragTotalDelta.dx;
@@ -177,6 +185,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
         _isHorizontalDrag = true;
       } else if (dy.abs() > 8 && dy.abs() > dx.abs() * 1.1) {
         _isVerticalDrag = true;
+        if (dy < 0 && widget.onLyricsDragUpdate != null) {
+          _draggingLyricsSheet = true;
+        }
       }
     }
 
@@ -184,6 +195,9 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
       setState(() {
         _horizontalDragOffset = dx;
       });
+    } else if (_draggingLyricsSheet) {
+      // Forward raw delta directly to the lyrics AnimationController (zero parent rebuilds).
+      widget.onLyricsDragUpdate?.call(details.delta.dy);
     } else if (_isVerticalDrag) {
       setState(() {
         _verticalDragOffset = dy;
@@ -192,7 +206,16 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
   }
 
   void _handlePanEnd(DragEndDetails details) {
-    if (!widget.enabled) return;
+    if (!widget.enabled || (widget.isLyricsOpen?.call() ?? false)) {
+      if (_draggingLyricsSheet) {
+        widget.onLyricsDragEnd?.call(details.velocity.pixelsPerSecond.dy);
+      }
+      _dragTotalDelta = Offset.zero;
+      _isHorizontalDrag = false;
+      _isVerticalDrag = false;
+      _draggingLyricsSheet = false;
+      return;
+    }
 
     final dx = _dragTotalDelta.dx;
     final dy = _dragTotalDelta.dy;
@@ -200,7 +223,10 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
     final vy = details.velocity.pixelsPerSecond.dy;
     final screenWidth = MediaQuery.maybeSizeOf(context)?.width ?? 400.0;
 
-    if (_isHorizontalDrag || dx.abs() > dy.abs() * 1.2) {
+    if (_draggingLyricsSheet) {
+      widget.onLyricsDragEnd?.call(vy);
+      _draggingLyricsSheet = false;
+    } else if (_isHorizontalDrag || dx.abs() > dy.abs() * 1.2) {
       // Horizontal
       if (dx < -_horizontalThreshold || vx < -300) {
         // Deslizar hacia la izquierda -> Siguiente pista
@@ -234,6 +260,18 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
       _animateSpringBack();
     }
 
+    _dragTotalDelta = Offset.zero;
+    _isHorizontalDrag = false;
+    _isVerticalDrag = false;
+  }
+
+  void _handlePanCancel() {
+    if (_draggingLyricsSheet) {
+      widget.onLyricsDragEnd?.call(0.0);
+      _draggingLyricsSheet = false;
+    } else {
+      _animateSpringBack();
+    }
     _dragTotalDelta = Offset.zero;
     _isHorizontalDrag = false;
     _isVerticalDrag = false;
@@ -286,6 +324,7 @@ class _PlayerGesturesWrapperState extends State<PlayerGesturesWrapper>
       onPanStart: _handlePanStart,
       onPanUpdate: _handlePanUpdate,
       onPanEnd: _handlePanEnd,
+      onPanCancel: _handlePanCancel,
       child: Stack(
         fit: StackFit.expand,
         children: [
