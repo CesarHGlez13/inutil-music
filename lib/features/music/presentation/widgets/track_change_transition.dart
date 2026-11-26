@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/platform/app_platform.dart';
+
 /// Returns an identity that changes only when the presented song changes.
 ///
 /// Player updates such as position, buffering and play/pause must not restart
@@ -206,7 +208,8 @@ class _TrackChangeTransitionState extends State<TrackChangeTransition> {
       return widget.child;
     }
 
-    final effectiveDuration = MediaQuery.disableAnimationsOf(context)
+    final effectiveDuration =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
         : widget.duration;
     return AnimatedSwitcher(

@@ -492,6 +492,10 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
         (!AppPlatform.isFlutterTest && visualActive
             ? effectiveVideoSourceUrl
             : null);
+    final isResolvingCanvas =
+        primaryCanvasPending ||
+        (fallbackVideoPreviewAsync?.isLoading ?? false) ||
+        (!visualActive && effectiveVideoSourceUrl != null);
     final hasTrack =
         snapshot.title != null ||
         snapshot.artist != null ||
@@ -587,6 +591,7 @@ class _PlayerPanelState extends ConsumerState<PlayerPanel> {
                                 animatedArtworkEnabled:
                                     widget.animatedArtworkEnabled,
                                 canvasUrl: canvasUrl,
+                                isResolvingCanvas: isResolvingCanvas,
                                 videoStartOffset: videoStartOffset,
                                 videoDurationHint: videoDurationHint,
                                 hasTrack: hasTrack,

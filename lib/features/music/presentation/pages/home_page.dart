@@ -166,8 +166,8 @@ class _HomePageState extends ConsumerState<HomePage>
   bool _rootRouteVisible = true;
   static const _maxViewHistory = 2;
   static const _shellTransitionDuration = Duration(milliseconds: 320);
-  static const _playerTransitionDuration = Duration(milliseconds: 420);
-  static const _playerReverseTransitionDuration = Duration(milliseconds: 360);
+  static const _playerTransitionDuration = Duration(milliseconds: 460);
+  static const _playerReverseTransitionDuration = Duration(milliseconds: 400);
   static const _bottomNavigationHideTravel = 24.0;
   static const _bottomNavigationShowTravel = 12.0;
 
@@ -823,7 +823,9 @@ class _HomePageState extends ConsumerState<HomePage>
   }
 
   Duration _resolvedMotionDuration(Duration duration) =>
-      MediaQuery.disableAnimationsOf(context) ? Duration.zero : duration;
+      AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context)
+      ? Duration.zero
+      : duration;
 
   void _beginLiquidGlassChromeMotion() {
     _liquidGlassChromeSettleTimer?.cancel();
@@ -1499,14 +1501,15 @@ class _HomePageState extends ConsumerState<HomePage>
         ? 0.0
         : (hasActivePlayback ? miniPlayerHeight : 0.0) +
               (transparentSurfaces ? bottomNavigationHeight : 0.0);
-    final shellTransitionDuration = MediaQuery.disableAnimationsOf(context)
+    final reduceShellMotion =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
+    final shellTransitionDuration = reduceShellMotion
         ? Duration.zero
         : _shellTransitionDuration;
-    final playerTransitionDuration = MediaQuery.disableAnimationsOf(context)
+    final playerTransitionDuration = reduceShellMotion
         ? Duration.zero
         : _playerTransitionDuration;
-    final playerReverseTransitionDuration =
-        MediaQuery.disableAnimationsOf(context)
+    final playerReverseTransitionDuration = reduceShellMotion
         ? Duration.zero
         : _playerReverseTransitionDuration;
     final chromeVisibilityDuration = _playerTransitionActive
@@ -3923,7 +3926,8 @@ class _PersistentViewSlotState extends State<_PersistentViewSlot> {
 
   @override
   Widget build(BuildContext context) {
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final disableAnimations =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     final stableGlassTabGeometry =
         Theme.of(context).platform == TargetPlatform.android &&
         AppColors.surfaceBackgroundModeFor(context).isLiquidGlass;

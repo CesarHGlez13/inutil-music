@@ -2,9 +2,9 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
-const playbackPageTransitionDuration = Duration(milliseconds: 420);
-const playbackPageReverseTransitionDuration = Duration(milliseconds: 360);
-const playbackPageTransitionBeginOffset = Offset(0, 0.14);
+const playbackPageTransitionDuration = Duration(milliseconds: 460);
+const playbackPageReverseTransitionDuration = Duration(milliseconds: 400);
+const playbackPageTransitionBeginOffset = Offset(0, 0.12);
 
 /// The shared page motion used when moving into a playback-focused surface.
 ///
@@ -42,8 +42,8 @@ class PlaybackPageTransition extends StatelessWidget {
   Widget build(BuildContext context) {
     final morphCurve = CurvedAnimation(
       parent: animation,
-      curve: const Cubic(0.18, 0.92, 0.22, 1.0),
-      reverseCurve: const Cubic(0.28, 0.0, 0.20, 1.0),
+      curve: const Cubic(0.22, 0.80, 0.24, 1.0),
+      reverseCurve: const Cubic(0.36, 0.0, 0.16, 1.0),
     );
 
     final slide = Tween<Offset>(
@@ -55,8 +55,8 @@ class PlaybackPageTransition extends StatelessWidget {
 
     final opacity = CurvedAnimation(
       parent: animation,
-      curve: const Interval(0.0, 0.34, curve: Curves.easeOut),
-      reverseCurve: const Interval(0.06, 0.48, curve: Curves.easeIn),
+      curve: const Interval(0.0, 0.18, curve: Curves.easeOut),
+      reverseCurve: const Interval(0.0, 0.20, curve: Curves.easeIn),
     );
 
     final boundaryChild = RepaintBoundary(

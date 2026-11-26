@@ -15,6 +15,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
     required this.trackTransitionsEnabled,
     this.animatedArtworkEnabled = true,
     required this.canvasUrl,
+    this.isResolvingCanvas = false,
     required this.videoStartOffset,
     required this.videoDurationHint,
     required this.hasTrack,
@@ -39,6 +40,7 @@ class _SpotifyFullscreenCanvasPlayer extends ConsumerStatefulWidget {
   final bool trackTransitionsEnabled;
   final bool animatedArtworkEnabled;
   final Uri? canvasUrl;
+  final bool isResolvingCanvas;
   final Duration videoStartOffset;
   final Duration videoDurationHint;
   final bool hasTrack;
@@ -158,6 +160,7 @@ class _SpotifyFullscreenCanvasPlayerState
   bool get trackTransitionsEnabled => widget.trackTransitionsEnabled;
   bool get animatedArtworkEnabled => widget.animatedArtworkEnabled;
   Uri? get canvasUrl => widget.canvasUrl;
+  bool get isResolvingCanvas => widget.isResolvingCanvas;
   Duration get videoStartOffset => widget.videoStartOffset;
   Duration get videoDurationHint => widget.videoDurationHint;
   bool get hasTrack => widget.hasTrack;
@@ -198,7 +201,8 @@ class _SpotifyFullscreenCanvasPlayerState
         ? snapshot.artist!.trim()
         : 'Inutix Music';
 
-    final disableAnimations = MediaQuery.disableAnimationsOf(context);
+    final disableAnimations =
+        AppPlatform.isFlutterTest && MediaQuery.disableAnimationsOf(context);
     final backdropFadeDuration = disableAnimations
         ? Duration.zero
         : const Duration(milliseconds: 850);
@@ -256,9 +260,57 @@ class _SpotifyFullscreenCanvasPlayerState
                     ),
                   ),
 
-                  // 1b. Dynamic breathing ambient glow when displaying the expanded cover
-                  // without a ready video Canvas; fades out cleanly once frame 1 is decoded.
-                  if ((activeCanvasUrl == null || !_canvasVideoReady) && artworkSource?.trim().isNotEmpty == true)
+                  // 1b. Smooth full-bleed animated artwork placeholder ONLY while a
+                  // Canvas video is resolving or decoding its first frame. That way
+                  // songs with Canvas never flash a floating square cover before video,
+                  // and crossfade edge-to-edge directly into the live Canvas video.
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: backdropFadeDuration,
+                      reverseDuration: const Duration(milliseconds: 650),
+                      switchInCurve: Curves.easeInOutCubic,
+                      switchOutCurve: Curves.easeInOutCubic,
+                      layoutBuilder: (currentChild, previousChildren) => Stack(
+                        fit: StackFit.expand,
+                        children: [...previousChildren, ?currentChild],
+                      ),
+                      child: (activeCanvasUrl != null || isResolvingCanvas) &&
+                              !_canvasVideoReady &&
+                              artworkSource?.trim().isNotEmpty == true
+                          ? RepaintBoundary(
+                              key: ValueKey(
+                                'canvas-fullbleed-loading-${artworkSource ?? visualIdentity}',
+                              ),
+                              child: AnimatedArtworkMotion(
+                                enabled: motionAllowed,
+                                isPlaying: isPlaying,
+                                identity: visualIdentity,
+                                borderRadius: BorderRadius.zero,
+                                depthEnabled: false,
+                                motionScale: 1.0,
+                                zoomDuration:
+                                    AnimatedArtworkMotion.defaultZoomDuration,
+                                panDuration:
+                                    AnimatedArtworkMotion.defaultPanDuration,
+                                child: SourceImage(
+                                  source: artworkSource,
+                                  fallbackSource: artworkFallbackSource,
+                                  fit: BoxFit.cover,
+                                  fallback: const SizedBox.shrink(),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.expand(
+                              key: ValueKey('canvas-fullbleed-loading-empty'),
+                            ),
+                    ),
+                  ),
+
+                  // 1c. Dynamic breathing ambient glow when displaying the centered cover
+                  // for tracks that genuinely have no Canvas video.
+                  if (activeCanvasUrl == null &&
+                      !isResolvingCanvas &&
+                      artworkSource?.trim().isNotEmpty == true)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: _CanvasArtworkAmbientAura(
@@ -460,7 +512,8 @@ class _SpotifyFullscreenCanvasPlayerState
                             ),
                           );
                         },
-                        child: (activeCanvasUrl == null || !_canvasVideoReady) &&
+                        child: activeCanvasUrl == null &&
+                                !isResolvingCanvas &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
                                 key: ValueKey(
@@ -1024,7 +1077,8 @@ class _SpotifyFullscreenCanvasPlayerState
                             ),
                           );
                         },
-                        child: (activeCanvasUrl == null || !_canvasVideoReady) &&
+                        child: activeCanvasUrl == null &&
+                                !isResolvingCanvas &&
                                 artworkSource?.trim().isNotEmpty == true
                             ? Transform.translate(
                                 key: ValueKey(
